@@ -1,0 +1,27 @@
+<!DOCTYPE HTML>
+
+<html>
+	<head>
+		<title>Flask Template</title>
+    <style>
+      form {
+        margin: 0 auto;
+        max-width: 400px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      input {
+        font-size: 28px;
+        margin-top: 20px;
+      }
+    </style>
+	</head>
+	<body>
+		<form action="/user">
+			<input type="text" placeholder="username" name="username"></input>
+			<input type="submit" value="go to your page"></input>
+		</form>
+	</body>
+</html>

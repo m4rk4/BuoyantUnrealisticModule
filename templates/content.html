@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+	<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>{{ content.title }}</title>
+	</head>
+	<body style="max-width:800px;">
+    <h2><a href="{{ content.url }}">{{ content.title }}</a></h2>
+    <p>
+      {% if content.author %}
+        By {{ content.author.name }}
+      {% endif %}
+      {% if content.author and content._display_date %}
+        <br />
+      {% endif %}
+      {% if content._display_date %}
+        Published {{ content._display_date }}
+      {% endif %}
+    </p>
+    {{ content.content_html | safe }}
+    {% if content.tags %}
+      <div style="width:100%; text-align:center; border-bottom:1px solid #000; border-top:1px solid #000; line-height:0.1em; margin:10px 0 20px;">&nbsp;</div>
+      <p>Tags: 
+        {{', '.join(content.tags) | safe}}
+      </p>
+    {% endif %}
+	</body>
+</html>
