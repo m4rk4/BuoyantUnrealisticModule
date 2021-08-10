@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "repl_python3_BuoyantUnrealisticModule-1"
+version = "0.1.0"
+description = ""
+authors = ["m4rk4 <<>>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Flask = "^2.0.1"
+pytube = "^11.0.0"
+snscrape = "^0.3.4"
+bs4 = "^0.0.1"
+feedparser = "^6.0.8"
+pytz = "^2021.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

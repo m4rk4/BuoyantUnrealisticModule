@@ -1,0 +1,79 @@
+[2021-08-10T19:38:09] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-10T19:38:09] INFO [werkzeug._log:225]  * Running on http://172.18.0.124:8080/ (Press CTRL+C to quit)
+[2021-08-10T19:38:09] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:38:09] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:38:10] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:38:10] "GET /content?debug&url=https%3A%2F%2Fgizmodo.com%2Flucifers-season-6-trailer-promises-a-devilishly-wild-fi-1847458685 HTTP/1.1" 200 -
+[2021-08-10T19:38:10] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:38:10] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:38:11] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:38:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+[2021-08-10T19:38:29] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:38:29] "GET /content?debug&url=https%3A%2F%2Fgizmodo.com%2Flucifers-season-6-trailer-promises-a-devilishly-wild-fi-1847458685 HTTP/1.1" 200 -
+[2021-08-10T19:41:02] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-10T19:41:02] INFO [werkzeug._log:225]  * Running on http://172.18.0.107:8080/ (Press CTRL+C to quit)
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET /feed?url=https%3A%2F%2Fnow.core.api.espn.com%2Fv1%2Fsports%2Folympics%2Fnews&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:41:02] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:02] "GET / HTTP/1.1" 200 -
+[2021-08-10T19:41:05] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:05] "GET /feed?feedtype=gawker&url=https%3A%2F%2Fwww.gizmodo.com%2Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:41:36] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:41:36] "GET /feed?url=http%3A%2F%2Ffeeds.washingtonpost.com%2Frss%2Frss_powerpost&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:42:29] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:42:29] "GET /feed?url=https%3A%2F%2Fwww.stereogum.com%2Fwp-json%2Fwp%2Fv2%2Fposts%3Fcategories%3D1223332&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:43:45] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:43:45] "GET /feed?url=https%3A%2F%2Fwww.cleveland.com%2Fstaff%2Ftpluto%2Fposts.html&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:47:49] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:47:49] "GET /content?debug&url=https%3A%2F%2Fgizmodo.com%2Flucifers-season-6-trailer-promises-a-devilishly-wild-fi-1847458685 HTTP/1.1" 200 -
+[2021-08-10T19:50:18] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:50:18] "GET /feed?url=https%3A%2F%2Fwww.engadget.com%2Frss-full.xml&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:51:14] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:51:14] "GET /feed?url=https%3A%2F%2Fwww.cleveland.com%2Fstaff%2Fmcabot%2Fposts.html&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:54:43] ERROR [main.log_exception:1454] Exception on /feed [GET]
+Traceback (most recent call last):
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 2070, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1515, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1513, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1499, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "main.py", line 84, in feed
+    feed = module.get_feed(args, save_debug)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/medium.py", line 257, in get_feed
+    return rss.get_feed(args, save_debug, get_content)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/rss.py", line 127, in get_feed
+    item = func_get_content(it['url'], args, save_debug)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/medium.py", line 58, in get_content
+    item['_timestamp'] = dt_pub.timestamp()
+NameError: name 'dt_pub' is not defined
+[2021-08-10T19:54:43] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:54:43] "[35m[1mGET /feed?feedtype=medium&url=https%3A%2F%2Fdebugger.medium.com%2Ffeed&age=4 HTTP/1.1[0m" 500 -
+[2021-08-10T19:55:03] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:55:03] "GET /feed?url=https%3A%2F%2Fwww.theguardian.com%2Fus%2Ftechnology%2Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:55:21] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:55:21] "GET /feed?url=https%3A%2F%2Ftheathletic.com%2Fauthor%2Fjeff-gluck%2F%3Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:55:35] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:55:35] "GET /feed?url=https%3A%2F%2Ftwitter.com%2Fpearljam&max=10 HTTP/1.1" 200 -
+[2021-08-10T19:56:06] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:56:06] "GET /feed?feedtype=gawker&url=https%3A%2F%2Fwww.kotaku.com%2Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:56:22] WARNING [__main__.get_module:48] unknown feedhandler module for domain kill-the-newsletter.com
+[2021-08-10T19:56:24] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:56:24] "GET /feed?feedhandler=axios&url=https%3A%2F%2Fkill-the-newsletter.com%2Ffeeds%2Fnp0hqdor55cdgu4e.xml&age=4 HTTP/1.1" 200 -
+[2021-08-10T19:56:57] WARNING [feedhandlers.cne.iter_body:239] unhandled iframe https://embed.podcasts.apple.com/us/podcast/little-gold-men/id1042433465?itsct=podcast_box_player&itscg=30200&theme=auto in https://www.vanityfair.com/hollywood/2021/08/awards-insider-barry-jenkins-on-underground-railroad
+[2021-08-10T19:56:58] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 19:56:58] "GET /feed?url=https%3A%2F%2Fwww.vanityfair.com%2Fhollywood%2F&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:00:35] ERROR [main.log_exception:1454] Exception on /feed [GET]
+Traceback (most recent call last):
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 2070, in wsgi_app
+    response = self.full_dispatch_request()
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1515, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1513, in full_dispatch_request
+    rv = self.dispatch_request()
+  File "/opt/virtualenvs/python3/lib/python3.8/site-packages/flask/app.py", line 1499, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**req.view_args)
+  File "main.py", line 84, in feed
+    feed = module.get_feed(args, save_debug)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/cnn.py", line 521, in get_feed
+    item = get_content(feed_item['url'], args, save_debug)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/cnn.py", line 467, in get_content
+    item = get_item_info(article_json)
+  File "/home/runner/BuoyantUnrealisticModule/feedhandlers/cnn.py", line 181, in get_item_info
+    item['_timestamp'] = dt_pub.timestamp()
+NameError: name 'dt_pub' is not defined
+[2021-08-10T20:00:35] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:00:35] "[35m[1mGET /feed?url=http%3A%2F%2Frss.cnn.com%2Frss%2Fcnn_tech.rss&age=4 HTTP/1.1[0m" 500 -
+[2021-08-10T20:01:11] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:01:11] "GET /feed?url=https%3A%2F%2Fwww.rollingstone.com%2Fwp-json%2Fwp%2Fv2%2Fposts%3Fcategories%3D6&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:01:40] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:01:40] "GET /feed?url=https%3A%2F%2Ftheathletic.com%2Fauthor%2Fjason-lloyd%2F%3Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:04:00] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:04:00] "GET /feed?url=https%3A%2F%2Fwww.rollingstone.com%2Fwp-json%2Fwp%2Fv2%2Fposts%3Fcategories%3D7&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:04:26] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-10T20:04:26] INFO [werkzeug._log:225]  * Running on http://172.18.0.107:8080/ (Press CTRL+C to quit)
+[2021-08-10T20:04:27] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:04:27] "GET / HTTP/1.1" 200 -

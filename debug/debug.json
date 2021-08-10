@@ -1,0 +1,712 @@
+{
+    "meta": {
+        "error": null,
+        "warnings": []
+    },
+    "data": [
+        {
+            "id": 1847458685,
+            "permalinkRedirect": null,
+            "parentId": null,
+            "parentAuthorId": null,
+            "parentAuthorIds": [],
+            "starterId": 1847458685,
+            "publishTimeMillis": 1628620200685,
+            "lastUpdateTimeMillis": 1628620201931,
+            "timezone": "America/New_York",
+            "sharedUrl": null,
+            "salesAvatar": null,
+            "sponsored": false,
+            "adSettings": null,
+            "status": "PUBLISHED",
+            "authorId": "5876237249235068657",
+            "authorIds": [
+                "5876237249235068657"
+            ],
+            "allowReplies": true,
+            "showAuthorBio": true,
+            "byline": "",
+            "showByline": true,
+            "categorization": {
+                "channelId": "10",
+                "sectionId": "968"
+            },
+            "storyTypeId": null,
+            "categoryId": null,
+            "subcategoryId": null,
+            "properties": "{\"amazonPromoCode\":\"\",\"headTitleTag\":\"Lucifer Season 6 Trailer: Animated, Devilish Series Finale\",\"showCommerceDisclaimer\":false,\"socialHeadline\":\"Lucifer's Season 6 Trailer Promises a Devilishly Wild Finale\",\"amazonUrl\":\"\",\"socialDescription\":\"Lucifer\u2019s sixth and final season arrives in one month, and to mark the occasion Netflix has shared a truly over-the-top trailer teasing what\u2019s to come. We've got action, romance, jazz hands, choreographed dancing, and even some animation to look forward to.\",\"dropCapEnabled\":false,\"hasDisclaimerParagraph\":false,\"isEmbiggened\":true,\"amazonPrice\":\"\",\"hideSlidesNumber\":false,\"autoRepostDisabled\":false,\"impactHeader\":{}}",
+            "template": null,
+            "isFeatured": false,
+            "isVideo": false,
+            "isRoundup": false,
+            "relatedModule": null,
+            "defaultBlogId": 4,
+            "approved": true,
+            "headline": "<i>Lucifer</i>'s Season 6 Trailer Promises a Devilishly Wild Finale",
+            "headlineSfw": null,
+            "subhead": [
+                {
+                    "styles": [],
+                    "value": "The DC Comics adaptation returns for what looks to be an action-packed and suitably bonkers swan song on Netflix on September 10.",
+                    "type": "Text"
+                }
+            ],
+            "body": [
+                {
+                    "id": "49332a54d4052b37a842afa639ac546f",
+                    "format": "jpg",
+                    "width": 1129,
+                    "height": 625,
+                    "alignment": "Bleed",
+                    "caption": [
+                        {
+                            "styles": [],
+                            "value": "Chloe and Lucifer get animated, and they\u2019re just as shocked as we are!",
+                            "type": "Text"
+                        }
+                    ],
+                    "altText": "Chloe and Lucifer, characters from Netflix's Lucifer series, appear in an animated segment seen in the series' season six trailer looking very shocked.",
+                    "syndicationRights": true,
+                    "attribution": [
+                        {
+                            "label": "Screenshot",
+                            "credit": [
+                                {
+                                    "styles": [],
+                                    "value": "Netflix",
+                                    "type": "Text"
+                                }
+                            ],
+                            "source": []
+                        }
+                    ],
+                    "lightbox": true,
+                    "imageRights": "fair-use",
+                    "hideCredit": false,
+                    "type": "Image"
+                },
+                {
+                    "containers": [],
+                    "value": [
+                        {
+                            "reference": "https://gizmodo.com/lucifer-really-shouldnt-be-as-good-as-it-is-1795589827",
+                            "value": [
+                                {
+                                    "styles": [
+                                        "Italic"
+                                    ],
+                                    "value": "Lucifer",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [],
+                            "value": "\u2019s sixth and final season arrives ",
+                            "type": "Text"
+                        },
+                        {
+                            "reference": "https://gizmodo.com/sdcc-2021-lucifers-devilish-star-on-the-netflix-series-1847331879",
+                            "value": [
+                                {
+                                    "styles": [],
+                                    "value": "one month from today",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [],
+                            "value": ", and to mark the occasion Netflix has shared a truly over-the-top trailer teasing what\u2019s to come. ",
+                            "type": "Text"
+                        }
+                    ],
+                    "type": "Paragraph"
+                },
+                {
+                    "containers": [],
+                    "value": [
+                        {
+                            "reference": "https://gizmodo.com/catch-up-with-lucifer-ahead-of-the-devils-return-for-se-1844653956",
+                            "value": [
+                                {
+                                    "styles": [],
+                                    "value": "Season five",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [],
+                            "value": "\u2014which wrapped up in late May after airing in two parts across 2020 and 2021, ",
+                            "type": "Text"
+                        },
+                        {
+                            "reference": "https://gizmodo.com/lucifers-season-5-finale-was-mid-production-when-the-pa-1844737473",
+                            "value": [
+                                {
+                                    "styles": [],
+                                    "value": "thanks to covid-19 delay",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [],
+                            "value": "s\u2014ended on one of ",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [
+                                "Italic"
+                            ],
+                            "value": "Lucifer",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [],
+                            "value": "\u2019s by-now signature cliffhangers; to sum up a lot of celestial shenanigans, it sure looked like Lucifer Morningstar (Tom Ellis), aka the Actual Devil, had ascended to his father\u2019s throne to become... God? ",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [],
+                            "value": "Unsurprisingly, the trailer suggests that bizarre state of affairs will shape the show\u2019s final story arcs (\u201cHe\u2019s got quite a few mysteries to solve in season six,\u201d Ellis said of his character ",
+                            "type": "Text"
+                        },
+                        {
+                            "reference": "https://gizmodo.com/sdcc-2021-lucifers-devilish-star-on-the-netflix-series-1847331879",
+                            "value": [
+                                {
+                                    "styles": [],
+                                    "value": "at the ",
+                                    "type": "Text"
+                                },
+                                {
+                                    "styles": [
+                                        "Italic"
+                                    ],
+                                    "value": "Lucifer ",
+                                    "type": "Text"
+                                },
+                                {
+                                    "styles": [],
+                                    "value": "San Diego",
+                                    "type": "Text"
+                                },
+                                {
+                                    "styles": [
+                                        "Italic"
+                                    ],
+                                    "value": "\u00a0",
+                                    "type": "Text"
+                                },
+                                {
+                                    "styles": [],
+                                    "value": "Comic-Con panel",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [],
+                            "value": " last month). It also promises all manner of action, romance, and quirky curve balls (jazz hands, Colombian vacations, animation!) to help wrap things up as memorably as possible. Check it out!",
+                            "type": "Text"
+                        }
+                    ],
+                    "type": "Paragraph"
+                },
+                {
+                    "id": "ueMwVGBwqRo",
+                    "start": 0,
+                    "alignment": "Bleed",
+                    "thumbnail": {
+                        "id": "67b1e1f49f063f27d5ff178858910bf3",
+                        "format": "jpg"
+                    },
+                    "caption": [],
+                    "type": "YoutubeVideo"
+                },
+                {
+                    "containers": [],
+                    "value": [
+                        {
+                            "styles": [],
+                            "value": "Major takeaways: we\u2019ve got a new antagonist in the form of Rory (",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [
+                                "Italic"
+                            ],
+                            "value": "Deadpool",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [],
+                            "value": "\u2019s Brianna Hildebrand), a troublemaking angel with her eyes set on Lucifer\u2019s throne and her feet in some rather dramatic footwear; Maze (Lesley-Ann Brandt) kicking ass with a smile while romancing Eve (Inbar Levi); a shrieking Detective Dan (Kevin Alejandro) back walking the Earth after, uh, dying last season; and the unlikely sight of Chloe (Lauren German) attempting to fight her beloved Lucifer to the death? Also, there\u2019s definitely going to be plenty of partying, drinking, cop-bribing, and choreographed dancing this season\u2014plus, as Ella (Aimee Garcia) grimly reports, \u201cthe apocalypse is nigh.\u201d In other words, business as usual for this series.",
+                            "type": "Text"
+                        }
+                    ],
+                    "type": "Paragraph"
+                },
+                {
+                    "containers": [],
+                    "value": [
+                        {
+                            "styles": [
+                                "Italic"
+                            ],
+                            "value": "Lucifer",
+                            "type": "Text"
+                        },
+                        {
+                            "styles": [],
+                            "value": "\u2019s sixth and final season hits Netflix on September 10. What did you think of the trailer, and will you be tuning in to see how everything turns out?",
+                            "type": "Text"
+                        }
+                    ],
+                    "type": "Paragraph"
+                },
+                {
+                    "style": "Line",
+                    "containers": [],
+                    "type": "HorizontalRule"
+                },
+                {
+                    "containers": [],
+                    "value": [
+                        {
+                            "styles": [
+                                "Italic"
+                            ],
+                            "value": "Wondering where our RSS feed went? You can ",
+                            "type": "Text"
+                        },
+                        {
+                            "reference": "https://gizmodo.com/rss/regular/io9",
+                            "value": [
+                                {
+                                    "styles": [
+                                        "Italic"
+                                    ],
+                                    "value": "pick the new up one here",
+                                    "type": "Text"
+                                }
+                            ],
+                            "type": "Link"
+                        },
+                        {
+                            "styles": [
+                                "Italic"
+                            ],
+                            "value": ".",
+                            "type": "Text"
+                        }
+                    ],
+                    "type": "Paragraph"
+                }
+            ],
+            "tags": [
+                {
+                    "canonical": "lucifer",
+                    "urlName": "lucifer",
+                    "displayName": "Lucifer"
+                },
+                {
+                    "canonical": "inbarlevi",
+                    "urlName": "inbar-levi",
+                    "displayName": "Inbar Levi"
+                },
+                {
+                    "canonical": "laurengerman",
+                    "urlName": "lauren-german",
+                    "displayName": "Lauren German"
+                },
+                {
+                    "canonical": "briannahildebrand",
+                    "urlName": "brianna-hildebrand",
+                    "displayName": "Brianna Hildebrand"
+                },
+                {
+                    "canonical": "demons",
+                    "urlName": "demons",
+                    "displayName": "Demons"
+                },
+                {
+                    "canonical": "godinfiction",
+                    "urlName": "god-in-fiction",
+                    "displayName": "God in fiction"
+                },
+                {
+                    "canonical": "rory",
+                    "urlName": "rory",
+                    "displayName": "Rory"
+                },
+                {
+                    "canonical": "lesleyannbrandt",
+                    "urlName": "lesley-ann-brandt",
+                    "displayName": "Lesley-Ann Brandt"
+                },
+                {
+                    "canonical": "urbanfantasy",
+                    "urlName": "urban-fantasy",
+                    "displayName": "Urban fantasy"
+                },
+                {
+                    "canonical": "lucifermorningstar",
+                    "urlName": "lucifer-morningstar",
+                    "displayName": "Lucifer Morningstar"
+                },
+                {
+                    "canonical": "deadpool",
+                    "urlName": "deadpool",
+                    "displayName": "Deadpool"
+                },
+                {
+                    "canonical": "tomellis",
+                    "urlName": "tom-ellis",
+                    "displayName": "Tom Ellis"
+                },
+                {
+                    "canonical": "aimeegarcia",
+                    "urlName": "aimee-garcia",
+                    "displayName": "Aimee Garcia"
+                },
+                {
+                    "canonical": "fictionalcharacters",
+                    "urlName": "fictional-characters",
+                    "displayName": "Fictional characters"
+                },
+                {
+                    "canonical": "kevinalejandro",
+                    "urlName": "kevin-alejandro",
+                    "displayName": "Kevin Alejandro"
+                },
+                {
+                    "canonical": "netflix",
+                    "urlName": "netflix",
+                    "displayName": "Netflix"
+                },
+                {
+                    "canonical": "dccomicscharacters",
+                    "urlName": "dc-comics-characters",
+                    "displayName": "DC Comics characters"
+                }
+            ],
+            "refinitivTags": {
+                "topics": [],
+                "socialTags": [
+                    {
+                        "name": "Demons",
+                        "importance": "VeryCentric",
+                        "score": 1,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": []
+                        }
+                    },
+                    {
+                        "name": "DC Comics characters",
+                        "importance": "VeryCentric",
+                        "score": 1,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": []
+                        }
+                    },
+                    {
+                        "name": "Fictional characters",
+                        "importance": "VeryCentric",
+                        "score": 1,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": []
+                        }
+                    },
+                    {
+                        "name": "God in fiction",
+                        "importance": "SomewhatCentric",
+                        "score": 0.67,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": []
+                        }
+                    },
+                    {
+                        "name": "Lucifer",
+                        "importance": "SomewhatCentric",
+                        "score": 0.67,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [
+                                0
+                            ],
+                            "inBody": [
+                                0,
+                                0.16,
+                                0.21,
+                                0.37,
+                                0.57,
+                                0.74,
+                                0.88
+                            ]
+                        }
+                    },
+                    {
+                        "name": "Urban fantasy",
+                        "importance": "SomewhatCentric",
+                        "score": 0.67,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": []
+                        }
+                    },
+                    {
+                        "name": "Tom Ellis",
+                        "importance": "SomewhatCentric",
+                        "score": 0.67,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.22
+                            ]
+                        }
+                    }
+                ],
+                "entities": [
+                    {
+                        "_type": "Company",
+                        "name": "Netflix",
+                        "relevance": 0.8,
+                        "score": 0.8,
+                        "confidencelevel": 1,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.05,
+                                0.9
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Aimee Garcia",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.98,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.83
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Lesley-Ann Brandt",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.98,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.61
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Rory",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.925,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.53
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Kevin Alejandro",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.98,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.67
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Lauren German",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.99,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.72
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Brianna Hildebrand",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.973,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.54
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Deadpool",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.925,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.53
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Lucifer Morningstar",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.947,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.21
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Inbar Levi",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.95,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.64
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "Person",
+                        "name": "Tom Ellis",
+                        "relevance": 0.2,
+                        "score": 0.2,
+                        "confidencelevel": 0.997,
+                        "forenduserdisplay": true,
+                        "position": {
+                            "inHeadline": [],
+                            "inBody": [
+                                0.22
+                            ]
+                        }
+                    }
+                ]
+            },
+            "featuredMedia": null,
+            "mainMedia": {
+                "id": "49332a54d4052b37a842afa639ac546f",
+                "format": "jpg",
+                "width": 1129,
+                "height": 625,
+                "alignment": "Bleed",
+                "caption": [
+                    {
+                        "styles": [],
+                        "value": "Chloe and Lucifer get animated, and they\u2019re just as shocked as we are!",
+                        "type": "Text"
+                    }
+                ],
+                "altText": "Chloe and Lucifer, characters from Netflix's Lucifer series, appear in an animated segment seen in the series' season six trailer looking very shocked.",
+                "syndicationRights": true,
+                "attribution": [
+                    {
+                        "label": "Screenshot",
+                        "credit": [
+                            {
+                                "styles": [],
+                                "value": "Netflix",
+                                "type": "Text"
+                            }
+                        ],
+                        "source": []
+                    }
+                ],
+                "lightbox": true,
+                "imageRights": "fair-use",
+                "hideCredit": false,
+                "type": "Image"
+            },
+            "largeOnStream": true,
+            "relatedPosts": [],
+            "length": 1878,
+            "aboveHeadline": {
+                "src": "UNUSED",
+                "isAnimated": false,
+                "id": "49332a54d4052b37a842afa639ac546f",
+                "width": 800,
+                "height": 442,
+                "format": "jpg",
+                "frozenFormat": "jpg",
+                "type": "image"
+            },
+            "sharingMainImage": {
+                "src": "UNUSED",
+                "isAnimated": false,
+                "id": "49332a54d4052b37a842afa639ac546f",
+                "width": 800,
+                "height": 442,
+                "format": "jpg",
+                "frozenFormat": "jpg",
+                "type": "image"
+            },
+            "plaintext": "Lucifer\u2019s sixth and final season arrives one month from today, and to mark the occasion Netflix has shared a truly over-the-top trailer teasing what\u2019s to come. ",
+            "author": null,
+            "authors": [],
+            "parent": null,
+            "starter": null,
+            "permalink": "https://gizmodo.com/lucifers-season-6-trailer-promises-a-devilishly-wild-fi-1847458685",
+            "permalinkHost": "https://gizmodo.com",
+            "permalinkPath": "/lucifers-season-6-trailer-promises-a-devilishly-wild-fi-1847458685"
+        }
+    ]
+}

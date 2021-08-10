@@ -55,7 +55,7 @@ def get_content(url, args, save_debug=False):
 
   dt = datetime.fromtimestamp(post['firstPublishedAt']/1000).replace(tzinfo=timezone.utc)
   item['date_published'] = dt.isoformat()
-  item['_timestamp'] = dt_pub.timestamp()
+  item['_timestamp'] = dt.timestamp()
   item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
   dt = datetime.fromtimestamp(post['updatedAt']/1000).replace(tzinfo=timezone.utc)
   item['date_modified'] = dt.isoformat()
