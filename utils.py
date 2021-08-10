@@ -152,7 +152,6 @@ def closest_value(lst, target):
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i]) - target))]
 
 def closest_dict(lst, k, target):
-  print(lst)
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i][k]) - target))]
 
 def clean_url(url):
