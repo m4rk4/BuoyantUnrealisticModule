@@ -77,3 +77,14 @@ NameError: name 'dt_pub' is not defined
    WARNING: This is a development server. Do not use it in a production deployment.
 [2021-08-10T20:04:26] INFO [werkzeug._log:225]  * Running on http://172.18.0.107:8080/ (Press CTRL+C to quit)
 [2021-08-10T20:04:27] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:04:27] "GET / HTTP/1.1" 200 -
+[2021-08-10T20:11:57] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-10T20:11:57] INFO [werkzeug._log:225]  * Running on http://172.18.0.107:8080/ (Press CTRL+C to quit)
+[2021-08-10T20:11:58] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:11:58] "GET / HTTP/1.1" 200 -
+[2021-08-10T20:14:06] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:14:06] "GET /feed?url=https%3A%2F%2Fwww.ign.com%2Freviews&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:18:43] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:18:43] "GET /feed?feedtype=cne&url=https%3A%2F%2Fwww.pitchfork.com%2Ffeed%2Frss&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:24:05] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:24:05] "GET /feed?url=https%3A%2F%2Ffeeds.a.dj.com%2Frss%2FRSSWSJD.xml&age=4 HTTP/1.1" 200 -
+[2021-08-10T20:24:12] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-10T20:24:12] INFO [werkzeug._log:225]  * Running on http://172.18.0.107:8080/ (Press CTRL+C to quit)
+[2021-08-10T20:24:13] INFO [werkzeug._log:225] 172.18.0.1 - - [10/Aug/2021 20:24:13] "GET / HTTP/1.1" 200 -

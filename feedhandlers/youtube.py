@@ -73,9 +73,8 @@ def get_content(url, args, save_debug=False):
   if yt_json['videoDetails'].get('keywords'):
     item['tags'] = yt_json['videoDetails']['keywords'].copy()
 
-  image = utils.closest_dict(yt_json['videoDetails']['thumbnail']['thumbnails'], 'width', 640)
+  image = utils.closest_dict(yt_json['videoDetails']['thumbnail']['thumbnails'], 'height', 1080)
   item['_image'] = image['url']
-  #item['_image'] = 'https://i.ytimg.com/vi/{}/hqdefault.jpg'.format(yt_id)
 
   item['summary'] = yt_json['videoDetails']['shortDescription']
 
@@ -86,7 +85,7 @@ def get_content(url, args, save_debug=False):
       utils.write_file(yt_json['streamingData'], './debug/video.json')
 
     streams = {}
-    streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'width', 640)
+    streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', 480)
     streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
 
     stream_url = ''
