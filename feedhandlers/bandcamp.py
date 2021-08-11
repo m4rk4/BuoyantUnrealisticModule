@@ -67,7 +67,7 @@ def get_content(url, args, save_debug=False):
               if 'mp3' in prop['name']:
                 item['_audio'] = prop['value']
                 break
-          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/redirect?&url=' + quote_plus(audio_json['@id'])
+          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['@id'])
           item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(audio_json['image'], audio_json['@id'], audio_json['name'])
           if audio_json.get('inAlbum'):
             item['content_html'] += 'from <a href="{}">{}</a><br />'.format(audio_json['inAlbum']['@id'], audio_json['inAlbum']['name'])
@@ -77,7 +77,7 @@ def get_content(url, args, save_debug=False):
         elif audio_json['@type'] == 'MusicAlbum':
           item['content_html'] = '<center><table style="width:480px;"><tr><td colspan="2"><img width="100%" src="{}"></td></tr>'.format(audio_json['image'])
           for i, track in enumerate(audio_json['track']['itemListElement']):
-            redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/redirect?&url=' + quote_plus(track['item']['@id'])
+            redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(track['item']['@id'])
             audio_src = ''
             if track['item'].get('additionalProperty'):
               for prop in track['item']['additionalProperty']:
