@@ -1,144 +1,90 @@
 {
-  "in_reply_to_screen_name": "flcnhvy",
-  "in_reply_to_status_id_str": "1264222947499282432",
-  "in_reply_to_user_id_str": "1060180551544528897",
   "lang": "en",
-  "favorite_count": 9482,
-  "created_at": "2020-05-23T18:29:12.000Z",
+  "favorite_count": 524,
+  "created_at": "2021-08-11T07:42:01.000Z",
   "display_text_range": [
-    18,
-    179
+    0,
+    265
   ],
   "entities": {
-    "hashtags": [],
-    "urls": [],
-    "user_mentions": [
+    "hashtags": [
       {
-        "id_str": "1060180551544528897",
         "indices": [
-          0,
-          8
+          247,
+          257
         ],
-        "name": "Viv \u2736",
-        "screen_name": "flcnhvy"
-      },
-      {
-        "id_str": "35859588",
-        "indices": [
-          9,
-          17
-        ],
-        "name": "Jay Leno",
-        "screen_name": "jayleno"
+        "text": "OnThisDay"
       }
     ],
-    "symbols": []
+    "urls": [],
+    "user_mentions": [],
+    "symbols": [],
+    "media": [
+      {
+        "display_url": "pic.twitter.com/TMV8vCI6yd",
+        "expanded_url": "https://twitter.com/TheBishF1/status/1425361847616737281/photo/1",
+        "indices": [
+          266,
+          289
+        ],
+        "url": "https://t.co/TMV8vCI6yd"
+      }
+    ]
   },
-  "id_str": "1264262116954927104",
-  "text": "@flcnhvy @jayleno Reviewed design with Franz last night. Even 3% smaller is too small. Will be pretty much this size. We\u2019ll probably do a smaller, tight world truck at some point.",
+  "id_str": "1425361847616737281",
+  "text": "Tazio Nuvolari won almost 200 races during his long career. When asked if racing frightened him, he replied: \u201cTell me, do you think you\u2019ll die in your bed? You do? Then where do you find the courage to get into it every night?\u201d He died in his bed #OnThisDay in \u201953. https://t.co/TMV8vCI6yd",
   "user": {
-    "id_str": "44196397",
-    "name": "Elon Musk",
-    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1423663740344406029/l_-QOIHY_normal.jpg",
-    "screen_name": "elonmusk",
+    "id_str": "434239640",
+    "name": "Matt Bishop \ud83c\udff3\ufe0f\u200d\ud83c\udf08",
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1297945780205101060/MbIl76mf_normal.jpg",
+    "screen_name": "TheBishF1",
     "verified": true
   },
-  "conversation_count": 709,
-  "news_action_type": "conversation",
-  "parent": {
-    "lang": "en",
-    "place": {
-      "full_name": "D\u00fcsseldorf, Germany",
-      "id": "b7d3c12268abd20e"
-    },
-    "reply_count": 270,
-    "retweet_count": 1635,
-    "favorite_count": 14644,
-    "created_at": "2020-05-23T15:53:33.000Z",
-    "display_text_range": [
-      0,
-      254
-    ],
-    "entities": {
-      "hashtags": [],
-      "urls": [],
-      "user_mentions": [
-        {
-          "id_str": "35859588",
-          "indices": [
-            1,
-            9
-          ],
-          "name": "Jay Leno",
-          "screen_name": "jayleno"
-        },
-        {
-          "id_str": "44196397",
-          "indices": [
-            69,
-            78
-          ],
-          "name": "Elon Musk",
-          "screen_name": "elonmusk"
-        }
-      ],
-      "symbols": [],
-      "media": [
-        {
-          "display_url": "pic.twitter.com/DSVqIortl0",
-          "expanded_url": "https://twitter.com/flcnhvy/status/1264222947499282432/video/1",
-          "indices": [
-            255,
-            278
-          ],
-          "url": "https://t.co/DSVqIortl0"
-        }
-      ]
-    },
-    "id_str": "1264222947499282432",
-    "text": ".@jayleno: \u201cWhy\u2019s it important [for Cybertruck] to be bulletproof?\u201d\n\n@elonmusk: \u201cBecause it\u2019s badass &amp; super cool! I mean, do you want your truck to be bulletproof or not? Of course you do! ... We want to be a leader in apocalypse technology\u201d\n\n\u2694\ufe0f\u2694\ufe0f\u2694\ufe0f https://t.co/DSVqIortl0",
-    "user": {
-      "id_str": "1060180551544528897",
-      "name": "Viv \u2736",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1424428035349041153/OysEm0WI_normal.jpg",
-      "screen_name": "flcnhvy",
-      "verified": false
-    },
-    "photos": [],
-    "video": {
-      "aspectRatio": [
-        16,
-        9
-      ],
-      "contentType": "media_entity",
-      "durationMs": 138320,
-      "mediaAvailability": {
-        "status": "available"
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
       },
-      "poster": "https://pbs.twimg.com/ext_tw_video_thumb/1264222815672315905/pu/img/kUyO97tg9UnrQcK3.jpg",
-      "variants": [
+      "cropCandidates": [
         {
-          "type": "video/mp4",
-          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/640x360/LXKzpG9Wg4V1K63Y.mp4?tag=10"
+          "x": 92,
+          "y": 0,
+          "w": 848,
+          "h": 475
         },
         {
-          "type": "application/x-mpegURL",
-          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/pl/1WBuoqn-2U-D4Son.m3u8?tag=10"
+          "x": 279,
+          "y": 0,
+          "w": 475,
+          "h": 475
         },
         {
-          "type": "video/mp4",
-          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/1280x720/nNdzLFbZeHMdUOSh.mp4?tag=10"
+          "x": 308,
+          "y": 0,
+          "w": 417,
+          "h": 475
         },
         {
-          "type": "video/mp4",
-          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/480x270/Xd8f-A0bVQSaDGkk.mp4?tag=10"
+          "x": 397,
+          "y": 0,
+          "w": 238,
+          "h": 475
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "w": 1218,
+          "h": 475
         }
       ],
-      "videoId": {
-        "type": "tweet",
-        "id": "1264222947499282432"
-      },
-      "viewCount": 576038
+      "expandedUrl": "https://twitter.com/TheBishF1/status/1425361847616737281/photo/1",
+      "url": "https://pbs.twimg.com/media/E8fnC4MXEAAl6WO.jpg",
+      "width": 1218,
+      "height": 475
     }
-  }
+  ],
+  "conversation_count": 17,
+  "news_action_type": "conversation"
 }
