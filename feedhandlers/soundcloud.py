@@ -93,7 +93,7 @@ def get_content(url, args, save_debug):
 
     item['_image'] = audio_json['artwork_url']
 
-    redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/redirect?&url=' + quote_plus(audio_json['permalink_url'])
+    redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['permalink_url'])
 
     if audio_json.get('tracks'):
       item['content_html'] = '<center><table style="width:480px;"><tr><td colspan="2"><img width="100%" src="{}"></td></tr>'.format(audio_json['artwork_url'])
@@ -102,7 +102,7 @@ def get_content(url, args, save_debug):
           # Skip - this is likely a 30 sec sample
           item['content_html'] += '<tr><td colspan="2" style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td>'.format(i+1, track['permalink_url'], track['title'])
         else:          
-          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/redirect?&url=' + quote_plus(track['permalink_url'])
+          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(track['permalink_url'])
           item['content_html'] += '<tr><td style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td><audio controls><source src="{3}" type="audio/mpeg"><a href="{3}">Play track</a></audio></td></tr>'.format(i+1, track['permalink_url'], track['title'], redirect_url)
       item['content_html'] += '</table></center>'
 

@@ -32,11 +32,6 @@ def get_content_review(url, args, save_debug=False):
   dt = datetime.fromisoformat(result_json['modifiedAt'].replace('Z', '+00:00'))
   item['date_modified'] = dt.isoformat()
 
-  # Check age
-  if 'age' in args:
-    if not utils.check_age(item, args):
-      return None
-
   authors = []
   for author in result_json['authors']:
     authors.append(author['name'])
