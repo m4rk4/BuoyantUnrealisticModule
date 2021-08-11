@@ -1,8 +1,7 @@
-import json, math, os, pytz, re
-from urllib.parse import urlsplit
+import json, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
-from urllib.parse import urlsplit
+from datetime import datetime
+from urllib.parse import unquote_plus
 
 from feedhandlers import rss, twitter
 import utils
@@ -10,10 +9,16 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
+def get_full_image(img_src):
+  m = re.search(r'(https:\/\/s\.yimg\.com\/os\/creatr-uploaded-images\/[^\.]+)', img_src)
+  if m:
+    return m.group(1)
+  m = re.search(r'image_uri=([^&]+)', img_src)
+  if m:
+    return unquote_plus(m.group(1))
+  return img_src
+
 def get_content(url, args, save_debug=False):
-  item = {}
-  item['id'] = url
-  item['url'] = url
 
   # Some content is blocked without this header
   article_html = utils.get_url_html(url, 'desktop', {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"})
@@ -31,6 +36,15 @@ def get_content(url, args, save_debug=False):
 
   if ld_json.get('itemReviewed'):
     ld_json = ld_json['itemReviewed']['review']
+
+  item = {}
+  el = soup.find('meta', attrs={"name": "post_id"})
+  if el and el.get('content'):
+    item['id'] = el['content']
+  else:
+    item['id'] = url
+
+  item['url'] = url
 
   if ld_json.get('headline'):
     item['title'] = ld_json['headline']
@@ -69,7 +83,7 @@ def get_content(url, args, save_debug=False):
   for tag in ld_json['keywords'].split(','):
     item['tags'].append(tag)
   
-  item['image'] = ld_json['thumbnailUrl']
+  item['_image'] = get_full_image(ld_json['thumbnailUrl'])
 
   if ld_json.get('articleBody'):
     item['summary'] = ld_json['articleBody']
@@ -77,7 +91,7 @@ def get_content(url, args, save_debug=False):
     item['summary'] = ld_json['reviewBody']
 
   # Parse the main story contents
-  article = soup.find('section', attrs={"data-component": "ArticleContainer"})
+  #article = soup.find('section', attrs={"data-component": "ArticleContainer"})
 
   content_html = ''
   for article_text in soup.find_all(class_='article-text'):
@@ -101,8 +115,8 @@ def get_content(url, args, save_debug=False):
             caption = ''
             cap = el.find(class_=re.compile(r'C\(engadgetFont(Black|Gray)\)'))
             if cap:
-              caption = cap.get_text()
-            article_text.insert(0, BeautifulSoup(utils.add_image(img['src'], caption), 'html.parser'))
+              caption = cap.get_text().strip()
+            article_text.insert(0, BeautifulSoup(utils.add_image(get_full_image(img['src']), caption), 'html.parser'))
             break
 
     for el in article_text.find_all(class_='article-slideshow'):
@@ -120,46 +134,61 @@ def get_content(url, args, save_debug=False):
             logger.warning('unknown img src in ' + str(img))
           images.append(img_src)
 
-          caption = ''
+          caption = []
           el_cap = fig.find('figcaption')
           if el_cap:
-            caption += el_cap.get_text()
+            cap = el_cap.get_text().strip()
+            if cap:
+              caption.append(cap)
           el_cap = fig.find(class_='photo-credit')
           if el_cap:
-            if caption:
-              caption += '<br />'
-            caption += el_cap.get_text()
-          captions.append(caption)
+            cap = el_cap.get_text().strip()
+            if cap:
+              caption.append(cap)
+          captions.append(' | '.join(caption))
     
       for n in reversed(range(len(images))):
         caption = '[{}/{}] {}'.format(n+1, len(images), captions[n])
-        el.insert_after(BeautifulSoup(utils.add_image(images[n], caption), 'html.parser'))
-      
+        img_src = get_full_image(images[n])
+        el.insert_after(BeautifulSoup(utils.add_image(img_src, caption), 'html.parser'))
+
       el.decompose()
 
     for el in article_text.find_all('figure'):
-      img = el.find('img')
-      if img:
-        img_src = ''
-        if img.has_attr('src'):
-          img_src = img.get('src')
-        elif img.has_attr('data-wf-src'):
-          img_src = img.get('data-wf-src')
-        else:
-          logger.warning('unknown img src in ' + str(img))
+      if el.has_attr('class') and 'iframe-container' in el['class']:
+        it = el.find('iframe')
+        if it and 'youtube.com' in it['src']:
+          if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
+            el = el.parent
+          el.insert_after(BeautifulSoup(utils.add_video(it['src'], 'youtube'), 'html.parser'))
+          el.decompose()
+      else:
+        img = el.find('img')
+        if img:
+          img_src = ''
+          if img.has_attr('src'):
+            img_src = img.get('src')
+          elif img.has_attr('data-wf-src'):
+            img_src = img.get('data-wf-src')
+          else:
+            logger.warning('unknown img src in ' + str(img))
 
-        caption = ''
-        el_cap = el.find('figcaption')
-        if el_cap:
-          caption += el_cap.get_text()
-        el_cap = el.find(class_='photo-credit')
-        if el_cap:
-          if caption:
-            caption += '<br />'
-          caption += el_cap.get_text()
+          caption = []
+          el_cap = el.find('figcaption')
+          if el_cap:
+            cap = el_cap.get_text().strip()
+            if cap:
+              caption.append(cap)
+          el_cap = el.find(class_='photo-credit')
+          if el_cap:
+            cap = el_cap.get_text().strip()
+            if cap:
+              caption.append(cap)
+          print(caption)
 
-        el.insert_after(BeautifulSoup(utils.add_image(img_src, caption), 'html.parser'))
-      el.decompose()
+          img_src = get_full_image(img_src)
+          el.insert_after(BeautifulSoup(utils.add_image(img_src, ' | '.join(caption)), 'html.parser'))
+          el.decompose()
 
     for el in article_text.find_all('span', id='end-legacy-contents'):
       el.decompose()
@@ -186,43 +215,41 @@ def get_content(url, args, save_debug=False):
 
     for el in article_text.find_all('div', id=re.compile(r'[0-9a-f]{32}')):
       it = el.find('iframe')
-      if it:
-        m = re.search('https:\/\/www\.youtube\.com\/embed\/([a-zA-Z0-9_-]{11})', it['src'])
-        if m:
-          el.insert_after(BeautifulSoup(utils.add_video('https://www.youtube-nocookie.com/embed/' + m.group(1), 'youtube'), 'html.parser'))
-          el.decompose()
+      if it and 'youtube.com' in it['src']:
+        el.insert_after(BeautifulSoup(utils.add_video(it['src'], 'youtube'), 'html.parser'))
+        el.decompose()
 
     for el in article_text.find_all('iframe'):
-      if el.get('style'):
-        del el['style']
-      if el.get('src'):
-        if 'youtube' in el['src']:
-          el['width'] = '640'
-          el['height'] = '360'
+      if el.has_attr('src') and 'youtube.com' in el['src']:
+        el.insert_after(BeautifulSoup(utils.add_video(el['src'], 'youtube'), 'html.parser'))
+        el.decompose()
       else:
-        logger.warning('iframe with no scr in ' + url)
-        if el.parent['class'] == 'iframe-container':
-          el.parent.decompose()
-        else:
-          el.decompose()
+        logger.warning('unhandled iframe in ' + url)
 
-    for el in article_text.find_all('blockquote', class_='twitter-tweet'):
-      tweet_url = ''
-      for a in el.find_all('a'):
-        tweet_url = a['href']
-      if tweet_url:
-        tweet = twitter.get_content(tweet_url, None)
-        if tweet:
-          el.insert_after(BeautifulSoup(tweet['content_html'], 'html.parser'))
+    for el in article_text.find_all('blockquote'):
+      if el.has_attr('class'):
+        if 'twitter-tweet' in el['class']:
+          tweet_url = ''
+          for a in el.find_all('a'):
+            tweet_url = a['href']
+          if tweet_url:
+            tweet = twitter.get_content(tweet_url, None)
+            if tweet:
+              el.insert_after(BeautifulSoup(tweet['content_html'], 'html.parser'))
+              el.decompose()
+        else:
+          logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
+      else:
+        if el.p:
+          quote = str(el.p)
+          el.insert_after(BeautifulSoup(utils.add_pullquote(quote[3:-4]), 'html.parser'))
           el.decompose()
+        else:
+          logger.warning('unhandled blockquote in ' + url)
 
     content_html += str(article_text)
 
   item['content_html'] = content_html
-  if item.get('image'):
-    if re.search(r'<img\s|<figure\b', content_html):
-      item['_image'] = item['image']
-      del item['image']
   return item
 
 def get_feed(args, save_debug=False):
