@@ -1,229 +1,144 @@
 {
-  "in_reply_to_screen_name": "shadowpiper",
-  "in_reply_to_status_id_str": "1423784098045120514",
-  "in_reply_to_user_id_str": "45026813",
+  "in_reply_to_screen_name": "flcnhvy",
+  "in_reply_to_status_id_str": "1264222947499282432",
+  "in_reply_to_user_id_str": "1060180551544528897",
   "lang": "en",
-  "favorite_count": 793,
-  "created_at": "2021-08-06T23:12:37.000Z",
+  "favorite_count": 9482,
+  "created_at": "2020-05-23T18:29:12.000Z",
   "display_text_range": [
-    0,
-    247
+    18,
+    179
   ],
   "entities": {
-    "hashtags": [
+    "hashtags": [],
+    "urls": [],
+    "user_mentions": [
       {
+        "id_str": "1060180551544528897",
         "indices": [
-          233,
-          243
+          0,
+          8
         ],
-        "text": "powerdown"
+        "name": "Viv \u2736",
+        "screen_name": "flcnhvy"
+      },
+      {
+        "id_str": "35859588",
+        "indices": [
+          9,
+          17
+        ],
+        "name": "Jay Leno",
+        "screen_name": "jayleno"
       }
     ],
-    "urls": [],
-    "user_mentions": [],
-    "symbols": [],
-    "media": [
-      {
-        "display_url": "pic.twitter.com/0oKexuTUXC",
-        "expanded_url": "https://twitter.com/shadowpiper/status/1423784104621862916/photo/1",
-        "indices": [
-          248,
-          271
-        ],
-        "url": "https://t.co/0oKexuTUXC"
-      }
-    ]
+    "symbols": []
   },
-  "id_str": "1423784104621862916",
-  "text": "While early talks with Devs/Publishers was favorable, ultimately time + big shifts in our business saw conversations around Project Nomad peter out.\n\nThese things totally happen! The industry is built on 'what could have beens.'  \u26a1\ufe0f #powerdown 5/6 https://t.co/0oKexuTUXC",
+  "id_str": "1264262116954927104",
+  "text": "@flcnhvy @jayleno Reviewed design with Franz last night. Even 3% smaller is too small. Will be pretty much this size. We\u2019ll probably do a smaller, tight world truck at some point.",
   "user": {
-    "id_str": "45026813",
-    "name": "Jason Bischoff",
-    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1343822592562483202/hshfEa6u_normal.jpg",
-    "screen_name": "shadowpiper",
-    "verified": false
+    "id_str": "44196397",
+    "name": "Elon Musk",
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1423663740344406029/l_-QOIHY_normal.jpg",
+    "screen_name": "elonmusk",
+    "verified": true
   },
-  "photos": [
-    {
-      "backgroundColor": {
-        "red": 204,
-        "green": 214,
-        "blue": 221
-      },
-      "cropCandidates": [
-        {
-          "x": 0,
-          "y": 0,
-          "w": 1648,
-          "h": 923
-        },
-        {
-          "x": 0,
-          "y": 0,
-          "w": 1648,
-          "h": 1648
-        },
-        {
-          "x": 0,
-          "y": 0,
-          "w": 1648,
-          "h": 1879
-        },
-        {
-          "x": 0,
-          "y": 0,
-          "w": 942,
-          "h": 1884
-        },
-        {
-          "x": 0,
-          "y": 0,
-          "w": 1648,
-          "h": 1884
-        }
-      ],
-      "expandedUrl": "https://twitter.com/shadowpiper/status/1423784104621862916/photo/1",
-      "url": "https://pbs.twimg.com/media/E8JKr8AVcAAp-WB.jpg",
-      "width": 1648,
-      "height": 1884
-    },
-    {
-      "backgroundColor": {
-        "red": 204,
-        "green": 214,
-        "blue": 221
-      },
-      "cropCandidates": [
-        {
-          "x": 0,
-          "y": 0,
-          "w": 3136,
-          "h": 1756
-        },
-        {
-          "x": 704,
-          "y": 0,
-          "w": 1884,
-          "h": 1884
-        },
-        {
-          "x": 820,
-          "y": 0,
-          "w": 1653,
-          "h": 1884
-        },
-        {
-          "x": 1175,
-          "y": 0,
-          "w": 942,
-          "h": 1884
-        },
-        {
-          "x": 0,
-          "y": 0,
-          "w": 3136,
-          "h": 1884
-        }
-      ],
-      "expandedUrl": "https://twitter.com/shadowpiper/status/1423784104621862916/photo/1",
-      "url": "https://pbs.twimg.com/media/E8JKr8yVIAAAhja.jpg",
-      "width": 3136,
-      "height": 1884
-    }
-  ],
-  "conversation_count": 6,
+  "conversation_count": 709,
   "news_action_type": "conversation",
   "parent": {
-    "in_reply_to_screen_name": "shadowpiper",
-    "in_reply_to_status_id_str": "1423784096833015812",
-    "in_reply_to_user_id_str": "45026813",
     "lang": "en",
-    "reply_count": 20,
-    "retweet_count": 148,
-    "favorite_count": 887,
-    "created_at": "2021-08-06T23:12:36.000Z",
+    "place": {
+      "full_name": "D\u00fcsseldorf, Germany",
+      "id": "b7d3c12268abd20e"
+    },
+    "reply_count": 270,
+    "retweet_count": 1635,
+    "favorite_count": 14644,
+    "created_at": "2020-05-23T15:53:33.000Z",
     "display_text_range": [
       0,
-      279
+      254
     ],
     "entities": {
-      "hashtags": [
+      "hashtags": [],
+      "urls": [],
+      "user_mentions": [
         {
+          "id_str": "35859588",
           "indices": [
-            265,
-            275
+            1,
+            9
           ],
-          "text": "powerdown"
+          "name": "Jay Leno",
+          "screen_name": "jayleno"
+        },
+        {
+          "id_str": "44196397",
+          "indices": [
+            69,
+            78
+          ],
+          "name": "Elon Musk",
+          "screen_name": "elonmusk"
         }
       ],
-      "urls": [],
-      "user_mentions": [],
       "symbols": [],
       "media": [
         {
-          "display_url": "pic.twitter.com/LuuvWyAiPQ",
-          "expanded_url": "https://twitter.com/shadowpiper/status/1423784098045120514/photo/1",
+          "display_url": "pic.twitter.com/DSVqIortl0",
+          "expanded_url": "https://twitter.com/flcnhvy/status/1264222947499282432/video/1",
           "indices": [
-            280,
-            303
+            255,
+            278
           ],
-          "url": "https://t.co/LuuvWyAiPQ"
+          "url": "https://t.co/DSVqIortl0"
         }
       ]
     },
-    "id_str": "1423784098045120514",
-    "text": "Calling on old friends, we built the pitch we wanted to see. While these looks were never intended to be final, I think it's safe to say we were onto something compelling!  \n\nShout-outs to Lineage, Carlos Dattoli, Jarold Sng and the many others who contributed!\n\u26a1\ufe0f #powerdown 4/6 https://t.co/LuuvWyAiPQ",
+    "id_str": "1264222947499282432",
+    "text": ".@jayleno: \u201cWhy\u2019s it important [for Cybertruck] to be bulletproof?\u201d\n\n@elonmusk: \u201cBecause it\u2019s badass &amp; super cool! I mean, do you want your truck to be bulletproof or not? Of course you do! ... We want to be a leader in apocalypse technology\u201d\n\n\u2694\ufe0f\u2694\ufe0f\u2694\ufe0f https://t.co/DSVqIortl0",
     "user": {
-      "id_str": "45026813",
-      "name": "Jason Bischoff",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1343822592562483202/hshfEa6u_normal.jpg",
-      "screen_name": "shadowpiper",
+      "id_str": "1060180551544528897",
+      "name": "Viv \u2736",
+      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1424428035349041153/OysEm0WI_normal.jpg",
+      "screen_name": "flcnhvy",
       "verified": false
     },
-    "photos": [
-      {
-        "backgroundColor": {
-          "red": 204,
-          "green": 214,
-          "blue": 221
+    "photos": [],
+    "video": {
+      "aspectRatio": [
+        16,
+        9
+      ],
+      "contentType": "media_entity",
+      "durationMs": 138320,
+      "mediaAvailability": {
+        "status": "available"
+      },
+      "poster": "https://pbs.twimg.com/ext_tw_video_thumb/1264222815672315905/pu/img/kUyO97tg9UnrQcK3.jpg",
+      "variants": [
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/640x360/LXKzpG9Wg4V1K63Y.mp4?tag=10"
         },
-        "cropCandidates": [
-          {
-            "x": 914,
-            "y": 0,
-            "w": 2268,
-            "h": 1270
-          },
-          {
-            "x": 1413,
-            "y": 0,
-            "w": 1270,
-            "h": 1270
-          },
-          {
-            "x": 1491,
-            "y": 0,
-            "w": 1114,
-            "h": 1270
-          },
-          {
-            "x": 1731,
-            "y": 0,
-            "w": 635,
-            "h": 1270
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "w": 4096,
-            "h": 1270
-          }
-        ],
-        "expandedUrl": "https://twitter.com/shadowpiper/status/1423784098045120514/photo/1",
-        "url": "https://pbs.twimg.com/media/E8JJfT7VUAYivvf.jpg",
-        "width": 4096,
-        "height": 1270
-      }
-    ]
+        {
+          "type": "application/x-mpegURL",
+          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/pl/1WBuoqn-2U-D4Son.m3u8?tag=10"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/1280x720/nNdzLFbZeHMdUOSh.mp4?tag=10"
+        },
+        {
+          "type": "video/mp4",
+          "src": "https://video.twimg.com/ext_tw_video/1264222815672315905/pu/vid/480x270/Xd8f-A0bVQSaDGkk.mp4?tag=10"
+        }
+      ],
+      "videoId": {
+        "type": "tweet",
+        "id": "1264222947499282432"
+      },
+      "viewCount": 576038
+    }
   }
 }

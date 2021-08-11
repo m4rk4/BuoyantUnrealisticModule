@@ -178,7 +178,7 @@ def get_item_info(article_json, save_debug=False):
 
   dt = datetime.fromisoformat(article_json['firstPublishDate'].replace('Z', '+00:00'))
   item['date_published'] = dt.isoformat()
-  item['_timestamp'] = dt_pub.timestamp()
+  item['_timestamp'] = dt.timestamp()
   item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
   dt = datetime.fromisoformat(article_json['lastPublishDate'].replace('Z', '+00:00'))
   item['date_modified'] = dt.isoformat()
