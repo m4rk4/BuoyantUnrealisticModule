@@ -105,27 +105,6 @@ def content():
       return render_template('content.html', content=content)
   return 'Something went wrong :(' 
 
-@app.route('/redirect', methods=['GET'])
-def av_redirect():
-  args = request.args
-  if 'debug' in args:
-    save_debug = True
-  else:
-    save_debug = False
-
-  module = get_module(args)
-  if module:
-    content = module.get_content(args['url'], args, save_debug)
-    if 'video' in args:
-      return redirect(content['_video'])
-    elif 'audio' in args:
-      return redirect(content['_audio'])
-    elif content.get('_video'):
-      return redirect(content['_video'])
-    elif content.get('_audio'):
-      return redirect(content['_audio'])
-  return 'No audio or video sources found for <a href="{0}">{0}</a>'.format(args['url'])
-
 @app.route('/audio', methods=['GET'])
 def audio():
   args = request.args
@@ -148,6 +127,50 @@ def audio():
 
   return redirect(content['_audio'])
 
+@app.route('/video', methods=['GET'])
+def video():
+  args = request.args
+
+  if not args.get('url'):
+    return 'No url specified'
+
+  if 'debug' in args:
+    save_debug = True
+  else:
+    save_debug = False
+
+  module = get_module(args)
+  if not module:
+    return 'No content module for this url'
+
+  content = module.get_content(args['url'], args, save_debug)
+  if not content.get('_video'):
+    return 'No audio sources found for this url'
+
+  return redirect(content['_video'])
+
+@app.route('/videojs')
+def videojs():
+  args = request.args
+  video_args = args.copy()
+  if not video_args.get('src'):
+    return 'No video src specified'
+
+  if not video_args.get('poster'):
+    video_args['poster'] = '/static/video_poster-640x360.webp'
+
+  if not video_args.get('type'):
+    if '.mp4' in video_args['src'].lower():
+      video_args['type'] = 'video/mp4'
+    elif '.webm' in video_args['src'].lower():
+      video_args['type'] = 'video/webm'
+    elif '.m3u8' in video_args['src'].lower():
+      video_args['type'] = 'application/x-mpegURL'
+    else:
+      video_args['type'] = 'video/mp4'
+
+  return render_template('videojs.html', args=video_args)
+
 @app.route('/debug')
 def debug():
   args = request.args
@@ -168,65 +191,6 @@ def debug():
   with open('./debug/' + log_file, 'r') as f:
     log = f.read()
   return render_template('debug.html', title=log_file, content=log)
-
-@app.route('/video')
-def video():
-  args = request.args
-  if 'debug' in args:
-    save_debug = True
-  else:
-    save_debug = False
-
-  video_args = {}
-  if 'src' in args:
-    video_args['src'] = args['src']
-  elif 'url' in args:
-    video_args['src'] = args['src']
-  else:
-    return 'No video src/url found'
-
-  if 'poster' in args:
-    video_args['poster'] = args['poster']
-  else:
-    video_args['poster'] = '/static/video_poster-640x360.webp'
-
-  if 'video_type' in args:
-    video_args['video_type'] = args['video_type']
-  else:
-    video_args['video_type'] = 'none'
-
-  if video_args['video_type'] == 'video/mp4' or '.mp4' in video_args['src'].lower():
-    video_args['video_type'] = 'video/mp4'
-    return render_template('video.html', args=video_args)
-
-  elif video_args['video_type'] == 'video/webm' or '.webm' in video_args['src'].lower():
-    video_args['video_type'] = 'video/webm'
-    return render_template('video.html', args=video_args)
-
-  elif video_args['video_type'] == 'application/x-mpegURL' or '.m3u8' in video_args['src'].lower():
-    video_args['video_type'] = 'application/x-mpegURL'
-    return render_template('videojs.html', args=video_args)
-
-  elif 'vimeo.com' in video_args['src'].lower():
-    content = vimeo.get_content(video_args['src'], None, save_debug)
-    if content:
-      video_args['src'] = content['_video']
-      video_args['poster'] = content['_image']
-      video_args['video_type'] = 'video/mp4'
-      return render_template('video.html', args=video_args)
-
-  elif 'youtube' in video_args['src'].lower():
-    content = youtube.get_content(video_args['src'], None, save_debug)
-    if content:
-      video_args['src'] = content['_video']
-      video_args['poster'] = content['_image']
-      if 'mp4' in content['_video']:
-        video_args['video_type'] = 'video/mp4'
-      elif 'webm' in content['_video']:
-        video_args['video_type'] = 'video/webm'
-      return render_template('video.html', args=video_args)
-
-  return 'Unknown video type'
 
 @app.route('/instagram')
 def instagram():

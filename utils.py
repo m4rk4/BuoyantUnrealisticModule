@@ -382,26 +382,22 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
 
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
-    video_html = '<video width="100%" controls poster="{}" crossorigin="anonymous"><source src="{}" type="{}"></video>'.format(poster, video_src, video_type)
   elif video_type == 'application/x-mpegURL':
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?src={}&video_type={}&poster={}'.format(quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
-    video_html = '<div style="overflow:hidden; position:relative; padding-top:{}%;"><iframe style="width:100%; height:100%; position:absolute; left:0; top:0;" frameBorder="0" src="{}" scrolling="no" allowfullscreen></iframe></div>'.format(h, video_src)
+    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/videojs?src={}&type={}&poster={}'.format(quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
   elif video_type == 'vimeo':
     content = vimeo.get_content(video_url, None, False)
     if content.get('_image'):
       poster = content['_image']
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/redirect?url={}'.format(quote_plus(video_url))
-    caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
-    video_html = '<video width="100%" controls poster="{}" crossorigin="anonymous"><source src="{}" type="video/mp4"></video>'.format(content['_image'], video_src)
+    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
+    if not caption:
+      caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
   elif video_type == 'youtube':
     content = youtube.get_content(video_url, None, False)
     if content.get('_image'):
       poster = content['_image']
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/redirect?url={}'.format(quote_plus(video_url))
-    caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
-    video_html = '<video width="100%" controls poster="{}" crossorigin="anonymous"><source src="{}" type="video/mp4"></video>'.format(content['_image'], video_src)
-  elif video_type == 'iframe':
-    video_html = '<div style="overflow:hidden; position:relative; padding-top:{}%;"><iframe style="width:100%; height:100%; position:absolute; left:0; top:0;" frameBorder="0" src="{}" scrolling="no" allowfullscreen></iframe></div>'.format(h, video_url)
+    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
+    if not caption:
+      caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
   else:
     logger.warning('unknown video type {} for {}'.format(video_type, video_url))
     return ''
@@ -410,13 +406,6 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     caption += ' | '
   caption += '<a href="{}">Open video</a>'.format(video_src)
 
-  #begin_html = '<table style="width:100%; max-height:480px; margin-right:auto; margin-left:auto;"><tr><td><center>{}</center></td></tr><tr><td><small>'.format(video_html)
-  #end_html = caption + '</small></td></tr></table>'
-  #begin_html = video_html + '<div><small>'
-  #end_html = caption + '</small></div>'
-  #if gawker:
-  #  return begin_html, end_html
-  #return begin_html + end_html
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
