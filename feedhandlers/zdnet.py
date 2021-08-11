@@ -81,7 +81,7 @@ def get_content(url, args, save_debug=False):
     item['title'] = ld_json['headline']
     dt = datetime.fromisoformat(ld_json['datePublished']).astimezone(tz=None)
     item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt_pub.timestamp()
+    item['_timestamp'] = dt.timestamp()
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
     dt = datetime.fromisoformat(ld_json['dateModified']).astimezone(tz=None)
     item['date_modified'] = dt.isoformat()
