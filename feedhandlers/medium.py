@@ -60,11 +60,6 @@ def get_content(url, args, save_debug=False):
   dt = datetime.fromtimestamp(post['updatedAt']/1000).replace(tzinfo=timezone.utc)
   item['date_modified'] = dt.isoformat()
 
-  # Check age
-  if args.get('age'):
-    if not utils.check_age(item, args):
-      return None
-
   if post.get('creator'):
     item['author'] = {}
     item['author']['name'] = article_json[post['creator']['__ref']]['name']

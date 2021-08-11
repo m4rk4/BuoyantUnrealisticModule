@@ -29,11 +29,6 @@ def get_content(url, args, save_debug=False):
   item['_timestamp'] = dt.timestamp()
   item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
-  # Check age
-  if args.get('age'):
-    if not utils.check_age(item, args):
-      return None
-
   item['author'] = {}
   if page.get('author'):
     item['author']['name'] = page['author']

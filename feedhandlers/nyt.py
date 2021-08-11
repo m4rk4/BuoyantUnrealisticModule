@@ -41,10 +41,6 @@ def get_content_from_html(article_html, url, args, save_debug):
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
     dt = datetime.fromisoformat(ld_json['dateModified'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
-    # Check age
-    if 'age' in args:
-      if not utils.check_age(item, args):
-        return None
     authors = []
     for author in ld_json['author']:
       authors.append(author['name'])
@@ -430,10 +426,6 @@ def get_content(url, args, save_debug=False):
       item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
       dt = datetime.fromisoformat(initial_state[article_id]['lastModified'].replace('Z', '+00:00'))
       item['date_modified'] = dt.isoformat()
-      # Check age
-      if args.get('age'):
-        if not utils.check_age(item, args):
-          return None
       authors = []
       for byline in initial_state[article_id]['bylines']:
         authors.append(format_block(byline['id']))

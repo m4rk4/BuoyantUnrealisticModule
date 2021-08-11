@@ -55,11 +55,6 @@ def get_content(url, args, save_debug=False):
   if dt_mod:
     item['date_modified'] = dt_mod.isoformat()
 
-  # Check age
-  if 'age' in args:
-    if not utils.check_age(item, args):
-      return None
-
   if ld_json.get('author'):
     item['author'] = {}
     if isinstance(ld_json['author'], dict):

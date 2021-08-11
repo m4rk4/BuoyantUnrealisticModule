@@ -119,11 +119,6 @@ def get_content(url, args, save_debug=False):
   item['date_published'] = dt.isoformat()
   item['_timestamp'] = dt.timestamp()
   item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-  if args.get('age'):
-    if not utils.check_age(item, args):
-      if save_debug:
-        logger.debug('skipping old article ' + url)
-      return None
 
   el = soup.find('meta', attrs={"property": "article:modified_time"})
   if el:
