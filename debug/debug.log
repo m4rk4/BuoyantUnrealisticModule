@@ -221,3 +221,6 @@ ValueError: Invalid isoformat string: '2021-08-11T01:53:58.05+00:00'
 [2021-08-11T02:41:04] INFO [werkzeug._log:225] 172.18.0.1 - - [11/Aug/2021 02:41:04] "GET /feed?url=http%3A%2F%2Ffeeds.washingtonpost.com%2Frss%2Frss_powerpost&age=4 HTTP/1.1" 200 -
 [2021-08-11T02:41:39] INFO [werkzeug._log:225] 172.18.0.1 - - [11/Aug/2021 02:41:39] "GET / HTTP/1.1" 200 -
 [2021-08-11T02:42:52] DEBUG [feedhandlers.rss.get_feed:64] skipping duplicate https://www.washingtonpost.com/technology/2021/08/10/apple-drops-corellium-lawsuit/?utm_source=rss&utm_medium=referral&utm_campaign=wp_business-technology
+[2021-08-11T09:23:45] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-11T09:23:45] INFO [werkzeug._log:225]  * Running on http://192.168.1.30:8080/ (Press CTRL+C to quit)
