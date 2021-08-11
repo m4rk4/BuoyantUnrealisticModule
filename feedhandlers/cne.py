@@ -274,6 +274,12 @@ def get_content(url, args, save_debug=False):
       if tag == 'div':
         # Change heading tags from div's to h1, h2, h3, etc
         if 'role' in body_json[1] and body_json[1]['role'] == 'heading':
+          # Skip the Related Stories heading
+          try:
+            if re.search(r'Related Stories', body_json[2], flags=re.I):
+              return
+          except:
+            pass
           # Check if there's a newsletter sign up link, etc to skip
           try:
             if body_json[2][0] == 'a':
