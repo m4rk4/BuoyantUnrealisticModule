@@ -126,6 +126,28 @@ def av_redirect():
       return redirect(content['_audio'])
   return 'No audio or video sources found for <a href="{0}">{0}</a>'.format(args['url'])
 
+@app.route('/audio', methods=['GET'])
+def audio():
+  args = request.args
+
+  if not args.get('url'):
+    return 'No url specified'
+
+  if 'debug' in args:
+    save_debug = True
+  else:
+    save_debug = False
+
+  module = get_module(args)
+  if not module:
+    return 'No content module for this url'
+
+  content = module.get_content(args['url'], args, save_debug)
+  if not content.get('_audio'):
+    return 'No audio sources found for this url'
+
+  return redirect(content['_audio'])
+
 @app.route('/debug')
 def debug():
   args = request.args
