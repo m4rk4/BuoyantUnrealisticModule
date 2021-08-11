@@ -1,235 +1,116 @@
 {
-    "identifier": "hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime",
-    "journey": {
-        "url": "https://journey.vanityfair.com/compiler-5798b038a0a6c5e7a350023ae01a4dca.js"
-    },
+    "identifier": "news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/",
+    "journey": {},
     "ads.page": {
-        "channel": "hollywood",
+        "channel": "news",
         "contentType": "article",
         "keywords": {
             "copilotid": [
-                "610d22ea310bb772a2c598a2"
+                "6112fda0d7ac235dcdd87de4"
             ],
             "platform": [
                 "verso"
             ],
             "tags": [
-                "old-hollywood",
-                "podcasts",
-                "karina-longworth",
-                "you-must-remember-this",
-                "zooey-deschanel",
-                "jon-hamm",
-                "griffin-dunne",
-                "love-is-a-crime",
-                "movies"
+                "tours",
+                "coronavirus",
+                "news"
             ]
         },
         "server": "production",
-        "slug": "hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime",
-        "subChannel": "movies",
+        "slug": "stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases",
+        "subChannel": "",
         "templateType": "mt_article_two_column"
     },
     "ads.none": false,
     "payment": {
-        "form": "sample",
-        "scopedForm": "sample",
+        "form": "free",
         "acceptableFormsOfTenderedPayment": [
-            "sample"
+            "free"
         ],
         "contentClassifiers": {
-            "isPaywalled": true,
-            "canBeSampled": true
+            "isPaywalled": false,
+            "canBeSampled": false
         },
-        "acceptableForms": [
-            "free",
-            "sample",
-            "sub",
-            "tmp",
-            "usmp"
-        ],
-        "acceptableScopes": [
-            "sponsorship"
-        ],
-        "groupsToRender": [
-            "ads",
-            "consumer-marketing",
-            "paywall",
-            "subscription-workflow"
-        ],
+        "acceptableForms": [],
+        "acceptableScopes": [],
+        "groupsToRender": [],
         "entitlement": {
-            "enabled": true,
-            "domain": ".vanityfair.com",
-            "server": ""
+            "enabled": false,
+            "domain": ".pitchfork.com",
+            "server": "https://payment.conde.io/pitchfork"
         },
-        "products": [
-            {
-                "name": "vanityfair.com:basic",
-                "slug": "vyf"
-            }
-        ],
+        "products": [],
         "negotiation": {
-            "tender": "free; q=0.9, sample; q=0.8",
             "content": {
-                "channelSlug": "hollywood",
+                "channelSlug": "news",
                 "contentType": "article",
                 "functionalTags": [],
                 "isPreview": false,
-                "publishDate": "2021-08-10T11:00:00.000Z",
+                "publishDate": "2021-08-10T22:36:51.298Z",
                 "tags": [
-                    "old hollywood",
-                    "podcasts",
-                    "karina longworth",
-                    "you must remember this",
-                    "zooey deschanel",
-                    "jon hamm",
-                    "griffin dunne",
-                    "love is a crime"
+                    "tours",
+                    "coronavirus"
                 ]
             },
-            "config": {
-                "acceptableForms": [
-                    "free",
-                    "sample",
-                    "sub",
-                    "tmp",
-                    "usmp"
-                ],
-                "acceptableScopes": [
-                    "sponsorship"
-                ],
-                "products": [
-                    {
-                        "name": "vanityfair.com:basic",
-                        "slug": "vyf"
-                    }
-                ],
-                "contentTypes": [
-                    "article",
-                    "gallery"
-                ],
-                "renderingRules": [
-                    {
-                        "form": "free",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "subscription-workflow"
-                        ]
-                    },
-                    {
-                        "form": "tmp",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "subscription-workflow"
-                        ]
-                    },
-                    {
-                        "form": "sample",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "paywall",
-                            "subscription-workflow"
-                        ]
-                    },
-                    {
-                        "form": "usmp",
-                        "scope": "sponsorship",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "paywall",
-                            "subscription-workflow"
-                        ]
-                    },
-                    {
-                        "form": "sub",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "subs-cta"
-                        ]
-                    },
-                    {
-                        "form": "",
-                        "groups": [
-                            "ads",
-                            "consumer-marketing",
-                            "paywall",
-                            "subscription-workflow"
-                        ]
-                    }
-                ],
-                "entitlementChecks": {},
-                "allContentIsFree": false,
-                "articlesAreFreeWhen": []
-            },
-            "logic": {
-                "tender": {
-                    "generate": "function(a){var e=[];return e.push(\"free; q=0.9\"),a.payment.sub&&e.push(\"sub\"),a.payment.sample&&a.payment.sample.urls.find((function(e){return a[\"head.canonicalUrl\"].match(e)}))&&e.push(\"sample; q=0.8\"),e.join(\", \")}"
-                }
-            }
+            "logic": {}
         }
     },
     "response": {
         "headers": {
-            "payment": "sample"
+            "payment": "free"
         },
         "statusCode": 200
     },
     "paywall": {
-        "strategy": "alpha",
-        "paragraphLimit": 2,
         "isMuted": false,
         "gateway": {}
     },
     "coreDataLayer": {
         "content": {
-            "authorIds": "606de692153ffd14570a2da8",
-            "authorNames": "Savannah Walsh",
-            "brand": "Vanity Fair",
-            "brandSlug": "vanity-fair",
-            "contentId": "610d22ea310bb772a2c598a2",
+            "authorIds": "592604b57fd06e5349102f43",
+            "authorNames": "Evan Minsker",
+            "brand": "Pitchfork",
+            "brandSlug": "pitchfork",
+            "contentId": "6112fda0d7ac235dcdd87de4",
             "contentLength": "1",
             "contentSource": "web",
             "contentType": "article",
-            "contentTitle": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, \u2018Love Is a Crime\u2019",
+            "contentTitle": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
             "coralCommentsStatus": "disabled",
             "dataSource": "web",
-            "editorNames": "Jaime Archer",
-            "embeddedMedia": "",
-            "functionalTags": "TextAboveCenterGridWidth",
+            "editorNames": "Matthew Strauss",
+            "embeddedMedia": "instagram_bottom",
+            "functionalTags": "",
             "hasBuyButtons": "false",
-            "modifiedDate": "2021-08-10T11:00:00.000Z",
-            "noOfRevisions": "38",
+            "modifiedDate": "2021-08-10T22:36:51.298Z",
+            "noOfRevisions": "5",
             "pageValue": "all",
-            "publishDate": "2021-08-10T11:00:00.000Z",
-            "section": "hollywood",
-            "subsection": "movies",
+            "publishDate": "2021-08-10T22:36:51.298Z",
+            "section": "news",
+            "subsection": "",
             "subsection2": "",
-            "tags": "hollywood|movies|old hollywood|podcasts|karina longworth|you must remember this|zooey deschanel|jon hamm|griffin dunne|love is a crime|textabovecentergridwidth|web",
-            "wordCount": "482"
+            "tags": "news|tours|coronavirus|stevie nicks|web",
+            "wordCount": "185"
         },
         "marketing": {
-            "brand": "Vanity Fair"
+            "brand": "Pitchfork"
         },
         "page": {
             "syndicatorUrl": "",
-            "canonical": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime"
+            "canonical": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/"
         },
         "search": {},
         "site": {
-            "orgId": "4gKgcExWVbtxQKpGvgwhWNaTTr3V",
+            "orgId": "4gKgcFE8Pkt1xb8F8VD54FMMMunM",
             "orgAppId": "a61a3c7a-01d9-4175-8ab8-7171949de605",
             "appVersion": "multi-tenant",
             "env": "production"
         }
     },
-    "googleTagManagerId": "KSG89LT",
-    "brandName": "Vanity Fair",
-    "channelSlug": "hwd",
+    "googleTagManagerId": "MMFBX2W",
+    "brandName": "Pitchfork",
+    "channelSlug": "default",
     "scTheme": {
         "colors": {
             "background": {
@@ -237,104 +118,104 @@
                     "inverted": "g17",
                     "special": "c6",
                     "standard": "g17",
-                    "sticky": "a2"
+                    "sticky": "a3"
                 },
-                "black": "a3",
-                "brand": "a1",
-                "dark": "c2",
+                "black": "a2",
+                "brand": "b3",
+                "dark": "b1",
                 "light": "c7",
-                "white": "a2"
+                "white": "a3"
             },
             "consumption": {
                 "body": {
                     "inverted": {
                         "accent": "a1",
                         "adlabel": "g16",
-                        "bg-card": "c2",
-                        "bg-photo": "c1",
-                        "body": "a2",
-                        "body-deemphasized": "c4",
+                        "bg-card": "c3",
+                        "bg-photo": "c3",
+                        "body": "c5",
+                        "body-deemphasized": "c5",
                         "display-signature": "a1",
-                        "display-texture": "a2",
-                        "divider": "c2",
-                        "link": "a1",
+                        "display-texture": "c3",
+                        "divider": "c3",
+                        "link": "c5",
                         "link-hover": "a1",
-                        "subhed": "a2"
+                        "subhed": "c5"
                     },
                     "special": {
                         "accent": "a1",
                         "adlabel": "g16",
-                        "bg-card": "c8",
+                        "bg-card": "c7",
                         "bg-photo": "c7",
-                        "body": "c1",
+                        "body": "c2",
                         "body-deemphasized": "c3",
                         "display-signature": "a1",
-                        "display-texture": "c1",
-                        "divider": "c5",
-                        "link": "a1",
+                        "display-texture": "c3",
+                        "divider": "c6",
+                        "link": "c2",
                         "link-hover": "a1",
-                        "subhed": "a3"
+                        "subhed": "a1"
                     },
                     "standard": {
                         "accent": "a1",
                         "adlabel": "g16",
-                        "bg-card": "c8",
+                        "bg-card": "c7",
                         "bg-photo": "c7",
                         "body": "c1",
                         "body-deemphasized": "c3",
                         "display-signature": "a1",
                         "display-texture": "c1",
-                        "divider": "c5",
-                        "link": "a1",
+                        "divider": "c6",
+                        "link": "c1",
                         "link-hover": "a1",
-                        "subhed": "a3"
+                        "subhed": "c1"
                     }
                 },
                 "lead": {
                     "inverted": {
-                        "accent": "a1",
-                        "accreditation": "a2",
-                        "background": "c1",
-                        "context-signature": "a2",
-                        "context-tertiary": "c7",
-                        "context-texture": "c1",
-                        "description": "a2",
-                        "divider": "a2",
-                        "heading": "a2",
-                        "heading-background": "c1",
+                        "accent": "c7",
+                        "accreditation": "c3",
+                        "background": "a2",
+                        "context-signature": "a1",
+                        "context-tertiary": "c3",
+                        "context-texture": "a2",
+                        "description": "c5",
+                        "divider": "c2",
+                        "heading": "c7",
+                        "heading-background": "c2",
                         "link": "a2",
-                        "link-hover": "a2",
-                        "syndication": "a2"
+                        "link-hover": "c8",
+                        "syndication": "c3"
                     },
                     "special": {
                         "accent": "a1",
-                        "accreditation": "c1",
-                        "background": "a2",
-                        "context-signature": "a1",
+                        "accreditation": "c2",
+                        "background": "a3",
+                        "context-signature": "c2",
                         "context-tertiary": "c3",
-                        "context-texture": "a2",
-                        "description": "c1",
-                        "divider": "c1",
-                        "heading": "a1",
-                        "heading-background": "a2",
-                        "link": "c1",
-                        "link-hover": "c1",
-                        "syndication": "c1"
+                        "context-texture": "a3",
+                        "description": "c3",
+                        "divider": "c7",
+                        "heading": "a2",
+                        "heading-background": "c7",
+                        "link": "a2",
+                        "link-hover": "a1",
+                        "syndication": "c2"
                     },
                     "standard": {
                         "accent": "a1",
-                        "accreditation": "c1",
-                        "background": "a2",
-                        "context-signature": "a1",
+                        "accreditation": "c2",
+                        "background": "a3",
+                        "context-signature": "c2",
                         "context-tertiary": "c3",
-                        "context-texture": "a2",
+                        "context-texture": "a3",
                         "description": "c1",
-                        "divider": "c1",
-                        "heading": "a3",
-                        "heading-background": "a2",
-                        "link": "c1",
-                        "link-hover": "c1",
-                        "syndication": "c1"
+                        "divider": "c7",
+                        "heading": "a2",
+                        "heading-background": "c7",
+                        "link": "a2",
+                        "link-hover": "a1",
+                        "syndication": "c2"
                     }
                 }
             },
@@ -342,92 +223,92 @@
                 "body": {
                     "black": {
                         "accent": "a1",
-                        "accreditation": "a2",
-                        "background": "a3",
-                        "border": "c3",
+                        "accreditation": "b3",
+                        "background": "c1",
+                        "border": "b2",
                         "context-signature": "a1",
-                        "context-tertiary": "a2",
+                        "context-tertiary": "b3",
                         "context-texture": "a3",
-                        "description": "a2",
-                        "divider": "c3",
-                        "heading": "a2",
-                        "heading-background": "a3",
-                        "syndication": "a2"
+                        "description": "a3",
+                        "divider": "b2",
+                        "heading": "a3",
+                        "heading-background": "b2",
+                        "syndication": "b3"
                     },
                     "brand": {
-                        "accent": "a3",
-                        "accreditation": "a2",
-                        "background": "a1",
-                        "border": "b1",
+                        "accent": "a1",
+                        "accreditation": "c2",
+                        "background": "b3",
+                        "border": "c6",
                         "context-signature": "a2",
-                        "context-tertiary": "a2",
-                        "context-texture": "a1",
-                        "description": "a2",
-                        "divider": "b1",
+                        "context-tertiary": "c3",
+                        "context-texture": "a3",
+                        "description": "c2",
+                        "divider": "c6",
                         "heading": "a2",
-                        "heading-background": "a1",
-                        "syndication": "a2"
+                        "heading-background": "c6",
+                        "syndication": "c2"
                     },
                     "dark": {
                         "accent": "a1",
-                        "accreditation": "a2",
-                        "background": "c2",
-                        "border": "c3",
+                        "accreditation": "b3",
+                        "background": "b1",
+                        "border": "b2",
                         "context-signature": "a1",
-                        "context-tertiary": "a2",
-                        "context-texture": "c2",
-                        "description": "a2",
-                        "divider": "c3",
-                        "heading": "a2",
-                        "heading-background": "c2",
-                        "syndication": "a2"
+                        "context-tertiary": "b3",
+                        "context-texture": "a3",
+                        "description": "a3",
+                        "divider": "b2",
+                        "heading": "a3",
+                        "heading-background": "b2",
+                        "syndication": "b3"
                     },
                     "light": {
                         "accent": "a1",
-                        "accreditation": "a3",
+                        "accreditation": "c2",
                         "background": "c8",
                         "border": "c6",
-                        "context-signature": "a1",
-                        "context-tertiary": "a3",
-                        "context-texture": "c8",
-                        "description": "a3",
+                        "context-signature": "c2",
+                        "context-tertiary": "c3",
+                        "context-texture": "a3",
+                        "description": "c2",
                         "divider": "c6",
-                        "heading": "a3",
-                        "heading-background": "c8",
-                        "syndication": "a3"
+                        "heading": "a2",
+                        "heading-background": "c6",
+                        "syndication": "c2"
                     },
                     "white": {
                         "accent": "a1",
-                        "accreditation": "a3",
-                        "background": "a2",
-                        "border": "c1",
-                        "context-signature": "a1",
-                        "context-tertiary": "a3",
-                        "context-texture": "a2",
-                        "description": "a3",
-                        "divider": "c1",
-                        "heading": "a3",
-                        "heading-background": "a2",
-                        "syndication": "a3"
+                        "accreditation": "c1",
+                        "background": "a3",
+                        "border": "c6",
+                        "context-signature": "c1",
+                        "context-tertiary": "c5",
+                        "context-texture": "a3",
+                        "description": "c1",
+                        "divider": "c6",
+                        "heading": "a2",
+                        "heading-background": "c6",
+                        "syndication": "c1"
                     }
                 },
                 "lead": {
                     "primary": {
                         "accent": "a1",
-                        "background": "a2",
-                        "description": "a3",
-                        "divider": "c1",
-                        "hed": "a3",
-                        "link": "a3",
+                        "background": "c8",
+                        "description": "c2",
+                        "divider": "a1",
+                        "hed": "b1",
+                        "link": "a1",
                         "link-hover": "a1"
                     },
                     "secondary": {
                         "accent": "a1",
-                        "background": "a2",
-                        "description": "a3",
-                        "divider": "c1",
-                        "hed": "a3",
-                        "link": "a3",
+                        "background": "a3",
+                        "description": "c6",
+                        "divider": "c6",
+                        "hed": "c1",
+                        "link": "a1",
                         "link-hover": "a1"
                     }
                 }
@@ -435,95 +316,97 @@
             "foundation": {
                 "collapsed-menu": {
                     "nav-link": {
-                        "default": "a3",
-                        "hover": "a1"
+                        "default": "c5",
+                        "hover": "a3"
                     },
                     "utility-link": {
-                        "default": "a1",
-                        "hover": "a1"
+                        "default": "c5",
+                        "hover": "a3"
                     }
                 },
-                "expanded-context": "a3",
+                "expanded-context": "c1",
                 "expanded-menu": {
                     "nav-link": {
-                        "default": "a3",
+                        "default": "c1",
                         "hover": "a1"
                     },
                     "utility-link": {
-                        "default": "a3",
+                        "default": "c1",
                         "hover": "a1"
                     }
                 },
                 "expanded-utility": {
                     "nav-link": {
-                        "default": "a3",
+                        "default": "c1",
                         "hover": "a1"
                     }
                 },
                 "footer": {
-                    "accent": "a2",
+                    "accent": "c3",
                     "bg": "c1",
-                    "context": "a2",
+                    "context": "c7",
                     "links": {
-                        "primary": "a2",
-                        "secondary": "c7"
+                        "primary": "c5",
+                        "secondary": "c5"
                     },
-                    "meta-primary": "a2",
-                    "meta-secondary": "c7",
+                    "meta-primary": "c7",
+                    "meta-secondary": "c5",
                     "social": {
-                        "hover": "a1"
+                        "hover": "c7"
                     }
                 },
                 "icon": {
-                    "default": "a3",
-                    "hover": "a1"
+                    "default": "c4",
+                    "hover": "a3"
                 },
                 "menu": {
-                    "dividers": "c6"
+                    "dividers": "c7"
                 },
                 "menu-bg": {
-                    "accent": "a1",
-                    "collapsed": "a2",
-                    "expanded": "a2"
+                    "accent": "c1",
+                    "collapsed": "c1",
+                    "expanded": "c8"
                 }
             },
             "interactive": {
                 "base": {
-                    "black": "a3",
-                    "brand-primary": "a3",
-                    "brand-secondary": "b1",
+                    "black": "a2",
+                    "brand-primary": "a1",
+                    "brand-secondary": "b4",
                     "dark": "c3",
                     "invalid-primary": "a1",
-                    "invalid-secondary": "b4",
-                    "light": "c7",
-                    "valid-primary": "a3",
-                    "valid-secondary": "c6",
-                    "white": "a2"
+                    "invalid-secondary": "e1",
+                    "light": "c6",
+                    "valid-primary": "e2",
+                    "valid-secondary": "e4",
+                    "white": "a3"
                 },
                 "social": {
-                    "primary": "a3",
+                    "primary": "c1",
                     "primary-hover": "a1",
-                    "secondary": "a2",
-                    "secondary-hover": "a2"
+                    "secondary": "a3",
+                    "secondary-hover": "a3"
                 }
             },
             "palette": {
-                "a1": "rgba(231,19,26,1)",
-                "a2": "rgba(255,255,255,1)",
-                "a3": "rgba(0,0,0,1)",
-                "a4": "rgba(255,83,83,1)",
-                "b1": "rgba(188,9,15,1)",
-                "b2": "rgba(238,35,36,1)",
-                "b3": "rgba(255,0,0,1)",
-                "b4": "rgba(255,181,184,1)",
-                "c1": "rgba(35,31,32,1)",
-                "c2": "rgba(62,62,62,1)",
+                "a1": "rgba(235,4,0,1)",
+                "a2": "rgba(0,0,0,1)",
+                "a3": "rgba(255,255,255,1)",
+                "b1": "rgba(64,25,53,1)",
+                "b2": "rgba(105,8,147,1)",
+                "b3": "rgba(250,240,254,1)",
+                "b4": "rgba(255,103,99,1)",
+                "c1": "rgba(26,26,26,1)",
+                "c2": "rgba(43,43,43,1)",
                 "c3": "rgba(117,117,117,1)",
-                "c4": "rgba(155,155,155,1)",
-                "c5": "rgba(174,171,172,1)",
-                "c6": "rgba(223,223,223,1)",
-                "c7": "rgba(229,229,229,1)",
-                "c8": "rgba(245,245,245,1)",
+                "c4": "rgba(130,130,130,1)",
+                "c5": "rgba(179,179,179,1)",
+                "c6": "rgba(204,204,204,1)",
+                "c7": "rgba(238,238,238,1)",
+                "c8": "rgba(247,247,247,1)",
+                "e1": "rgba(255,205,204,1)",
+                "e2": "rgba(0,178,51,1)",
+                "e4": "rgba(204,255,218,1)",
                 "g12": "rgba(69,145,194,1)",
                 "g13": "rgba(59,89,152,1)",
                 "g14": "rgba(0,123,182,1)",
@@ -570,10 +453,10 @@
                         "style": "underline"
                     },
                     "hover": {
-                        "style": "underline"
+                        "style": "null"
                     },
                     "link": {
-                        "style": "null"
+                        "style": "underline"
                     },
                     "visited": {
                         "style": "null"
@@ -581,13 +464,13 @@
                 },
                 "navigation": {
                     "active": {
-                        "style": "underline"
+                        "style": "null"
                     },
                     "focus": {
-                        "style": "underline"
+                        "style": "null"
                     },
                     "hover": {
-                        "style": "underline"
+                        "style": "null"
                     },
                     "link": {
                         "style": "null"
@@ -652,700 +535,757 @@
                 "consumptionEditorial": {
                     "body-core": {
                         "case": "normal",
-                        "family": "Georgia",
+                        "family": "TiemposText",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.75,
+                        "line-height": 2,
                         "mobile-size": 16,
                         "weight": 400
                     },
                     "body-feature": {
                         "case": "normal",
-                        "family": "Georgia",
+                        "family": "TiemposText",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.75,
+                        "line-height": 2,
                         "mobile-size": 16,
                         "weight": 400
                     },
                     "citation": {
                         "case": "normal",
-                        "family": "Georgia",
+                        "family": "TiemposText",
                         "italic": true,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.559999942779541,
+                        "line-height": 2,
                         "mobile-size": 16,
                         "weight": 400
                     },
                     "description-core": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.559999942779541,
-                        "mobile-size": 16,
+                        "line-height": 1.4,
+                        "mobile-size": 20,
                         "weight": 400
                     },
                     "description-embed": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "TiemposText",
+                        "italic": false,
+                        "letter-spacing": 0,
+                        "ligatures": null,
+                        "line-height": 1.3300000031789143,
+                        "mobile-size": 12,
+                        "weight": 400
+                    },
+                    "description-feature": {
+                        "case": "normal",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
                         "line-height": 1.5,
                         "mobile-size": 16,
-                        "weight": 300
-                    },
-                    "description-feature": {
-                        "case": "normal",
-                        "family": "VFDidot7",
-                        "italic": false,
-                        "letter-spacing": 0,
-                        "ligatures": null,
-                        "line-height": 1.559999942779541,
-                        "mobile-size": 16,
                         "weight": 400
                     },
                     "display-large": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "TiemposText",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1,
-                        "mobile-size": 140,
+                        "line-height": 1.1,
+                        "mobile-size": 100,
                         "weight": 400
                     },
                     "display-medium": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.3300000031789143,
-                        "mobile-size": 24,
-                        "weight": 600
+                        "line-height": 1.5,
+                        "mobile-size": 16,
+                        "weight": 400
                     },
                     "display-small": {
                         "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 28.799999237060547,
+                        "family": "Walfork",
+                        "fontSizeMd": 19.200000762939453,
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.3300000031789143,
-                        "lineHeightMd": 1.3298611198494465,
-                        "mobile-size": 24,
-                        "weight": 600
+                        "line-height": 1.5,
+                        "lineHeightMd": 1.4999999006589293,
+                        "mobile-size": 16,
+                        "weight": 400
                     },
                     "hed-bulletin": {
                         "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 28.799999237060547,
+                        "family": "TiemposHeadline",
+                        "fontSizeMd": 33.599998474121094,
                         "italic": false,
-                        "letter-spacing": -0.0035000002632538476,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.3300000031789143,
-                        "lineHeightMd": 1.3298611198494465,
-                        "mobile-size": 24,
-                        "weight": 600
+                        "line-height": 1.25,
+                        "lineHeightMd": 1.250000056766331,
+                        "mobile-size": 28,
+                        "weight": 700
                     },
                     "hed-feature": {
                         "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeLg": 44.20000076293945,
-                        "fontSizeMd": 40.79999923706055,
+                        "family": "TiemposHeadline",
+                        "fontSizeLg": 41.599998474121094,
+                        "fontSizeMd": 38.400001525878906,
                         "italic": false,
-                        "letter-spacing": -0.003500000080641578,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.1799999685848461,
-                        "lineHeightLg": 1.1800904739157134,
-                        "lineHeightMd": 1.1799019678882892,
-                        "mobile-size": 34,
-                        "weight": 600
+                        "line-height": 1.25,
+                        "lineHeightLg": 1.2500000458497285,
+                        "lineHeightMd": 1.2499999503294648,
+                        "mobile-size": 32,
+                        "weight": 700
                     },
                     "hed-standard": {
                         "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeLg": 44.20000076293945,
-                        "fontSizeMd": 40.79999923706055,
+                        "family": "TiemposHeadline",
+                        "fontSizeLg": 41.599998474121094,
+                        "fontSizeMd": 38.400001525878906,
                         "italic": false,
-                        "letter-spacing": -0.003500000080641578,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.1799999685848461,
-                        "lineHeightLg": 1.1800904739157134,
-                        "lineHeightMd": 1.1799019678882892,
-                        "mobile-size": 34,
-                        "weight": 600
+                        "line-height": 1.25,
+                        "lineHeightLg": 1.2500000458497285,
+                        "lineHeightMd": 1.2499999503294648,
+                        "mobile-size": 32,
+                        "weight": 700
                     },
                     "subhed-aux-primary": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": -0.004599999975074421,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.2700000242753462,
-                        "mobile-size": 22,
+                        "line-height": 1.3,
+                        "mobile-size": 20,
                         "weight": 600
                     },
                     "subhed-aux-secondary": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": -0.004600000293815837,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.8799999461454504,
-                        "mobile-size": 17,
+                        "line-height": 1.3600000653948103,
+                        "mobile-size": 14,
                         "weight": 600
                     },
                     "subhed-break-primary": {
                         "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 31.200000762939453,
+                        "family": "Walfork",
+                        "fontSizeMd": 33.599998474121094,
                         "italic": false,
-                        "letter-spacing": -0.004600000209533251,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.1499999853280873,
-                        "lineHeightMd": 1.1500000061132967,
-                        "mobile-size": 26,
+                        "line-height": 1.2100000381469727,
+                        "lineHeightMd": 1.2101190980329557,
+                        "mobile-size": 28,
                         "weight": 600
                     },
                     "subhed-break-secondary": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": -0.004599999975074421,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.2700000242753462,
-                        "mobile-size": 22,
+                        "line-height": 1.25,
+                        "mobile-size": 24,
                         "weight": 600
                     }
                 },
                 "discovery": {
                     "description-core": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.25,
-                        "mobile-size": 16,
-                        "weight": 300
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "description-feature": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.25,
-                        "mobile-size": 16,
-                        "weight": 300
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "description-page": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.25,
-                        "mobile-size": 16,
-                        "weight": 300
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "hed-break-out": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "TiemposHeadline",
                         "fontSizeLg": 36.400001525878906,
                         "fontSizeMd": 33.599998474121094,
                         "italic": false,
-                        "letter-spacing": -0.0035000001745564596,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.2899999618530273,
-                        "lineHeightLg": 1.290109810876959,
-                        "lineHeightMd": 1.289881015499706,
+                        "line-height": 1.1400000027247839,
+                        "lineHeightLg": 1.1401098423167704,
+                        "lineHeightMd": 1.1398809814399076,
                         "mobile-size": 28,
-                        "weight": 600
+                        "weight": 700
                     },
                     "hed-bulletin-primary": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.3799999461454504,
-                        "mobile-size": 17,
-                        "weight": 500
+                        "line-height": 1.3,
+                        "mobile-size": 16,
+                        "weight": 600
                     },
                     "hed-bulletin-secondary": {
                         "case": "normal",
-                        "family": "VFSans",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0,
+                        "ligatures": null,
+                        "line-height": 1.3600000143051147,
+                        "mobile-size": 16,
+                        "weight": 600
+                    },
+                    "hed-core-primary": {
+                        "case": "normal",
+                        "family": "TiemposHeadline",
+                        "fontSizeMd": 31.200000762939453,
+                        "italic": false,
+                        "letter-spacing": 0,
+                        "ligatures": null,
+                        "line-height": 1.3499999413123498,
+                        "lineHeightMd": 1.3499999327537358,
+                        "mobile-size": 26,
+                        "weight": 700
+                    },
+                    "hed-core-secondary": {
+                        "case": "normal",
+                        "family": "Walfork",
+                        "fontSizeMd": 24,
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
                         "line-height": 1.25,
-                        "mobile-size": 16,
-                        "weight": 400
-                    },
-                    "hed-core-primary": {
-                        "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 28.799999237060547,
-                        "italic": false,
-                        "letter-spacing": -0.0035000002632538476,
-                        "ligatures": null,
-                        "line-height": 1.3300000031789143,
-                        "lineHeightMd": 1.3298611198494465,
-                        "mobile-size": 24,
-                        "weight": 600
-                    },
-                    "hed-core-secondary": {
-                        "case": "normal",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 24,
-                        "italic": false,
-                        "letter-spacing": -0.003500000014901161,
-                        "ligatures": null,
-                        "line-height": 1.4,
-                        "lineHeightMd": 1.3999999364217122,
+                        "lineHeightMd": 1.25,
                         "mobile-size": 20,
                         "weight": 600
                     },
                     "hed-feature": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "TiemposHeadline",
                         "fontSizeLg": 36.400001525878906,
                         "fontSizeMd": 33.599998474121094,
                         "italic": false,
-                        "letter-spacing": -0.0035000001745564596,
+                        "letter-spacing": 0,
                         "ligatures": null,
                         "line-height": 1.2899999618530273,
                         "lineHeightLg": 1.290109810876959,
                         "lineHeightMd": 1.289881015499706,
                         "mobile-size": 28,
-                        "weight": 600
+                        "weight": 700
                     },
                     "page-hed-section": {
-                        "case": "uppercase",
-                        "family": "VFDidot7",
-                        "fontSizeMd": 44.20000076293945,
-                        "italic": false,
-                        "letter-spacing": -0.003500000080641578,
-                        "ligatures": null,
-                        "line-height": 1.1799999685848461,
-                        "lineHeightMd": 1.1800904739157134,
-                        "mobile-size": 34,
-                        "weight": 600
-                    },
-                    "page-hed-subsection": {
-                        "case": "uppercase",
-                        "family": "VFDidot7",
+                        "case": "normal",
+                        "family": "TiemposHeadline",
                         "fontSizeMd": 36.400001525878906,
-                        "italic": false,
-                        "letter-spacing": -0.0035000001745564596,
-                        "ligatures": null,
-                        "line-height": 1.2899999618530273,
-                        "lineHeightMd": 1.290109810876959,
-                        "mobile-size": 28,
-                        "weight": 600
-                    },
-                    "subhed-section-collection": {
-                        "case": "uppercase",
-                        "family": "VFSans",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.1400000027247839,
+                        "lineHeightMd": 1.1401098423167704,
+                        "mobile-size": 28,
+                        "weight": 700
+                    },
+                    "page-hed-subsection": {
+                        "case": "uppercase",
+                        "family": "Walfork",
+                        "fontSizeMd": 18.200000762939453,
+                        "italic": false,
+                        "letter-spacing": 0.14000000272478377,
+                        "ligatures": null,
+                        "line-height": 1.5,
+                        "lineHeightMd": 1.499999895200629,
+                        "mobile-size": 14,
+                        "weight": 400
+                    },
+                    "subhed-section-collection": {
+                        "case": "uppercase",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0.14000000272478377,
+                        "ligatures": null,
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "subhed-section-primary": {
-                        "case": "uppercase",
-                        "family": "FlamaUltracondensed",
-                        "fontSizeMd": 45.599998474121094,
+                        "case": "normal",
+                        "family": "TiemposHeadline",
+                        "fontSizeMd": 33.599998474121094,
                         "italic": false,
-                        "letter-spacing": 0.026000000928577623,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.2099999879535877,
-                        "lineHeightMd": 1.2100877664829643,
-                        "mobile-size": 38,
-                        "weight": 500
+                        "line-height": 1.25,
+                        "lineHeightMd": 1.250000056766331,
+                        "mobile-size": 28,
+                        "weight": 700
                     },
                     "subhed-section-secondary": {
                         "case": "uppercase",
-                        "family": "FlamaUltracondensed",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.026000000928577623,
+                        "letter-spacing": 0.14000000272478377,
                         "ligatures": null,
-                        "line-height": 1.2099999879535877,
-                        "mobile-size": 38,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "subhed-section-tertiary": {
                         "case": "uppercase",
-                        "family": "FlamaUltracondensed",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.026000000928577623,
+                        "letter-spacing": 0.14000000272478377,
                         "ligatures": null,
-                        "line-height": 1,
-                        "mobile-size": 38,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     }
                 },
                 "foundation": {
                     "link-feature": {
-                        "case": "uppercase",
-                        "family": "FlamaUltracondensed",
-                        "italic": false,
-                        "letter-spacing": 0.06699999968210855,
-                        "ligatures": null,
-                        "line-height": 1,
-                        "mobile-size": 30,
-                        "weight": 500
-                    },
-                    "link-primary": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "TiemposHeadline",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1,
+                        "mobile-size": 24,
+                        "weight": 700
+                    },
+                    "link-primary": {
+                        "case": "uppercase",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0.08299999435742696,
+                        "ligatures": null,
+                        "line-height": 1.5,
+                        "mobile-size": 12,
+                        "weight": 600
                     },
                     "link-secondary": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "link-utility": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0,
+                        "letter-spacing": 0.08299999887293036,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.1799999583851208,
+                        "mobile-size": 11,
+                        "weight": 600
                     },
                     "list": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0,
+                        "letter-spacing": 0.08299999435742696,
                         "ligatures": null,
-                        "line-height": 1.6700000762939453,
+                        "line-height": 1.5,
                         "mobile-size": 12,
-                        "weight": 400
+                        "weight": 600
                     },
                     "meta-primary": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
+                        "line-height": 1.5,
+                        "mobile-size": 14,
                         "weight": 400
                     },
                     "meta-secondary": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
-                        "mobile-size": 11,
+                        "line-height": 1.5,
+                        "mobile-size": 12,
                         "weight": 400
                     },
                     "title-primary": {
                         "case": "uppercase",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.035999996321541924,
+                        "letter-spacing": 0.08299999435742696,
                         "ligatures": null,
-                        "line-height": 1.3600000653948103,
-                        "mobile-size": 14,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 12,
+                        "weight": 600
                     },
                     "title-secondary": {
                         "case": "uppercase",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.04200000067551931,
+                        "letter-spacing": 0.08299999435742696,
                         "ligatures": null,
-                        "line-height": 1.6700000762939453,
+                        "line-height": 1.5,
                         "mobile-size": 12,
-                        "weight": 500
+                        "weight": 600
                     }
                 },
                 "globalEditorial": {
                     "accreditation-core": {
-                        "case": "uppercase",
-                        "family": "VFSans",
+                        "case": "normal",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.1819999868219549,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
-                        "mobile-size": 11,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "accreditation-feature": {
-                        "case": "uppercase",
-                        "family": "VFSans",
+                        "case": "normal",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.10899999508490929,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "ad-label": {
                         "case": "uppercase",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0.15,
                         "ligatures": null,
                         "line-height": 1,
                         "mobile-size": 10,
-                        "weight": 300
+                        "weight": 600
                     },
                     "context-primary": {
                         "case": "uppercase",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.1500000086697665,
+                        "letter-spacing": 0.07500000433488326,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
+                        "line-height": 1.1799999583851208,
                         "mobile-size": 11,
-                        "weight": 500
+                        "weight": 600
                     },
                     "context-secondary": {
                         "case": "normal",
-                        "family": "VFSans",
-                        "italic": false,
-                        "letter-spacing": 0.008000000165059017,
-                        "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 300
-                    },
-                    "context-tertiary": {
-                        "case": "uppercase",
-                        "family": "VFSans",
-                        "italic": false,
-                        "letter-spacing": 0.1819999933242798,
-                        "ligatures": null,
-                        "line-height": 1.5,
-                        "mobile-size": 10,
-                        "weight": 300
-                    },
-                    "context-title": {
-                        "case": "normal",
-                        "family": "VFSans",
-                        "italic": false,
-                        "letter-spacing": 0.008000000165059017,
-                        "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
-                    },
-                    "numerical-large": {
-                        "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.4,
-                        "mobile-size": 20,
+                        "line-height": 1.5,
+                        "mobile-size": 14,
                         "weight": 400
                     },
-                    "numerical-small": {
-                        "case": "uppercase",
-                        "family": "VFSans",
+                    "context-tertiary": {
+                        "case": "normal",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.10900000008669766,
+                        "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
-                        "mobile-size": 11,
-                        "weight": 500
+                        "line-height": 1.5,
+                        "mobile-size": 12,
+                        "weight": 400
+                    },
+                    "context-title": {
+                        "case": "uppercase",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0.05999999812671116,
+                        "ligatures": null,
+                        "line-height": 1.5,
+                        "mobile-size": 14,
+                        "weight": 600
+                    },
+                    "numerical-large": {
+                        "case": "normal",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0,
+                        "ligatures": null,
+                        "line-height": 1,
+                        "mobile-size": 42,
+                        "weight": 600
+                    },
+                    "numerical-small": {
+                        "case": "normal",
+                        "family": "Walfork",
+                        "italic": false,
+                        "letter-spacing": 0,
+                        "ligatures": null,
+                        "line-height": 1.5,
+                        "mobile-size": 16,
+                        "weight": 600
                     },
                     "syndication": {
                         "case": "uppercase",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.10900000008669766,
+                        "letter-spacing": 0.07500000433488326,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
+                        "line-height": 1.1799999583851208,
                         "mobile-size": 11,
-                        "weight": 500
+                        "weight": 600
                     },
                     "tags": {
                         "case": "uppercase",
-                        "family": "VFSans",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.10900000008669766,
+                        "letter-spacing": 0.07500000433488326,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
+                        "line-height": 1.1799999583851208,
                         "mobile-size": 11,
-                        "weight": 500
+                        "weight": 600
                     }
                 },
                 "utility": {
                     "assistive-text": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.449999982660467,
-                        "mobile-size": 11,
+                        "line-height": 1.3600000653948103,
+                        "mobile-size": 14,
                         "weight": 400
                     },
                     "button-bulletin": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0,
+                        "letter-spacing": 0.07500000433488326,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.1799999583851208,
+                        "mobile-size": 11,
+                        "weight": 600
                     },
                     "button-core": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.022999999614862297,
+                        "letter-spacing": 0.125,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.3600000653948103,
+                        "mobile-size": 14,
+                        "weight": 400
                     },
                     "button-utility": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0.022999999614862297,
+                        "letter-spacing": 0.125,
                         "ligatures": null,
-                        "line-height": 1.380000041081355,
-                        "mobile-size": 13,
-                        "weight": 500
+                        "line-height": 1.3600000653948103,
+                        "mobile-size": 14,
+                        "weight": 600
                     },
                     "input-core": {
                         "case": "normal",
-                        "family": "Fabriga",
+                        "family": "Walfork",
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.6700000762939453,
-                        "mobile-size": 12,
+                        "line-height": 1.3600000653948103,
+                        "mobile-size": 14,
                         "weight": 400
                     },
                     "input-feature": {
                         "case": "normal",
-                        "family": "VFDidot7",
+                        "family": "Walfork",
                         "fontSizeMd": 33.599998474121094,
                         "italic": false,
                         "letter-spacing": 0,
                         "ligatures": null,
-                        "line-height": 1.2899999618530273,
-                        "lineHeightMd": 1.289881015499706,
+                        "line-height": 1.5,
+                        "lineHeightMd": 1.500000113532662,
                         "mobile-size": 28,
                         "weight": 400
                     },
                     "label": {
-                        "case": "normal",
-                        "family": "Fabriga",
+                        "case": "uppercase",
+                        "family": "Walfork",
                         "italic": false,
-                        "letter-spacing": 0,
+                        "letter-spacing": 0.08299999435742696,
                         "ligatures": null,
-                        "line-height": 1.6700000762939453,
+                        "line-height": 1.5,
                         "mobile-size": 12,
-                        "weight": 400
+                        "weight": 600
                     }
                 }
             },
             "typefaces": {
-                "Fabriga": {
-                    "fallback": "'helvetica, sans-serif'"
+                "TiemposHeadline": {
+                    "fallback": "'helvetica, sans-serif'",
+                    "imports": [
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/TiemposHeadline-Bold.woff'",
+                                "woff2": "'assets/fonts/TiemposHeadline-Bold.woff2'"
+                            },
+                            "italic": false,
+                            "weight": 700
+                        },
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/TiemposHeadline-BoldItalic.woff'",
+                                "woff2": "'assets/fonts/TiemposHeadline-BoldItalic.woff2'"
+                            },
+                            "italic": true,
+                            "weight": 700
+                        }
+                    ]
                 },
-                "FlamaUltracondensed": {
-                    "fallback": "'helvetica, sans-serif'"
+                "TiemposText": {
+                    "fallback": "'helvetica, sans-serif'",
+                    "imports": [
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/TiemposText-Regular.woff'",
+                                "woff2": "'assets/fonts/TiemposText-Regular.woff2'"
+                            },
+                            "italic": false,
+                            "weight": 400
+                        },
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/TiemposText-RegularItalic.woff'",
+                                "woff2": "'assets/fonts/TiemposText-RegularItalic.woff2'"
+                            },
+                            "italic": true,
+                            "weight": 400
+                        }
+                    ]
                 },
-                "Georgia": {
-                    "fallback": "'helvetica, sans-serif'"
-                },
-                "VFDidot5": {
-                    "fallback": "'helvetica, sans-serif'"
-                },
-                "VFDidot7": {
-                    "fallback": "'helvetica, sans-serif'"
-                },
-                "VFSans": {
-                    "fallback": "'helvetica, sans-serif'"
+                "Walfork": {
+                    "fallback": "'helvetica, sans-serif'",
+                    "imports": [
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/Walfork-Regular.woff'"
+                            },
+                            "italic": false,
+                            "weight": 400
+                        },
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/Walfork-RegularOblique.woff'"
+                            },
+                            "italic": true,
+                            "weight": 400
+                        },
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/Walfork-Demi.woff'"
+                            },
+                            "italic": false,
+                            "weight": 600
+                        },
+                        {
+                            "files": {
+                                "woff": "'assets/fonts/Walfork-DemiOblique.woff'"
+                            },
+                            "italic": true,
+                            "weight": 600
+                        }
+                    ]
                 }
             },
-            "fontFaces": "\n      \n@font-face {\n    font-family: Fabriga;\n    font-weight: 700;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Fabriga-Bold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/Fabriga-Bold.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Fabriga;\n    font-weight: 400;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Fabriga-Italic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/Fabriga-Italic.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Fabriga;\n    font-weight: 500;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Fabriga-Medium.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/Fabriga-Medium.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Fabriga;\n    font-weight: 500;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Fabriga-MediumItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/Fabriga-MediumItalic.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Fabriga;\n    font-weight: 400;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Fabriga-Regular.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/Fabriga-Regular.woff\") format(\"woff\"); }\n    \n      \n  @font-face {\n    font-family: FlamaUltracondensed;\n    font-weight: 700;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/FlamaUltracondensed-Bold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/FlamaUltracondensed-Bold.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: FlamaUltracondensed;\n    font-weight: 300;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/FlamaUltracondensed-Book.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/FlamaUltracondensed-Book.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: FlamaUltracondensed;\n    font-weight: 500;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/FlamaUltracondensed-Medium.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/FlamaUltracondensed-Medium.woff\") format(\"woff\"); }\n\n      \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 700;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-Bold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-Bold.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 700;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-BoldItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-BoldItalic.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 400;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-Regular.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-Regular.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 400;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-RegularItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-RegularItalic.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 600;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-Semibold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-Semibold.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFDidot5;\n    font-weight: 600;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot5-SemiboldItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot5-SemiboldItalic.woff\") format(\"woff\"); }\n    \n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 700;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-Bold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-Bold.woff\") format(\"woff\"); }\n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 700;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-BoldItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-BoldItalic.woff\") format(\"woff\"); }\n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 400;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-Regular.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-Regular.woff\") format(\"woff\"); }\n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 400;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-RegularItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-RegularItalic.woff\") format(\"woff\"); }\n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 600;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-Semibold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-Semibold.woff\") format(\"woff\"); }\n      \n  @font-face {\n    font-family: VFDidot7;\n    font-weight: 600;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFDidot7-SemiboldItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFDidot7-SemiboldItalic.woff\") format(\"woff\"); }\n\n      \n  @font-face {\n    font-family: VFSans;\n    font-weight: 300;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFSans-Book.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFSans-Book.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFSans;\n    font-weight: 300;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFSans-BookOblique.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFSans-BookOblique.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFSans;\n    font-weight: 500;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFSans-Medium.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFSans-Medium.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: VFSans;\n    font-weight: 500;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/VFSans-MediumOblique.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/VFSans-MediumOblique.woff\") format(\"woff\"); }\n  \n    "
+            "fontFaces": "\n      \n  @font-face {\n    font-family: Walfork;\n    font-weight: 600;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Walfork-Demi.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Walfork;\n    font-weight: 600;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Walfork-DemiOblique.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Walfork;\n    font-weight: 400;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Walfork-Regular.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: Walfork;\n    font-weight: 400;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/Walfork-RegularOblique.woff\") format(\"woff\"); }\n  \n      \n@font-face {\n    font-family: TiemposHeadline;\n    font-weight: 700;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/TiemposHeadline-Bold.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/TiemposHeadline-Bold.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: TiemposHeadline;\n    font-weight: 700;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/TiemposHeadline-BoldItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/TiemposHeadline-BoldItalic.woff\") format(\"woff\"); }\n    \n      \n  @font-face {\n    font-family: TiemposText;\n    font-weight: 400;\n    font-style: normal;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/TiemposText-Regular.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/TiemposText-Regular.woff\") format(\"woff\"); }\n  \n  @font-face {\n    font-family: TiemposText;\n    font-weight: 400;\n    font-style: italic;\n    font-display: swap;\n    src: url(\"/verso/static/assets/fonts/TiemposText-RegularItalic.woff2\") format(\"woff2\"), url(\"/verso/static/assets/fonts/TiemposText-RegularItalic.woff\") format(\"woff\"); }\n    \n    "
         },
         "meta": {
-            "name": "hwd",
+            "name": "pitchfork",
             "market": "us"
         }
     },
     "presenter": "presenter-articles",
     "comScoreCollectionName": "CN Entertainment",
     "footerLogo": {
-        "altText": "HWD",
+        "altText": "Pitchfork",
         "sources": {
             "sm": {
-                "url": "/verso/static/hwd/assets/logo-reverse.6ef96ab8686439a35176e2ff8b2c4487e92fbaae.svg"
+                "url": "/verso/static/pitchfork/assets/logo-reverse.9d3663e398aea54849134e5a5dd2960673500746.svg"
             }
         }
     },
     "headerLogo": {
-        "altText": "HWD",
+        "altText": "Pitchfork",
         "sources": {
             "sm": {
-                "url": "/verso/static/hwd/assets/logo-header.7b6624f3aa336c67441a33a3e19289ee14eaf5c7.svg"
+                "url": "/verso/static/pitchfork/assets/logo-header.9d3663e398aea54849134e5a5dd2960673500746.svg"
             }
         }
     },
     "headerInvertedLogo": {
-        "altText": "HWD",
+        "altText": "Pitchfork",
         "sources": {
             "sm": {
-                "url": "/verso/static/hwd/assets/logo-reverse.6ef96ab8686439a35176e2ff8b2c4487e92fbaae.svg"
+                "url": "/verso/static/pitchfork/assets/logo-reverse.9d3663e398aea54849134e5a5dd2960673500746.svg"
             }
         }
     },
     "logo": {
-        "altText": "HWD",
+        "altText": "Pitchfork",
         "sources": {
             "sm": {
-                "url": "/verso/static/hwd/assets/logo.05775cbaf7ba6fe7c1938e41f3583b3341db9bc9.svg"
+                "url": "/verso/static/pitchfork/assets/logo.e6138e8f6bdfec0e87c52a89db4f2334c541f063.svg"
             }
         }
     },
     "invertedLogo": {
-        "altText": "HWD",
+        "altText": "Pitchfork",
         "sources": {
             "sm": {
-                "url": "/verso/static/hwd/assets/logo.05775cbaf7ba6fe7c1938e41f3583b3341db9bc9.svg"
+                "url": "/verso/static/pitchfork/assets/logo.e6138e8f6bdfec0e87c52a89db4f2334c541f063.svg"
             }
         }
     },
     "logoBaseUrl": "/",
-    "head.og.image": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/16:9/w_1280,c_limit/love-is-a-crime-podcast.jpg",
-    "head.twitterImageSrc": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/16:9/w_1280,c_limit/love-is-a-crime-podcast.jpg",
+    "head.og.image": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/16:9/w_1280,c_limit/1037530708",
+    "head.twitterImageSrc": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/16:9/w_1280,c_limit/1037530708",
     "seriesLogos": {},
     "landingPageLink": {},
     "navigationSearch": true,
@@ -3971,20 +3911,20 @@
     },
     "boomerang": {
         "tags": {
-            "brand": "vanity-fair",
+            "brand": "pitchfork",
             "contentType": "article",
             "verso": true
         }
     },
     "brandIdentityAssets": {
-        "favicon": "https://www.vanityfair.com/verso/static/hwd/assets/favicon.ico",
-        "styles": "/verso/static/hwd/styles.min.c0600f4a2bb910848c3f9603c92c96199de40fb1.css",
+        "favicon": "https://pitchfork.com/verso/static/pitchfork/assets/favicon.ico",
+        "styles": "/verso/static/pitchfork/styles.min.f800159a8297f3f9640706213f8772a1a4bb80f6.css",
         "signInModalAsset": {
             "default": {
                 "altText": "Sign In",
                 "sources": {
                     "sm": {
-                        "url": "/verso/static/hwd/assets/sign-in-modal.be3b009d99330266ec05edf7f5a35cdae33c503a.png"
+                        "url": "/verso/static/pitchfork/assets/sign-in-modal.png"
                     }
                 }
             },
@@ -3992,7 +3932,7 @@
                 "altText": "Sign In",
                 "sources": {
                     "sm": {
-                        "url": "/verso/static/hwd/assets/sign-in-modal-crosswords.png"
+                        "url": "/verso/static/pitchfork/assets/sign-in-modal-crosswords.png"
                     }
                 }
             }
@@ -4002,7 +3942,7 @@
         "response": {
             "headers": {
                 "model-name": "article",
-                "modified-at": 1628531625,
+                "modified-at": 1628692001,
                 "surrogate-control": "stale-while-revalidate=60, stale-if-error=86400, max-age=3720"
             }
         }
@@ -4010,98 +3950,81 @@
     "google": {
         "isSwgEnabledOnTenantChannel": false,
         "isSwgEnabledOnSystem": true,
-        "registrationSourceCode": "VERSO_VANITY_FAIR",
+        "registrationSourceCode": "VERSO_PITCHFORK",
         "swgPublicationId": "",
         "swgSku": "",
         "entitlement": {
             "processEntitlementResponse": false
         }
     },
-    "head.canonicalUrl": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime",
+    "head.canonicalUrl": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/",
     "head.hreflang": [],
-    "head.description": "In a coproduction with Cadence13, \u2018Love Is a Crime\u2019 hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
-    "head.keywords": "old hollywood,podcasts,karina longworth,you must remember this,zooey deschanel,jon hamm,griffin dunne,love is a crime",
+    "head.description": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
+    "head.keywords": "tours,coronavirus",
     "head.og.type": "article",
     "head.robots": "index, follow, max-image-preview:large",
-    "head.title": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, \u2018Love Is a Crime\u2019 | Vanity Fair",
-    "tenant": "vanity-fair",
-    "head.social.title": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, \u2018Love Is a Crime\u2019",
-    "head.social.description": "In a coproduction with Cadence13, \u2018Love Is a Crime\u2019 hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
-    "head.promo.dek": "In a coproduction with Cadence13, Love Is a Crime hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
+    "head.title": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases | Pitchfork",
+    "tenant": "pitchfork",
+    "head.social.title": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
+    "head.social.description": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
+    "head.promo.dek": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
     "head.social.opinion": "false",
     "head.jsonld": [
         {
             "@context": "http://schema.org",
             "@type": "NewsArticle",
-            "articleBody": "+++dropcap\n\nJoan Bennett, leading lady of *Scarlet Street* and *The Woman in the Window,* was a famous femme fatale in 1940s film noir. The most salacious story she ever starred in, however, happened off-screen. Enter her film-producer husband, Walter Wanger, whose jealousy and rage over Bennett\u2019s affair with an agent would lead to one of Old Hollywood\u2019s wildest scandals.\n\n+++\n\n*Vanity Fair* introduces *Love Is a Crime*, a 10-episode podcast series coproduced by *V.F.* and Cadence13. [*You Must Remember This*](https://www.vanityfair.com/hollywood/2017/04/you-must-remember-this-podcast-karina-longworth-old-hollywood){: target=\"_blank\"} podcast creator **Karina Longworth** and filmmaker **Vanessa Hope**\u2014the granddaughter of Bennett and Wanger\u2014will lead listeners through a journey to unpack just how Wanger and Bennett \u201cended up staring at each other over another man\u2019s bloody body in December 1951.\u201d\n\n\n\n[#iframe: https://embed.podcasts.apple.com/us/podcast/love-is-a-crime/id1578559817?itsct=podcast_box_player&itscg=30200&ls=1&theme=auto](750x450)\n\n*Love Is a Crime* is executive produced, created, written, and hosted by Hope and Longworth and includes a starry voice cast. The ensemble includes **Zooey Deschanel** as Joan, **Jon Hamm** as Walter, **Griffin Dunne** as agent Jennings Lang, **Mara Wilson** as Joan\u2019s older movie-star sister, Constance, and **Adam Mortimer** as Joan\u2019s turbulent father, Richard. This podcast is executive produced by **Chris Corcoran** alongside showrunner **Jacquelyn Jamjoom.**&nbsp;\n\nQuestions abound in the series, which examines both the lead-up to Walter and Joan\u2019s fateful 1951 encounter and its misogynistic aftermath. \u201cWhy would my grandfather, a successful movie producer, a liberal thinker, a man who helped Jewish \u00e9migr\u00e9s escape Hitler, take a gun to confront his wife?\u201d Hope asks in a preview of the podcast. \u201cWhy would my grandmother, a beautiful movie star who had all but invented the archetype of the film noir femme fatale, and was then starring in a hit franchise of family films, risk everything to sneak around with her agent?\u201d\n\nThe first episode of *Love Is a Crime* launches on Tuesday, August 17. Listen and subscribe at [listen.vanityfair.com/loveisacrime](http://listen.vanityfair.com/loveisacrime){: target=\"_blank\"} or wherever you get your podcasts.\n\n### **More Great Stories From** ***Vanity Fair***\n\u2014 Searching for [the Truth About Anthony Bourdain](https://www.vanityfair.com/hollywood/2021/07/anthony-bourdain-asia-argento-roadrunner?itm_content=footer-recirc){: target=\"_blank\"} and Asia Argento\\\n\u2014 How *Never Have I Ever* Tore Up the [\u201cImmigrant Mom\u201d Trope](https://www.vanityfair.com/hollywood/2021/07/never-have-i-ever-season-two-immigrant-mom-trope?itm_content=footer-recirc){: target=\"_blank\"}\\\n\u2014 What [*Black Widow*\u2019s Final Minutes](https://www.vanityfair.com/hollywood/2021/07/black-widow-end-of-credits-florence-pugh-hawkeye-julia-louis-dreyfus-natasha-funeral?itm_content=footer-recirc){: target=\"_blank\"} Mean for the MCU\u2019s Future\\\n\u2014 Can Hot People in Animal Masks [Find True Love](https://www.vanityfair.com/hollywood/2021/07/07/sexy-beasts-dating-show-review-netflix?itm_content=footer-recirc){: target=\"_blank\"} on *Sexy Beasts*?\\\n\u2014 The [Best Shows and Movies](https://www.vanityfair.com/hollywood/2021/07/new-on-netflix-the-best-movies-and-tv-shows-coming-in-august?itm_content=footer-recirc){: target=\"_blank\"} Coming to Netflix in August\\\n\u2014 The Poignant Story Behind [Anthony Bourdain\u2019s Favorite Song](https://www.vanityfair.com/hollywood/2021/07/anthony-bourdain-favorite-song-roadrunner-doc?itm_content=footer-recirc){: target=\"_blank\"}\\\n\u2014 How [Brad and Angelina](https://www.vanityfair.com/hollywood/2021/07/loki-sophia-di-martino-interview-finale-season-2?itm_content=footer-recirc){: target=\"_blank\"} Inspired *Loki*\u2019s Finale\\\n\u2014 The Ballad of [Bobby Darin and Sandra Dee](https://www.vanityfair.com/hollywood/2021/07/sandra-dee-bobby-darin-relationship-marriage?itm_content=footer-recirc){: target=\"_blank\"}\\\n\u2014 From the Archive: Richard Gully, [the Man Hollywood Trusted](https://archive.vanityfair.com/article/share/35b83ea0-30e2-4142-a8fc-5033bd0ef77e?itm_content=footer-recirc){: target=\"_blank\"}\\\n\u2014 Sign up for the [\u201cHWD Daily\u201d newsletter](https://www.vanityfair.com/newsletters?itm_content=footer-recirc){: target=\"_blank\"} for must-read industry and awards coverage\u2014plus a special weekly edition of Awards Insider.\n\n",
-            "articleSection": "hollywood",
+            "articleBody": "[Stevie Nicks](https://pitchfork.com/artists/23583-stevie-nicks/) has canceled her headlining 2021 festival appearances at Austin City Limits, Jazz Aspen Festival, and BottleRock Napa Valley. In a statement today, she cited the ongoing nature of [the COVID-19 pandemic](https://pitchfork.com/topics/coronavirus/) as her reason for pulling out of shows.\n\n> These are challenging times with challenging decisions that have to be made. I want everyone to be safe and healthy, and the rising COVID cases should be of concern to all of us. While I\u2019m vaccinated, at my age, I am still being extremely cautious and for that reason have decided to skip the five performances I had planned for 2021. Because singing and performing have been my whole life, my primary goal is to keep healthy so I can continue singing for the next decade or longer. I\u2019m devastated and I know the fans are disappointed, but we will look toward a brighter 2022.\n\nNicks was also set to perform at this year\u2019s New Orleans Jazz & Heritage Festival, which was [postponed to 2022](https://pitchfork.com/news/2021-new-orleans-jazz-and-heritage-fest-canceled-due-to-covid-19-concerns/) over the weekend.\n\nRevisit \u201c[Stevie Nicks: Her Art and Life in 33&nbsp;Songs](https://pitchfork.com/features/lists-and-guides/stevie-nicks-in-33-songs/)\u201d\n\n\n\n[#instagram: https://www.instagram.com/p/CSaH8KNLaLI]",
+            "articleSection": "news",
             "author": [
                 {
                     "@type": "Person",
-                    "name": "Savannah Walsh",
-                    "sameAs": "https://www.vanityfair.com/contributor/savannah-walsh"
+                    "name": "Evan Minsker",
+                    "sameAs": "https://pitchfork.com/staff/evan-minsker/"
                 }
             ],
-            "dateModified": "2021-08-10T07:00:00.000-04:00",
-            "datePublished": "2021-08-10T07:00:00.000-04:00",
-            "headline": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, \u2018Love Is a Crime\u2019",
+            "dateModified": "2021-08-10T18:36:51.298-04:00",
+            "datePublished": "2021-08-10T18:36:51.298-04:00",
+            "headline": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
             "image": [
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/3:2/w_3000,h_2000,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/5:3/w_3000,h_1800,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/2:3/w_1331,h_1997,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/9:16/w_1124,h_1999,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/7:3/w_2996,h_1284,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/16:9/w_2992,h_1683,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/4:3/w_2664,h_1998,c_limit/love-is-a-crime-podcast.jpg",
-                "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/1:1/w_2000,h_2000,c_limit/love-is-a-crime-podcast.jpg"
+                "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_5999,h_2999,c_limit/1037530708",
+                "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/16:9/w_5999,h_3374,c_limit/1037530708",
+                "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/4:3/w_5320,h_3990,c_limit/1037530708",
+                "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/1:1/w_3990,h_3990,c_limit/1037530708"
             ],
             "keywords": [
-                "movies",
-                "old hollywood",
-                "podcasts",
-                "karina longworth",
-                "you must remember this",
-                "zooey deschanel",
-                "jon hamm",
-                "griffin dunne",
-                "love is a crime",
-                "textabovecentergridwidth",
+                "news",
+                "tours",
+                "coronavirus",
+                "stevie nicks",
                 "web"
             ],
-            "thumbnailUrl": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/1:1/w_2000,h_2000,c_limit/love-is-a-crime-podcast.jpg",
-            "url": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime",
+            "thumbnailUrl": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/1:1/w_3990,h_3990,c_limit/1037530708",
+            "url": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/",
             "isPartOf": {
                 "@type": [
                     "CreativeWork",
                     "Product"
                 ],
-                "name": "Vanity Fair"
+                "name": "Pitchfork"
             },
-            "isAccessibleForFree": false,
-            "hasPart": [
-                {
-                    "@type": "WebPageElement",
-                    "isAccessibleForFree": "False",
-                    "cssSelector": ".paywall"
-                }
-            ],
-            "alternativeHeadline": "In a coproduction with Cadence13, \u2018Love Is a Crime\u2019 hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
-            "description": "In a coproduction with Cadence13, \u2018Love Is a Crime\u2019 hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
+            "isAccessibleForFree": true,
+            "alternativeHeadline": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
+            "description": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
             "mainEntityOfPage": {
                 "@type": "WebPage",
-                "@id": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime"
+                "@id": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/"
             },
             "publisher": {
                 "@context": "https://schema.org",
                 "@type": "Organization",
-                "name": "Vanity Fair",
+                "name": "Pitchfork",
                 "logo": {
                     "@type": "ImageObject",
-                    "url": "https://www.vanityfair.com/verso/static/vanity-fair/assets/logo-seo.b8b0a6b2e49f59af970fcf5a687d01a81411dfce.png",
-                    "width": "500px",
-                    "height": "114px"
+                    "url": "https://pitchfork.com/verso/static/pitchfork/assets/logo-seo.6b7c06d316d25ef371b8e800b456ee3012d2e352.png",
+                    "width": "565px",
+                    "height": "100px"
                 },
-                "url": "https://www.vanityfair.com"
+                "url": "https://pitchfork.com"
             }
         },
         {
@@ -4111,28 +4034,28 @@
                 {
                     "@type": "ListItem",
                     "position": 1,
-                    "name": "Hollywood",
-                    "item": "https://www.vanityfair.com/hollywood"
+                    "name": "News",
+                    "item": "https://pitchfork.com/news"
                 },
                 {
                     "@type": "ListItem",
                     "position": 2,
-                    "name": "old hollywood",
-                    "item": "https://www.vanityfair.com/tags/old-hollywood"
+                    "name": "Tours",
+                    "item": "https://pitchfork.com/news/tags/tours"
                 },
                 {
                     "@type": "ListItem",
                     "position": 3,
-                    "name": "Go Inside One of Hollywood\u2019s Wildest Scandals in *Vanity Fair*\u2019s Newest Podcast, *Love Is a Crime*"
+                    "name": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases"
                 }
             ]
         }
     ],
-    "head.contentID": "610d22ea310bb772a2c598a2",
+    "head.contentID": "6112fda0d7ac235dcdd87de4",
     "head.pageType": "article",
     "head.photos": {
-        "image-16-9": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/16:9/w_1000,c_limit/love-is-a-crime-podcast.jpg",
-        "image-1-1": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/1:1/w_1000,c_limit/love-is-a-crime-podcast.jpg"
+        "image-16-9": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/16:9/w_1000,c_limit/1037530708",
+        "image-1-1": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/1:1/w_1000,c_limit/1037530708"
     },
     "head.firstPublishDate": "August 10, 2021",
     "head.primaryTagsRoot": "tags",
@@ -4144,139 +4067,93 @@
         "tracking": ""
     },
     "navigation": {
-        "aboutText": "",
+        "aboutText": "The most trusted voice in music",
         "account": {
-            "accountLinks": [
-                {
-                    "text": "My Account",
-                    "url": "/account/profile"
-                },
-                {
-                    "text": "Verify Subscription",
-                    "url": "/account/link",
-                    "paymentGroup": "subscription-workflow"
-                },
-                {
-                    "text": "View Saved Stories",
-                    "url": "/account/saved",
-                    "isProfileLink": true
-                },
-                {
-                    "text": "Manage subscription",
-                    "url": "https://subscriptions.vanityfair.com/servlet/RegistrationGateway?cds_mag_code=VYF&cds_config_id=990",
-                    "paymentGroup": "subs-cta"
-                }
-            ],
-            "signInLink": "/auth/initiate?redirectURL=%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime&source=VERSO_NAVIGATION",
-            "redirectURL": "%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime",
-            "signOutLink": "/auth/end?redirectURL=%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime"
+            "redirectURL": "https%3A%2F%2Fpitchfork.com%2Fnews%2Fstevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases%2F",
+            "signInLink": "/account/sign-in",
+            "signOutLink": "/auth/end?redirectURL=https%3A%2F%2Fpitchfork.com%2Fnews%2Fstevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases%2F"
         },
         "contactLinks": [
             {
-                "text": "Contact VF",
-                "url": "/contact/contact-us",
-                "isActive": false
-            },
-            {
-                "text": "Customer Service",
-                "url": "https://w1.buysub.com/servlet/CSGateway?cds_mag_code=VYF",
+                "text": "Pitchfork Music Festival Chicago",
+                "url": "https://pitchforkmusicfestival.com/",
                 "isExternal": true,
                 "isActive": false
             },
             {
-                "text": "Advertising",
-                "url": "https://www.condenastdigital.com/vanityfair.html",
+                "text": "Pitchfork Music Festival Paris",
+                "url": "https://pitchforkmusicfestival.fr/",
                 "isExternal": true,
                 "isActive": false
             },
             {
-                "text": "Careers",
-                "url": "https://www.condenast.com/careers",
+                "text": "Pitchfork Music Festival Berlin",
+                "url": "https://www.pitchforkmusicfestival.de/",
                 "isExternal": true,
+                "isActive": false
+            },
+            {
+                "text": "Pitchfork Midwinter",
+                "url": "http://midwinter.pitchfork.com",
+                "isExternal": true,
+                "isActive": false
+            },
+            {
+                "text": "All Events",
+                "url": "/events/",
                 "isActive": false
             }
         ],
-        "contactLinksHeading": "Contact",
+        "contactLinksHeading": "Events",
         "footerLinks": [
             {
-                "text": "Promotions",
-                "url": "http://promotions.vf.com/",
-                "isExternal": true,
+                "text": "Video",
+                "url": "/tv/",
                 "isActive": false
             },
             {
-                "text": "Newsletter",
-                "url": "/newsletters",
+                "text": "Artists",
+                "url": "/artists/",
                 "isActive": false
             },
             {
-                "text": "Subscribe",
-                "url": "https://adclick.g.doubleclick.net/pcs/click?xai=AKAOjssc5DpG2q7MGxrHMxZezKOqswtMDF6_09HkiL8uAGJKzDTpCVW6u4UMCm4cL_-yuCxwP4NtVt3VRHRbYGWjqr5bEJqjgb8o7ZwYTZLv7be03Ud32Ws7rPuSILf77sZfMXmaQU5wrzkjmsjieC1LaXQPHaCP_F3b9y1NSpGg545d6bHVgEWn-P79Wy5krMsQMzpnXUtuyesyRoS1H6XASPlzYj1R6pnyx7SwSxVujQI0SK8zvkVajFRtvuA9cN2z&sai=AMfl-YSgoG5Ci2-vXdDHYcjjqiWP0vmndq6Yk5kU0PZackIzP3RJJOM9ej40QDwCdG-yKtsKE2a0dmb4VrGODuIzTIcqpJp66x74CYADNhU-vOKWpHOfUuMuuFi_jGJNxkb_ubRF7ANFMZ2NasI2XdSW&sig=Cg0ArKJSzE-e_pQ-tYYfEAE&urlfix=1&adurl=https://subscribe.vanityfair.com/subscribe/vanityfair/118234%3Fsource%3DAMS_VYF_GLOBAL_SITE_FOOTER_SUBSCRIBE_1mFREETEST_TEST%26pos_name%3DAMS_VYF_GLOBAL_SITE_FOOTER_SUBSCRIBE",
-                "isExternal": true,
+                "text": "Lists & Guides",
+                "url": "/features/lists-and-guides/",
                 "isActive": false
             },
             {
-                "text": "Digital Edition",
-                "url": "/app",
+                "text": "Podcast",
+                "url": "/features/podcast/",
                 "isActive": false
             },
             {
-                "text": "Inside the Issue",
-                "url": "/credits",
+                "text": "Masthead",
+                "url": "/masthead/",
                 "isActive": false
             }
         ],
-        "footerLinksHeading": "More from Vanity Fair",
+        "footerLinksHeading": "More From Pitchfork",
         "hasChannelNavigation": false,
         "internationalInfo": {
             "homeLocation": {
                 "name": "United States"
             },
-            "internationalSites": [
-                {
-                    "name": "U.K.",
-                    "url": "http://www.vanityfair.co.uk/"
-                },
-                {
-                    "name": "Italy",
-                    "url": "https://www.vanityfair.it/"
-                },
-                {
-                    "name": "Mexico",
-                    "url": "http://www.vanityfair.mx/"
-                },
-                {
-                    "name": "Spain",
-                    "url": "http://www.revistavanityfair.es/"
-                },
-                {
-                    "name": "France",
-                    "url": "https://www.vanityfair.fr/"
-                }
-            ]
+            "internationalSites": []
         },
         "noticesLinks": [
             {
-                "text": "Cond\u00e9 Nast Store",
-                "url": "https://condenaststore.com/~/vanity-fair?utm_medium=referral&utm_source=VanityFair&utm_content=FOOTER&AID=1244593740",
-                "isExternal": true,
+                "text": "Newsletter",
+                "url": "/newsletter/",
                 "isActive": false
             },
             {
-                "text": "Reprints / Permissions",
-                "url": "http://www.condenast.com/reprints-permissions",
-                "isExternal": true,
+                "text": "RSS Feeds",
+                "url": "/rss/",
                 "isActive": false
             },
             {
-                "text": "VF Media Kit",
-                "url": "http://www.condenastmediakit.com/vf/",
-                "isExternal": true,
-                "isActive": false
-            },
-            {
-                "text": "Sitemap",
-                "url": "/sitemap",
+                "text": "Contact",
+                "url": "/contact/",
                 "isActive": false
             },
             {
@@ -4284,7 +4161,12 @@
                     "rel": "nofollow"
                 },
                 "text": "Accessibility Help",
-                "url": "/accessibility-help",
+                "url": "/accessibility-help/",
+                "isActive": false
+            },
+            {
+                "text": "Advertising",
+                "url": "/ad/",
                 "isActive": false
             },
             {
@@ -4298,241 +4180,145 @@
         "primaryLinks": [
             {
                 "isExternal": false,
-                "showInTopNav": false,
-                "text": "HIVE",
-                "url": "/news",
-                "forceLeftOfNav": false,
-                "children": [
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Business",
-                        "url": "/news/business",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Technology",
-                        "url": "/news/tech",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Politics",
-                        "url": "/news/politics",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "The Players",
-                        "url": "/people",
-                        "forceLeftOfNav": false
-                    }
-                ],
+                "showInTopNav": true,
+                "text": "News",
+                "url": "/news/",
+                "forceLeftOfNav": true,
                 "isActive": false
             },
             {
                 "isExternal": false,
-                "showInTopNav": false,
-                "text": "HWD",
-                "url": "/hollywood",
+                "showInTopNav": true,
+                "text": "Reviews",
+                "url": "/reviews/albums/",
                 "forceLeftOfNav": false,
-                "children": [
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Movies",
-                        "url": "/hollywood/movies",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Television",
-                        "url": "/hollywood/television",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Awards",
-                        "url": "/news/awards",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Reviews",
-                        "url": "/news/reviews",
-                        "forceLeftOfNav": false
-                    }
-                ],
                 "isActive": false
             },
             {
                 "isExternal": false,
-                "showInTopNav": false,
-                "text": "VANITIES",
-                "url": "/style",
+                "showInTopNav": true,
+                "text": "Best New Music",
+                "url": "/best/",
                 "forceLeftOfNav": false,
-                "children": [
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Celebrity",
-                        "url": "/style/celebrity",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Fashion",
-                        "url": "/style/fashion",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Beauty",
-                        "url": "/style/beauty",
-                        "forceLeftOfNav": false
-                    },
-                    {
-                        "isExternal": false,
-                        "showInTopNav": false,
-                        "text": "Royals",
-                        "url": "/style/royals",
-                        "forceLeftOfNav": false
-                    }
-                ],
+                "isActive": false
+            },
+            {
+                "isExternal": false,
+                "showInTopNav": true,
+                "text": "Features",
+                "url": "/features/",
+                "forceLeftOfNav": false,
+                "isActive": false
+            },
+            {
+                "isExternal": false,
+                "showInTopNav": true,
+                "text": "Lists",
+                "url": "/features/lists-and-guides/",
+                "forceLeftOfNav": false,
+                "isActive": false
+            },
+            {
+                "isExternal": false,
+                "showInTopNav": true,
+                "text": "The Pitch",
+                "url": "/thepitch/",
+                "forceLeftOfNav": false,
+                "isActive": false
+            },
+            {
+                "isExternal": false,
+                "showInTopNav": true,
+                "text": "Video",
+                "url": "/tv/",
+                "forceLeftOfNav": false,
+                "isActive": false
+            },
+            {
+                "isExternal": false,
+                "showInTopNav": true,
+                "text": "Reviews Explorer",
+                "url": "/features/interactives/reviews-explorer/",
+                "forceLeftOfNav": false,
                 "isActive": false
             },
             {
                 "isExternal": true,
-                "showInTopNav": false,
-                "text": "COMPLETE ARCHIVE",
-                "url": "https://archive.vanityfair.com",
-                "forceLeftOfNav": true,
+                "showInTopNav": true,
+                "text": "Festival",
+                "url": "https://pitchforkmusicfestival.com/",
+                "forceLeftOfNav": false,
                 "isActive": false
             }
         ],
-        "searchLink": "/search",
+        "searchLink": "/search/",
         "secondaryLinks": [
             {
                 "isExternal": false,
                 "showInTopNav": false,
                 "text": "Newsletter",
-                "url": "/newsletters",
+                "url": "/newsletter",
                 "forceLeftOfNav": false,
                 "isActive": false
             },
             {
                 "isExternal": false,
                 "showInTopNav": false,
-                "text": "Video",
-                "url": "https://video.vanityfair.com",
-                "forceLeftOfNav": false,
-                "isActive": false
-            },
-            {
-                "isExternal": false,
-                "showInTopNav": false,
-                "text": "VF Store",
-                "url": "https://condenaststore.com/",
-                "forceLeftOfNav": false,
-                "isActive": false
-            },
-            {
-                "isExternal": false,
-                "showInTopNav": false,
-                "text": "VF London",
-                "url": "/london",
-                "forceLeftOfNav": false,
-                "isActive": false
-            },
-            {
-                "isExternal": false,
-                "showInTopNav": false,
-                "text": "Magazine",
-                "url": "/magazine",
+                "text": "Pitchfork Radio",
+                "url": "/radio/",
                 "forceLeftOfNav": false,
                 "isActive": false
             }
         ],
         "callToActionLink": null,
-        "pageHeadline": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, Love Is a Crime",
+        "pageHeadline": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
         "socialLinks": [
             {
-                "network": "facebook",
-                "url": "https://www.facebook.com/vanityfairmagazine",
-                "label": "Follow us on Facebook"
+                "network": "instagram",
+                "url": "https://www.instagram.com/pitchfork/",
+                "label": "Follow Pitchfork on Instagram"
             },
             {
                 "network": "twitter",
-                "url": "https://twitter.com/vanityfair",
-                "label": "Follow us on Twitter"
+                "url": "https://twitter.com/pitchfork",
+                "label": "Follow Pitchfork on Twitter"
             },
             {
-                "network": "instagram",
-                "url": "https://www.instagram.com/vanityfair/",
-                "label": "Follow us on Instagram"
-            },
-            {
-                "network": "pinterest",
-                "url": "https://www.pinterest.com/vanityfair/",
-                "label": "Follow us on Pinterest"
+                "network": "facebook",
+                "url": "https://www.facebook.com/Pitchfork/",
+                "label": "Follow Pitchfork on Facebook"
             },
             {
                 "network": "youtube",
-                "url": "https://www.youtube.com/user/VanityFairMagazine",
-                "label": "Follow us on YouTube"
+                "url": "https://www.youtube.com/channel/UC7kI8WjpCfFoMSNDuRh_4lA",
+                "label": "Follow Pitchfork on YouTube"
             }
         ],
         "socialLinksHeading": "",
         "subchannelLinks": [],
-        "utilityLinks": [
-            {
-                "cmPosition": "nav-cta",
-                "paymentGroup": "consumer-marketing",
-                "forceLeftOfNav": false,
-                "isActive": false
-            },
-            {
-                "text": "Give a Gift",
-                "url": "https://subscribe.vanityfair.com/subscribe/splits/vanityfair/VYF_SINGLE_GIFT?source=VYF_Actives_Gift",
-                "forceLeftOfNav": false,
-                "showInTopNav": false,
-                "isExternal": true,
-                "paymentGroup": "subs-cta",
-                "isActive": false
-            }
-        ]
+        "utilityLinks": []
     },
     "parsely": {
         "isEnabled": true,
-        "publicKey": "vanityfair.com"
+        "publicKey": "pitchfork.com"
     },
     "sentry": {
         "dsn": "https://01670db7f463402085dc9e319887ec36@sentry.io/1222280"
     },
     "userPlatform": {
         "isDomainSigninSwitchEnabled": true,
-        "siteCode": "VANITYFAIR",
-        "userPlatformProxy": "https://www.vanityfair.com/api/up",
-        "xClientID": "Verso-VanityFair",
-        "isOidcSignInLinkActive": true,
+        "siteCode": "PITCHFORK",
+        "userPlatformProxy": "https://pitchfork.com/api/up",
+        "xClientID": "Verso-Pitchfork",
         "excludedBookmarkTypes": []
     },
-    "head.ampUrl": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime/amp",
+    "head.ampUrl": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/amp/",
     "inlineRecirc": [],
     "outbrain": {
         "shouldDisplayAboveRecircList": false,
-        "template": "vanityfair",
+        "template": "pitchfork",
         "widgetId": "AR_14",
-        "canonicalUrl": "https://www.vanityfair.com/hollywood/2021/08/hollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime"
+        "canonicalUrl": "https://pitchfork.com/news/stevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases/"
     },
     "related": [],
     "seriesData": null,
@@ -4542,154 +4328,45 @@
         "body": [
             "div",
             [
-                "inline-embed",
-                {
-                    "props": {
-                        "name": "dropcap",
-                        "attrs": {},
-                        "childTypes": []
+                "p",
+                [
+                    "a",
+                    {
+                        "href": "https://pitchfork.com/artists/23583-stevie-nicks/",
+                        "isExternal": false
                     },
-                    "ref": "",
-                    "type": "callout:dropcap"
-                },
+                    "Stevie Nicks"
+                ],
+                " has canceled her headlining 2021 festival appearances at Austin City Limits, Jazz Aspen Festival, and BottleRock Napa Valley. In a statement today, she cited the ongoing nature of ",
+                [
+                    "a",
+                    {
+                        "href": "https://pitchfork.com/topics/coronavirus/",
+                        "isExternal": false
+                    },
+                    "the COVID-19 pandemic"
+                ],
+                " as her reason for pulling out of shows."
+            ],
+            [
+                "blockquote",
                 [
                     "p",
-                    {
-                        "class": "has-dropcap"
-                    },
-                    "Joan Bennett, leading lady of ",
-                    [
-                        "em",
-                        "Scarlet Street"
-                    ],
-                    " and ",
-                    [
-                        "em",
-                        "The Woman in the Window,"
-                    ],
-                    " was a famous femme fatale in 1940s film noir. The most salacious story she ever starred in, however, happened off-screen. Enter her film-producer husband, Walter Wanger, whose jealousy and rage over Bennett\u2019s affair with an agent would lead to one of Old Hollywood\u2019s wildest scandals."
+                    "These are challenging times with challenging decisions that have to be made. I want everyone to be safe and healthy, and the rising COVID cases should be of concern to all of us. While I\u2019m vaccinated, at my age, I am still being extremely cautious and for that reason have decided to skip the five performances I had planned for 2021. Because singing and performing have been my whole life, my primary goal is to keep healthy so I can continue singing for the next decade or longer. I\u2019m devastated and I know the fans are disappointed, but we will look toward a brighter 2022."
                 ]
             ],
             [
                 "p",
-                [
-                    "em",
-                    "Vanity Fair"
-                ],
-                " introduces ",
-                [
-                    "em",
-                    "Love Is a Crime"
-                ],
-                ", a 10-episode podcast series coproduced by ",
-                [
-                    "em",
-                    "V.F."
-                ],
-                " and Cadence13. ",
+                "Nicks was also set to perform at this year\u2019s New Orleans Jazz & Heritage Festival, which was ",
                 [
                     "a",
                     {
-                        "href": "https://www.vanityfair.com/hollywood/2017/04/you-must-remember-this-podcast-karina-longworth-old-hollywood",
-                        "target": "_blank",
+                        "href": "https://pitchfork.com/news/2021-new-orleans-jazz-and-heritage-fest-canceled-due-to-covid-19-concerns/",
                         "isExternal": false
                     },
-                    [
-                        "em",
-                        "You Must Remember This"
-                    ]
+                    "postponed to 2022"
                 ],
-                " podcast creator ",
-                [
-                    "strong",
-                    "Karina Longworth"
-                ],
-                " and filmmaker ",
-                [
-                    "strong",
-                    "Vanessa Hope"
-                ],
-                "\u2014the granddaughter of Bennett and Wanger\u2014will lead listeners through a journey to unpack just how Wanger and Bennett \u201cended up staring at each other over another man\u2019s bloody body in December 1951.\u201d"
-            ],
-            [
-                "inline-embed",
-                {
-                    "props": {
-                        "dangerousCaption": "",
-                        "height": "450",
-                        "url": "https://embed.podcasts.apple.com/us/podcast/love-is-a-crime/id1578559817?itsct=podcast_box_player&itscg=30200&ls=1&theme=auto",
-                        "width": "750"
-                    },
-                    "ref": "",
-                    "type": "iframe"
-                }
-            ],
-            [
-                "p",
-                {
-                    "class": "paywall"
-                },
-                [
-                    "em",
-                    "Love Is a Crime"
-                ],
-                " is executive produced, created, written, and hosted by Hope and Longworth and includes a starry voice cast. The ensemble includes ",
-                [
-                    "strong",
-                    "Zooey Deschanel"
-                ],
-                " as Joan, ",
-                [
-                    "strong",
-                    "Jon Hamm"
-                ],
-                " as Walter, ",
-                [
-                    "strong",
-                    "Griffin Dunne"
-                ],
-                " as agent Jennings Lang, ",
-                [
-                    "strong",
-                    "Mara Wilson"
-                ],
-                " as Joan\u2019s older movie-star sister, Constance, and ",
-                [
-                    "strong",
-                    "Adam Mortimer"
-                ],
-                " as Joan\u2019s turbulent father, Richard. This podcast is executive produced by ",
-                [
-                    "strong",
-                    "Chris Corcoran"
-                ],
-                " alongside showrunner ",
-                [
-                    "strong",
-                    "Jacquelyn Jamjoom."
-                ],
-                "\u00a0"
-            ],
-            [
-                "inline-embed",
-                {
-                    "type": "cneinterlude",
-                    "props": {
-                        "brand": "vanityfair",
-                        "embeddedVideos": [],
-                        "hasExcludedEmbed": false,
-                        "playerBase": "https://player.cnevids.com",
-                        "isRailEligible": true,
-                        "isRightRail": false
-                    }
-                }
-            ],
-            [
-                "p",
-                {
-                    "class": "paywall"
-                },
-                "Questions abound in the series, which examines both the lead-up to Walter and Joan\u2019s fateful 1951 encounter and its misogynistic aftermath. \u201cWhy would my grandfather, a successful movie producer, a liberal thinker, a man who helped Jewish \u00e9migr\u00e9s escape Hitler, take a gun to confront his wife?\u201d Hope asks in a preview of the podcast. \u201cWhy would my grandmother, a beautiful movie star who had all but invented the archetype of the film noir femme fatale, and was then starring in a hit franchise of family films, risk everything to sneak around with her agent?\u201d"
+                " over the weekend."
             ],
             [
                 "native-ad",
@@ -4701,242 +4378,57 @@
             ],
             [
                 "p",
-                {
-                    "class": "paywall"
-                },
-                "The first episode of ",
-                [
-                    "em",
-                    "Love Is a Crime"
-                ],
-                " launches on Tuesday, August 17. Listen and subscribe at ",
+                "Revisit \u201c",
                 [
                     "a",
                     {
-                        "href": "http://listen.vanityfair.com/loveisacrime",
-                        "target": "_blank",
+                        "href": "https://pitchfork.com/features/lists-and-guides/stevie-nicks-in-33-songs/",
                         "isExternal": false
                     },
-                    "listen.vanityfair.com/loveisacrime"
+                    "Stevie Nicks: Her Art and Life in 33\u00a0Songs"
                 ],
-                " or wherever you get your podcasts."
+                "\u201d"
             ],
             [
-                "div",
+                "inline-embed",
                 {
-                    "class": "paywall heading-h3",
-                    "role": "heading",
-                    "aria-level": "3"
-                },
-                [
-                    "strong",
-                    "More Great Stories From"
-                ],
-                " ",
-                [
-                    "em",
-                    [
-                        "strong",
-                        "Vanity Fair"
-                    ]
-                ]
-            ],
-            [
-                "p",
-                {
-                    "class": "paywall"
-                },
-                "\u2014 Searching for ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/anthony-bourdain-asia-argento-roadrunner?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
+                    "props": {
+                        "url": "https://www.instagram.com/p/CSaH8KNLaLI"
                     },
-                    "the Truth About Anthony Bourdain"
-                ],
-                " and Asia Argento",
-                [
-                    "br"
-                ],
-                "\u2014 How ",
-                [
-                    "em",
-                    "Never Have I Ever"
-                ],
-                " Tore Up the ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/never-have-i-ever-season-two-immigrant-mom-trope?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "\u201cImmigrant Mom\u201d Trope"
-                ],
-                [
-                    "br"
-                ],
-                "\u2014 What ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/black-widow-end-of-credits-florence-pugh-hawkeye-julia-louis-dreyfus-natasha-funeral?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    [
-                        "em",
-                        "Black Widow"
-                    ],
-                    "\u2019s Final Minutes"
-                ],
-                " Mean for the MCU\u2019s Future",
-                [
-                    "br"
-                ],
-                "\u2014 Can Hot People in Animal Masks ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/07/sexy-beasts-dating-show-review-netflix?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "Find True Love"
-                ],
-                " on ",
-                [
-                    "em",
-                    "Sexy Beasts"
-                ],
-                "?",
-                [
-                    "br"
-                ],
-                "\u2014 The ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/new-on-netflix-the-best-movies-and-tv-shows-coming-in-august?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "Best Shows and Movies"
-                ],
-                " Coming to Netflix in August",
-                [
-                    "br"
-                ],
-                "\u2014 The Poignant Story Behind ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/anthony-bourdain-favorite-song-roadrunner-doc?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "Anthony Bourdain\u2019s Favorite Song"
-                ],
-                [
-                    "br"
-                ],
-                "\u2014 How ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/loki-sophia-di-martino-interview-finale-season-2?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "Brad and Angelina"
-                ],
-                " Inspired ",
-                [
-                    "em",
-                    "Loki"
-                ],
-                "\u2019s Finale",
-                [
-                    "br"
-                ],
-                "\u2014 The Ballad of ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/hollywood/2021/07/sandra-dee-bobby-darin-relationship-marriage?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "Bobby Darin and Sandra Dee"
-                ],
-                [
-                    "br"
-                ],
-                "\u2014 From the Archive: Richard Gully, ",
-                [
-                    "a",
-                    {
-                        "href": "https://archive.vanityfair.com/article/share/35b83ea0-30e2-4142-a8fc-5033bd0ef77e?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "the Man Hollywood Trusted"
-                ],
-                [
-                    "br"
-                ],
-                "\u2014 Sign up for the ",
-                [
-                    "a",
-                    {
-                        "href": "https://www.vanityfair.com/newsletters?itm_content=footer-recirc",
-                        "target": "_blank",
-                        "isExternal": false
-                    },
-                    "\u201cHWD Daily\u201d newsletter"
-                ],
-                " for must-read industry and awards coverage\u2014plus a special weekly edition of Awards Insider."
+                    "ref": "",
+                    "type": "instagram"
+                }
             ]
         ],
         "affiliateDisclaimer": "All products are independently selected by our editors. If you buy something, we may earn an affiliate commission.",
-        "channelMap": {
-            "Hollywood": "HWD",
-            "News": "Hive",
-            "Style": "Vanities"
-        },
         "coralComments": {
             "enableComments": false,
             "coralHostName": "no coral host configured"
         },
-        "showBookmark": true,
+        "showBookmark": false,
         "featureFlags": {
-            "enableAccounts": true,
+            "enableAccounts": false,
             "enableAnalytics": true,
-            "enableBookmarking": true,
-            "enableDropcap": true,
-            "enableEntitlementProxy": true,
-            "enableEntitlementValidation": true,
+            "enableDropcap": false,
+            "enableEntitlementProxy": false,
+            "enableEntitlementValidation": false,
             "enableEntitlementGrantLogic": false,
             "enableGoogleAmp": true,
-            "enablePayment": true,
+            "enablePayment": false,
             "enableRecipeRatings": false,
-            "enableRemotePayment": true,
             "recentWorkTeaser": "rubric-only",
-            "contentTeaser": "rubric-only",
+            "bundleTeaser": "channel-only",
+            "contentTeaser": "channel-only",
             "tagTeaser": "rubric-only",
             "preferCollectionGrid": false,
             "overrideBodyContentHeadings": true,
             "enableSponsoredContentInRelated": false,
-            "shouldKeepSubscribeLinkActive": true,
-            "shouldShowEmbeddedGalleryHed": true,
-            "personalizeRecircMostPopular": true,
             "personalizeRecircList": true,
+            "personalizeRecircMostPopular": true,
             "videoPersistable": false,
             "google": {
                 "swgEnabled": false,
-                "signInEnabled": true
+                "signInEnabled": false
             },
             "featureOnboarding": {}
         },
@@ -4953,97 +4445,87 @@
                 "author": {
                     "items": [
                         {
-                            "dangerousBio": null,
-                            "dangerousTitle": null,
-                            "name": "Savannah Walsh",
-                            "socialMedia": [],
-                            "url": "/contributor/savannah-walsh"
+                            "dangerousBio": "<a href=\"/staff/evan-minsker\">Evan Minsker</a> lives in Menomonie, Wisconsin. He&#39;s been writing for Pitchfork since 2010.",
+                            "dangerousTitle": "News Editor",
+                            "name": "Evan Minsker",
+                            "socialMedia": [
+                                {
+                                    "label": "Follow Evan Minsker on Twitter",
+                                    "handle": "@evanminsker",
+                                    "network": "twitter"
+                                }
+                            ],
+                            "url": "/staff/evan-minsker/"
                         }
                     ]
                 }
             },
-            "dangerousDek": "In a coproduction with Cadence13, <em>Love Is a Crime</em> hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
-            "dangerousHed": "Go Inside One of Hollywood\u2019s Wildest Scandals in <em>Vanity Fair</em>\u2019s Newest Podcast, <em>Love Is a Crime</em>",
+            "dangerousDek": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
+            "dangerousHed": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
             "hidePublishDate": false,
             "lede": {
-                "altText": "Go Inside One of Hollywoods Wildest Scandals in Vanity Fairs Newest Podcast Love Is a Crime",
-                "caption": "",
+                "altText": "Stevie Nicks in 2018",
                 "contentType": "photo",
-                "credit": "",
-                "id": "611136ce1a2290bc63fd98b5",
+                "credit": "Stevie Nicks, September 2018 (Kevin Winter/Getty Images for iHeartMedia)",
+                "id": "6112fed6b8f9347b25a1dece",
                 "sources": {
                     "sm": {
-                        "aspectRatio": "master",
+                        "aspectRatio": "2:1",
                         "width": 360,
-                        "url": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_360,c_limit/love-is-a-crime-podcast.jpg",
-                        "srcset": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_120,c_limit/love-is-a-crime-podcast.jpg 120w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_240,c_limit/love-is-a-crime-podcast.jpg 240w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_320,c_limit/love-is-a-crime-podcast.jpg 320w",
-                        "height": 240
+                        "url": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_360,c_limit/1037530708",
+                        "srcset": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_120,c_limit/1037530708 120w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_240,c_limit/1037530708 240w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_320,c_limit/1037530708 320w"
                     },
                     "md": {
-                        "aspectRatio": "master",
+                        "aspectRatio": "2:1",
                         "width": 1024,
-                        "url": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1024,c_limit/love-is-a-crime-podcast.jpg",
-                        "srcset": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_120,c_limit/love-is-a-crime-podcast.jpg 120w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_240,c_limit/love-is-a-crime-podcast.jpg 240w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_320,c_limit/love-is-a-crime-podcast.jpg 320w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_640,c_limit/love-is-a-crime-podcast.jpg 640w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_960,c_limit/love-is-a-crime-podcast.jpg 960w",
-                        "height": 683
+                        "url": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1024,c_limit/1037530708",
+                        "srcset": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_120,c_limit/1037530708 120w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_240,c_limit/1037530708 240w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_320,c_limit/1037530708 320w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_640,c_limit/1037530708 640w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_960,c_limit/1037530708 960w"
                     },
                     "lg": {
-                        "aspectRatio": "master",
+                        "aspectRatio": "2:1",
                         "width": 1280,
-                        "url": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1280,c_limit/love-is-a-crime-podcast.jpg",
-                        "srcset": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_120,c_limit/love-is-a-crime-podcast.jpg 120w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_240,c_limit/love-is-a-crime-podcast.jpg 240w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_320,c_limit/love-is-a-crime-podcast.jpg 320w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_640,c_limit/love-is-a-crime-podcast.jpg 640w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_960,c_limit/love-is-a-crime-podcast.jpg 960w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1280,c_limit/love-is-a-crime-podcast.jpg 1280w",
-                        "height": 853
+                        "url": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1280,c_limit/1037530708",
+                        "srcset": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_120,c_limit/1037530708 120w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_240,c_limit/1037530708 240w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_320,c_limit/1037530708 320w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_640,c_limit/1037530708 640w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_960,c_limit/1037530708 960w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1280,c_limit/1037530708 1280w"
                     },
                     "xl": {
-                        "aspectRatio": "master",
+                        "aspectRatio": "2:1",
                         "width": 1280,
-                        "url": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1280,c_limit/love-is-a-crime-podcast.jpg",
-                        "srcset": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_120,c_limit/love-is-a-crime-podcast.jpg 120w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_240,c_limit/love-is-a-crime-podcast.jpg 240w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_320,c_limit/love-is-a-crime-podcast.jpg 320w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_640,c_limit/love-is-a-crime-podcast.jpg 640w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_960,c_limit/love-is-a-crime-podcast.jpg 960w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1280,c_limit/love-is-a-crime-podcast.jpg 1280w",
-                        "height": 853
+                        "url": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1280,c_limit/1037530708",
+                        "srcset": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_120,c_limit/1037530708 120w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_240,c_limit/1037530708 240w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_320,c_limit/1037530708 320w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_640,c_limit/1037530708 640w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_960,c_limit/1037530708 960w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1280,c_limit/1037530708 1280w"
                     },
                     "xxl": {
-                        "aspectRatio": "master",
+                        "aspectRatio": "2:1",
                         "width": 2560,
-                        "url": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_2560,c_limit/love-is-a-crime-podcast.jpg",
-                        "srcset": "https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_120,c_limit/love-is-a-crime-podcast.jpg 120w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_240,c_limit/love-is-a-crime-podcast.jpg 240w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_320,c_limit/love-is-a-crime-podcast.jpg 320w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_640,c_limit/love-is-a-crime-podcast.jpg 640w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_960,c_limit/love-is-a-crime-podcast.jpg 960w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1280,c_limit/love-is-a-crime-podcast.jpg 1280w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1600,c_limit/love-is-a-crime-podcast.jpg 1600w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_1920,c_limit/love-is-a-crime-podcast.jpg 1920w, https://media.vanityfair.com/photos/611136ce1a2290bc63fd98b5/master/w_2240,c_limit/love-is-a-crime-podcast.jpg 2240w",
-                        "height": 1707
+                        "url": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_2560,c_limit/1037530708",
+                        "srcset": "https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_120,c_limit/1037530708 120w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_240,c_limit/1037530708 240w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_320,c_limit/1037530708 320w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_640,c_limit/1037530708 640w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_960,c_limit/1037530708 960w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1280,c_limit/1037530708 1280w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1600,c_limit/1037530708 1600w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_1920,c_limit/1037530708 1920w, https://media.pitchfork.com/photos/6112fed6b8f9347b25a1dece/2:1/w_2240,c_limit/1037530708 2240w"
                     }
                 },
-                "masterAspectRatio": "3000:2000"
+                "masterAspectRatio": "6000:3990"
             },
             "publishDate": "August 10, 2021",
             "rubric": {
-                "name": "Love Is a Crime"
+                "name": "News",
+                "url": "/news/"
             },
             "showIssueCopyByDate": false,
             "socialMedia": {
-                "showBookmark": true,
+                "showBookmark": false,
                 "links": [
                     {
                         "network": "facebook",
                         "behavior": "popup",
-                        "url": "https://www.facebook.com/dialog/feed?&display=popup&caption=Go%20Inside%20One%20of%20Hollywood%E2%80%99s%20Wildest%20Scandals%20in%20Vanity%20Fair%E2%80%99s%20Newest%20Podcast%2C%20%E2%80%98Love%20Is%20a%20Crime%E2%80%99&app_id=305927716147259&link=https%3A%2F%2Fwww.vanityfair.com%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime%3Futm_source%3Dfacebook%26utm_medium%3Dsocial%26utm_campaign%3Donsite-share%26utm_brand%3Dvanity-fair%26utm_social-type%3Dearned",
+                        "url": "https://www.facebook.com/dialog/feed?&display=popup&caption=Stevie%20Nicks%20Cancels%202021%20Festival%20Dates%2C%20Citing%20Rising%20COVID-19%20Cases&app_id=207089362687909&link=https%3A%2F%2Fpitchfork.com%2Fnews%2Fstevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases%2F%3Futm_source%3Dfacebook%26utm_medium%3Dsocial%26utm_campaign%3Donsite-share%26utm_brand%3Dpitchfork%26utm_social-type%3Dearned",
                         "label": "Share on Facebook"
                     },
                     {
                         "network": "twitter",
-                        "url": "https://twitter.com/intent/tweet/?url=https%3A%2F%2Fwww.vanityfair.com%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime%3Futm_source%3Dtwitter%26utm_medium%3Dsocial%26utm_campaign%3Donsite-share%26utm_brand%3Dvanity-fair%26utm_social-type%3Dearned&text=Go%20Inside%20One%20of%20Hollywood%E2%80%99s%20Wildest%20Scandals%20in%20Vanity%20Fair%E2%80%99s%20Newest%20Podcast%2C%20%E2%80%98Love%20Is%20a%20Crime%E2%80%99&via=VanityFair",
+                        "url": "https://twitter.com/intent/tweet/?url=https%3A%2F%2Fpitchfork.com%2Fnews%2Fstevie-nicks-cancels-2021-festival-dates-citing-rising-covid-19-cases%2F%3Futm_source%3Dtwitter%26utm_medium%3Dsocial%26utm_campaign%3Donsite-share%26utm_brand%3Dpitchfork%26utm_social-type%3Dearned&text=Stevie%20Nicks%20Cancels%202021%20Festival%20Dates%2C%20Citing%20Rising%20COVID-19%20Cases&via=pitchfork",
                         "label": "Share on Twitter"
-                    },
-                    {
-                        "network": "email",
-                        "url": "mailto:?subject=Go%20Inside%20One%20of%20Hollywood%E2%80%99s%20Wildest%20Scandals%20in%20Vanity%20Fair%E2%80%99s%20Newest%20Podcast%2C%20%E2%80%98Love%20Is%20a%20Crime%E2%80%99&body=https%3A%2F%2Fwww.vanityfair.com%2Fhollywood%2F2021%2F08%2Fhollywood-wildest-scandals-vf-newest-podcast-love-is-a-crime%3Futm_source%3Donsite-share%26utm_medium%3Demail%26utm_campaign%3Donsite-share%26utm_brand%3Dvanity-fair",
-                        "label": "Share via Email"
-                    },
-                    {
-                        "behavior": "bookmark",
-                        "label": "Save story",
-                        "network": "bookmark",
-                        "url": "#"
                     }
                 ]
             },
-            "socialTitle": "Go Inside One of Hollywood\u2019s Wildest Scandals in Vanity Fair\u2019s Newest Podcast, \u2018Love Is a Crime\u2019",
-            "socialDescription": "In a coproduction with Cadence13, \u2018Love Is a Crime\u2019 hosts Karina Longworth and Vanessa Hope explore the dark, bygone story of film producer Walter Wanger and actor Joan Bennett.",
+            "socialTitle": "Stevie Nicks Cancels 2021 Festival Dates, Citing Rising COVID-19 Cases",
+            "socialDescription": "She was set to headline Austin City Limits, BottleRock, and Jazz Aspen",
             "signage": null
         },
         "hideAffiliateDisclaimer": false,
@@ -7680,13 +7162,13 @@
         "licensedPartnerLink": null,
         "relatedVideo": {
             "showRelatedVideo": false,
-            "brand": "vanityfair",
+            "brand": "pitchfork",
             "related": null,
-            "pageSize": 10
+            "pageSize": 8
         },
         "interlude": {
-            "brand": "vanityfair",
-            "humanName": "Vanity Fair",
+            "brand": "pitchfork",
+            "humanName": "Pitchfork",
             "playerBase": "https://player.cnevids.com",
             "strategy": {
                 "enabled": true,
@@ -7698,92 +7180,91 @@
                 }
             },
             "isRailEligible": true,
+            "isTitleLinkDisabled": true,
             "embeddedVideos": [],
             "hasExcludedEmbed": false
         },
-        "hideContributorBio": false,
+        "hideContributorBio": true,
         "badge": null,
         "tagCloud": {
-            "tags": []
+            "tags": [
+                {
+                    "id": "5afb0d00846bf02b4c448b32",
+                    "tag": "Tours",
+                    "url": "/news/tags/tours/"
+                },
+                {
+                    "id": "5e68ed6e875ad20009c9418d",
+                    "tag": "Coronavirus",
+                    "url": "/news/tags/coronavirus/"
+                },
+                {
+                    "tag": "Stevie Nicks",
+                    "url": "/artists/23583-stevie-nicks/"
+                }
+            ]
         },
         "newsletter": {
             "formName": "newsletter",
             "sourceCode": "article-newsletter",
-            "placeholder": "Your e-mail address",
-            "textFieldLabel": "Enter your e-mail address",
+            "placeholder": "",
+            "textFieldLabel": "",
             "buttonLabelOnSuccess": "",
-            "dangerousDisclaimer": "<p>By signing up you agree to our <a href=\"https://www.condenast.com/user-agreement\">User Agreement</a> and <a href=\"https://www.condenast.com/privacy-policy\">Privacy Policy & Cookie Statement</a>.</p>",
-            "newsletterId": 248786,
-            "dangerousHed": "HWD Daily",
-            "dangerousDek": "From the awards race to the box office, with everything in between: get the entertainment industry's must-read newsletter.",
-            "buttonLabel": "Sign Up"
+            "dangerousDisclaimer": "",
+            "newsletterId": 248912,
+            "dangerousHed": "Get Hot Links",
+            "dangerousDek": "A daily roundup of the most important stories in music",
+            "buttonLabel": "Sign Up Now"
         },
         "showBreadCrumb": false,
         "lightboxImages": [],
         "channelCloudData": {}
     },
     "featureFlags": {
-        "enableAccounts": true,
+        "enableAccounts": false,
         "enableAnalytics": true,
-        "enableBookmarking": true,
-        "enableDropcap": true,
-        "enableEntitlementProxy": true,
-        "enableEntitlementValidation": true,
+        "enableDropcap": false,
+        "enableEntitlementProxy": false,
+        "enableEntitlementValidation": false,
         "enableEntitlementGrantLogic": false,
         "enableGoogleAmp": true,
-        "enablePayment": true,
+        "enablePayment": false,
         "enableRecipeRatings": false,
-        "enableRemotePayment": true,
         "recentWorkTeaser": "rubric-only",
-        "contentTeaser": "rubric-only",
+        "bundleTeaser": "channel-only",
+        "contentTeaser": "channel-only",
         "tagTeaser": "rubric-only",
         "preferCollectionGrid": false,
         "overrideBodyContentHeadings": true,
         "enableSponsoredContentInRelated": false,
-        "shouldKeepSubscribeLinkActive": true,
-        "shouldShowEmbeddedGalleryHed": true,
-        "personalizeRecircMostPopular": true,
         "personalizeRecircList": true,
+        "personalizeRecircMostPopular": true,
         "videoPersistable": false,
         "google": {
             "swgEnabled": false,
-            "signInEnabled": true
+            "signInEnabled": false
         },
         "featureOnboarding": {},
-        "embeddedLedeCategoriesPath": "verso-settings/article-settings/ContentHeader/variation/InlineImage",
         "hasMagazineHeaderPromoCopy": false,
         "hasMagazineDisclaimer": false,
-        "hideLedeImageCaption": false,
-        "hideBylineContributorImage": false,
-        "hideContributorBio": false,
-        "hideTagCloud": true,
-        "mediaSocialShares": [],
+        "hideLedeImageCaption": true,
+        "hideBylineContributorImage": true,
+        "hideContributorBio": true,
+        "hideTagCloud": false,
+        "mediaSocialShares": [
+            "pinterest"
+        ],
+        "showFirstRailRecirc": true,
         "newsletterModules": [
             {
-                "newsletterId": 248786,
-                "dangerousDek": "From the awards race to the box office, with everything in between: get the entertainment industry's must-read newsletter.",
-                "dangerousHed": "HWD Daily"
-            },
-            {
-                "newsletterId": 248760,
-                "dangerousDek": "The freshest-and most essential-updates from Washington, Wall Street, and Silicon Valley.",
-                "dangerousHed": "Get the Hive Newsletter"
-            },
-            {
-                "newsletterId": 373,
-                "dangerousDek": "Sign up for our essential daily brief and never miss a story. It's on the house."
-            },
-            {
-                "newsletterId": 248843,
-                "dangerousDek": "Get the latest chatter, from Kensington Palace and beyond, straight to your inbox."
+                "newsletterId": 248912,
+                "dangerousDek": "A daily roundup of the most important stories in music",
+                "dangerousHed": "Get Hot Links"
             }
         ],
         "socialShares": [
             "facebook",
-            "twitter",
-            "email",
-            "bookmark"
-        ],
-        "showFirstRailRecirc": true
+            "twitter"
+        ]
     }
 }
