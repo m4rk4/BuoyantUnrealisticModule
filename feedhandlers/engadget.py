@@ -1,8 +1,6 @@
-import json, math, os, pytz, re
-from urllib.parse import urlsplit
+import json, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
-from urllib.parse import urlsplit
+from datetime import datetime
 
 from feedhandlers import rss, twitter
 import utils
@@ -206,15 +204,26 @@ def get_content(url, args, save_debug=False):
         else:
           el.decompose()
 
-    for el in article_text.find_all('blockquote', class_='twitter-tweet'):
-      tweet_url = ''
-      for a in el.find_all('a'):
-        tweet_url = a['href']
-      if tweet_url:
-        tweet = twitter.get_content(tweet_url, None)
-        if tweet:
-          el.insert_after(BeautifulSoup(tweet['content_html'], 'html.parser'))
+    for el in article_text.find_all('blockquote'):
+      if el.has_attr('class'):
+        if 'twitter-tweet' in el['class']:
+          tweet_url = ''
+          for a in el.find_all('a'):
+            tweet_url = a['href']
+          if tweet_url:
+            tweet = twitter.get_content(tweet_url, None)
+            if tweet:
+              el.insert_after(BeautifulSoup(tweet['content_html'], 'html.parser'))
+              el.decompose()
+        else:
+          logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
+      else:
+        if el.p:
+          quote = str(el.p)
+          el.insert_after(BeautifulSoup(utils.add_pullquote(quote[3:-4]), 'html.parser'))
           el.decompose()
+        else:
+          logger.warnint('unhandled blockquote in ' + url)
 
     content_html += str(article_text)
 
