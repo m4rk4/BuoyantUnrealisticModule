@@ -84,8 +84,12 @@ def get_content(url, args, save_debug=False):
     if save_debug:
       utils.write_file(yt_json['streamingData'], './debug/video.json')
 
+    h = 480
+    if args and args.get('height'):
+      h = int(args['height'])
+
     streams = {}
-    streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', 480)
+    streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', h)
     streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
 
     stream_url = ''
