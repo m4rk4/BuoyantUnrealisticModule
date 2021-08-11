@@ -230,3 +230,10 @@ ValueError: Invalid isoformat string: '2021-08-11T01:53:58.05+00:00'
 [2021-08-11T10:27:12] WARNING [werkzeug._log:225]  * Running on all addresses.
    WARNING: This is a development server. Do not use it in a production deployment.
 [2021-08-11T10:27:12] INFO [werkzeug._log:225]  * Running on http://192.168.1.30:8080/ (Press CTRL+C to quit)
+[2021-08-11T10:58:05] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-11T10:58:05] INFO [werkzeug._log:225]  * Running on http://192.168.1.30:8080/ (Press CTRL+C to quit)
+[2021-08-11T11:22:52] WARNING [werkzeug._log:225]  * Running on all addresses.
+   WARNING: This is a development server. Do not use it in a production deployment.
+[2021-08-11T11:22:52] INFO [werkzeug._log:225]  * Running on http://192.168.1.30:8080/ (Press CTRL+C to quit)
+[2021-08-11T11:24:15] INFO [werkzeug._log:225] 127.0.0.1 - - [11/Aug/2021 11:24:15] "[32mGET /audio?debug&url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DSvMhWghZ_EE HTTP/1.1[0m" 302 -
