@@ -1,12 +1,22 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import unquote_plus
 
 from feedhandlers import rss, twitter
 import utils
 
 import logging
 logger = logging.getLogger(__name__)
+
+def get_full_image(img_src):
+  m = re.search(r'(https:\/\/s\.yimg\.com\/os\/creatr-uploaded-images\/[^\.]+)', img_src)
+  if m:
+    return m.group(1)
+  m = re.search(r'image_uri=([^&]+)', img_src)
+  if m:
+    return unquote_plus(m.group(1))
+  return img_src
 
 def get_content(url, args, save_debug=False):
   item = {}
@@ -67,7 +77,7 @@ def get_content(url, args, save_debug=False):
   for tag in ld_json['keywords'].split(','):
     item['tags'].append(tag)
   
-  item['image'] = ld_json['thumbnailUrl']
+  item['_image'] = get_full_image(ld_json['thumbnailUrl'])
 
   if ld_json.get('articleBody'):
     item['summary'] = ld_json['articleBody']
@@ -100,7 +110,7 @@ def get_content(url, args, save_debug=False):
             cap = el.find(class_=re.compile(r'C\(engadgetFont(Black|Gray)\)'))
             if cap:
               caption = cap.get_text()
-            article_text.insert(0, BeautifulSoup(utils.add_image(img['src'], caption), 'html.parser'))
+            article_text.insert(0, BeautifulSoup(utils.add_image(get_full_image(img['src']), caption), 'html.parser'))
             break
 
     for el in article_text.find_all(class_='article-slideshow'):
@@ -131,7 +141,7 @@ def get_content(url, args, save_debug=False):
     
       for n in reversed(range(len(images))):
         caption = '[{}/{}] {}'.format(n+1, len(images), captions[n])
-        el.insert_after(BeautifulSoup(utils.add_image(images[n], caption), 'html.parser'))
+        el.insert_after(BeautifulSoup(utils.add_image(get_full_image(images[n]), caption), 'html.parser'))
       
       el.decompose()
 
@@ -156,7 +166,7 @@ def get_content(url, args, save_debug=False):
             caption += '<br />'
           caption += el_cap.get_text()
 
-        el.insert_after(BeautifulSoup(utils.add_image(img_src, caption), 'html.parser'))
+        el.insert_after(BeautifulSoup(utils.add_image(get_full_image(img_src), caption), 'html.parser'))
       el.decompose()
 
     for el in article_text.find_all('span', id='end-legacy-contents'):
@@ -223,15 +233,11 @@ def get_content(url, args, save_debug=False):
           el.insert_after(BeautifulSoup(utils.add_pullquote(quote[3:-4]), 'html.parser'))
           el.decompose()
         else:
-          logger.warnint('unhandled blockquote in ' + url)
+          logger.warning('unhandled blockquote in ' + url)
 
     content_html += str(article_text)
 
   item['content_html'] = content_html
-  if item.get('image'):
-    if re.search(r'<img\s|<figure\b', content_html):
-      item['_image'] = item['image']
-      del item['image']
   return item
 
 def get_feed(args, save_debug=False):
