@@ -129,6 +129,8 @@ def get_feed(args, save_debug=False):
     url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, content['canonical_url'])
     if save_debug:
       logger.debug('getting content from ' + url)
+      if content['_id'] == 'URN6T4ADLRAF7KG364WIEJUZMA':
+        utils.write_file(content, './debug/debug.json')
     item = get_item(content, url, args, save_debug)
     if item:
       if utils.filter_item(item, args) == True:

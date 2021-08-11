@@ -73,7 +73,8 @@ def get_content(url, args, save_debug=False):
   if yt_json['videoDetails'].get('keywords'):
     item['tags'] = yt_json['videoDetails']['keywords'].copy()
 
-  image = utils.closest_dict(yt_json['videoDetails']['thumbnail']['thumbnails'], 'height', 1080)
+  images = yt_json['videoDetails']['thumbnail']['thumbnails'] + yt_json['microformat']['playerMicroformatRenderer']['thumbnail']['thumbnails']
+  image = utils.closest_dict(images, 'height', 1080)
   item['_image'] = image['url']
 
   item['summary'] = yt_json['videoDetails']['shortDescription']

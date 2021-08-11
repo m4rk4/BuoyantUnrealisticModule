@@ -192,7 +192,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
 def get_content_html(content, lead_image, func_resize_image, url, save_debug):
   content_html = ''
   # Add a lead image if it's not in the article (except galleries because those are moved to the end)
-  if not re.search(r'image|youtube', content['content_elements'][0]['type']):
+  if not (content['content_elements'][0]['type'] == 'image' or (content['content_elements'][0]['type'] == 'oembed_response' and content['content_elements'][0]['subtype'] == 'youtube')):
     if content.get('multimedia_main'):
       if content['multimedia_main']['type'] == 'gallery':
         content_html += process_content_element(content['multimedia_main']['content_elements'][0], url, func_resize_image)
