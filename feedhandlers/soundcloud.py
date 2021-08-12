@@ -92,6 +92,7 @@ def get_content(url, args, save_debug):
     item['tags'].append(audio_json['genre'])
 
     item['_image'] = audio_json['artwork_url']
+    poster = 'https://buoyantunrealisticmodule.m4rk4.repl.co/image?width=128&url=' + quote_plus(audio_json['artwork_url'])
 
     redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['permalink_url'])
 
@@ -109,7 +110,7 @@ def get_content(url, args, save_debug):
     else:
       item['_audio'] = audio_json['stream_url'] + '?consumer_key=' + sc_key
 
-      item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(audio_json['artwork_url'], audio_json['permalink_url'], audio_json['title'])
+      item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(poster, audio_json['permalink_url'], audio_json['title'])
       item['content_html'] += 'by <a href="{}">{}</a></small></td></tr>'.format(audio_json['user']['permalink_url'], item['author']['name'])
       item['content_html'] += '<tr><td><audio controls><source src="{0}" type="audio/mpeg"><a href="{0}">Play track</a></audio></td></tr></table></center>'.format(redirect_url)
 

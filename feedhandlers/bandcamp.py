@@ -54,7 +54,7 @@ def get_content(url, args, save_debug=False):
         item['author']['name'] = audio_json['byArtist']['name']
         item['tags'] = audio_json['keywords'].copy()
         item['_image'] = audio_json['image']
-  
+        poster = 'https://buoyantunrealisticmodule.m4rk4.repl.co/image?width=128&url=' + quote_plus(audio_json['image'])
 
         if audio_json.get('description'):
           item['summary'] = audio_json['description']
@@ -67,17 +67,17 @@ def get_content(url, args, save_debug=False):
               if 'mp3' in prop['name']:
                 item['_audio'] = prop['value']
                 break
-          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['@id'])
-          item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(audio_json['image'], audio_json['@id'], audio_json['name'])
+          audio_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['@id'])
+          item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(poster, audio_json['@id'], audio_json['name'])
           if audio_json.get('inAlbum'):
             item['content_html'] += 'from <a href="{}">{}</a><br />'.format(audio_json['inAlbum']['@id'], audio_json['inAlbum']['name'])
           item['content_html'] += 'by <a href="{}">{}</a></small></td></tr>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
-          item['content_html'] += '<tr><td><audio controls><source src="{0}" type="audio/mpeg"><a href="{0}">Play track</a></audio></td></tr></table></center>'.format(redirect_url)
+          item['content_html'] += '<tr><td><audio controls><source src="{0}" type="audio/mpeg"><a href="{0}">Play track</a></audio></td></tr></table></center>'.format(audio_url)
 
         elif audio_json['@type'] == 'MusicAlbum':
           item['content_html'] = '<center><table style="width:480px;"><tr><td colspan="2"><img width="100%" src="{}"></td></tr>'.format(audio_json['image'])
           for i, track in enumerate(audio_json['track']['itemListElement']):
-            redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(track['item']['@id'])
+            audio_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(track['item']['@id'])
             audio_src = ''
             if track['item'].get('additionalProperty'):
               for prop in track['item']['additionalProperty']:
@@ -85,7 +85,7 @@ def get_content(url, args, save_debug=False):
                   audio_src = prop['value']
                   break
             if audio_src:
-              item['content_html'] += '<tr><td style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td><audio controls><source src="{3}" type="audio/mpeg"><a href="{3}">Play track</a></audio></td></tr>'.format(i+1, track['item']['@id'], track['item']['name'], redirect_url)
+              item['content_html'] += '<tr><td style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td><audio controls><source src="{3}" type="audio/mpeg"><a href="{3}">Play track</a></audio></td></tr>'.format(i+1, track['item']['@id'], track['item']['name'], audio_url)
             else:
               item['content_html'] += '<tr><td colspan="2" style="height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td>'.format(i+1, track['item']['@id'], track['item']['name'])
           item['content_html'] += '</table></center>'
