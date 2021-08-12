@@ -184,7 +184,6 @@ def get_content(url, args, save_debug=False):
             cap = el_cap.get_text().strip()
             if cap:
               caption.append(cap)
-          print(caption)
 
           img_src = get_full_image(img_src)
           el.insert_after(BeautifulSoup(utils.add_image(img_src, ' | '.join(caption)), 'html.parser'))
