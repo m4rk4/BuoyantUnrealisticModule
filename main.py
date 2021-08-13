@@ -212,40 +212,51 @@ def image():
   if not 'url' in args:
     return 'No url given'
 
-  h = 0
+  height = 0
   if 'height' in args:
-    h = int(args['height'])
-  w = 0
+    height = int(args['height'])
+  width = 0
   if 'width' in args:
-    w = int(args['width'])
-  s = 0
+    width = int(args['width'])
+  scale = 0
   if 'scale' in args:
-    s = int(args['scale'])
+    scale = int(args['scale'])
 
   try:
-    img = Image.open(requests.get(args['url'], stream=True).raw)
+    r = requests.get(args['url'])
+    img_io = BytesIO(r.content)
+    img = Image.open(img_io)
   except:
     img = None
+
   if not img:
     return 'Something went wrong :('
 
+  mimetype = img.get_format_mimetype()
   img_h, img_w = img.size
-  if s > 0:
-    h = img_h // s
-    w = img_w // s
-  elif h > 0 and w == 0:
-    w = (img_w * h) // img_h
-  elif h == 0 and w > 0:
-    h = (img_h * w) // img_w
+
+  if scale > 0:
+    h = (img_h * scale) // 100
+    w = (img_w * scale) // 100
+  elif height > 0 and width == 0:
+    h = height
+    w = (img_w * height) // img_h
+  elif height == 0 and width > 0:
+    h = (img_h * width) // img_w
+    w = width
   else:
     h = img_h
     w = img_w
 
-  img.thumbnail((h, w))
-  img_io = BytesIO()
-  img.save(img_io, 'JPEG', quality=70)
+  if h != img_h or w != img_w:
+    #img.thumbnail((h, w))
+    img = img.resize((h, w), resample=Image.LANCZOS)
+    img_io = BytesIO()
+    img.save(img_io, 'JPEG', quality=70)
+    mimetype = 'image/jpeg'
+
   img_io.seek(0)
-  return send_file(img_io, mimetype='image/jpeg')
+  return send_file(img_io, mimetype=mimetype)
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=8080)
