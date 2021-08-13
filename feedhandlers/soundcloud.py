@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import utils
 
@@ -47,8 +47,11 @@ def get_item_info(sc_json):
     item['_image'] = sc_json['artwork_url'].replace('-large', '-t500x500')
   return item
 
-def get_track_content(track_id, client_id, save_debug):
-  track_json = utils.get_url_json('https://api-v2.soundcloud.com/tracks/{}?client_id={}'.format(track_id, client_id))
+def get_track_content(track_id, client_id, secret_token, save_debug):
+  json_url = 'https://api-v2.soundcloud.com/tracks/{}?client_id={}'.format(track_id, client_id)
+  if secret_token:
+    json_url += '&secret_token=' + secret_token
+  track_json = utils.get_url_json(json_url)
   if not track_json:
     return None
 
@@ -87,8 +90,11 @@ def get_track_content(track_id, client_id, save_debug):
 
   return item
 
-def get_playlist_content(playlist_id, client_id, save_debug):
-  playlist_json = utils.get_url_json('https://api-v2.soundcloud.com/playlists/{}?client_id={}'.format(playlist_id, client_id))
+def get_playlist_content(playlist_id, client_id, secret_token, save_debug):
+  json_url = 'https://api-v2.soundcloud.com/playlists/{}?client_id={}'.format(track_id, client_id)
+  if secret_token:
+    json_url += '&secret_token=' + secret_token
+  playlist_json = utils.get_url_json(json_url)
   if not playlist_json:
     return None
 
@@ -152,7 +158,12 @@ def get_content(url, args, save_debug):
   soup = BeautifulSoup(sc_html, 'html.parser')
 
   # If the url is the widget, we need to find the real url
+  secret_token = ''
   if url.startswith('https://w.soundcloud.com/player/'):
+    print(url)
+    m = re.search(r'secret_token%3D([^&]+)', url)
+    if m:
+      secret_token = m.group(1)
     el = soup.find('link', rel='canonical')
     if el:
       sc_html = utils.get_url_html(el['href'])
@@ -177,11 +188,11 @@ def get_content(url, args, save_debug):
 
   m = re.search(r'\/soundcloud\/sounds:(\d+)', el['href'])
   if m:
-    return get_track_content(m.group(1), client_id, save_debug)
+    return get_track_content(m.group(1), client_id, secret_token, save_debug)
 
   m = re.search(r'\/soundcloud\/playlists:(\d+)', el['href'])
   if m:
-    return get_playlist_content(m.group(1), client_id, save_debug)
+    return get_playlist_content(m.group(1), client_id, secret_token, save_debug)
 
   return None
 

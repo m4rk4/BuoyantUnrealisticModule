@@ -1,59 +1,114 @@
 {
-    "@context": "https://schema.org",
-    "itemReviewed": {
-        "@type": "Product",
-        "name": "SKULPTsynth SE",
-        "brand": {
-            "@type": "Brand",
-            "name": "Modal Electronics",
-            "url": "https://www.engadget.com/products/Modal Electronics"
+    "artwork_url": "https://i1.sndcdn.com/artworks-wZTuywljOFPiEBxs-R0Vt0A-large.jpg",
+    "caption": null,
+    "commentable": true,
+    "comment_count": 0,
+    "created_at": "2021-08-02T16:03:04Z",
+    "description": "",
+    "downloadable": false,
+    "download_count": 0,
+    "duration": 236173,
+    "full_duration": 236173,
+    "embeddable_by": "all",
+    "genre": "",
+    "has_downloads_left": false,
+    "id": 1098737245,
+    "kind": "track",
+    "label_name": null,
+    "last_modified": "2021-08-02T16:03:05Z",
+    "license": "all-rights-reserved",
+    "likes_count": 0,
+    "permalink": "modal-electronics-skulptsynth-se-sound-samples",
+    "permalink_url": "https://soundcloud.com/engadget-podcast/modal-electronics-skulptsynth-se-sound-samples/s-B0LetHEZU7a",
+    "playback_count": 691,
+    "public": false,
+    "publisher_metadata": {
+        "id": 1098737245,
+        "urn": "soundcloud:tracks:1098737245",
+        "contains_music": true
+    },
+    "purchase_title": null,
+    "purchase_url": null,
+    "release_date": null,
+    "reposts_count": 0,
+    "secret_token": "s-B0LetHEZU7a",
+    "sharing": "private",
+    "state": "finished",
+    "streamable": true,
+    "tag_list": "",
+    "title": "Modal Electronics SkulptSynth SE sound samples",
+    "track_format": "single-track",
+    "uri": "https://api.soundcloud.com/tracks/1098737245?secret_token=s-B0LetHEZU7a",
+    "urn": "soundcloud:tracks:1098737245",
+    "user_id": 245220958,
+    "visuals": null,
+    "waveform_url": "https://wave.sndcdn.com/oUYk7FjIjHBb_m.json",
+    "display_date": "2021-08-02T16:03:04Z",
+    "media": {
+        "transcodings": [
+            {
+                "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1098737245/d08a3cb6-2b39-45cf-a940-ec0f080ba377/stream/hls?secret_token=s-B0LetHEZU7a",
+                "preset": "mp3_0_1",
+                "duration": 236173,
+                "snipped": false,
+                "format": {
+                    "protocol": "hls",
+                    "mime_type": "audio/mpeg"
+                },
+                "quality": "sq"
+            },
+            {
+                "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1098737245/d08a3cb6-2b39-45cf-a940-ec0f080ba377/stream/progressive?secret_token=s-B0LetHEZU7a",
+                "preset": "mp3_0_1",
+                "duration": 236173,
+                "snipped": false,
+                "format": {
+                    "protocol": "progressive",
+                    "mime_type": "audio/mpeg"
+                },
+                "quality": "sq"
+            },
+            {
+                "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:1098737245/85c5d892-f37e-48b6-aa6d-129f4f84cee7/stream/hls?secret_token=s-B0LetHEZU7a",
+                "preset": "opus_0_0",
+                "duration": 236141,
+                "snipped": false,
+                "format": {
+                    "protocol": "hls",
+                    "mime_type": "audio/ogg; codecs=\"opus\""
+                },
+                "quality": "sq"
+            }
+        ]
+    },
+    "station_urn": "soundcloud:system-playlists:track-stations:1098737245",
+    "station_permalink": "track-stations:1098737245",
+    "track_authorization": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW8iOiJVUyIsInN1YiI6IiIsInJpZCI6IiIsImlhdCI6MTYyODgyMTA0OX0.2WsQKmR4u3QgCIUfIjSvXT94V4agWnotXR9Yl8g1FY8",
+    "monetization_model": "NOT_APPLICABLE",
+    "policy": "ALLOW",
+    "user": {
+        "avatar_url": "https://i1.sndcdn.com/avatars-000251455250-oty9cf-large.jpg",
+        "first_name": "",
+        "followers_count": 378,
+        "full_name": "",
+        "id": 245220958,
+        "kind": "user",
+        "last_modified": "2019-10-04T19:02:56Z",
+        "last_name": "",
+        "permalink": "engadget-podcast",
+        "permalink_url": "https://soundcloud.com/engadget-podcast",
+        "uri": "https://api.soundcloud.com/users/245220958",
+        "urn": "soundcloud:users:245220958",
+        "username": "Engadget",
+        "verified": false,
+        "city": "San Francisco",
+        "country_code": "US",
+        "badges": {
+            "pro": false,
+            "pro_unlimited": true,
+            "verified": false
         },
-        "image": [
-            "https://o.aolcdn.com/images/dims?image_uri=https%3A%2F%2Fs.yimg.com%2Fos%2Fcreatr-uploaded-images%2F2021-08%2F51bff4c0-f48e-11eb-8eff-e48cc52da2c8&thumbnail=%2C200&client=49kdj93ncb8s938hkdo&signature=ffa09bad628a1543e0b20de3ae268102de4be953"
-        ],
-        "review": {
-            "@type": "Review",
-            "reviewRating": {
-                "@type": "Rating",
-                "ratingValue": "86",
-                "worstRating": "0",
-                "bestRating": "100"
-            },
-            "author": {
-                "@type": "Person",
-                "name": "Terrence O'Brien",
-                "url": "https://www.engadget.com/about/editors/terrence-obrien"
-            },
-            "reviewBody": "Over the last decade or so we\u2019ve seen an explosion of cheap, portable synths driven largely by Korg\u2019s deceptively powerful Volca line. Even companies like Modal Electronics, which typically trafficked in higher-end instruments that started at around $2,000, suddenly felt pressure to compete in the sub-$300 range. First it dabbled with two simplistic DIY kits: the CraftSynth and CraftRhythms. But then in 2018 it brought the Skulpt to Kickstarter, followed shortly thereafter by the $149 CraftSynth 2.0. These were much more serious shots at the entry level. But where both impressed with their sound, the build quality was poor and the original Skulpt was a little overpriced at $299.\nThe SkulptSynth SE attempts to address those concerns. It\u2019s quite a bit cheaper at just $199, putting it more in line with the Volcas, and the build quality is sturdier, too. But under the hood it\u2019s largely the same instrument, and the question is whether it\u2019s as compelling now as it was three years ago.\nAlright, I won\u2019t make you wait: The answer is yes. The Skulpt sounds great. Sure, plenty of other synths have come and gone over the last three years, especially at the cheaper end of the spectrum, but that doesn\u2019t take away from the excellent virtual analog engine here. There\u2019s a total of 32 oscillators stacked in four voices (though using the spread function you can expand that to 16) with two different waves per voice. This gives the Skulpt a thick tone that, while you probably won\u2019t mistake it for true analog, is still plenty inviting. While it's perfectly capable of handling basslines and lead duty, the Skulpt really shines when it comes to pads where those stacked oscillators really flesh out the sound.\nThe Skulpt has a wealth of modulation options, too, that give it a surprising amount of depth for something so small and cheap. There are dedicated filter and amp envelopes, but also a mod envelope and a pair of LFOs, one of which is polyphonic. Those last three can be assigned to a host of different destinations, with a total of eight modulation slots available. In addition, there\u2019s ring modulation, FM and pulse width modulation options, plus a morphing filter that goes from lowpass, to bandpass then highpass, not to mention built-in delay and distortion effects. There are far more sound design tools here than you\u2019d have any right to expect for $200.\nTerrence O'Brien / Engadget\nThe wealth options are great, but actually navigating those controls is a bit difficult. The unit comes with a cheat sheet and you\u2019ll always want it on hand. While the front plate has simpler, less confusing graphics than the original Skulpt, the SE still isn\u2019t exactly intuitive. While there are lines that show you what controls are connected to each other, they\u2019re not laid out in any sort of obviously logical way. And the tiny orange and white text labels feel crowded and hard to read at times. While the layout is visually interesting, it\u2019s also infuriating. This a place where form clearly won out over function, and not for the better.\nAnother thing that\u2019s improved on the SE is the build quality. But, just like the panel design, it\u2019s not as huge an upgrade as you might hope. The knobs feel a little firmer and have slightly more resistance than on the Craft 2, but they\u2019re still pretty wobbly and cheap. At least they don\u2019t slide right off the encoders with a gentle tug, though.\nEngadget \u00b7 Modal Electronics SkulptSynth SE sound samples\nI\u2019m not sure how much better the overall build is than the original Skulpt, and it\u2019s only marginally better than the Craft 2. In general, the Skulpt SE still feels chintzy. But it does come with a cover that will help protect it in a bag, which is more than I can say for the Craft. Sadly, though, the touch keyboard is as bad as ever. It\u2019s not always super responsive and the layout somehow manages to feel both cramped and sprawling all at the same time. Playing simple triads required an uncomfortable amount of stretching and I could rarely play a chord progression without accidentally triggering at least one stray note. Volca keyboards are certainly nothing to get excited about, but they make the Modal touchstrips feel like cheap imposters.\nTerrence O'Brien / Engadget\nOne final gripe about the physical design: The Skulpt has full-sized MIDI in and out ports, but a 3.5mm lineout jack. While full-size MIDI DINs are appreciated, I\u2019d rather see \u00bc-inch audio outs and smaller TRS MIDI jacks if I had to choose. And honestly, on something that\u2019s battery powered and portable, TRS MIDI just makes more sense. Save the space.\nA lot of my complaints about the interface and unimpressive build quality can be ignored though if you just use the app. Stick the Skulpt someplace out of the way and connect it to your computer or phone over USB and you\u2019re set. Then you can control it via MIDI over USB and do all your patching from within the Modal app. It\u2019s much easier than using the device itself. It even has a VST version so you can control the Skulpt from your DAW, but I had some issues getting it running on my Windows PC.\n%Breakout-19fd7110f0864e86ac1322de738befc1%\nThe Skulpt is usable without the app, unlike the Craft 2. But honestly, this is probably the way you want to use the Skulpt anyway. While the whole battery-powered portable thing is nice, what\u2019s more exciting is its support for MPE, which is basically unheard of at this price point. But the built-in keys do not support MPE, velocity or aftertouch, you\u2019ll need to use an external controller.\nHaving access to aftertouch and polyphonic expression gives the Skulpt much more life. As a digital synth trying to emulate analog it can sound a little cold at times, but the small fluctuations that come with aftertouch and MPE make the synth feel more organic. Just be warned that dialing in MPE controls requires a bit of trial and error (definitely turn down the pitch bend range in the settings).\nTerrence O'Brien / Engadget\nThis also gives you more room to experiment with your sound design in interesting ways. For example, in one patch I set the mod wheel (sliding your fingers along the Y axis on the Sensel Morph) to change the wave shape, and aftertouch to control the filter cutoff. Then I could play a chord and slowly slide my fingers up on the highernotes, causing them to fizzle out as the wave morphed from saw to noise, but keep the bass note droning cleanly. And then I could adjust the balance between these two sounds simply by pressing harder or softer on the right keys. This isn\u2019t necessarily groundbreaking, but it\u2019s definitely impressive on a synth that costs just $200.\nThis does make me dream of an upgraded CraftSynth, though. As much as I enjoy the Skulpt, I prefer the sonic palette of the wavetable-based Craft a bit more. I\u2019d love to see Modal release a polyphonic version of it that supports MPE. Basically, give us the best of both synths in a single device.\n%Breakout-11b589afc1914f54aaf0989fb5f6772a%\nThere are so many options out there at the entry level for synths these days it\u2019s hard to say there is one that is best for most people. The Skulpt SE certainly wouldn\u2019t be a bad choice, though. If you\u2019re truly just starting to learn synthesis, something more straightforward like the $150 Volca Keys might be a good option. But it doesn\u2019t have the depth of the Skulpt. If you\u2019re willing to spend a bit more, Arturia\u2019s $350 Microfreak has even more sound design options to get lost in. Plus, it regularly gets new features and sounds. The only issue is it\u2019s even more complicated than the Skulpt, though its controls are much easier to navigate.\nThe SkulptSynth SE shows that Modal is serious about playing at the entry level. The company has delivered an excellent sounding instrument with a wealth of features at an impressive price. If it ever figures out how to design an interface that doesn\u2019t make you want to rip your hair out, Korg\u2019s grip on the budget synth market may be in jeopardy.",
-            "mainEntityOfPage": "True",
-            "thumbnailUrl": "https://s.yimg.com/uu/api/res/1.2/M_sXx7bzQx35Y98i4seS3w--~B/Zmk9ZmlsbDtoPTQ1MDt3PTY3NTthcHBpZD15dGFjaHlvbg--/https://s.yimg.com/os/creatr-uploaded-images/2021-08/2db11c20-f3a4-11eb-bfcc-694a073493c1.cf.webp",
-            "image": [
-                {
-                    "@type": "ImageObject",
-                    "url": "https://s.yimg.com/uu/api/res/1.2/M_sXx7bzQx35Y98i4seS3w--~B/Zmk9ZmlsbDtoPTQ1MDt3PTY3NTthcHBpZD15dGFjaHlvbg--/https://s.yimg.com/os/creatr-uploaded-images/2021-08/2db11c20-f3a4-11eb-bfcc-694a073493c1.cf.webp",
-                    "width": "2048px",
-                    "height": "1365px"
-                }
-            ],
-            "description": "Modal proves once again that it can make impressive sounding synths for dirt cheap..",
-            "articleSection": "Reviews",
-            "keywords": "gear,MPE,synthesizer,Modal electronics,musical instrument,skulptsynth se,virtual analog,review,modal skulpt",
-            "publisher": [
-                {
-                    "@type": "Organization",
-                    "name": "Engadget",
-                    "url": "https://www.engadget.com",
-                    "logo": [
-                        {
-                            "@type": "ImageObject",
-                            "url": "https://www.engadget.com/assets/images/eng-e-128.png",
-                            "width": "128px",
-                            "height": "128px"
-                        }
-                    ]
-                }
-            ],
-            "dateModified": "Mon, Aug 2 2021 12:30:57 EDT"
-        }
+        "station_urn": "soundcloud:system-playlists:artist-stations:245220958",
+        "station_permalink": "artist-stations:245220958"
     }
 }
