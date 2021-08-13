@@ -21,6 +21,124 @@ def get_soundcloud_key():
             return m.group(1)
   return ''
 
+def get_item_info(sc_json):
+  item = {}
+  item['id'] = sc_json['id']
+  item['url'] = sc_json['permalink_url']
+  item['title'] = sc_json['title']
+
+  dt = datetime.fromisoformat(sc_json['created_at'].replace('Z', '+00:00'))
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  dt = datetime.fromisoformat(sc_json['last_modified'].replace('Z', '+00:00'))
+  item['date_modified'] = dt.isoformat()
+
+  item['author'] = {}
+  item['author']['name'] = sc_json['user']['username']
+
+  if sc_json.get('tag_list'):
+    item['tags'] = sc_json['tag_list'].split(' ')
+  else:
+    item['tags'] = []
+    item['tags'].append(sc_json['genre'])
+
+  if sc_json.get('artwork_url'):
+    item['_image'] = sc_json['artwork_url'].replace('-large', '-t500x500')
+  return item
+
+def get_track_content(track_id, client_id, save_debug):
+  track_json = utils.get_url_json('https://api-v2.soundcloud.com/tracks/{}?client_id={}'.format(track_id, client_id))
+  if not track_json:
+    return None
+
+  if save_debug:
+    with open('./debug/debug.json', 'w') as file:
+      json.dump(track_json, file, indent=4)
+
+  item = get_item_info(track_json)
+  if not item:
+    return None
+
+  poster = '/image?width=100&url=' + quote_plus(item['_image'])
+  audio_url = '/audio?url=' + quote_plus(item['url'])
+
+  item['content_html'] = '<center><table style="width:480px; border:1px solid black; border-radius:10px; border-spacing:0;">'
+
+  stream_url = ''
+  for media in track_json['media']['transcodings']:
+    if media['format']['protocol'] == 'progressive':
+      stream_url = media['url']
+      break
+  if stream_url:
+    if not '?' in stream_url:
+      stream_url += '?'
+    else:
+      stream_url += '&'
+    stream_url += 'client_id={}&track_authorization={}'.format(client_id, track_json['track_authorization'])
+    stream_json = utils.get_url_json(stream_url)
+    item['_audio'] = stream_json['url']
+    item['content_html'] += '<tr><td style="padding:0; margin:0;"><a href="{}"><img style="display:block; width:100px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"></a></td>'.format(audio_url, poster)
+  else:
+    logger.warning('no progressive format for ' + item['url'])
+    item['content_html'] += '<tr><td style="padding:0; margin:0;"><img style="display:block; width:100px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"></td>'.format(poster)
+
+  item['content_html'] += '<td style="padding-left:0.5em;"><a href="{}"><b>{}</b></a><br /><small>by <a href="{}">{}</a></small></td></tr></table></center>'.format(track_json['permalink_url'], track_json['title'], track_json['user']['permalink_url'], track_json['user']['username'])
+
+  return item
+
+def get_playlist_content(playlist_id, client_id, save_debug):
+  playlist_json = utils.get_url_json('https://api-v2.soundcloud.com/playlists/{}?client_id={}'.format(playlist_id, client_id))
+  if not playlist_json:
+    return None
+
+  if save_debug:
+    with open('./debug/debug.json', 'w') as file:
+      json.dump(playlist_json, file, indent=4)
+
+  item = get_item_info(playlist_json)
+  if not item:
+    return None
+
+  item['content_html'] = '<center><table style="width:480px; border:1px solid black; border-radius:10px; border-spacing: 0;">'
+  if item.get('_image'):
+    item['content_html'] += '<tr><td colspan="2" style="padding:0 0 1em 0; margin:0;"><img style="display:block; width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" src="{}"></td></tr>'.format(item['_image'])
+    img_border = ''
+  else:
+    img_border = ' border-top-left-radius: 10px;'
+
+  i = 0
+  for track in playlist_json['tracks']:
+    if not track.get('permalink_url'):
+      continue
+
+    if track.get('artwork_url'):
+      poster = '/image?width=64&url=' + quote_plus(track['artwork_url'])
+    else:
+      poster = '/image?width=64&url=' + quote_plus('https://a-v2.sndcdn.com/assets/images/sc-icons/ios-a62dfc8fe7.png')
+
+    stream_url = ''
+    for media in track['media']['transcodings']:
+      if media['format']['protocol'] == 'progressive':
+        stream_url = media['url']
+        break
+
+    if stream_url:
+      audio_url = '/audio?url=' + quote_plus(track['permalink_url'])
+      #item['content_html'] += '<tr><td><audio id="track{0}" src="{1}"></audio><div><button onclick="audio=document.getElementById(\'track{0}\'); img=document.getElementById(\'icon{0}\'); if (audio.paused) {{audio.play(); img.src=\'/static/play-icon.png\'}} else {{audio.pause(); img.src=\'/static/pause-icon.png\'}}" style="border:none;"><img id="icon{0}" src="/static/pause-icon.png" style="height:64px; background-image:url(\'{2}\');" /></button></div></td>'.format(i, audio_url, poster)
+      item['content_html'] += '<tr><td style="vertical-align:top; padding:0 0 1em 0; margin:0;"><a href="{}"><img src="{}" style="height:64px;{}" /></a></td>'.format(audio_url, poster, img_border)
+    else:
+      item['content_html'] += '<tr><td style="vertical-align:top; padding:0 0 1em 0; margin:0;"><img src="{}" style="display:block; height:64px;{}" /></td>'.format(poster, img_border)
+
+    item['content_html'] += '<td style="vertical-align:top; padding-left:0.5em;"><b><a href="{}">{}</a></b><br /><small>by <a href="{}">{}</a></small></td></tr>'.format(track['permalink_url'], track['title'], track['user']['permalink_url'], track['user']['username'])
+    img_border = ''
+    i += 1
+
+  if i < playlist_json['track_count']:
+    item['content_html'] += '<tr><td colspan="2" style="text-align:center; border-top: 1px solid black;"><a href="{}">View full playlist</a></td></tr>'.format(item['url'])
+  item['content_html'] += '</table></center>'
+  return item
+
 def get_content(url, args, save_debug):
   item = None
   sc_key = get_soundcloud_key()
@@ -42,79 +160,30 @@ def get_content(url, args, save_debug):
         return None
       soup = BeautifulSoup(sc_html, 'html.parser')
 
-  track = ''
-  playlist = ''
-  el = soup.find('meta', attrs={"property": "al:ios:url"})
-  # <meta property="al:ios:url" content="soundcloud://sounds:1056424066">
-  # <meta property="al:ios:url" content="soundcloud://playlists:1265306068">
-  if el:
-    m = re.search(r'soundcloud:\/\/sounds:(\d+)', el['content'])
+  # Find the client id
+  client_id = ''
+  for script in soup.find_all('script', src=re.compile(r'^https:\/\/a-v2\.sndcdn\.com\/assets\/\d+-\w+\.js')):
+    print(script['src'])
+    script_html = utils.get_url_html(script['src'])
+    m = re.search(r'client_id=(\w+)', script_html)
     if m:
-      track = m.group(1)
-    else:
-      m = re.search(r'soundcloud:\/\/playlists:(\d+)', el['content'])
-      if m:
-        playlist = m.group(1)
+      client_id = m.group(1)
+      print(client_id)
+      break
 
-  audio_json = None
-  if track:
-    audio_json = utils.get_url_json('https://api.soundcloud.com/tracks/{}.json?consumer_key={}'.format(track, sc_key))
-  elif playlist:
-    audio_json = utils.get_url_json('https://api.soundcloud.com/playlists/{}.json?consumer_key={}'.format(playlist, sc_key))
+  el = soup.find('link', href=re.compile(r'^(android|ios)-app:'))
+  if not el:
+    return None
 
-  if audio_json:
-    if save_debug:
-      with open('./debug/debug.json', 'w') as file:
-        json.dump(audio_json, file, indent=4)
+  m = re.search(r'\/soundcloud\/sounds:(\d+)', el['href'])
+  if m:
+    return get_track_content(m.group(1), client_id, save_debug)
 
-    item = {}
-    item['id'] = audio_json['id']
-    item['url'] = audio_json['permalink_url']
-    item['title'] = audio_json['title']
+  m = re.search(r'\/soundcloud\/playlists:(\d+)', el['href'])
+  if m:
+    return get_playlist_content(m.group(1), client_id, save_debug)
 
-    # 2021/05/27 04:41:57 +0000
-    dt = datetime.strptime(audio_json['created_at'], '%Y/%m/%d %H:%M:%S +0000').replace(tzinfo=timezone.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
-    if audio_json.get('last_modified'):
-      dt = datetime.strptime(audio_json['last_modified'], '%Y/%m/%d %H:%M:%S +0000').replace(tzinfo=timezone.utc)
-      item['date_modified'] = dt.isoformat()
-
-    item['author'] = {}
-    if audio_json['user'].get('full_name'):
-      item['author']['name'] = audio_json['user']['full_name']
-    else:
-      item['author']['name'] = audio_json['user']['username']
-
-    item['tags'] = []
-    item['tags'].append(audio_json['genre'])
-
-    item['_image'] = audio_json['artwork_url']
-    poster = 'https://buoyantunrealisticmodule.m4rk4.repl.co/image?width=128&url=' + quote_plus(audio_json['artwork_url'])
-
-    redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(audio_json['permalink_url'])
-
-    if audio_json.get('tracks'):
-      item['content_html'] = '<center><table style="width:480px;"><tr><td colspan="2"><img width="100%" src="{}"></td></tr>'.format(audio_json['artwork_url'])
-      for i, track in enumerate(audio_json['tracks']):
-        if track['duration'] <= 30000:
-          # Skip - this is likely a 30 sec sample
-          item['content_html'] += '<tr><td colspan="2" style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td>'.format(i+1, track['permalink_url'], track['title'])
-        else:          
-          redirect_url = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus(track['permalink_url'])
-          item['content_html'] += '<tr><td style="width:50%; height:3em;">{0}.&nbsp;<a href="{1}">{2}</a></td><td><audio controls><source src="{3}" type="audio/mpeg"><a href="{3}">Play track</a></audio></td></tr>'.format(i+1, track['permalink_url'], track['title'], redirect_url)
-      item['content_html'] += '</table></center>'
-
-    else:
-      item['_audio'] = audio_json['stream_url'] + '?consumer_key=' + sc_key
-
-      item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(poster, audio_json['permalink_url'], audio_json['title'])
-      item['content_html'] += 'by <a href="{}">{}</a></small></td></tr>'.format(audio_json['user']['permalink_url'], item['author']['name'])
-      item['content_html'] += '<tr><td><audio controls><source src="{0}" type="audio/mpeg"><a href="{0}">Play track</a></audio></td></tr></table></center>'.format(redirect_url)
-
-  return item
+  return None
 
 def get_feed(args, save_debug):
   return None

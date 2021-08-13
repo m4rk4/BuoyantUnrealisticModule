@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import unquote_plus
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss, soundcloud, twitter
 import utils
 
 import logging
@@ -219,9 +219,21 @@ def get_content(url, args, save_debug=False):
         el.decompose()
 
     for el in article_text.find_all('iframe'):
-      if el.has_attr('src') and 'youtube.com' in el['src']:
-        el.insert_after(BeautifulSoup(utils.add_video(el['src'], 'youtube'), 'html.parser'))
-        el.decompose()
+      new_html = ''
+      if el.has_attr('src'):
+        if 'youtube.com' in el['src']:
+          new_html = utils.add_video(el['src'])
+        elif 'soundcloud.com' in el['src']:
+          embed = soundcloud.get_content(el['src'], {}, save_debug)
+          if embed:
+            new_html = embed['content_html']
+        else:
+          logger.warning('unhandled iframe in ' + url)
+        if new_html:
+          if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
+            el = el.parent
+          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+          el.decompose()
       else:
         logger.warning('unhandled iframe in ' + url)
 
