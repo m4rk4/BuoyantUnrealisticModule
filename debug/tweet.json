@@ -1,61 +1,157 @@
 {
+  "in_reply_to_screen_name": "ErrataRob",
+  "in_reply_to_status_id_str": "1425912984036069379",
+  "in_reply_to_user_id_str": "15300995",
   "lang": "en",
-  "favorite_count": 7526,
-  "created_at": "2021-08-11T14:57:25.000Z",
+  "favorite_count": 1442,
+  "created_at": "2021-08-12T20:14:50.000Z",
   "display_text_range": [
     0,
-    116
+    165
   ],
   "entities": {
     "hashtags": [],
     "urls": [],
     "user_mentions": [],
-    "symbols": [],
-    "media": [
-      {
-        "display_url": "pic.twitter.com/seFHDMiM4f",
-        "expanded_url": "https://twitter.com/ScottDuncanWX/status/1425471421082386432/photo/1",
-        "indices": [
-          115,
-          138
-        ],
-        "url": "https://t.co/seFHDMiM4f"
-      }
-    ]
+    "symbols": []
   },
-  "id_str": "1425471421082386432",
-  "text": "Ouch! Europe has just witnessed its highest temperature in recorded history. \n\n+48.8\u00b0C at Siracusa, Sicily (IT) \ud83c\uddee\ud83c\uddf9 https://t.co/seFHDMiM4f",
+  "id_str": "1425913689169928192",
+  "text": "79/ \nFinal verdict of this \"cyber expert\":\n\nNumber of \"packet captures\" or \"cyber pcaps\" seen = 0\nAmount of \"Absolute Proof\" seen = 0\nAmount of any evidence seen = 0",
   "user": {
-    "id_str": "3005897708",
-    "name": "Scott Duncan",
-    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1422926905070735371/gxpn5IGa_normal.jpg",
-    "screen_name": "ScottDuncanWX",
+    "id_str": "15300995",
+    "name": "Rob\u1d49\u02b3\u1d57 Graham @ Sioux Falls cyber symposium",
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1765729789/image1326952644_normal.png",
+    "screen_name": "ErrataRob",
     "verified": false
   },
-  "photos": [],
-  "video": {
-    "aspectRatio": [
-      1,
-      1
+  "conversation_count": 75,
+  "news_action_type": "conversation",
+  "parent": {
+    "in_reply_to_screen_name": "ErrataRob",
+    "in_reply_to_status_id_str": "1425899355530153987",
+    "in_reply_to_user_id_str": "15300995",
+    "lang": "en",
+    "reply_count": 23,
+    "retweet_count": 10,
+    "favorite_count": 222,
+    "created_at": "2021-08-12T20:12:02.000Z",
+    "display_text_range": [
+      0,
+      60
     ],
-    "contentType": "gif",
-    "durationMs": 0,
-    "mediaAvailability": {
-      "status": "available"
+    "entities": {
+      "hashtags": [],
+      "urls": [],
+      "user_mentions": [],
+      "symbols": [],
+      "media": [
+        {
+          "display_url": "pic.twitter.com/yr9bD9j19N",
+          "expanded_url": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
+          "indices": [
+            61,
+            84
+          ],
+          "url": "https://t.co/yr9bD9j19N"
+        }
+      ]
     },
-    "poster": "https://pbs.twimg.com/tweet_video_thumb/E8g78kbXsAAgM4B.jpg",
-    "variants": [
+    "id_str": "1425912984036069379",
+    "text": "78/ ok, good bye cybersymposium, time to head to the airport https://t.co/yr9bD9j19N",
+    "user": {
+      "id_str": "15300995",
+      "name": "Rob\u1d49\u02b3\u1d57 Graham @ Sioux Falls cyber symposium",
+      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1765729789/image1326952644_normal.png",
+      "screen_name": "ErrataRob",
+      "verified": false
+    },
+    "photos": [
       {
-        "type": "video/mp4",
-        "src": "https://video.twimg.com/tweet_video/E8g78kbXsAAgM4B.mp4"
+        "backgroundColor": {
+          "red": 204,
+          "green": 214,
+          "blue": 221
+        },
+        "cropCandidates": [
+          {
+            "x": 0,
+            "y": 92,
+            "w": 2048,
+            "h": 1147
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 1536,
+            "h": 1536
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 1347,
+            "h": 1536
+          },
+          {
+            "x": 281,
+            "y": 0,
+            "w": 768,
+            "h": 1536
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 2048,
+            "h": 1536
+          }
+        ],
+        "expandedUrl": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
+        "url": "https://pbs.twimg.com/media/E8ncSzrXIAUcMJV.jpg",
+        "width": 2048,
+        "height": 1536
+      },
+      {
+        "backgroundColor": {
+          "red": 204,
+          "green": 214,
+          "blue": 221
+        },
+        "cropCandidates": [
+          {
+            "x": 0,
+            "y": 92,
+            "w": 2048,
+            "h": 1147
+          },
+          {
+            "x": 307,
+            "y": 0,
+            "w": 1536,
+            "h": 1536
+          },
+          {
+            "x": 402,
+            "y": 0,
+            "w": 1347,
+            "h": 1536
+          },
+          {
+            "x": 691,
+            "y": 0,
+            "w": 768,
+            "h": 1536
+          },
+          {
+            "x": 0,
+            "y": 0,
+            "w": 2048,
+            "h": 1536
+          }
+        ],
+        "expandedUrl": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
+        "url": "https://pbs.twimg.com/media/E8ncSznWUAcFnGI.jpg",
+        "width": 2048,
+        "height": 1536
       }
-    ],
-    "videoId": {
-      "type": "tweet",
-      "id": "1425471421082386432"
-    },
-    "viewCount": 0
-  },
-  "conversation_count": 200,
-  "news_action_type": "conversation"
+    ]
+  }
 }
