@@ -154,6 +154,20 @@ def closest_value(lst, target):
 def closest_dict(lst, k, target):
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i][k]) - target))]
 
+def image_from_srcset(srcset, target):
+  images = []
+  for src in srcset.split(','):
+    m = re.search(r'^(.+)\s(\d+)', src)
+    if m:
+      image = {}
+      image['src'] = m.group(1)
+      image['width'] = int(m.group(2))
+      images.append(image)
+  if images:
+    image = closest_dict(images, 'width', target)
+    return image['src']
+  return ''
+
 def clean_url(url):
   split_url = urlsplit(url)
   return '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)

@@ -9,24 +9,36 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
+# Testing:
+# media-object-podcast: https://www.wsj.com/amp/articles/taliban-seize-kandahar-prepare-to-march-on-kabul-11628846975
+
 def get_caption(el):
-  caption = ''
+  caption = []
   img_caption = el.find(class_=re.compile('imageCaption\b|wsj-article-caption'))
   if img_caption:
-    caption += img_caption.get_text()
+    txt = img_caption.get_text().strip()
+    if txt:
+      caption.append(txt)
   else:
     img_caption = el.find(class_='imageCaptionContent')
     if img_caption:
-      caption += img_caption.get_text()
+      txt = img_caption.get_text().strip()
+      if txt:
+        caption.append(txt)
     img_credit = el.find(class_='imageCredit')
     if img_credit:
-      caption += img_credit.get_text()
-  return caption
+      txt = img_credit.get_text().strip()
+      if txt:
+        caption.append(txt)
+  return ' | '.join(caption)
 
 def convert_amp_image(el):
   img = el.find('amp-img')
   if img:
-    img_src = img['src']
+    if img.has_attr('srcset'):
+      img_src = utils.image_from_srcset(img['srcset'], 1000)
+    else:
+      img_src = img['src']
     return utils.add_image(img_src, get_caption(el))
   return ''
 
@@ -37,14 +49,15 @@ def convert_amp_video(iframe, src='', caption=''):
   m = re.search(r'guid=([0-9A-F\-]+)', src)
   if m:
     api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&count=1&https=1&query={}&fields=isQAEvent,type,video174kMP4Url,video320kMP4Url,video664kMP4Url,video1264kMP4Url,video1864kMP4Url,video2564kMP4Url,hls,videoMP4List,adZone,thumbnailList,guid,state,secondsUntilStartTime,author,description,name,linkURL,videoStillURL,duration,videoURL,adCategory,adsAllowed,chapterTimes,catastrophic,linkShortURL,doctypeID,youtubeID,titletag,rssURL,wsj-section,wsj-subsection,allthingsd-section,allthingsd-subsection,sm-section,sm-subsection,provider,formattedCreationDate,iso8601CreationDate,keywords,keywordsOmni,column,editor,emailURL,emailPartnerID,showName,omniProgramName,omniVideoFormat,linkRelativeURL,touchCastID,omniPublishDate,adTagParams,gptCustParams,format,forceClosedCaptions,captionsVTT,hlsNoCaptions,episodeNumber,seriesName,thumbstripURL,thumbnailImageManager,ads_allowed,mediaLiveChannelId'.format(m.group(1))
-    if False:
-      logger.debug('getting video details from ' + api_url)
     video_json = utils.get_url_json(api_url)
     if video_json:
-      poster = min(video_json['items'][0]['thumbnailList'], key=lambda x:abs(int(x['width'])-640))
+      if True:
+        utils.write_file(video_json, './debug/video.json')
+      video_src = utils.closest_dict(video_json['items'][0]['videoMP4List'], 'height', 480)
+      poster = utils.closest_dict(video_json['items'][0]['thumbnailList'], 'width', 1000)
       if iframe:
         caption = get_caption(iframe)
-      video_html = utils.add_video(video_json['items'][0]['video664kMP4Url'], 'video/mp4', poster['url'], caption)
+      video_html = utils.add_video(video_src['url'], 'video/mp4', poster['url'], caption)
   return video_html
 
 def get_video_content(url, args, save_debug=False):
@@ -64,10 +77,10 @@ def get_video_content(url, args, save_debug=False):
     m = re.search(r'guid=([0-9A-Fa-f\-]+)', ld_json['embedUrl'])
     if m:
       api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&count=1&https=1&query={}&fields=isQAEvent,type,video174kMP4Url,video320kMP4Url,video664kMP4Url,video1264kMP4Url,video1864kMP4Url,video2564kMP4Url,hls,videoMP4List,adZone,thumbnailList,guid,state,secondsUntilStartTime,author,description,name,linkURL,videoStillURL,duration,videoURL,adCategory,adsAllowed,chapterTimes,catastrophic,linkShortURL,doctypeID,youtubeID,titletag,rssURL,wsj-section,wsj-subsection,allthingsd-section,allthingsd-subsection,sm-section,sm-subsection,provider,formattedCreationDate,iso8601CreationDate,keywords,keywordsOmni,column,editor,emailURL,emailPartnerID,showName,omniProgramName,omniVideoFormat,linkRelativeURL,touchCastID,omniPublishDate,adTagParams,gptCustParams,format,forceClosedCaptions,captionsVTT,hlsNoCaptions,episodeNumber,seriesName,thumbstripURL,thumbnailImageManager,ads_allowed,mediaLiveChannelId'.format(m.group(1))
-      if save_debug:
-        logger.debug('getting video details from ' + api_url)
       video_json = utils.get_url_json(api_url)
       if video_json:
+        if save_debug:
+          utils.write_file(video_json, './debug/video.json')
         item['id'] = video_json['items'][0]['guid']
         item['url'] = url
         item['title'] = video_json['items'][0]['name']
@@ -78,10 +91,14 @@ def get_video_content(url, args, save_debug=False):
         item['author'] = {}
         item['author']['name'] = video_json['items'][0]['author']
         item['tags'] = [tag.title() for tag in video_json['items'][0]['keywords']]
-        item['_image'] = video_json['items'][0]['videoStillURL']
+
+        poster = utils.closest_dict(video_json['items'][0]['thumbnailList'], 'width', 1000)
+        item['_image'] = poster['url']
+
         item['summary'] = video_json['items'][0]['description']
-        poster = min(video_json['items'][0]['thumbnailList'], key=lambda x:abs(int(x['width'])-640))
-        item['content_html'] = video_html = utils.add_video(video_json['items'][0]['video664kMP4Url'], 'video/mp4', poster['url'])
+
+        video_src = utils.closest_dict(video_json['items'][0]['videoMP4List'], 'height', 480)
+        item['content_html'] = utils.add_video(video_src['url'], 'video/mp4', poster['url'])
         item['content_html'] += '<h4>{}</h4><p>{}</p>'.format(video_json['items'][0]['titletag'], video_json['items'][0]['description'])
     return item
 
@@ -154,9 +171,9 @@ def get_content(url, args, save_debug=False):
   split_url = urlsplit(url)
   clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
   if '/video/' in clean_url:
-    return get_video_content(url, args, save_debug)
+    return get_video_content(clean_url, args, save_debug)
   elif '/story/' in clean_url:
-    return get_story_content(url, args, save_debug)
+    return get_story_content(clean_url, args, save_debug)
 
   amp_url = '{}://{}/amp{}'.format(split_url.scheme, split_url.netloc, split_url.path)
   article_html = utils.get_url_html(amp_url, 'googlebot')
@@ -173,12 +190,12 @@ def get_content(url, args, save_debug=False):
   item['url'] = clean_url
   item['title'] = soup.find('meta', attrs={"name": "article.headline"}).get('content')
 
-  dt_pub = datetime.fromisoformat(soup.find('meta', attrs={"itemprop": "datePublished"}).get('content').replace('Z', '+00:00'))
-  item['date_published'] = dt_pub.isoformat()
-  dt_mod = datetime.fromisoformat(soup.find('meta', attrs={"itemprop": "dateModified"}).get('content').replace('Z', '+00:00'))
-  item['date_modified'] = dt_mod.isoformat()
-  item['_timestamp'] = dt_pub.timestamp()
-  item['_display_date'] = dt_pub.strftime('%b %-d, %Y')
+  dt = datetime.fromisoformat(soup.find('meta', attrs={"itemprop": "datePublished"}).get('content').replace('Z', '+00:00'))
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  dt = datetime.fromisoformat(soup.find('meta', attrs={"itemprop": "dateModified"}).get('content').replace('Z', '+00:00'))
+  item['date_modified'] = dt.isoformat()
 
   item['author'] = {}
   item['author']['name'] = soup.find('meta', attrs={"name": "author"}).get('content')
@@ -242,10 +259,10 @@ def get_content(url, args, save_debug=False):
       m = re.search(r'guid=([0-9A-Fa-f\-]+)', iframe_src)
       if m:
         api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&query={}&fields=adZone,allthingsd-section,allthingsd-subsection,audioURL,audioURLPanoply,author,column,description,doctypeID,duration,episodeNumber,formattedCreationDate,guid,keywords,linkURL,name,omniPublishDate,omniVideoFormat,playbackSite,podcastName,podcastSubscribeLinks,podcastUrl,sm-section,sm-subsection,thumbnailImageManager,thumbnailList,thumbnailUrl,titletag,type,wsj-section,wsj-subsection'.format(m.group(1))
-        if False:
+        if True:
           logger.debug('getting podcast details from ' + api_url)
         podcast_json = utils.get_url_json(api_url)
-        if podcast_json:
+        if podcast_json and not podcast_json['items'][0].get('error'):
           new_html = '<table style="border:1px solid black; border-radius:10px;"><tr><td><img src="{}?width=200" /></td><td><div><b>{}</b> &ndash; {}</div><audio controls><source src="{}" type="audio/mpeg">Your browser does not support the audio element.</audio><br /><a href="{}"><small>Play audio</small></a></td></tr></table>'.format(podcast_json['items'][0]['thumbnailImageManager'], podcast_json['items'][0]['name'], podcast_json['items'][0]['description'], podcast_json['items'][0]['audioURL'], podcast_json['items'][0]['audioURL'])
 
     elif el.find(class_='media-object-rich-text'):
@@ -272,6 +289,7 @@ def get_content(url, args, save_debug=False):
           new_html = ''
           if url_json.get('subType'):
             if url_json['subType'] == 'origami':
+              logger.debug('WSJ iframe origami in ' + m.group(1))
               group_caption = ''
               n = len(url_json['serverside']['data']['data']['data']['children']) - 1
               for i, it in enumerate(url_json['serverside']['data']['data']['data']['children']):
