@@ -1,157 +1,92 @@
 {
-  "in_reply_to_screen_name": "ErrataRob",
-  "in_reply_to_status_id_str": "1425912984036069379",
-  "in_reply_to_user_id_str": "15300995",
   "lang": "en",
-  "favorite_count": 1442,
-  "created_at": "2021-08-12T20:14:50.000Z",
+  "favorite_count": 46,
+  "created_at": "2021-08-11T17:14:45.000Z",
   "display_text_range": [
     0,
-    165
+    85
   ],
   "entities": {
     "hashtags": [],
-    "urls": [],
-    "user_mentions": [],
-    "symbols": []
-  },
-  "id_str": "1425913689169928192",
-  "text": "79/ \nFinal verdict of this \"cyber expert\":\n\nNumber of \"packet captures\" or \"cyber pcaps\" seen = 0\nAmount of \"Absolute Proof\" seen = 0\nAmount of any evidence seen = 0",
-  "user": {
-    "id_str": "15300995",
-    "name": "Rob\u1d49\u02b3\u1d57 Graham @ Sioux Falls cyber symposium",
-    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1765729789/image1326952644_normal.png",
-    "screen_name": "ErrataRob",
-    "verified": false
-  },
-  "conversation_count": 75,
-  "news_action_type": "conversation",
-  "parent": {
-    "in_reply_to_screen_name": "ErrataRob",
-    "in_reply_to_status_id_str": "1425899355530153987",
-    "in_reply_to_user_id_str": "15300995",
-    "lang": "en",
-    "reply_count": 23,
-    "retweet_count": 10,
-    "favorite_count": 222,
-    "created_at": "2021-08-12T20:12:02.000Z",
-    "display_text_range": [
-      0,
-      60
+    "urls": [
+      {
+        "display_url": "rcmp-grc.ca/95161",
+        "expanded_url": "http://rcmp-grc.ca/95161",
+        "indices": [
+          58,
+          81
+        ],
+        "url": "https://t.co/lpeLAyTSuI"
+      }
     ],
-    "entities": {
-      "hashtags": [],
-      "urls": [],
-      "user_mentions": [],
-      "symbols": [],
-      "media": [
-        {
-          "display_url": "pic.twitter.com/yr9bD9j19N",
-          "expanded_url": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
-          "indices": [
-            61,
-            84
-          ],
-          "url": "https://t.co/yr9bD9j19N"
-        }
-      ]
-    },
-    "id_str": "1425912984036069379",
-    "text": "78/ ok, good bye cybersymposium, time to head to the airport https://t.co/yr9bD9j19N",
-    "user": {
-      "id_str": "15300995",
-      "name": "Rob\u1d49\u02b3\u1d57 Graham @ Sioux Falls cyber symposium",
-      "profile_image_url_https": "https://pbs.twimg.com/profile_images/1765729789/image1326952644_normal.png",
-      "screen_name": "ErrataRob",
-      "verified": false
-    },
-    "photos": [
+    "user_mentions": [],
+    "symbols": [],
+    "media": [
       {
-        "backgroundColor": {
-          "red": 204,
-          "green": 214,
-          "blue": 221
-        },
-        "cropCandidates": [
-          {
-            "x": 0,
-            "y": 92,
-            "w": 2048,
-            "h": 1147
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "w": 1536,
-            "h": 1536
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "w": 1347,
-            "h": 1536
-          },
-          {
-            "x": 281,
-            "y": 0,
-            "w": 768,
-            "h": 1536
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "w": 2048,
-            "h": 1536
-          }
+        "display_url": "pic.twitter.com/NmbWQ3dV6K",
+        "expanded_url": "https://twitter.com/RCMPSK/status/1425505980582928392/photo/1",
+        "indices": [
+          86,
+          109
         ],
-        "expandedUrl": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
-        "url": "https://pbs.twimg.com/media/E8ncSzrXIAUcMJV.jpg",
-        "width": 2048,
-        "height": 1536
-      },
-      {
-        "backgroundColor": {
-          "red": 204,
-          "green": 214,
-          "blue": 221
-        },
-        "cropCandidates": [
-          {
-            "x": 0,
-            "y": 92,
-            "w": 2048,
-            "h": 1147
-          },
-          {
-            "x": 307,
-            "y": 0,
-            "w": 1536,
-            "h": 1536
-          },
-          {
-            "x": 402,
-            "y": 0,
-            "w": 1347,
-            "h": 1536
-          },
-          {
-            "x": 691,
-            "y": 0,
-            "w": 768,
-            "h": 1536
-          },
-          {
-            "x": 0,
-            "y": 0,
-            "w": 2048,
-            "h": 1536
-          }
-        ],
-        "expandedUrl": "https://twitter.com/ErrataRob/status/1425912984036069379/photo/1",
-        "url": "https://pbs.twimg.com/media/E8ncSznWUAcFnGI.jpg",
-        "width": 2048,
-        "height": 1536
+        "url": "https://t.co/NmbWQ3dV6K"
       }
     ]
-  }
+  },
+  "id_str": "1425505980582928392",
+  "text": "Man charged after stopping helicopter at ice cream shop - https://t.co/lpeLAyTSuI ^km https://t.co/NmbWQ3dV6K",
+  "user": {
+    "id_str": "575646270",
+    "name": "RCMP Saskatchewan",
+    "profile_image_url_https": "https://pbs.twimg.com/profile_images/1011282080297201665/62frgeVi_normal.jpg",
+    "screen_name": "RCMPSK",
+    "verified": true
+  },
+  "photos": [
+    {
+      "backgroundColor": {
+        "red": 204,
+        "green": 214,
+        "blue": 221
+      },
+      "cropCandidates": [
+        {
+          "x": 0,
+          "y": 0,
+          "w": 1071,
+          "h": 600
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "w": 600,
+          "h": 600
+        },
+        {
+          "x": 7,
+          "y": 0,
+          "w": 526,
+          "h": 600
+        },
+        {
+          "x": 120,
+          "y": 0,
+          "w": 300,
+          "h": 600
+        },
+        {
+          "x": 0,
+          "y": 0,
+          "w": 1200,
+          "h": 600
+        }
+      ],
+      "expandedUrl": "https://twitter.com/RCMPSK/status/1425505980582928392/photo/1",
+      "url": "https://pbs.twimg.com/media/E8hqH2OWEAQcOgn.jpg",
+      "width": 1200,
+      "height": 600
+    }
+  ],
+  "conversation_count": 15,
+  "news_action_type": "conversation"
 }
