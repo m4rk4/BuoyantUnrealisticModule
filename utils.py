@@ -390,14 +390,15 @@ def add_megaphone(url):
 
 def add_video(video_url, video_type, poster='', caption='', width=640, height=360, gawker=False):
   if not poster:
-    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
-
-  h = round(height/width*100, 2)
+    #poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
+    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-1280x720.webp'
 
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
+
   elif video_type == 'application/x-mpegURL':
     video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/videojs?src={}&type={}&poster={}'.format(quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
+
   elif video_type == 'vimeo':
     content = vimeo.get_content(video_url, None, False)
     if content.get('_image'):
@@ -405,6 +406,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
     if not caption:
       caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
+
   elif video_type == 'youtube':
     content = youtube.get_content(video_url, None, False)
     if content.get('_image'):
@@ -412,6 +414,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
     if not caption:
       caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
+
   else:
     logger.warning('unknown video type {} for {}'.format(video_type, video_url))
     return ''
@@ -419,6 +422,8 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
   if caption:
     caption += ' | '
   caption += '<a href="{}">Open video</a>'.format(video_src)
+
+  poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 

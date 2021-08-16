@@ -157,7 +157,7 @@ def videojs():
     return 'No video src specified'
 
   if not video_args.get('poster'):
-    video_args['poster'] = '/static/video_poster-640x360.webp'
+    video_args['poster'] = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
 
   if not video_args.get('type'):
     if '.mp4' in video_args['src'].lower():
@@ -224,39 +224,75 @@ def image():
 
   try:
     r = requests.get(args['url'])
-    img_io = BytesIO(r.content)
-    img = Image.open(img_io)
+    im_io = BytesIO(r.content)
+    im = Image.open(im_io)
   except:
-    img = None
+    im = None
 
-  if not img:
+  if not im:
     return 'Something went wrong :('
 
-  mimetype = img.get_format_mimetype()
-  img_h, img_w = img.size
+  mimetype = im.get_format_mimetype()
 
   if scale > 0:
-    h = (img_h * scale) // 100
-    w = (img_w * scale) // 100
+    h = (im.height * scale) // 100
+    w = (im.width * scale) // 100
   elif height > 0 and width == 0:
     h = height
-    w = (img_w * height) // img_h
+    w = (im.width * height) // im.height
   elif height == 0 and width > 0:
-    h = (img_h * width) // img_w
+    h = (im.height * width) // im.width
     w = width
   else:
-    h = img_h
-    w = img_w
+    h = im.height
+    w = im.width
 
-  if h != img_h or w != img_w:
-    #img.thumbnail((h, w))
-    img = img.resize((h, w), resample=Image.LANCZOS)
-    img_io = BytesIO()
-    img.save(img_io, 'JPEG', quality=70)
+  save = False
+  if h != im.height or w != im.width:
+    #im.thumbnail((h, w))
+    im = im.resize((w, h), resample=Image.LANCZOS)
+    save = True
+
+  if 'overlay' in args:
+    if args['overlay'] == 'video':
+      overlay_sizes = [{"width": 512, "height": 360, "name": "video_play_button-512x360.png"},
+                       {"width": 384, "height": 270, "name": "video_play_button-384x270.png"},
+                       {"width": 256, "height": 180, "name": "video_play_button-256x180.png"},
+                       {"width": 192, "height": 135, "name": "video_play_button-192x135.png"},
+                       {"width": 128, "height": 90, "name": "video_play_button-128x90.png"},
+                       {"width": 97, "height": 68, "name": "video_play_button-97x68.png"},
+                       {"width": 64, "height": 45, "name": "video_play_button-64x45.png"},
+                       {"width": 48, "height": 34, "name": "video_play_button-48x34.png"}]
+    else:
+      overlay_sizes = [{"width": 512, "height": 512, "name": "play_button-512x512.png"},
+                       {"width": 384, "height": 384, "name": "play_button-384x384.png"},
+                       {"width": 256, "height": 256, "name": "play_button-256x256.png"},
+                       {"width": 192, "height": 192, "name": "play_button-192x192.png"},
+                       {"width": 128, "height": 128, "name": "play_button-128x128.png"},
+                       {"width": 96, "height": 96, "name": "play_button-96x96.png"},
+                       {"width": 64, "height": 64, "name": "play_button-64x64.png"},
+                       {"width": 48, "height": 48, "name": "play_button-48x48.png"}]
+
+    w_size = utils.closest_dict(overlay_sizes, 'width', w//3)
+    h_size = utils.closest_dict(overlay_sizes, 'height', h//3)
+    if h_size['width'] <= w_size['width']:
+      overlay_name = h_size['name']
+    else:
+      overlay_name = w_size['name']
+    #im_overlay = Image.open(requests.get('https://icons.iconarchive.com/icons/iconsmind/outline/{}/Youtube-icon.png'.format(size), stream=True).raw)
+    im_overlay = Image.open('./static/' + overlay_name)
+    x = (w - im_overlay.width) // 2
+    y = (h - im_overlay.height) // 2
+    im.paste(im_overlay, (x, y), mask=im_overlay)
+    save = True
+
+  if save:
+    im_io = BytesIO()
+    im.save(im_io, 'JPEG', quality=70)
     mimetype = 'image/jpeg'
 
-  img_io.seek(0)
-  return send_file(img_io, mimetype=mimetype)
+  im_io.seek(0)
+  return send_file(im_io, mimetype=mimetype)
 
 if __name__ == '__main__':
   app.run(host='0.0.0.0', port=8080)
