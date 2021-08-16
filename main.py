@@ -157,7 +157,7 @@ def videojs():
     return 'No video src specified'
 
   if not video_args.get('poster'):
-    video_args['poster'] = '/static/video_poster-640x360.webp'
+    video_args['poster'] = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
 
   if not video_args.get('type'):
     if '.mp4' in video_args['src'].lower():

@@ -423,7 +423,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     caption += ' | '
   caption += '<a href="{}">Open video</a>'.format(video_src)
 
-  poster = '/image?url={}&overlay=video'.format(quote_plus(poster))
+  poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
