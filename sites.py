@@ -74,6 +74,9 @@ handlers = {
   "ign.com": {
     "module": "ign"
   },
+  "instagram.com": {
+    "module": "instagram"
+  },
   "mashable.com": {
     "module": "mashable"
   },
