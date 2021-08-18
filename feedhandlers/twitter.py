@@ -199,8 +199,10 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
       else:
         media_html += '<div style="border:1px solid black; border-radius:10px;"><a href="{0}"><img width="100%" style="border-top-left-radius:10px; border-top-right-radius:10px;" src="{1}" /></a><div style="padding:0 1em 0 1em;"><b><a href="{0}">{2}</a></b><br /><small>{3}&nbsp;<a href="{0}">{4}</a></small></div></div><br />'.format(link, img, title, link_svg, link_text)
 
-  td = datetime.fromisoformat(tweet_json['created_at'].replace('Z', '+00:00'))
-  
+  dt = datetime.fromisoformat(tweet_json['created_at'].replace('Z', '+00:00'))
+  tweet_time = '{}:{} {}'.format(dt.strftime('%I').lstrip('0'), dt.minute, dt.strftime('%p'))
+  tweet_date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
   if tweet_json.get('quoted_tweet'):
     media_html += make_tweet(tweet_json['quoted_tweet'], is_quoted=True)
 
@@ -215,19 +217,19 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
     border = ' border-left:2px solid rgb(196, 207, 214);'
     if is_reply == 1:
       border = ''
-    tweet_html = '<tr style="font-size:0.9em;"><td style="width:56px;"><img style="width:48px; height:48px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_svg, tweet_url, td.strftime('%b %-d, %Y'))
+    tweet_html = '<tr style="font-size:0.9em;"><td style="width:56px;"><img style="width:48px; height:48px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_svg, tweet_url, tweet_date)
     tweet_html += '<tr><td colspan="2" style="padding:0 0 0 24px;">'
     tweet_html += '<table style="font-size:0.9em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(border, text_html)
     tweet_html += '<tr><td>{}</td></tr></table></tr></td>'.format(media_html)
   elif is_quoted:
-    tweet_html = '<table style="font-size:0.9em; width:95%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img style="width:32px; height:32px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_svg, tweet_url, td.strftime('%b %-d, %Y'))
+    tweet_html = '<table style="font-size:0.9em; width:95%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img style="width:32px; height:32px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_svg, tweet_url, tweet_date)
     tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(text_html)
     tweet_html += '<tr><td colspan="2">{}</td></tr></table>'.format(media_html)
   else:
     tweet_html = '<tr><td style="width:56px;"><img style="width:48px; height:48px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3}<br /><small>@{1}</small></a></td></tr>'.format(tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_svg)
     tweet_html += '<tr><td colspan="2" style="padding:0 0 1em 0;">{}</td></tr>'.format(text_html)
     tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(media_html)
-    tweet_html += '<tr><td colspan="2"><a style="text-decoration:none;" href="{}"><small>{}</small></a></td></tr>'.format(tweet_url, td.strftime('%-I:%M %p · %b %-d, %Y'))
+    tweet_html += '<tr><td colspan="2"><a style="text-decoration:none;" href="{}"><small>{} · {}</small></a></td></tr>'.format(tweet_url, tweet_time, tweet_date)
 
   return tweet_html
 
