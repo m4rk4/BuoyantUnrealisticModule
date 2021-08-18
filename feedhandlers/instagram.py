@@ -32,6 +32,17 @@ def get_content(url, args, save_debug=False):
 
   soup = BeautifulSoup(ig_embed, 'html.parser')
 
+  el = soup.find(class_='EmbedIsBroken')
+  if el:
+    msg = el.find(class_='ebmMessage').get_text()
+    if 'removed' in msg:
+      item = {}
+      item['content_html'] = '<blockquote><a href="{}">{}</a></blockquote>'.format(ig_url, msg)
+      return item
+    else:
+      logger.warning('embMessage "{}" in {}'.format(el.get_text(), ig_url))
+      return None
+
   m = re.search(r"window\.__additionalDataLoaded\('extra',(.+)\);<\/script>", ig_embed)
   if m:
     try:
@@ -49,7 +60,7 @@ def get_content(url, args, save_debug=False):
     avatar = el.img['src']
     username = soup.find(class_='UsernameText').get_text()
 
-  title = 'Instagram post by ' + username
+  title = '{} posted on Instagram'.format(username)
   caption = None
   post_caption = '<a href="{}"><small>Open in Instagram</small></a>'.format(ig_url)
   if ig_data:
@@ -97,7 +108,7 @@ def get_content(url, args, save_debug=False):
         a.string = a.get_text()
 
       if str(caption):
-        title = caption.get_text()
+        title = '{} posted: {}'.format(username, caption.get_text())
         post_caption = str(caption) + post_caption
       while post_caption.startswith('<br/>'):
         post_caption = post_caption[5:]
@@ -115,7 +126,8 @@ def get_content(url, args, save_debug=False):
   elif media_type == 'GraphVideo':
     if ig_data:
       video_src = ig_data['shortcode_media']['video_url']
-      poster = ig_data['shortcode_media']['display_resources'][0]['src']
+      img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
+      poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img['src']))
       post_media += utils.add_video(video_src, 'video/mp4', poster)
     else:
       el = soup.find('img', class_='EmbeddedMediaImage')
@@ -133,7 +145,8 @@ def get_content(url, args, save_debug=False):
 
         elif edge['node']['__typename'] == 'GraphVideo':
           video_src = edge['node']['video_url']
-          poster = edge['node']['display_resources'][0]['src']
+          img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
+          poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img['src']))
           post_media += utils.add_video(video_src, 'video/mp4', poster)
 
         post_media += '<br/><br/>'
