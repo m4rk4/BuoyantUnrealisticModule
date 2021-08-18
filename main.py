@@ -9,8 +9,6 @@ import utils
 from feedhandlers import *
 from sites import handlers
 
-# Test: https://buoyantunrealisticmodule.m4rk4.repl.co/feed?feedtype=wp-posts&url=https%3A%2F%2Fliliputing.com%2Fwp-json%2Fwp%2Fv2%2Fposts%3Fper_page%3D3&title=Liliputing&exc_filters=%7B%22tags%22%3A%20%22%2Fdeals%2Fi%22%7D
-
 app = Flask(__name__)
 
 # Setup logger
