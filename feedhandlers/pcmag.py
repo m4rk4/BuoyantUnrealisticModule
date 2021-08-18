@@ -1,57 +1,63 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus
 
 import utils
-from feedhandlers import twitter
+from feedhandlers import twitter, youtube
 
 import logging
 logger = logging.getLogger(__name__)
 
-def resize_image(img_path):
-  #h = math.ceil(int(height)*int(w)/int(width))
-  path, fmt = img_path.split('.')
-  return 'https://i.pcmag.com/imagery/{}.fit_lim.size_640x.{}'.format(path, fmt)
+def get_image_src(el_img, width=1000, height=''):
+  if el_img.has_attr('data-lazy-sized'):
+    img_src = el_img['data-image-loader']
+  else:
+    img_src = el_img['src']
+
+  if img_src.startswith('https://i.pcmag.com/imagery'):
+    m = re.search(r'\.(size_\d+x\d+)', img_src)
+    if m:
+      return img_src.replace(m.group(1), 'size_{}x{}'.format(width, height))
+    m = re.search(r'\.(fit_\w+)', img_src)
+    if m:
+      return img_src.replace(m.group(1), 'fit_lim.size_{}x{}'.format(width, height))
+    m = re.search(r'\.(jpg|png)', img_src)
+    if m:
+      return img_src.replace(m.group(1), 'fit_lim.size_{}x{}.{}'.format(width, height, m.group(1)))
+  elif el_img.has_attr('srcset'):
+    return utils.image_from_srcset(el_img['srcset'], width)
+  return img_src
 
 def get_content(url, args, save_debug=False):
-  article_html = utils.get_url_html(url)
+  article_html = utils.get_url_html(url, 'desktop')
   if not article_html:
     return None
   if save_debug:
-    with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-      f.write(article_html)
+    utils.write_file(article_html, './debug/debug.html')
 
   soup = BeautifulSoup(article_html, 'html.parser')
-  article_page = soup.find(attrs={"tracking-source": "article-page"})
-  if not article_page:
-    article_page = soup.find(attrs={"tracking-source": "review-page"})
-  if not article_page:
-    logger.warning('unable to extract article json from ' + url)
-    return None
+  for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
+    ld_json = json.loads(el.string)
+    if ld_json.get('@type'):
+      if ld_json['@type'] == 'Article':
+        break
+      elif ld_json['@type'] == 'Product' and ld_json.get('review'):
+        ld_json = ld_json['review']
 
-  def replace_quot(matchobj):
-    return matchobj.group(0).replace('&quot;', '"')
-  article_data = re.sub(r'({|,|:)&quot;\w|\w&quot;(}|,|:)', replace_quot, article_page['context'])
-  if save_debug:
-    with open('./debug/debug.txt', 'w', encoding='utf-8') as f:
-      f.write(article_data)
-
-  article_json = json.loads(article_data)
-  if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(article_json, file, indent=4)
-  
   item = {}
-  item['id'] = article_json['id']
+  item['id'] = url
   item['url'] = url
-  item['title'] = article_json['title']
+  el = soup.find('meta', attrs={"property": "og:title"})
+  if el:
+    item['title'] = el['content']
+  else:
+    item['title'] = soup.title.string
 
-  dt = datetime.fromisoformat(article_json['published_at'].replace('Z', '+00:00'))
+  dt = datetime.fromisoformat(ld_json['datePublished'])
   item['date_published'] = dt.isoformat()
   item['_timestamp'] = dt.timestamp()
   item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-  dt = datetime.fromisoformat(article_json['updated_at'].replace('Z', '+00:00'))
+  dt = datetime.fromisoformat(ld_json['dateModified'])
   item['date_modified'] = dt.isoformat()
 
   # Check age
@@ -59,161 +65,168 @@ def get_content(url, args, save_debug=False):
     if not utils.check_age(item, args):
       return None
 
-  authors = []
-  for author in article_json['authors']:
-    authors.append('{} {}'.format(author['first_name'], author['last_name']))
-  item['author'] = {}
-  item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
-  item['tags'] = []
-  for cat in article_json['categories']:
-    item['tags'].append(cat['name'])
-
-  item['_image'] = resize_image(article_json['images']['images'][0]['path'])
-  item['summary'] = article_json['deck']
-
-  item['content_html'] = ''
-
-  def get_block_content(block, i):
-    nonlocal url
-    block_html = ''
-    if block['type'] == 'text':
-      if block.get('marks'):
-        end_tag = ''
-        for mark in block['marks']:
-          if mark['type'] == 'link':
-            block_html += '<a href="{}">'.format(mark['attrs']['href'])
-            end_tag = '</a>' + end_tag
-          elif mark['type'] == 'italic':
-            block_html += '<i>'
-            end_tag = '</i>' + end_tag
-          elif mark['type'] == 'bold':
-            block_html += '<b>'
-            end_tag = '</b>' + end_tag
-        block_html += block['text'] + end_tag
-      else:
-        block_html += block['text']
-
-    elif block['type'] == 'paragraph':
-      block_html += '<p>'
-      if block.get('content'):
-        for content in block['content']:
-          block_html += get_block_content(content, i)
-      block_html += '</p>'
-
-    elif block['type'] == 'code_block':
-      # If it's the first block, it's likely the lead image caption so skip it
-      if i > 0:
-        block_html += '<p>'
-        for content in block['content']:
-          block_html += get_block_content(content, i)
-        block_html += '</p>'
-    
-    elif block['type'] == 'heading':
-      block_html += '<h{}>'.format(block['attrs']['level'])
-      for content in block['content']:
-        block_html += get_block_content(content, i)
-      block_html += '</h{}>'.format(block['attrs']['level'])
-
-    elif block['type'] == 'horizontal_rule':
-      block_html += '<hr width="80%" />'
-
-    elif block['type'] == 'bullet_list':
-      block_html += '<ul>'
-      for list_item in block['content']:
-        block_html += get_block_content(list_item, i)
-      block_html += '</ul>'
-
-    elif block['type'] == 'ordered_list':
-      block_html += '<ol>'
-      for list_item in block['content']:
-        block_html += get_block_content(list_item, i)
-      block_html += '</ol>'
-
-    elif block['type'] == 'list_item':
-      block_html += '<li>'
-      for content in block['content']:
-        block_html += get_block_content(content, i)
-      block_html += '</li>'
-
-    elif block['type'] == 'eloquent_imagery_image':
-      block_html += utils.add_image(resize_image(block['attrs']['path']), block['attrs']['caption'])
-
-    elif block['type'] == 'youtube_video':
-      block_html += utils.add_youtube(block['attrs']['id'])
-
-    elif block['type'] == 'mashable_video':
-      m = re.search('({{"slug":"{}"[^}}]+}})'.format(block['attrs']['id']), article_html)
-      if m:
-        video_json = json.loads(m.group(1))
-        if video_json:
-          video_src = ''
-          for fmt in ['480.mp4', '720.mp4', '1080.mp4']:
-            for src in video_json['transcoded_urls']:
-              if src.endswith(fmt):
-                video_src = src
-                break
-            if video_src:
-              break
-          if not video_src:
-            video_src = video_json['url']
-          block_html += utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], video_json['title'])
-
-    elif block['type'] == 'twitter_embed':
-      tweet = twitter.get_content('https://twitter.com/' + block['attrs']['id'], None)
-      block_html += tweet['content_html']
-
-    elif block['type'] == 'infogram_embed':
-      infogram_json = utils.get_url_json('https://infogram.com/oembed/?url=' + quote_plus(block['attrs']['url']))
-      if infogram_json:
-        block_html += utils.add_image(infogram_json['thumbnail_url'], '<a href="{}">{}</a>'.format(infogram_json['uri'], infogram_json['title']))
-      else:
-        block_html += '<p><a href="">Infogram embed chart</a>'.format(block['attrs']['url'])
-
-    elif block['type'] == 'hard_break':
-      pass
-
+  if ld_json.get('author'):
+    item['author'] = {}
+    if isinstance(ld_json['author'], list):
+      authors = []
+      for author in ld_json['author']:
+        authors.append(author['name'])
+      item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     else:
-      logger.warning('unhandled content block type {} in {}'.format(block['type'], url)) 
-    return block_html
+      item['author']['name'] = ld_json['author']['name']
 
-  # Lead image
-  caption = ''
-  if article_json['body_content_blocks']['content'][0]['type'] == 'code_block':
-    for content in article_json['body_content_blocks']['content'][0]['content']:
-      caption += get_block_content(content, 1)
-    caption = BeautifulSoup(caption, 'html.parser').get_text()
-  else:
+  m = re.search(r'PogoConfig = (\{[^\}]+\})', article_html)
+  if m:
+    pogo = json.loads(m.group(1))
+    item['tags'] = []
+    if pogo.get('category'):
+      item['tags'].append(pogo['category'])
+    if pogo.get('tags'):
+      for tag in pogo['tags']:
+        item['tags'].append(tag)
+
+  el = soup.find('meta', attrs={"property": "og:image"})
+  if el:
+    item['_image'] = el['content']
+
+  el = soup.find('meta', attrs={"property": "description"})
+  if el:
+    item['summary'] = el['content']
+
+  article = soup.find('article')
+  if not article:
+    return item
+
+  article.attrs = {}
+
+  for el in article.find_all('img'):
+    img_src = get_image_src(el)
     caption = ''
-  item['content_html'] += utils.add_image(item['_image'], caption)
+    for it in el.next_siblings:
+      if not it.name:
+        continue
+      break
+    if it.name == 'div' and it.small:
+      caption = it.get_text().strip()
+      it.decompose()
+    new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
+    el.insert_after(new_el)
+    el.decompose()
 
-  # Review summary
-  if article_json.get('is_editors_choice') and article_json['is_editors_choice']== True:
-    item['content_html'] += '<center><img height="60px" src="https://www.pcmag.com/images/editors-choice-horizontal.png" /></center>'
-  if article_json.get('score'):
-    item['content_html'] += '<center><h2>Review score: {}</h2></center>'.format(article_json['score'])
-  if article_json.get('bottom_line'):
-    item['content_html'] += '<h2>Bottom Line</h2><p>{}</p>'.format(article_json['bottom_line'])
-  if article_json.get('pros'):
-    item['content_html'] += '<h2>Pros:</h2><ul>'
-    for it in article_json['pros'].split('\n'):
-      item['content_html'] += '<li>{}</li>'.format(it)
-    item['content_html'] += '</ul>'
-  if article_json.get('cons'):
-    item['content_html'] += '<h2>Cons</h2><ul>'
-    for it in article_json['cons'].split('\n'):
-      item['content_html'] += '<li>{}</li>'.format(it)
-    item['content_html'] += '</ul><hr width="80%" />'
+  for el in article.children:
+    if el.name == 'ins':
+      el.decompose()
+    elif el.name == 'div':
+      if el.has_attr('x-data'):
+        el.decompose()
+      elif el.has_attr('id') and ('comments' in el['id'] or 'similar-products' in el['id']):
+        el.decompose()
+      elif el.has_attr('class') and 'review-card' in el['class']:
+        el.decompose()
+      elif el.h3 and re.search(r'Recommended by Our Editors', el.h3.get_text()):
+        el.decompose()
+      elif el.iframe:
+        if el.iframe.has_attr('loading') and el.iframe['loading'] == 'lazy':
+          iframe_src = el.iframe['data-image-loader']
+        else:
+          iframe_src = el.iframe['src']
+        if 'youtube.com' in iframe_src:
+          new_el = BeautifulSoup(utils.add_video(iframe_src, 'youtube'), 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+      elif el.find(id=re.compile(r'video-container-')):
+        video_json = None
+        for it in el.parent.find_all('script'):
+          m = re.search(r'window\.videoEmbeds\.push\(\{.*data:\s(\{.*\}).*\}\);', str(it), flags=re.S)
+          if m:
+            video_json = json.loads(m.group(1))
+            break
+        if video_json:
+          if save_debug:
+            utils.write_file(video_json, './debug/video.json')
+          videos = []
+          for video_src in video_json['transcoded_urls']:
+            m = re.search(r'\/(\d+)\.mp4', video_src)
+            if m:
+              video = {}
+              video['src'] = video_src
+              video['height'] = m.group(1)
+          if videos:
+            video_src = utils.closest_dict(videos, '480')
+          new_el = BeautifulSoup(utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], video_json['title']), 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+        else:
+          logger.warning('unable to parse video json data in ' + url)
 
-  # Article body
-  #item['content_html'] += article_json['body']
-  for i, block in enumerate(article_json['body_content_blocks']['content']):
-    item['content_html'] += get_block_content(block, i)
-  
+    elif el.name == 'p':
+      for it in el.find_all('strong'):
+        if it.a and it.a['href'] == 'https://www.pcmag.com/newsletter_manage':
+          el.decompose()
+          break
+
+  if '/reviews/' in url:
+    review_html = ''
+    el = soup.find(ref='gallery')
+    if el:
+      img_src = get_image_src(el.img)
+    review_html += utils.add_image(img_src)
+
+    if ld_json.get('reviewRating'):
+      review_html += '<center><h3>{} / {}'.format(ld_json['reviewRating']['ratingValue'], ld_json['reviewRating']['bestRating'])
+      el = soup.find('header', id='content-header')
+      if el:
+        if el.img and el.img.has_attr('alt') and 'editors choice' in el.img['alt']:
+          review_html += ' 	&ndash; Editors\' Choice'
+      review_html += '</h3></center>'
+
+    el = soup.find(class_='bottom-line')
+    if el:
+      review_html += '<h3>{}</h3>{}'.format(el.h3.get_text(), el.p)
+
+    el = soup.find(class_='pros-cons')
+    if el:
+      headers = el.find_all('h3')
+      for i, ul in enumerate(el.find_all('ul')):
+        review_html += '<h3>{}</h3><ul>'.format(headers[i].get_text())
+        for li in ul.find_all('li'):
+          review_html += '<li>{}</li>'.format(li.get_text())
+        review_html += '</ul>'
+
+    el = soup.find(id='specs')
+    if el:
+      review_html += '<h3>{}</h3>'.format(el.get_text())
+      for it in el.next_siblings:
+        if it.name == None:
+          continue
+        break
+      if it.name == 'table':
+        it.attrs = {}
+        for t in it.find_all(['tr', 'td']):
+          t.attrs = {}
+        review_html += str(it)
+
+    if review_html:
+      review_html += '<hr />'
+      new_el = BeautifulSoup(review_html, 'html.parser')
+      article.insert(0, new_el)
+
+  # Add lead image
+  el = soup.find(class_='article-image')
+  if el:
+    img_src = get_image_src(el.img)
+    if el.small:
+      caption = el.small.get_text()
+    else:
+      caption = ''
+    new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
+    article.insert(0, new_el)
+
+  item['content_html'] = str(article)
   return item
 
 def get_feed(args, save_debug=False):
-  page_html = utils.get_url_html(args['url'])
+  page_html = utils.get_url_html(args['url'], 'desktop')
   if not page_html:
     return None
   if save_debug:
