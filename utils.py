@@ -311,7 +311,7 @@ def add_pullquote(quote, author=''):
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
-def add_image(img_src, caption=None, width=None, height=None, attr=None, background='', link='', gawker=False):
+def add_image(img_src, caption='', width=None, height=None, attr='', background='', link='', gawker=False):
   if width:
     img_width = 'width="{}"'.format(width)
   else:
@@ -419,12 +419,11 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     logger.warning('unknown video type {} for {}'.format(video_type, video_url))
     return ''
 
-  if caption:
-    caption += ' | '
-  caption += '<a href="{}">Open video</a>'.format(video_src)
+  #if caption:
+  #  caption += ' | '
+  #caption += '<a href="{}">Open video</a>'.format(video_src)
 
   poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
-
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
