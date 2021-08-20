@@ -393,6 +393,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     #poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
     poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-1280x720.webp'
 
+  video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
 
@@ -409,21 +410,26 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
 
   elif video_type == 'youtube':
     content = youtube.get_content(video_url, None, False)
-    if content.get('_image'):
-      poster = content['_image']
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
-    if not caption:
-      caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
+    if content:
+      if content.get('_image'):
+        poster = content['_image']
+      video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
+      if not caption:
+        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
 
   else:
     logger.warning('unknown video type {} for {}'.format(video_type, video_url))
     return ''
+
+  if not video_src:
+    return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
 
   #if caption:
   #  caption += ' | '
   #caption += '<a href="{}">Open video</a>'.format(video_src)
 
   poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
+
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
