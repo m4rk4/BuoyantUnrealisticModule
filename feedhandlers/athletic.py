@@ -9,22 +9,19 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_amp_img_src(amp_img, width=800):
+def get_amp_img_src(amp_img, width=1000):
+  img_src = ''
   if amp_img.get('srcset'):
-    images = []
-    for src in amp_img['srcset'].split(','):
-      m = re.search(r'^(.+)\s(\d+)', src)
-      if m:
-        image = {}
-        image['src'] = m.group(1)
-        image['width'] = int(m.group(2))
-        images.append(image)
-    if images:
-      image = utils.closest_dict(images, 'width', 800)
-      return image['src']
+    img_src = utils.image_from_srcset(amp_img['srcset'], width)
   if amp_img.get('src'):
-    return amp_img['src']
-  return ''
+    img_src = amp_img['src']
+
+  m = re.search(r'(\/width=\d+\/)', img_src)
+  if m:
+    img_src = img_src.replace(m.group(1), '/width={}/'.format(width))
+  elif img_src.startswith('https://cdn.theathletic.com/app/uploads/'):
+    img_src = img_src.replace('https://cdn.theathletic.com/', 'https://cdn.theathletic.com/cdn-cgi/image/width={}/'.format(width))
+  return img_src
 
 def get_content(url, args, save_debug=False):
   clean_url = utils.clean_url(url)

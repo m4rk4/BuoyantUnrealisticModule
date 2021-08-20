@@ -62,6 +62,10 @@ def get_content(url, args, save_debug=False):
   if save_debug:
     utils.write_file(yt_json, './debug/debug.json')
 
+  if yt_json['playabilityStatus']['status'] != 'OK':
+    logger.debug('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
+    return None
+
   item = {}
   item['id'] = yt_id
   item['url'] = 'https://www.youtube.com/watch?v=' + yt_id
