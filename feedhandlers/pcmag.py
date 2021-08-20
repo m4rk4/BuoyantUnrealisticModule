@@ -159,6 +159,14 @@ def get_content(url, args, save_debug=False):
         else:
           logger.warning('unable to parse video json data in ' + url)
 
+    elif el.name == 'blockquote':
+      if el.has_attr('class') and 'twitter-tweet' in el['class']:
+        tweet = twitter.get_content(el.a['href'], {}, save_debug)
+        if tweet:
+          new_el = BeautifulSoup(tweet['content_html'], 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+
     elif el.name == 'p':
       for it in el.find_all('strong'):
         if it.a and it.a['href'] == 'https://www.pcmag.com/newsletter_manage':
@@ -216,11 +224,24 @@ def get_content(url, args, save_debug=False):
   if el:
     img_src = get_image_src(el.img)
     if el.small:
-      caption = el.small.get_text()
+      caption = el.small.get_text().strip()
     else:
       caption = ''
+      for it in article.children:
+        if it.name:
+          if it.name == 'center':
+            caption = it.get_text().strip()
+            it.decompose()
+          break
+    for it in article.children:
+      if it.name:
+        if it.name == 'br':
+          it.decompose()
+        else:
+          break
     new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
     article.insert(0, new_el)
+
 
   item['content_html'] = str(article)
   return item
