@@ -206,24 +206,48 @@ def instagram():
 
 @app.route('/image')
 def image():
+  im = None
   args = request.args
   if not 'url' in args:
-    return 'No url given'
+    w = -1
+    h = -1
+    if args.get('width'):
+      w = int(args['width'])
+    if args.get('height'):
+      h = int(args['height'])
+    if w > 0 and h < 0:
+      h = w
+    elif w < 0 and h > 0:
+      w = h
+    if w > 0 and h > 0:
+      color = 'lightgrey'
+      if args.get('color'):
+        if args['color'].count(',') == 0:
+          color = args['color']
+        else:
+          r, g, b = args['color'].split(',')
+          color = (int(r), int(g), int(b))
+      im = Image.new('RGB', (w, h), color=color)
+      mimetype = 'image/jpg'
+    else:
+      return 'No url given'
 
-  try:
-    #im_overlay = Image.open(requests.get(args['url'].format(size), stream=True).raw)
-    r = requests.get(args['url'])
-    im_io = BytesIO(r.content)
-    im = Image.open(im_io)
-  except:
-    im = None
+  if not im:
+    try:
+      #im_overlay = Image.open(requests.get(args['url'].format(size), stream=True).raw)
+      r = requests.get(args['url'])
+      if r.status_code == 200:
+        im_io = BytesIO(r.content)
+        im = Image.open(im_io)
+        mimetype = im.get_format_mimetype()
+    except:
+      im = None
 
   if not im:
     return 'Something went wrong :('
 
   w = im.width
   h = im.height
-  mimetype = im.get_format_mimetype()
 
   # Do operations in the order of the args
   resized = False
@@ -272,26 +296,27 @@ def image():
 
     elif arg == 'overlay':
       if val == 'video':
-        overlay_sizes = [{"width": 512, "height": 360, "name": "video_play_button-512x360.png"},
-                         {"width": 384, "height": 270, "name": "video_play_button-384x270.png"},
-                         {"width": 256, "height": 180, "name": "video_play_button-256x180.png"},
-                         {"width": 192, "height": 135, "name": "video_play_button-192x135.png"},
-                         {"width": 128, "height": 90, "name": "video_play_button-128x90.png"},
-                         {"width": 97, "height": 68, "name": "video_play_button-97x68.png"},
-                         {"width": 64, "height": 45, "name": "video_play_button-64x45.png"},
-                         {"width": 48, "height": 34, "name": "video_play_button-48x34.png"}]
+        overlay_sizes = [
+          {"width": 512, "height": 360, "name": "video_play_button-512x360.png"},
+          {"width": 384, "height": 270, "name": "video_play_button-384x270.png"},
+          {"width": 256, "height": 180, "name": "video_play_button-256x180.png"},
+          {"width": 192, "height": 135, "name": "video_play_button-192x135.png"},
+          {"width": 128, "height": 90, "name": "video_play_button-128x90.png"},
+          {"width": 97, "height": 68, "name": "video_play_button-97x68.png"},
+          {"width": 64, "height": 45, "name": "video_play_button-64x45.png"},
+          {"width": 48, "height": 34, "name": "video_play_button-48x34.png"}]
       else:
-        overlay_sizes = [{"width": 512, "height": 512, "name": "play_button-512x512.png"},
-                         {"width": 384, "height": 384, "name": "play_button-384x384.png"},
-                         {"width": 256, "height": 256, "name": "play_button-256x256.png"},
-                         {"width": 192, "height": 192, "name": "play_button-192x192.png"},
-                         {"width": 128, "height": 128, "name": "play_button-128x128.png"},
-                         {"width": 96, "height": 96, "name": "play_button-96x96.png"},
-                         {"width": 64, "height": 64, "name": "play_button-64x64.png"},
-                         {"width": 48, "height": 48, "name": "play_button-48x48.png"}]
-
-      w_size = utils.closest_dict(overlay_sizes, 'width', w//3)
-      h_size = utils.closest_dict(overlay_sizes, 'height', h//3)
+        overlay_sizes = [
+          {"width": 512, "height": 512, "name": "play_button-512x512.png"},
+          {"width": 384, "height": 384, "name": "play_button-384x384.png"},
+          {"width": 256, "height": 256, "name": "play_button-256x256.png"},
+          {"width": 192, "height": 192, "name": "play_button-192x192.png"},
+          {"width": 128, "height": 128, "name": "play_button-128x128.png"},
+          {"width": 96, "height": 96, "name": "play_button-96x96.png"},
+          {"width": 64, "height": 64, "name": "play_button-64x64.png"},
+          {"width": 48, "height": 48, "name": "play_button-48x48.png"}]
+      w_size = utils.closest_dict(overlay_sizes, 'width', w//5)
+      h_size = utils.closest_dict(overlay_sizes, 'height', h//5)
       if h_size['width'] <= w_size['width']:
         overlay_name = h_size['name']
       else:
