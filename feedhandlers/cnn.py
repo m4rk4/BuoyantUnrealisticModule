@@ -4,8 +4,8 @@ from datetime import datetime
 from html import unescape
 from urllib.parse import urlsplit
 
-from feedhandlers import rss, twitter
 import utils
+from feedhandlers import rss
 
 import logging
 logger = logging.getLogger(__name__)
@@ -156,15 +156,14 @@ def process_element(element, url, save_debug=False):
   elif element['contentType'] == 'twitter':
     #logger.warning('CNN twitter embed in ' + url)
     #element_html += element_contents['embedHtml']
-    tweet = twitter.get_content(element_contents['embedUrl'], None, save_debug)
+    tweet = utils.add_twitter(element_contents['embedUrl'])
     if tweet:
-      element_html += tweet['content_html']
+      element_html += tweet
     else:
+      logger.warning('unable to add tweet {} in {}'.format(element_contents['embedUrl'], url))
       m = re.search(r'^(<blockquote.*<\/blockquote>)', element_contents['embedHtml'])
       if m:
         element_html += m.group(1)
-      else:
-        logger.warning('unable to add tweet {} in {}'.format(element_contents['embedUrl'], url))
 
   else:
     logger.warning('unhandled element type {} in {}'.format(element['contentType'], url))

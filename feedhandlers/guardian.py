@@ -226,6 +226,15 @@ def get_content(url, args, save_debug=False):
           el.insert_after(snippet_body)
           el.decompose()
 
+    for el in article_body.find_all('figure', class_='element-tweet'):
+      tweet = utils.add_twitter(el['data-canonical-url'])
+      if tweet:
+        new_el = BeautifulSoup(tweet, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+      else:
+        logger.warning('unable to add tweet {} in {}'.format(el['data-canonical-url'], url))
+
     for el in article_body.find_all('figure', class_='element-embed'):
       it = el.find('iframe')
       if it:

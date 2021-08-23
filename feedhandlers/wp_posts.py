@@ -1,10 +1,10 @@
-import json, os, re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from html import unescape
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss
 import utils
 
 import logging
@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 
 def get_post_content(post, args, save_debug=False):
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(post, file, indent=4)
+    utils.write_file(post, './debug/debug.json')
 
   item = {}
   item['id'] = post['guid']['rendered']
@@ -21,20 +20,16 @@ def get_post_content(post, args, save_debug=False):
   item['title'] = unescape(post['title']['rendered'])
 
   # Dates
-  dt_pub = datetime.fromisoformat(post['date_gmt']).replace(tzinfo=timezone.utc)
-  item['date_published'] = dt_pub.isoformat()
-  dt_mod = datetime.fromisoformat(post['modified_gmt']).replace(tzinfo=timezone.utc)
-  item['date_modified'] = dt_mod.isoformat()
-
-  # Use timestamp for sorting
-  item['_timestamp'] = dt_pub.timestamp()
+  dt = datetime.fromisoformat(post['date_gmt']).replace(tzinfo=timezone.utc)
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  dt = datetime.fromisoformat(post['modified_gmt']).replace(tzinfo=timezone.utc)
+  item['date_modified'] = dt.isoformat()
 
   if 'age' in args:
     if not utils.check_age(item, args):
       return None
-
-  # Simplified date to display
-  item['_display_date'] = dt_pub.strftime('%b %-d, %Y')
 
   # Authors
   author = ''
@@ -153,16 +148,7 @@ def get_post_content(post, args, save_debug=False):
     img = el.find('img')
     if img:
       if img.get('data-lazy-srcset'):
-        data = img['data-lazy-srcset'].split(', ')
-        srcset = {}
-        widths = []
-        for d in data:
-          it = d.split(' ')
-          w = it[1][:-1]
-          widths.append(int(w))
-          srcset[w] = it[0]
-        w = widths[min(range(len(widths)), key = lambda i: abs(widths[i]-600))]
-        img_src = srcset[str(w)]
+        img_src = utils.image_from_srcset(img['data-lazy-srcset'], 1000)
       elif img.get('data-lazy-src'):
         img_src = img['data-lazy-src']
       figcaption = el.find('figcaption')
@@ -196,6 +182,12 @@ def get_post_content(post, args, save_debug=False):
     el.insert_after(new_el)
     el.decompose()
 
+  for el in soup.find_all('iframe'):
+    if el.get('src') and re.search(r'www\.youtube\.com\/', el['src']):
+      new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
+      el.insert_after(new_el)
+      el.decompose()
+
   for el in soup.find_all(class_='blogstyle__iframe'):
     iframe = el.find('iframe')
     if iframe:
@@ -212,18 +204,15 @@ def get_post_content(post, args, save_debug=False):
     elif el.find(class_='twitter-tweet'):
       m = re.search(r'<a href=\"(https:\/\/twitter\.com\/[^\/]+\/status\/\d+)', str(el))
       if m:
-        tweet = twitter.get_content(m.group(1), None)
-        new_el = BeautifulSoup(tweet['content_html'], 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        tweet = utils.get_twitter(m.group(1))
+        if tweet:
+          new_el = BeautifulSoup(tweet, 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+        else:
+          logger.warning('unable to add tweet {} in {}'.format(m.group(1), item['url']))
     else:
       logger.warning('unhandled blogstyle__iframe in ' + item['url'])
-
-  for el in soup.find_all('iframe'):
-    if el.get('src') and re.search(r'www\.youtube\.com\/', el['src']):
-      new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
-      el.insert_after(new_el)
-      el.decompose()
 
   item['content_html'] = str(soup)
   return item

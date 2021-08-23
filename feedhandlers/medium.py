@@ -145,9 +145,9 @@ def get_content(url, args, save_debug=False):
           split_url = urlsplit(iframe_src)
           m = re.search(r'https:\/\/twitter\.com\/[^\/]+\/status\/\d+', unquote(split_url.query))
           if m:
-            tweet = twitter.get_content(m.group(0), None, save_debug)
+            tweet = utils.add_twitter(m.group(0))
             if tweet:
-              start_tag += tweet['content_html']
+              start_tag += tweet
               end_tag = ''
               paragraph_text = ''
               iframe_src = ''

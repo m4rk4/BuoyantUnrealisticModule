@@ -15,8 +15,7 @@ def get_content_review(url, args, save_debug=False):
   if not review_json:
     return None
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(review_json, file, indent=4)
+    utils.write_file(review_json, './debug/debug.json')
 
   # Assume only 1
   result_json = review_json['results'][0]
@@ -95,9 +94,9 @@ def get_content_review(url, args, save_debug=False):
     for audio in result_json['audio_files']:
       audio_embed = ''
       if 'bandcamp' in audio['embedUrl']:
-        audio_embed = bandcamp.get_content(audio['embedUrl'], None, save_debug)
+        audio_embed = bandcamp.get_content(audio['embedUrl'], {}, save_debug)
       elif 'soundcloud' in audio['embedUrl']:
-        audio_embed = soundcloud.get_content(audio['embedUrl'], None, save_debug)
+        audio_embed = soundcloud.get_content(audio['embedUrl'], {}, save_debug)
       if audio_embed:
         content_html += audio_embed['content_html'] + '<hr width="80%" />'
 

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, unquote, urlsplit
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss
 import utils
 
 import logging
@@ -276,10 +276,12 @@ def get_content(url, args, save_debug=False):
 
     elif el.find('amp-twitter'):
       it = el.find('amp-twitter')
-      tweet = twitter.get_content(it['data-tweetid'], None, save_debug)
+      tweet = utils.add_twitter(it['data-tweetid'])
       if tweet:
-        new_html = tweet['content_html']
-  
+        new_html = tweet
+      else:
+        logger.warning('unable to get tweet {} in {}'.format(it['data-tweetid'], clean_url))
+
     elif el.find(class_='dynamic-inset-iframe'):
       iframe_src = el.find('amp-iframe').get('src')
       m = re.search(r'\?url=(.+)$', iframe_src)

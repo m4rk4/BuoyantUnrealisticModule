@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
 import utils
-from feedhandlers import twitter
 
 import logging
 logger = logging.getLogger(__name__)
@@ -88,8 +87,11 @@ def get_content_html(content_uri):
         content_html = '<p>Source: <a href="{}">{}</a></p>'.format(src['url'], ' '.join(text))
 
     elif '/clay-tweet/' in content_uri:
-      tweet = twitter.get_content(content_json['tweetId'], None)
-      content_html = tweet['content_html']
+      tweet = utils.add_twitter(content_json['tweetId'])
+      if tweet:
+        content_html = tweet
+      else:
+        logger.warning('unable to add tweet {} in {}'.format(content_json['tweetId'], content_uri))
 
     elif '/subsection/' in content_uri:
       content_html = ''

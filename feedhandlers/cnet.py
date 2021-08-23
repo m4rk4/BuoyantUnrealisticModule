@@ -2,8 +2,8 @@ import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
-from feedhandlers import rss, twitter
 import utils
+from feedhandlers import rss
 
 import logging
 logger = logging.getLogger(__name__)
@@ -276,8 +276,13 @@ def get_content(url, args, save_debug=False):
       if el.find('amp-youtube'):
         new_html = utils.add_youtube(el.find('amp-youtube').get('data-videoid'))
       elif el.find('amp-twitter'):
-        tweet = twitter.get_content(el.find('amp-twitter').get('data-tweetid'), None, False)
-        new_html = tweet['content_html']
+        tweet_url = el.find('amp-twitter').get('data-tweetid')
+        if tweet_url:
+          tweet = utils.add_twitter(tweet_url)
+          if tweet:
+            new_html = tweet
+          else:
+            logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
       else:
         logger.warning('unhandled op-social content in ' + url)
       if new_html:

@@ -1,10 +1,9 @@
-import json, re
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit, quote_plus
 
 import utils
-from feedhandlers import twitter
 
 import logging
 logger = logging.getLogger(__name__)
@@ -122,9 +121,11 @@ def get_story(story_json, args, save_debug=False):
           elif 'twitter-tweet' in el['class']:
             it = el.find_all('a')
             tweet_url = it[-1]['href']
-            tweet = twitter.get_content(tweet_url, None, False)
+            tweet = utils.add_twitter(tweet_url)
             if tweet:
-              return tweet['content_html']
+              return tweet
+            else:
+              logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
           elif 'pull-quote' in el['class']:
             author = ''
             it = el.find('cite')

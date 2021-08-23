@@ -1,8 +1,8 @@
-import json, pytz, re
+import json, re
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
-from feedhandlers import bandcamp, rss, soundcloud, spotify, twitter, wp_posts
+from feedhandlers import bandcamp, rss, soundcloud, spotify, wp_posts
 import utils
 
 import logging
@@ -28,8 +28,7 @@ def get_content(url, args, save_debug=False):
     return None
 
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(article_json, file, indent=4)
+    utils.write_file(article_json, './debug/debug.json')
 
   item = {}
   item['id'] = article_json['coreDataLayer']['content']['contentId']
@@ -207,11 +206,12 @@ def get_content(url, args, save_debug=False):
         body_html += utils.add_instagram(body_json[1]['props']['url'])
   
       elif body_json[1]['type'] == 'twitter':
-        tweet = twitter.get_content(body_json[1]['props']['url'], None)
+        tweet_url = body_json[1]['props']['url']
+        tweet = utils.add_twitter(tweet_url)
         if tweet:
-          body_html += tweet['content_html']
+          body_html += tweet
         else:
-          logger.warning('error getting twitter content from {} in {}'.format(body_json[1]['props']['url'], json_url))
+          logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
 
       elif body_json[1]['type'] == 'iframe':
         if 'youtube' in body_json[1]['props']['url']:

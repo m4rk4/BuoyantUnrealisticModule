@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 
 import utils
-from feedhandlers import twitter, youtube
 
 import logging
 logger = logging.getLogger(__name__)
@@ -161,11 +160,13 @@ def get_content(url, args, save_debug=False):
 
     elif el.name == 'blockquote':
       if el.has_attr('class') and 'twitter-tweet' in el['class']:
-        tweet = twitter.get_content(el.a['href'], {}, save_debug)
+        tweet = utils.add_twitter(el.a['href'])
         if tweet:
-          new_el = BeautifulSoup(tweet['content_html'], 'html.parser')
+          new_el = BeautifulSoup(tweet, 'html.parser')
           el.insert_after(new_el)
           el.decompose()
+        else:
+          logger.warning('unable to add tweet {} in {}'.format(el.a['href'], url))
 
     elif el.name == 'p':
       for it in el.find_all('strong'):

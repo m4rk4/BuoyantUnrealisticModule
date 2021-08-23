@@ -3,7 +3,7 @@ from datetime import datetime
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss
 import utils
 
 import logging
@@ -305,11 +305,11 @@ def get_content(url, args, save_debug=False):
         body_html += get_kinja_video(it['id'], url)
 
       elif it['type'] == 'Twitter':
-        tweet = twitter.get_content(it['id'], {}, True)
+        tweet = utils.add_twitter(it['id'])
         if tweet:
-          body_html += tweet['content_html']
+          body_html += tweet
         else:
-          logger.warning('error getting twitter content from tweet {} in {}'.format(it['id'], url))
+          logger.warning('unable to add tweet {} in {}'.format(it['id'], url))
 
       elif it['type'] == 'TikTok':
         body_html += utils.add_tiktok(it['id'])

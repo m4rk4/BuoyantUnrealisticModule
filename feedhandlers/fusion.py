@@ -1,8 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
-from feedhandlers import twitter
 import utils
 
 import logging
@@ -74,10 +73,11 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     if 'https://www.youtube.com/embed/' in element['raw_oembed']['html']:
       element_html += utils.add_youtube(element['raw_oembed']['html'])
     elif 'twitter-tweet' in element['raw_oembed']['html']:
-      tweet = twitter.get_content(element['raw_oembed']['url'], {}, False)
+      tweet = utils.add_twitter(element['raw_oembed']['url'])
       if tweet:
-        element_html += tweet['content_html']
+        element_html += tweet
       else:
+        logger.warning('unable to add tweet {} in {}'.format(element['raw_oembed']['url'], url))
         element_html += element['raw_oembed']['html'].replace('\n', '')
     else:
       element_html += element['raw_oembed']['html'].replace('\n', '')
@@ -178,10 +178,12 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     el_soup = BeautifulSoup(element['html'], 'html.parser')
     for el in reversed(el_soup.find_all('a')):
       if '/status/' in el['href']:
-        tweet = twitter.get_content(el['href'], None, False)
+        tweet = utils.add_twitter(el['href'])
         if tweet:
-          element_html += tweet['content_html']
+          element_html += tweet
           break
+        else:
+          logger.warning('unable to add tweet {} in {}'.format(el['href'], url))
 
   elif element['type'] == 'interstitial_link':
     pass

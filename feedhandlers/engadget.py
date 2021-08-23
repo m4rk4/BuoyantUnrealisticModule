@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import unquote_plus
 
-from feedhandlers import rss, soundcloud, twitter
+from feedhandlers import rss, soundcloud
 import utils
 
 import logging
@@ -244,10 +244,12 @@ def get_content(url, args, save_debug=False):
           for a in el.find_all('a'):
             tweet_url = a['href']
           if tweet_url:
-            tweet = twitter.get_content(tweet_url, None)
+            tweet = utils.add_twitter(tweet_url)
             if tweet:
-              el.insert_after(BeautifulSoup(tweet['content_html'], 'html.parser'))
+              el.insert_after(BeautifulSoup(tweet, 'html.parser'))
               el.decompose()
+            else:
+              logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
         else:
           logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
       else:

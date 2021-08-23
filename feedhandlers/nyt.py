@@ -2,7 +2,7 @@ import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss
 import utils
 
 import logging
@@ -323,10 +323,11 @@ def get_content(url, args, save_debug=False):
       block_html += utils.add_video('https://www.youtube.com/embed/' + block['youTubeId'], 'youtube')
 
     elif block['__typename'] == 'TwitterEmbedBlock':
-      tweet = twitter.get_content(block['twitterUrl'], {}, False)
+      tweet = utils.add_twitter(block['twitterUrl'])
       if tweet:
-        block_html += tweet['content_html']
+        block_html += tweet
       else:
+        logger.warning('unable to add tweet {} in {}'.format(block['html'], url))
         block_html += block['html']
 
     elif block['__typename'] == 'AudioBlock':
