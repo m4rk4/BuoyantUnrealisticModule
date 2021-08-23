@@ -388,10 +388,6 @@ def add_megaphone(url):
   return add_audio(data_json['episodes'][0]['audioUrl'], 'audio/mpeg', data_json['episodes'][0]['imageUrl'], data_json['episodes'][0]['title'], data_json['episodes'][0]['subtitle'], data_json['episodes'][0]['dataClipboardText'])
 
 def add_video(video_url, video_type, poster='', caption='', width=640, height=360, gawker=False):
-  if not poster:
-    #poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
-    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-1280x720.webp'
-
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -423,11 +419,10 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
   if not video_src:
     return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
 
-  #if caption:
-  #  caption += ' | '
-  #caption += '<a href="{}">Open video</a>'.format(video_src)
-
-  poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
+  if poster:
+    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
+  else:
+    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?width=1280&height=720&overlay=video'
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 

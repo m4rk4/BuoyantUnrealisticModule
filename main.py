@@ -220,7 +220,7 @@ def image():
     elif w < 0 and h > 0:
       w = h
     if w > 0 and h > 0:
-      color = 'lightgrey'
+      color = 'SlateGray'
       if args.get('color'):
         if args['color'].count(',') == 0:
           color = args['color']
