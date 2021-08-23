@@ -85,8 +85,8 @@ def get_content(url, args, save_debug=False):
 
   if page_json['__typename'] == 'Video':
     item['summary'] = page_json['description']
-    video = min(page_json['assets'], key=lambda x:abs(x["width"]-640))
-    poster = page_json['thumbnailUrl'] + '?width=640'
+    video = utils.closest_dict(page_json['assets'], 'width', 640)
+    poster = page_json['thumbnailUrl'] + '?width=1000'
     item['content_html'] = utils.add_video(video['url'], 'video/mp4', poster)
     item['content_html'] += '<p>{}</p>'.format(page_json['description'])
 
@@ -115,14 +115,14 @@ def get_content(url, args, save_debug=False):
           for key, val in apollo_state['ROOT_QUERY'].items():
             if key.startswith('slideshow') and re.search(r'\"{}\"'.format(el['data-value']), key):
               el_html = '<h2>Gallery</h2>'
-              n = len(val['images:{}']['images'])
-              for i, image in enumerate(val['images:{}']['images']):
+              n = len(val['slideshowImages:{}']['images'])
+              for i, image in enumerate(val['slideshowImages:{}']['images']):
                 i += 1
                 img_src = apollo_state[image['__ref']]['url']
                 caption = '[{}/{}] '.format(i, n)
                 if apollo_state[image['__ref']].get('caption'):
                   caption += apollo_state[image['__ref']]['caption']
-                el_html += utils.add_image(img_src + '?width=640', caption)
+                el_html += utils.add_image(img_src + '?width=1000', caption)
                 if i < n:
                   el_html += '<hr width="50%" />'
               el.insert_after(BeautifulSoup(el_html, 'html.parser'))
@@ -133,8 +133,8 @@ def get_content(url, args, save_debug=False):
           for key, val in apollo_state['ROOT_QUERY'].items():
             if key.startswith('videoPlayerProps') and el['data-slug'] in key:
               video_json = apollo_state[val['__ref']]
-              video = min(video_json['assets'], key=lambda x:abs(x["width"]-640))
-              poster = video_json['thumbnails'][0]['url'] + '?width=640'
+              video = utils.closest_dict(video_json['assets'], 'width', 640)
+              poster = video_json['thumbnails'][0]['url'] + '?width=1000'
               caption = video_json['metadata']['title']
               el_html = utils.add_video(video['url'], 'video/mp4', poster, caption)
               el.insert_after(BeautifulSoup(el_html, 'html.parser'))
@@ -155,19 +155,19 @@ def get_content(url, args, save_debug=False):
     
     for el in page_soup.find_all('a'):
       if re.search(r'\.(gif|jpg|jpeg|png)$', el['href'], flags=re.I):
-        el.insert_after(BeautifulSoup(utils.add_image(el['href'] + '?width=640'), 'html.parser'))
+        el.insert_after(BeautifulSoup(utils.add_image(el['href'] + '?width=1000'), 'html.parser'))
         el.decompose()
 
     item['content_html'] = ''
     lead = False
     if page_json.get('headerImageUrl'):
-      item['content_html'] += utils.add_image(page_json['headerImageUrl'] + '?width=640')
+      item['content_html'] += utils.add_image(page_json['headerImageUrl'] + '?width=1000')
       lead = True
     elif page_json.get('canWatchRead') and page_json['canWatchRead'] == True and page_json.get('relatedMediaId'):
       video_json = utils.get_url_json('https://mollusk.apis.ign.com/graphql?operationName=VideoPlayerProps&variables=%7B%22videoId%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22ef401f728f7976541dd0c9bd7e337fbec8c3cb4fec5fa64e3d733d838d608e34%22%7D%7D'.format(page_json['relatedMediaId']))
       if video_json:
         video = utils.closest_dict(video_json['data']['videoPlayerProps']['assets'], 'width', 640)
-        poster = video_json['data']['videoPlayerProps']['thumbnails'][0]['styleUrl'].replace('{size}', '640')
+        poster = video_json['data']['videoPlayerProps']['thumbnails'][0]['url'] + '?width=1000'
         caption = video_json['data']['videoPlayerProps']['metadata']['title']
         item['content_html'] += utils.add_video(video['url'], 'video/mp4', poster, caption)
         lead = True
