@@ -1,167 +1,167 @@
 handlers = {
-  "apnews.com": {
+  "apnews": {
     "module": "apnews"
   },
-  "theathletic.com": {
+  "theathletic": {
     "module": "athletic"
   },
-  "bandcamp.com": {
+  "bandcamp": {
     "module": "bandcamp"
   },
-  "cleveland.com": {
+  "cleveland": {
     "module": "cleveland"
   },
-  "cnn.com": {
+  "cnn": {
     "module": "cnn"
   },
-  "cnet.com": {
+  "cnet": {
     "module": "cnet"
   },
-  "autonews.com": {
+  "autonews": {
     "module": "crains"
   },
-  "crainscleveland.com": {
+  "crainscleveland": {
     "module": "crains"
   },
-  "european-rubber-journal.com": {
+  "european-rubber-journal": {
     "module": "crains"
   },
-  "plasticsnews.com": {
+  "plasticsnews": {
     "module": "crains"
   },
-  "rubbernews.com": {
+  "rubbernews": {
     "module": "crains"
   },
-  "tirebusiness.com": {
+  "tirebusiness": {
     "module": "crains"
   },
-  "engadget.com": {
+  "engadget": {
     "module": "engadget"
   },
-  "espn.com": {
+  "espn": {
     "module": "espn"
   },
-  "beaconjournal.com": {
+  "beaconjournal": {
     "module": "gannett"
   },
-  "usatoday.com": {
+  "usatoday": {
     "module": "gannett"
   },
-  "avclub.com": {
+  "avclub": {
     "module": "gawker"
   },
-  "gizmodo.com": {
+  "gizmodo": {
     "module": "gawker"
   },
-  "jalopnik.com": {
+  "jalopnik": {
     "module": "gawker"
   },
-  "kotaku.com": {
+  "kotaku": {
     "module": "gawker"
   },
-  "lifehacker.com": {
+  "lifehacker": {
     "module": "gawker"
   },
-  "theinventory.com": {
+  "theinventory": {
     "module": "gawker"
   },
-  "theonion.com": {
+  "theonion": {
     "module": "gawker"
   },
-  "theguardian.com": {
+  "theguardian": {
     "module": "guardian"
   },
-  "ign.com": {
+  "ign": {
     "module": "ign"
   },
-  "instagram.com": {
+  "instagram": {
     "module": "instagram"
   },
-  "mashable.com": {
+  "mashable": {
     "module": "mashable"
   },
-  "medium.com": {
+  "medium": {
     "module": "medium"
   },
-  "hackernoon.com": {
+  "hackernoon": {
     "module": "nextjs"
   },
-  "curbed.com": {
+  "curbed": {
     "module": "nymag"
   },
-  "grubstreet.com": {
+  "grubstreet": {
     "module": "nymag"
   },
-  "nymag.com": {
+  "nymag": {
     "module": "nymag"
   },
-  "thecut.com": {
+  "thecut": {
     "module": "nymag"
   },
-  "vulture.com": {
+  "vulture": {
     "module": "nymag"
   },
-  "nytimes.com": {
+  "nytimes": {
     "module": "nyt"
   },
-  "pcmag.com": {
+  "pcmag": {
     "module": "pcmag"
   },
-  "pitchfork.com": {
+  "pitchfork": {
     "module": "pitchfork"
   },
-  "reuters.com": {
+  "reuters": {
     "module": "reuters"
   },
-  "soundcloud.com": {
+  "soundcloud": {
     "module": "soundcloud"
   },
-  "spotify.com": {
+  "spotify": {
     "module": "spotify"
   },
-  "twitter.com": {
+  "twitter": {
     "module": "twitter"
   },
-  "vanityfair.com": {
+  "vanityfair": {
     "module": "vanityfair"
   },
-  "vimeo.com": {
+  "vimeo": {
     "module": "vimeo"
   },
-  "washingtonpost.com": {
+  "washingtonpost": {
     "module": "wapo"
   },
-  "wired.com": {
+  "wired": {
     "module": "wired"
   },
-  "rollingstone.com": {
+  "rollingstone": {
     "module": "wp_posts"
   },
-  "stereogum.com": {
+  "stereogum": {
     "module": "wp_posts"
   },
-  "variety.com": {
+  "variety": {
     "module": "wp_posts"
   },
-  "wksu.org": {
+  "wksu": {
     "module": "wksu"
   },
-  "wsj.com": {
+  "wsj": {
     "module": "wsj"
   },
-  "dj.com": {
+  "dj": {
     "module": "wsj"
   },
-  "youtube.com": {
+  "youtube": {
     "module": "youtube"
   },
-  "youtube-nocookie.com": {
+  "youtube-nocookie": {
     "module": "youtube"
   },
   "youtu.be": {
     "module": "youtube"
   },
-  "zdnet.com": {
+  "zdnet": {
     "module": "zdnet"
   },
   "TheHackersNews": {

@@ -1,4 +1,4 @@
-import glob, importlib, os, requests, sys
+import glob, importlib, os, requests, sys, tldextract
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from io import BytesIO
@@ -30,11 +30,13 @@ logging.getLogger('urllib3').setLevel(logging.WARNING)
 def get_module(args):
   module = None
   if args.get('url'):
-    split_url = urlsplit(args['url'])
-    split_loc = split_url.netloc.split('.')
-    domain = '.'.join(split_loc[-2:])
-    if domain == 'feedburner.com':
-      domain = split_url.path.split('/')[1]
+    tld = tldextract.extract(args['url'])
+    if tld.domain == 'youtu' and tld.suffix == 'be':
+      domain = 'youtu.be'
+    elif tld.domain == 'feedburner':
+      domain = urlsplit(args['url']).path.split('/')[1]
+    else:
+      domain = tld.domain
     if handlers.get(domain):
       try:
         module_name = '.{}'.format(handlers[domain]['module'])
