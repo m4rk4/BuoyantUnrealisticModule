@@ -164,7 +164,7 @@ def get_content(url, args, save_debug=False):
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<blockquote style="border:1px solid black; border-radius:10px; padding:0.5em;"><img style="vertical-align: middle;" src="http://localhost:8080/image?url={0}&height=48&mask=ellipse"><span style="padding-left:1em;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div>'.format(quote_plus(avatar), username)
+  item['content_html'] = '<blockquote style="border:1px solid black; border-radius:10px; padding:0.5em;"><img style="vertical-align: middle;" src="http://localhost:8080/image?url={0}&height=48&mask=ellipse"><span style="padding-left:1em;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span>'.format(quote_plus(avatar), username)
 
   if post_media:
     item['content_html'] += post_media
