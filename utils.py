@@ -293,10 +293,10 @@ def add_blockquote(text):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
 
 def open_pullquote():
-  return '<blockquote><table><tr><td><span style="font-size:2em;">&#x201C;</span></td><td><em>'
+  return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td><em>'
 
 def close_pullquote(author=''):
-  end_html = '</em></td><td><span style="font-size:2em;">&#x201E;</span></td></tr>'
+  end_html = '</em></td><td style="text-align:left; vertical-align:bottom;"><span style="font-size:2em;">&#x201E;</span></td></tr>'
   if author:
     #end_html += '<br /><small>&mdash;&nbsp;{}</small>'.format(author)
     end_html += '<tr><td>&nbsp;</td><td><small>&mdash;&nbsp;{}</small></td><td></td>&nbsp;</tr>'.format(author)
