@@ -2,4 +2,7 @@
 .idea/
 debug/
 venv/
+.breakpoints
 config.py
+poetry.lock
+pyproject.toml
