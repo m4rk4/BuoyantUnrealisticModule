@@ -81,7 +81,7 @@ def get_content(url, args, save_debug=False):
       elif isinstance(tag, dict):
         item['tags'].append(tag['displayName'])
 
-  item['_image'] = page_json['thumbnailUrl'] + '?width=640'
+  item['_image'] = page_json['thumbnailUrl'] + '?width=1000'
 
   if page_json['__typename'] == 'Video':
     item['summary'] = page_json['description']
@@ -114,18 +114,16 @@ def get_content(url, args, save_debug=False):
         elif el['data-transform'] == 'slideshow':
           for key, val in apollo_state['ROOT_QUERY'].items():
             if key.startswith('slideshow') and re.search(r'\"{}\"'.format(el['data-value']), key):
-              el_html = '<h2>Gallery</h2>'
+              el_html = '<h2 class="slideshow">Gallery</h2>'
               n = len(val['slideshowImages:{}']['images'])
               for i, image in enumerate(val['slideshowImages:{}']['images']):
-                i += 1
                 img_src = apollo_state[image['__ref']]['url']
-                caption = '[{}/{}] '.format(i, n)
+                caption = '[{}/{}] '.format(i+1, n)
                 if apollo_state[image['__ref']].get('caption'):
                   caption += apollo_state[image['__ref']]['caption']
                 el_html += utils.add_image(img_src + '?width=1000', caption)
-                if i < n:
-                  el_html += '<hr width="50%" />'
-              el.insert_after(BeautifulSoup(el_html, 'html.parser'))
+              # Append slideshows to end
+              page_soup.append(BeautifulSoup(el_html, 'html.parser'))
               el.decompose()
               break
 
@@ -200,7 +198,7 @@ def get_content(url, args, save_debug=False):
         editors_choice = '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
       else:
         editors_choice = ''
-      item['content_html'] += '<div style="width:75%; padding:10px 10px 0 10px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><center>{}<h1 style="margin:0;">{}</h1>{}</center></p><p><i>{}</i></p><p><small>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
+      item['content_html'] += '<br/><div style="width:75%; padding:10px 10px 0 10px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><center>{}<h1 style="margin:0;">{}</h1>{}</center></p><p><i>{}</i></p><p><small>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
 
       if page_json['object'].get('objectRegions') and page_json['object']['objectRegions'][0].get('ageRating'):
         if page_json['object']['objectRegions'][0].get('ageRatingDescriptors'):
@@ -242,15 +240,23 @@ def get_content(url, args, save_debug=False):
       if page_json['object'].get('objectRegions') and page_json['object']['objectRegions'][0]['releases'][0].get('timeframeYear'):
         item['content_html'] += '<br />Release date: {}'.format(page_json['object']['objectRegions'][0]['releases'][0]['timeframeYear'])
       elif page_json['object'].get('objectRegions') and page_json['object']['objectRegions'][0]['releases'][0].get('date'):
-        item['content_html'] += '<br />Release date: {}'.format(page_json['object']['objectRegions'][0]['releases'][0]['date'])
+        date = page_json['object']['objectRegions'][0]['releases'][0]['date']
+        if date.endswith('Z'):
+          dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+          date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+        item['content_html'] += '<br />Release date: {}'.format(date)
     
       item['content_html'] += '</small></p></div>'
       verdict = '<h2>Verdict</h2><p>{}</p>'.format(page_json['review']['verdict'])
 
-    item['content_html'] += str(page_soup)
     if verdict:
-      item['content_html'] += verdict
-  
+      el = page_soup.find(class_='slideshow')
+      if el:
+        el.insert_before(BeautifulSoup(verdict, 'html.parser'))
+      else:
+        page_soup.append(BeautifulSoup(verdict, 'html.parser'))
+    item['content_html'] += str(page_soup)
+
   return item
 
 def get_feed(args, save_debug=False):
