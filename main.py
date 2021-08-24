@@ -6,7 +6,6 @@ from PIL import Image, ImageDraw
 from urllib.parse import urlsplit
 
 import utils
-from feedhandlers import *
 from sites import handlers
 
 app = Flask(__name__)
@@ -23,6 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Turn off debuging in some modules
+logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
