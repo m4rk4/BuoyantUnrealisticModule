@@ -59,6 +59,7 @@ def get_content(url, args, save_debug=False):
     el = soup.find(class_='Avatar')
     avatar = el.img['src']
     username = soup.find(class_='UsernameText').get_text()
+  avatar = 'http://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&height=48&mask=ellipse'.format(quote_plus(avatar))
 
   title = '{} posted on Instagram'.format(username)
   caption = None
@@ -164,7 +165,7 @@ def get_content(url, args, save_debug=False):
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<blockquote style="border:1px solid black; border-radius:10px; padding:0.5em;"><img style="vertical-align: middle;" src="http://localhost:8080/image?url={0}&height=48&mask=ellipse"><span style="padding-left:1em;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span>'.format(quote_plus(avatar), username)
+  item['content_html'] = '<blockquote style="border:1px solid black; border-radius:10px; padding:0.5em;"><img style="vertical-align: middle;" src="{0}"><span style="padding-left:1em;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span>'.format(avatar, username)
 
   if post_media:
     item['content_html'] += post_media
