@@ -20,7 +20,7 @@ def get_domain_value(site_url):
   return ''
 
 def process_content_element(element, url, func_resize_image, gallery=None):
-  default_image_width = 800
+  default_image_width = 1000
   split_url = urlsplit(url)
 
   element_html = ''
