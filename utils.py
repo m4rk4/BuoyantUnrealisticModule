@@ -1,10 +1,11 @@
-import base64, feedparser, json, math, os, random, re, requests, string
+import json, math, os, random, re, requests, string
 from bs4 import BeautifulSoup
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import quote_plus, unquote, urlsplit
 
+import config
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
@@ -305,7 +306,7 @@ def close_pullquote(author=''):
 
 def add_pullquote(quote, author=''):
   # Strip quotes
-  if (quote.startswith('"') or quote.startswith('“')) and (quote.endswith('"') or quote.endswith('”')):
+  if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
     quote = quote[1:-1]
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
@@ -393,13 +394,13 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     video_src = video_url
 
   elif video_type == 'application/x-mpegURL':
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/videojs?src={}&type={}&poster={}'.format(quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
+    video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
     content = vimeo.get_content(video_url, None, False)
     if content.get('_image'):
       poster = content['_image']
-    video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
+    video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
     if not caption:
       caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
 
@@ -408,7 +409,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     if content:
       if content.get('_image'):
         poster = content['_image']
-      video_src = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/video?url={}'.format(quote_plus(video_url))
+      video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
       if not caption:
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
 
@@ -420,9 +421,9 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
 
   if poster:
-    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&overlay=video'.format(quote_plus(poster))
+    poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(poster))
   else:
-    poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?width=1280&height=720&overlay=video'
+    poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server)
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 

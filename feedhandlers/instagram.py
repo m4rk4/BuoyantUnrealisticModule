@@ -2,6 +2,7 @@ import json, re
 from bs4 import BeautifulSoup
 from urllib.parse import urlsplit, quote_plus
 
+import config
 import utils
 
 import logging
@@ -59,7 +60,7 @@ def get_content(url, args, save_debug=False):
     el = soup.find(class_='Avatar')
     avatar = el.img['src']
     username = soup.find(class_='UsernameText').get_text()
-  avatar = 'http://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&height=48&mask=ellipse'.format(quote_plus(avatar))
+  avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(avatar))
 
   title = '{} posted on Instagram'.format(username)
   caption = None
@@ -122,18 +123,18 @@ def get_content(url, args, save_debug=False):
         img_src = utils.image_from_srcset(el['srcset'], 640)
       else:
         img_src = el['src']
-      post_media += utils.add_image('https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img_src)), link=img_src)
+      post_media += utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), link=img_src)
 
   elif media_type == 'GraphVideo':
     if ig_data:
       video_src = ig_data['shortcode_media']['video_url']
       img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
-      poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img['src']))
+      poster = '/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
       post_media += utils.add_video(video_src, 'video/mp4', poster)
     else:
       el = soup.find('img', class_='EmbeddedMediaImage')
       if el:
-        poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480&overlay=video'.format(quote_plus(el['src']))
+        poster = '{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(el['src']))
         caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
         post_media += utils.add_image(poster, caption, link=ig_url)
 
@@ -142,12 +143,12 @@ def get_content(url, args, save_debug=False):
       for edge in ig_data['shortcode_media']['edge_sidecar_to_children']['edges']:
         if edge['node']['__typename'] == 'GraphImage':
           img_src = edge['node']['display_resources'][0]['src']
-          post_media += utils.add_image('https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img_src)), link=img_src)
+          post_media += utils.add_image('/image?url={}&width=480'.format(config.server, quote_plus(img_src)), link=img_src)
 
         elif edge['node']['__typename'] == 'GraphVideo':
           video_src = edge['node']['video_url']
           img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
-          poster = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/image?url={}&width=480'.format(quote_plus(img['src']))
+          poster = '{}/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
           post_media += utils.add_video(video_src, 'video/mp4', poster)
 
         post_media += '<br/><br/>'

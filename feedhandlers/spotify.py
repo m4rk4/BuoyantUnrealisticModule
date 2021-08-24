@@ -3,8 +3,9 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, unquote_plus
 
-from feedhandlers import youtube
+import config
 import utils
+from feedhandlers import youtube
 
 import logging
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def get_content(url, args, save_debug=False):
     item['content_html'] += '<tr><td><small>from <a href="{}">{}</a><br />by {}</small></td></tr>'.format(embed_json['album']['external_urls']['spotify'], embed_json['album']['name'], ', '.join(byline))
     yt_id = youtube.search(query)
     if yt_id:
-      item['_audio'] = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus('https://www.youtube.com/watch?v=' + yt_id)
+      item['_audio'] = '{}/audio?url='.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + yt_id))
       item['content_html'] += '<tr><td><audio controls><source src="{}"></audio><br /><a href="https://www.youtube.com/watch?v={}"><small>Play track</small></a></td></tr></table></center>'.format(item['_audio'], yt_id)
     else:
       item['_audio'] = embed_json['preview_url']
@@ -80,7 +81,7 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = '<center><table style="width:640px;"><tr><td colspan="3"><img width="100%" src="{}"></td></tr>'.format(item['_image'])
     for i, track in enumerate(embed_json['tracks']['items']):
       if i == 5 and args and 'embed' in args:
-        item['content_html'] += '<tr><td colspan="3" style="text-align: center;"><a href="https://buoyantunrealisticmodule.m4rk4.repl.co/content?url={}">View full playlist</a></td></tr>'.format(quote_plus(url))
+        item['content_html'] += '<tr><td colspan="3" style="text-align: center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
         break
 
       query = track['track']['name']
@@ -101,7 +102,7 @@ def get_content(url, args, save_debug=False):
 
       yt_id = youtube.search(query)
       if yt_id:
-        yt_stream = 'https://buoyantunrealisticmodule.m4rk4.repl.co/audio?url=' + quote_plus('https://www.youtube.com/watch?v=' + yt_id)
+        yt_stream = '{}/audio?url='.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + yt_id))
         item['content_html'] += '</small></td><td><audio controls><source src="{}" type="audio/mpeg"></audio><br /><a href="https://www.youtube.com/watch?v={}"><small>Play track</small></a></td></tr>'.format(yt_stream, yt_id)
       else:
         item['content_html'] += '</small></td><td><audio controls><source src="{0}" type="audio/mpeg"></audio><br /><a href="{0}"><small>Play track</small></a></td></tr>'.format(track['track']['preview_url'])
