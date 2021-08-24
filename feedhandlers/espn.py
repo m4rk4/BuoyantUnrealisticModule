@@ -8,7 +8,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def resize_image(img_src, width=800):
+def resize_image(img_src, width=1000):
   split_url = urlsplit(img_src)
   return 'https://a1.espncdn.com/combiner/i?img={}&w={}&cquality=80&location=origin&format=jpg'.format(quote_plus(split_url.path), width)
 
