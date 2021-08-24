@@ -15,7 +15,7 @@ def format_caption_links(matchobj):
 
 def get_content(url, args, save_debug=False):
   # Need to use a proxy to show images because of CORS
-  imageproxy = 'https://bibliogram.snopyta.org/imageproxy?url='
+  #imageproxy = 'https://bibliogram.snopyta.org/imageproxy?url='
 
   # Extract the post id
   m = re.search(r'instagram\.com\/([^\/]+)\/([^\/]+)', url)
