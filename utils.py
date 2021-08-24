@@ -294,7 +294,7 @@ def add_blockquote(text):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
 
 def open_pullquote():
-  return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td><em>'
+  return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td style="padding-top:0.5em;"><em>'
 
 def close_pullquote(author=''):
   end_html = '</em></td><td style="text-align:left; vertical-align:bottom;"><span style="font-size:2em;">&#x201E;</span></td></tr>'
