@@ -81,17 +81,17 @@ def get_content_from_html(article_html, url, args, save_debug):
   for el in article.find_all(class_=re.compile(r'rad-cover|photo')):
     img = el.find('img')
     if not img:
-      print(str(el))
+      #print(str(el))
       continue
     if img.has_attr('class') and 'rad-lazy' in img['class']:
       images = json.loads(img['data-widths'])
-      image = utils.closest_dict(images['MASTER'], 'width', 800)
+      image = utils.closest_dict(images['MASTER'], 'width', 1000)
       img_src = image['url']
     else:
       img_src = img['src']
     it = el.find('rad-caption')
     if it:
-      caption = it.get_text()
+      caption = it.get_text().strip()
     else:
       caption = ''
     if img_src:
@@ -246,7 +246,9 @@ def get_content(url, args, save_debug=False):
     elif block['__typename'] == 'Image':
       caption = []
       if block.get('caption'):
-        caption.append(format_block(block['caption']['id']))
+        cap = format_block(block['caption']['id']).strip()
+        if cap:
+          caption.append(cap)
       if block.get('credit'):
         caption.append('Credit: ' + block['credit'])
       images = []
@@ -299,9 +301,11 @@ def get_content(url, args, save_debug=False):
         caption = []
         m = re.search(r'<small>(.*)<\/small>', poster_html)
         if m:
-          caption.append(m.group(1))
-        if block.get('summary'):
-          caption.append(block['summary'])
+          cap = m.group(1).strip()
+          if cap:
+            caption.append(cap)
+        if block.get('summary').strip():
+          caption.append(block['summary'].strip())
         return utils.add_video(video['url'], 'video/mp4', poster, ' | '.join(caption))
       else:
         logger.warning('unhandled video in ' + url)

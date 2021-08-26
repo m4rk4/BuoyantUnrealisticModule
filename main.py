@@ -31,6 +31,7 @@ def get_module(args):
   module = None
   if args.get('url'):
     tld = tldextract.extract(args['url'])
+    print(tld)
     if tld.domain == 'youtu' and tld.suffix == 'be':
       domain = 'youtu.be'
     elif tld.domain == 'feedburner':
@@ -98,7 +99,7 @@ def content():
 
   module = get_module(args)
   if module:
-    content = module.get_content(args['url'], args, save_debug)
+    content = module.get_content(utils.clean_url(args['url']), args, save_debug)
     if 'json' in args:
       return jsonify(content)
     else:

@@ -296,6 +296,12 @@ def get_content(url, args, save_debug=False):
       article.insert(0, new_el)
       el.decompose()
 
+  # Pullquote
+  for el in article.find_all(class_='gnt_em_pq'):
+    new_el = BeautifulSoup(utils.add_pullquote(el['data-c-pq'], el['data-c-cr']), 'html.parser')
+    el.insert_after(new_el)
+    el.decompose()
+
   # These are usually ads
   for el in article.find_all('aside'):
     el.decompose()

@@ -16,6 +16,7 @@ def resize_image(image_item, width_target):
     image['url'] = val
     images.append(image)
   image = utils.closest_dict(images, 'width', width_target)
+  print(image['url'])
   return image['url']
 
 def get_item(content, url, args, save_debug):

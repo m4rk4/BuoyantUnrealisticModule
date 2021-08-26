@@ -34,20 +34,16 @@ def get_item(content, url, args, save_debug):
   item['tags'] = []
   if content['taxonomy'].get('seo_keywords'):
     item['tags'] = content['taxonomy']['seo_keywords'].copy()
-  else:
-    if content['taxonomy'].get('topics'):
-      for tag in content['taxonomy']['topics']:
-        if not tag['name'].startswith('@'):
-          item['tags'].append(tag['name'])  
-    if content['taxonomy'].get('tags'):
-      for tag in content['taxonomy']['tags']:
-        if not tag['text'].startswith('@'):
-          item['tags'].append(tag['text'])
+  elif content['tracking'].get('content_topics'):
+    item['tags'] = content['tracking']['content_topics'].split(';')
 
   lead_image = None
   if content['promo_items']['basic']['type'] == 'image':
     lead_image = content['promo_items']['basic']
     item['_image'] = lead_image['url']
+
+  if content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video':
+    lead_image = None
 
   item['summary'] = content['description']['basic']
 

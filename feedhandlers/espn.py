@@ -23,7 +23,8 @@ def get_image(image):
 def get_video(video):
   vid_src = video['links']['mobile']['source']['href']
   vid_type = 'video/mp4'
-  poster = video['posterImages']['default']['href']
+  poster = resize_image(video['thumbnail'])
+  # poster = video['posterImages']['full']['href']
   caption = []
   if video.get('caption'):
     caption.append(video['caption'])

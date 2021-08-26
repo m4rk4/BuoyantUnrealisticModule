@@ -239,19 +239,26 @@ def get_content(url, args, save_debug=False):
 
     for el in article_text.find_all('blockquote'):
       if el.has_attr('class'):
+        embed_html = ''
         if 'twitter-tweet' in el['class']:
           tweet_url = ''
           for a in el.find_all('a'):
             tweet_url = a['href']
           if tweet_url:
-            tweet = utils.add_twitter(tweet_url)
-            if tweet:
-              el.insert_after(BeautifulSoup(tweet, 'html.parser'))
-              el.decompose()
-            else:
+            embed_html = utils.add_twitter(tweet_url)
+            if not embed_html:
               logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
+        elif 'instagram-media' in el['class']:
+          embed_html = utils.add_instagram(el['data-instgrm-permalink'])
+          if not embed_html:
+            logger.warning('unable to embed instagram post {} in {}'.format(el['data-instgrm-permalink'], url))
         else:
           logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
+        if embed_html:
+          if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
+            el = el.parent
+          el.insert_after(BeautifulSoup(embed_html, 'html.parser'))
+          el.decompose()
       else:
         if el.p:
           quote = str(el.p)

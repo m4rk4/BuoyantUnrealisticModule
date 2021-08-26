@@ -21,7 +21,7 @@ def get_content(url, args, save_debug=False):
   if re.search(r'wired\.com/\d+/\d+/geeks-guide', url):
     return wp_posts.get_content(url, args, save_debug)
 
-  img_size = 'md'
+  img_size = 'lg'
   json_url = url + '?format=json'
   article_json = utils.get_url_json(json_url)
   if not article_json:
@@ -216,6 +216,9 @@ def get_content(url, args, save_debug=False):
       elif body_json[1]['type'] == 'iframe':
         if 'youtube' in body_json[1]['props']['url']:
           body_html += utils.add_video(body_json[1]['props']['url'], 'youtube')
+
+        elif 'podcasts.apple' in body_json[1]['props']['url']:
+          body_html += utils.add_apple_podcast(body_json[1]['props']['url'])
 
         elif 'bandcamp' in body_json[1]['props']['url']:
           embed = bandcamp.get_content(body_json[1]['props']['url'], {}, False)

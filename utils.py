@@ -568,3 +568,84 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
     graph_html += '<div><small>{}</small></div>'.format(caption)
   graph_html += '</div>'
   return graph_html
+
+def add_apple_podcast(embed_url, save_debug=True):
+  # https://embed.podcasts.apple.com/us/podcast/little-gold-men/id1042433465?itsct=podcast_box_player&itscg=30200&theme=auto
+  m = re.search(r'\/id(\d+)', embed_url)
+  if not m:
+    print('unable to parse podcast id from ' + embed_url)
+    return ''
+  print(m.group(1))
+  json_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/1042433465?include=episodes'.format(m.group(1))
+
+  s = requests.Session()
+  headers = {
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate, br",
+    "accept-language": "en-US,en;q=0.9",
+    "access-control-request-headers": "authorization",
+    "access-control-request-method": "GET",
+    "cache-control": "no-cache",
+    "dnt": "1",
+    "origin": "https://embed.podcasts.apple.com",
+    "pragma": "no-cache",
+    "referer": "https://embed.podcasts.apple.com/",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "sec-gpc": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+  }
+  preflight = s.options(json_url, headers=headers)
+  if preflight.status_code != 204:
+    print('status code {} getting preflight podcast info from {}'.format(preflight.status_code, embed_url))
+    return ''
+
+  headers = {
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate, br",
+    "accept-language": "en-US,en;q=0.9",
+    "authorization": "Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjI4NTEwOTQ3LCJleHAiOjE2MzQ3MzE3NDcsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.4hpyCflT_5hmcLsD2NpwXMaE9ZhznHcoK0T60XVj7bfeIwibz-fiUao_sH3p8WECcw5f-6v0pFN1VwvSr7klkw",
+    "cache-control": "no-cache",
+    "dnt": "1",
+    "origin": "https://embed.podcasts.apple.com",
+    "pragma": "no-cache",
+    "referer": "https://embed.podcasts.apple.com/",
+    "sec-ch-ua": "\"Chromium\";v=\"92\", \" Not A;Brand\";v=\"99\", \"Google Chrome\";v=\"92\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "sec-gpc": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+  }
+  r = s.get(json_url, headers=headers)
+  if r.status_code != 200:
+    print('status code {} getting request podcast info from {}'.format(r.status_code, embed_url))
+    return ''
+
+  req_json = r.json()
+  if save_debug:
+    write_file(req_json, './debug/podcast.json')
+
+  podcast_info = req_json['data'][0]['attributes']
+  poster = podcast_info['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
+  podcast_html = '<table style="border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td>'.format(podcast_info['url'], poster)
+  podcast_html += '<td style="vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:120px;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a><br/>by {}</h4><small>{}</small></td></tr>'.format(podcast_info['url'], podcast_info['name'], podcast_info['artistName'], podcast_info['description']['standard'])
+
+  for episode in req_json['data'][0]['relationships']['episodes']['data']:
+    poster = episode['attributes']['artwork']['url'].replace('{w}', '72').replace('{h}', '72').replace('{f}', 'jpg')
+    poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(poster))
+    podcast_html += '<tr><td style="padding:4px 0 0 0; margin:0; border-top:1px solid black; border-collapse:collapse; text-align:right; vertical-align:center;"><a href="{}"><img src="{}" /></a></td>'.format(episode['attributes']['assetUrl'], poster)
+    dt = datetime.fromisoformat(episode['attributes']['releaseDateTime'].replace('Z', '+00:00'))
+    date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    time = []
+    t = math.floor(episode['attributes']['durationInMilliseconds'] / 3600000)
+    if t >= 1:
+      time.append('{} hr'.format(t))
+    t = math.ceil((episode['attributes']['durationInMilliseconds'] - 3600000*t) / 60000)
+    if t > 0:
+      time.append('{} min.'.format(t))
+    podcast_html += '<td style="max-height:72px; padding:0; margin:0; border-top:1px solid black; border-collapse:collapse; vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden;"><small><b><a href="{}">{}</a></b><br/>{} &ndash; {}<br/><small>{}</small></small></td></tr>'.format(episode['attributes']['url'], episode['attributes']['name'], date, ' , '.join(time), episode['attributes']['description']['standard'])
+  podcast_html += '</table>'
+  return podcast_html

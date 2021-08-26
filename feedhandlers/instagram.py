@@ -129,7 +129,7 @@ def get_content(url, args, save_debug=False):
     if ig_data:
       video_src = ig_data['shortcode_media']['video_url']
       img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
-      poster = '/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
+      poster = '{}/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
       post_media += utils.add_video(video_src, 'video/mp4', poster)
     else:
       el = soup.find('img', class_='EmbeddedMediaImage')
@@ -143,7 +143,7 @@ def get_content(url, args, save_debug=False):
       for edge in ig_data['shortcode_media']['edge_sidecar_to_children']['edges']:
         if edge['node']['__typename'] == 'GraphImage':
           img_src = edge['node']['display_resources'][0]['src']
-          post_media += utils.add_image('/image?url={}&width=480'.format(config.server, quote_plus(img_src)), link=img_src)
+          post_media += utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), link=img_src)
 
         elif edge['node']['__typename'] == 'GraphVideo':
           video_src = edge['node']['video_url']
@@ -166,13 +166,12 @@ def get_content(url, args, save_debug=False):
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<blockquote style="border:1px solid black; border-radius:10px; padding:0.5em;"><img style="vertical-align: middle;" src="{0}"><span style="padding-left:1em;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span>'.format(avatar, username)
+  item['content_html'] = '<table style="max-width:520px; margin-left:auto; margin-right:auto; padding:10px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:50px;"><img style="vertical-align: middle;" src="{0}" /></td><td><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr><tr><td colspan="2" style="text-align:center;">'.format(avatar, username)
 
   if post_media:
-    item['content_html'] += post_media
+    item['content_html'] += post_media.replace('<img width="100%"', '<img')
 
-  item['content_html'] += post_caption
-  item['content_html'] += '</blockquote>'
+  item['content_html'] += '<tr><td colspan="2">{}</td></tr></table>'.format(post_caption)
   return item
 
 def get_feed(args, save_debug=False):
