@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
+logging.getLogger('tldextract').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 def get_module(args):
   module = None
   if args.get('url'):
     tld = tldextract.extract(args['url'])
-    print(tld)
     if tld.domain == 'youtu' and tld.suffix == 'be':
       domain = 'youtu.be'
     elif tld.domain == 'feedburner':
