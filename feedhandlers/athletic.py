@@ -9,19 +9,21 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_amp_img_src(amp_img, width=1000):
-  img_src = ''
-  if amp_img.get('srcset'):
-    img_src = utils.image_from_srcset(amp_img['srcset'], width)
-  if amp_img.get('src'):
-    img_src = amp_img['src']
-
+def resize_image(img_src, width=1000):
   m = re.search(r'(\/width=\d+\/)', img_src)
   if m:
     img_src = img_src.replace(m.group(1), '/width={}/'.format(width))
   elif img_src.startswith('https://cdn.theathletic.com/app/uploads/'):
     img_src = img_src.replace('https://cdn.theathletic.com/', 'https://cdn.theathletic.com/cdn-cgi/image/width={}/'.format(width))
   return img_src
+
+def get_amp_img_src(amp_img, width=1000):
+  img_src = ''
+  if amp_img.get('srcset'):
+    img_src = utils.image_from_srcset(amp_img['srcset'], width)
+  if amp_img.get('src'):
+    img_src = amp_img['src']
+  return resize_image(img_src)
 
 def get_content(url, args, save_debug=False):
   clean_url = utils.clean_url(url)
@@ -131,7 +133,8 @@ def get_content(url, args, save_debug=False):
       it = el.parent
       m = re.search(r'url\((.*)\)', it['style'])
       if m:
-        item['content_html'] += utils.add_image(m.group(1))
+        img_src = resize_image(m.group(1))
+        item['content_html'] += utils.add_image(img_src)
 
   item['content_html'] += str(article)
   return item
