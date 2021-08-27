@@ -22,6 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Turn off debuging in some modules
+logging.getLogger('filelock').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
@@ -230,8 +231,12 @@ def image():
         else:
           r, g, b = args['color'].split(',')
           color = (int(r), int(g), int(b))
-      im = Image.new('RGB', (w, h), color=color)
-      mimetype = 'image/jpg'
+      if color == 'none':
+        im = Image.new('RGBA', (w, h), color=(0,0,0,0))
+        mimetype = 'image/png'
+      else:
+        im = Image.new('RGB', (w, h), color=color)
+        mimetype = 'image/jpg'
     else:
       return 'No url given'
 
@@ -317,7 +322,8 @@ def image():
           {"width": 128, "height": 128, "name": "play_button-128x128.png"},
           {"width": 96, "height": 96, "name": "play_button-96x96.png"},
           {"width": 64, "height": 64, "name": "play_button-64x64.png"},
-          {"width": 48, "height": 48, "name": "play_button-48x48.png"}]
+          {"width": 48, "height": 48, "name": "play_button-48x48.png"},
+          {"width": 32, "height": 32, "name": "play_button-32x32.png"}]
       w_size = utils.closest_dict(overlay_sizes, 'width', w//5)
       h_size = utils.closest_dict(overlay_sizes, 'height', h//5)
       if h_size['width'] <= w_size['width']:
