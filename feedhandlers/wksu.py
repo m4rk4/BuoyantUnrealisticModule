@@ -25,32 +25,6 @@ def get_audio(el_audio):
       audio_name = el['data-stream-name']
   return audio_src, audio_type, audio_name
 
-def add_audio(el_audio):
-  audio_src, audio_type, audio_name = get_audio(el_audio)
-
-  poster = ''
-  el = el_audio.find(class_='AudioEnhancement-thumbnail')
-  if el:
-    poster, caption = get_image(el)
-  if poster:
-    poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(poster))
-  else:
-    poster = '{}/image?width=128&height&128&overlay=audio'.format(config.server)
-
-  el = el_audio.find(class_='AudioEnhancement-title')
-  if el:
-    desc = '<h4 style="margin-top:0; margin-bottom:0.5em;">Listen: {}</h4>'.format(el.get_text().strip())
-  else:
-    desc = '<h4 style="margin-top:0; margin-bottom:0.5em;">Listen</h4>'
-  el = el_audio.find(class_='AudioEnhancement-description')
-  if el:
-    desc += '<small>{}</small>'.format(el.get_text().strip())
-  if not desc and audio_name:
-    desc = audio_name
-
-  audio_html = '<table style="width:480px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:120px;">{}</td></tr></table>'.format(audio_src, poster, desc)
-  return audio_html
-
 def get_image(el_image):
   img = el_image.find('img')
   images = []
@@ -182,10 +156,7 @@ def get_content(url, args, save_debug=False):
       item['attachments'] = []
       item['attachments'].append(attachment)
       item['_audio'] = audio_src
-      desc = '<h4 style="margin-top:0; margin-bottom:0;">Listen</h4>'
-      if audio_name:
-        desc += '<small>{}</small>'.format(audio_name)
-      item['content_html'] += '<table style="width:480px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px" src="{}/image?width=72&height=72&overlay=audio" /></a></td><td style="vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:70px;">{}</td></tr></table>'.format(audio_src, config.server, desc)
+      item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{}"><img src="{}/image?width=32&height=32&color=none&overlay=audio" /></a>&nbsp;<h4>Listen</h4></div>'.format(audio_src, config.server)
 
   article = soup.find(class_='ArticlePage-articleBody')
 
@@ -200,7 +171,16 @@ def get_content(url, args, save_debug=False):
       new_html = utils.add_pullquote(el.blockquote.get_text(), author)
 
     elif el.find(class_='AudioEnhancement'):
-      new_html = add_audio(el)
+      audio_src, audio_type, audio_name = get_audio(el)
+      desc = ''
+      it = el.find(class_='AudioEnhancement-description')
+      if it:
+        desc += '<h4>Listen: {}</h4>'.format(el.get_text().strip())
+      if not desc and audio_name:
+        desc += '<h4>Listen: {}</h4>'.format(audio_name)
+      if not desc:
+        desc += '<h4>Listen</h4>'
+      new_html = '<blockquote><div style="display:flex; align-items:center;"><a href="{}"><img src="{}/image?width=32&height=32&color=none&overlay=audio" /></a>&nbsp;{}</div></blockquote>'.format(audio_src, config.server, desc)
 
     elif el.find(class_='Figure'):
       img_src, caption = get_image(el)
@@ -211,6 +191,14 @@ def get_content(url, args, save_debug=False):
       m = re.search(r'(https:\/\/twitter\.com/[^\/]+\/status\/\d+)', tweet_url[-1]['href'])
       if m:
         new_html = utils.add_twitter(m.group(1))
+
+    elif el.find('ps-youtubeplayer'):
+      caption = ''
+      it = el.find(class_='VideoEnhancement-title')
+      if it:
+        caption = it.get_text()
+        print(caption)
+      new_html = utils.add_video(el.iframe['src'], 'youtube')
 
     else:
       logger.warning('unhandled Enhancement in ' + url)
