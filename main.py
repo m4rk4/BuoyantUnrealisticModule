@@ -100,7 +100,11 @@ def content():
 
   module = get_module(args)
   if module:
-    content = module.get_content(utils.clean_url(args['url']), args, save_debug)
+    if 'youtube.com' in args['url']:
+      url = args['url']
+    else:
+      url = utils.clean_url(args['url'])
+    content = module.get_content(url, args, save_debug)
     if 'json' in args:
       return jsonify(content)
     else:
