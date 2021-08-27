@@ -330,14 +330,21 @@ def get_content(url, args, save_debug=False):
   content_html += make_tweet(tweet_json)
 
   # Find the conversation thread (replies from the same user)
-  tweet_replies = []
-  query = 'from:{} conversation_id:{} (filter:safe OR -filter:safe)'.format(tweet_user, tweet_id)
-  for i,tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
-    tweet_json = get_tweet_json(tweet.id)
-    if tweet_json.get('in_reply_to_screen_name') and tweet_json['in_reply_to_screen_name'] == tweet_user:
-      tweet_replies.append(tweet_json)
-  for i,tweet_json in reversed(list(enumerate(tweet_replies))):
-    content_html += make_tweet(tweet_json, is_reply=i+1)
+  search_scraper = None
+  try:
+    query = 'from:{} conversation_id:{} (filter:safe OR -filter:safe)'.format(tweet_user, tweet_id)
+    search_scraper = sntwitter.TwitterSearchScraper(query)
+  except Exception as e:
+    logger.warning('TwitterSearchScraper exception {} in {}'.format(e.__class__, clean_url))
+
+  if search_scraper:
+    tweet_replies = []
+    for i,tweet in enumerate(search_scraper.get_items()):
+      tweet_json = get_tweet_json(tweet.id)
+      if tweet_json.get('in_reply_to_screen_name') and tweet_json['in_reply_to_screen_name'] == tweet_user:
+        tweet_replies.append(tweet_json)
+    for i,tweet_json in reversed(list(enumerate(tweet_replies))):
+      content_html += make_tweet(tweet_json, is_reply=i+1)
 
   content_html += '</table>'
   item['content_html'] = content_html
