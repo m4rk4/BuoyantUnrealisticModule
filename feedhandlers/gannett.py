@@ -93,7 +93,6 @@ def get_video_content(url, args, save_debug=False):
     poster = resize_image(info['image']['url'])
     video = soup.find('video')
     if video and video.has_attr('poster'):
-      print(video['poster'])
       width = -1
       height = -1
       m = re.search(r'width=(\d+)', video['poster'])
