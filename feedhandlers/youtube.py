@@ -1,4 +1,4 @@
-import json, pytube, re
+import json, pytube, re, sys
 from pytube.cipher import Cipher
 from urllib.parse import parse_qs, quote_plus
 
@@ -104,12 +104,15 @@ def get_content(url, args, save_debug=False):
       elif stream.get('signatureCipher'):
         if save_debug:
           logger.debug('decoding signatureCipher for ' + url)
-        cipher_url = parse_qs(stream['signatureCipher'])
-        js_url = pytube.extract.js_url(yt_html)
-        js = utils.get_url_html(js_url)
-        cipher = Cipher(js=js)
-        signature = cipher.get_signature(cipher_url['s'][0])
-        item[key] = cipher_url['url'][0] + '&sig=' + signature
+        try:
+          cipher_url = parse_qs(stream['signatureCipher'])
+          js_url = pytube.extract.js_url(yt_html)
+          js = utils.get_url_html(js_url)
+          cipher = Cipher(js=js)
+          signature = cipher.get_signature(cipher_url['s'][0])
+          item[key] = cipher_url['url'][0] + '&sig=' + signature
+        except Exception as e:
+          logger.warning('error decoding signatureCipher {} in {}'.format(e.__class__, url))
       else:
         logger.warning('unable to get the {} stream in {}'.format(key, url))
 
