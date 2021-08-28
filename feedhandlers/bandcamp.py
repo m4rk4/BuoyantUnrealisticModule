@@ -72,12 +72,19 @@ def get_content(url, args, save_debug=False):
           desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>'.format(audio_json['@id'], audio_json['name'])
           if audio_json.get('inAlbum'):
             desc += 'from <a href="{}">{}</a><br/>'.format(audio_json['inAlbum']['@id'], audio_json['inAlbum']['name'])
-          desc += 'by <a href="{}">{}</a></small>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
+          if audio_json['byArtist'].get('@id'):
+            desc += 'by <a href="{}">{}</a></small>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
+          else:
+            desc += 'by <a href="{}">{}</a></small>'.format(audio_json['publisher']['@id'], audio_json['byArtist']['name'])
           item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:120px;">{}</td></tr></table></center>'.format(audio_src, poster, desc)
 
         elif audio_json['@type'] == 'MusicAlbum':
           poster = '{}/image?url={}&height=128'.format(config.server, audio_json['image'])
-          desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>by <a href="{}">{}</a>'.format(audio_json['@id'], audio_json['name'], audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
+          desc = '<h4 style="margin-top:0; margin-bottom:0;"><a href="{}">{}</a></h4>'.format(audio_json['@id'], audio_json['name'])
+          if audio_json['byArtist'].get('@id'):
+            desc += 'by <a href="{}">{}</a>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
+          else:
+            desc += 'by <a href="{}">{}</a>'.format(audio_json['publisher']['@id'], audio_json['byArtist']['name'])
           if audio_json.get('description'):
             desc += '<br/><small>{}</small>'.format(audio_json['description'])
           item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:120px;">{}</td></tr>'.format(audio_json['@id'], poster, desc)
@@ -94,10 +101,15 @@ def get_content(url, args, save_debug=False):
               item['content_html'] += '<tr><td colspan="2" style="border-top:1px solid black; border-collapse:collapse; '
             else:
               item['content_html'] += '<tr><td colspan="2" style="'
+
             if audio_src:
-              item['content_html'] += 'padding-left:24px;"><div style="display:flex; align-items:center;"><a href="{}"><img src="{}" /></a>&nbsp;{}.&nbsp;<a href="{}">{}</a></div></td></tr>'.format(audio_url, poster, track['position'], track['item']['@id'], track['item']['name'])
+              item['content_html'] += 'padding-left:24px;"><div style="display:flex; align-items:center;"><span><a href="{}"><img src="{}" /></a></span><span>&nbsp;{}.&nbsp;</span><span><a href="{}">{}</a>'.format(audio_url, poster, track['position'], track['item']['@id'], track['item']['name'])
             else:
-              item['content_html'] += 'padding-left:72px;">&nbsp;{}.&nbsp;<a href="{}">{}</a></td></tr>'.format(track['position'], track['item']['@id'], track['item']['name'])
+              item['content_html'] += 'padding-left:56px;"><div style="display:flex; align-items:center;"><span>&nbsp;{}.&nbsp;</span><span><a href="{}">{}</a>'.format(track['position'], track['item']['@id'], track['item']['name'])
+            if track['item'].get('byArtist') and track['item']['byArtist']['name'] != audio_json['byArtist']['name']:
+              item['content_html'] += ' by {}'.format(track['item']['byArtist']['name'])
+            item['content_html'] += '</span></div></td></tr>'
+
           item['content_html'] += '</table></center>'
           if args and 'embed' in args and item.get('summary'):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
