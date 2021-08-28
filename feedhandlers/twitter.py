@@ -1,4 +1,4 @@
-import json, re
+import json, re, sys
 from datetime import datetime
 import snscrape.modules.twitter as sntwitter
 from urllib.parse import urlsplit
