@@ -110,7 +110,7 @@ def get_content(url, args, save_debug=False):
             if track['item'].get('byArtist') and track['item']['byArtist']['name'] != audio_json['byArtist']['name']:
               item['content_html'] += ' by {}'.format(track['item']['byArtist']['name'])
             item['content_html'] += '</li>'
-          item['content_html'] += '</table></center>'
+          item['content_html'] += '</ol></td></tr></table></center>'
           if args and 'embed' in args and item.get('summary'):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
 
