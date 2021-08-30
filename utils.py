@@ -630,13 +630,10 @@ def add_apple_podcast(embed_url, save_debug=True):
 
   podcast_info = req_json['data'][0]['attributes']
   poster = podcast_info['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
-  podcast_html = '<table style="border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td>'.format(podcast_info['url'], poster)
-  podcast_html += '<td style="vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden; max-height:120px;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a><br/>by {}</h4><small>{}</small></td></tr>'.format(podcast_info['url'], podcast_info['name'], podcast_info['artistName'], podcast_info['description']['standard'])
+  desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small>'.format(podcast_info['url'], podcast_info['name'], podcast_info['artistName'])
+  podcast_html = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;">{}</td></tr><tr><td colspan="2">Episodes:<ol style="margin-top:0;">'.format(podcast_info['url'], poster, desc)
 
   for episode in req_json['data'][0]['relationships']['episodes']['data']:
-    poster = episode['attributes']['artwork']['url'].replace('{w}', '72').replace('{h}', '72').replace('{f}', 'jpg')
-    poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(poster))
-    podcast_html += '<tr><td style="padding:4px 0 0 0; margin:0; border-top:1px solid black; border-collapse:collapse; text-align:right; vertical-align:center;"><a href="{}"><img src="{}" /></a></td>'.format(episode['attributes']['assetUrl'], poster)
     dt = datetime.fromisoformat(episode['attributes']['releaseDateTime'].replace('Z', '+00:00'))
     date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
     time = []
@@ -646,6 +643,6 @@ def add_apple_podcast(embed_url, save_debug=True):
     t = math.ceil((episode['attributes']['durationInMilliseconds'] - 3600000*t) / 60000)
     if t > 0:
       time.append('{} min.'.format(t))
-    podcast_html += '<td style="max-height:72px; padding:0; margin:0; border-top:1px solid black; border-collapse:collapse; vertical-align:top; display:block; text-overflow:ellipsis; word-wrap:break-word; overflow:hidden;"><small><b><a href="{}">{}</a></b><br/>{} &ndash; {}<br/><small>{}</small></small></td></tr>'.format(episode['attributes']['url'], episode['attributes']['name'], date, ' , '.join(time), episode['attributes']['description']['standard'])
-  podcast_html += '</table>'
+    podcast_html += '<li><a style="text-decoration:none;" href="{}">&#9658;</a>&nbsp;<a href="{}">{}</a> ({}, {})</li>'.format(episode['attributes']['assetUrl'], episode['attributes']['url'], episode['attributes']['name'], date, ' , '.join(time))
+  podcast_html += '</ol></td></tr></table></center>'
   return podcast_html
