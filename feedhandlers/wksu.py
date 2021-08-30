@@ -156,7 +156,7 @@ def get_content(url, args, save_debug=False):
       item['attachments'] = []
       item['attachments'].append(attachment)
       item['_audio'] = audio_src
-      item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{}"><img src="{}/image?width=32&height=32&color=none&overlay=audio" /></a>&nbsp;<h4>Listen</h4></div>'.format(audio_src, config.server)
+      item['content_html'] += '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9658;</a>&nbsp;<a href="{0}">Listen</a></h4></blockquote>'.format(audio_src)
 
   article = soup.find(class_='ArticlePage-articleBody')
 
@@ -175,12 +175,10 @@ def get_content(url, args, save_debug=False):
       desc = ''
       it = el.find(class_='AudioEnhancement-description')
       if it:
-        desc += '<h4>Listen: {}</h4>'.format(el.get_text().strip())
+        desc += ' &ndash; {}'.format(el.get_text().strip())
       if not desc and audio_name:
-        desc += '<h4>Listen: {}</h4>'.format(audio_name)
-      if not desc:
-        desc += '<h4>Listen</h4>'
-      new_html = '<blockquote><div style="display:flex; align-items:center;"><a href="{}"><img src="{}/image?width=32&height=32&color=none&overlay=audio" /></a>&nbsp;{}</div></blockquote>'.format(audio_src, config.server, desc)
+        desc += ' &ndash; {}'.format(audio_name)
+      new_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9658;</a>&nbsp;<a href="{0}">Listen</a>{1}</h4></blockquote>'.format(audio_src, desc)
 
     elif el.find(class_='Figure'):
       img_src, caption = get_image(el)
