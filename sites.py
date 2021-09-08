@@ -2,11 +2,17 @@ handlers = {
   "apnews": {
     "module": "apnews"
   },
+  "apple": {
+    "module": "apple"
+  },
   "theathletic": {
     "module": "athletic"
   },
   "bandcamp": {
     "module": "bandcamp"
+  },
+  "billboard": {
+    "module": "billboard"
   },
   "cleveland": {
     "module": "cleveland"

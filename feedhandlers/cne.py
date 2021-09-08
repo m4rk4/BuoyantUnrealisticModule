@@ -2,7 +2,7 @@ import json, re
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
-from feedhandlers import bandcamp, rss, soundcloud, spotify, wp_posts
+from feedhandlers import apple, bandcamp, rss, soundcloud, spotify, wp_posts
 import utils
 
 import logging
@@ -220,6 +220,11 @@ def get_content(url, args, save_debug=False):
         elif 'podcasts.apple' in body_json[1]['props']['url']:
           body_html += utils.add_apple_podcast(body_json[1]['props']['url'])
 
+        elif re.search('(music|podcasts)\.apple', body_json[1]['props']['url']):
+          embed = apple.get_content(body_json[1]['props']['url'], {"max": 5}, False)
+          if embed:
+            body_html += embed['content_html']
+
         elif 'bandcamp' in body_json[1]['props']['url']:
           embed = bandcamp.get_content(body_json[1]['props']['url'], {}, False)
           if embed:
@@ -231,7 +236,7 @@ def get_content(url, args, save_debug=False):
             body_html += embed['content_html']
 
         elif 'spotify' in body_json[1]['props']['url']:
-          embed = spotify.get_content(body_json[1]['props']['url'], {"embed":""}, False)
+          embed = spotify.get_content(body_json[1]['props']['url'], {"max": 5}, False)
           if embed:
             body_html += embed['content_html']
 

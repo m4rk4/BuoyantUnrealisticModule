@@ -3,14 +3,52 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, unquote_plus
 
-import config
-import utils
+import config, utils
 from feedhandlers import youtube
 
 import logging
 logger = logging.getLogger(__name__)
 
+def get_authorization_header():
+  # Top Songs - USA
+  url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
+  spotify_html = utils.get_url_html(url)
+  m = re.search(r'"accessToken":"([^"]+)', spotify_html)
+  if not m:
+    return None
+  header = {}
+  header['authorization'] = 'Bearer ' + m.group(1)
+  return header
+
 def get_content(url, args, save_debug=False):
+  m = re.search(r'https:\/\/open\.spotify\.com\/([^\/]+)\/([0-9a-zA-Z]+)', url)
+  if not m:
+    m = re.search(r'https:\/\/open\.spotify\.com\/embed\/([^\/]+)\/([0-9a-zA-Z]+)', url)
+  if not m:
+    logger.warning('unable to parse Spotify url ' + url)
+    return None
+
+  content_type = m.group(1)
+  content_id = m.group(2)
+  api_url = 'https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id)
+  if content_type == 'album' or content_type == 'playlist':
+    api_url += '/tracks'
+  if content_typ == 'show':
+    api_url += '/episodes'
+  if 'max' in args:
+    api_url += '?limit=' + args['max']
+
+  headers = get_authorization_header()
+  if not headers:
+    logger.warning('unable to get Spotify authorization token')
+    return None
+  api_json = utils.get_url_json(api_url, headers=headers)
+  if not api_json:
+    return None
+  if save_debug:
+    utils.write_file(api_json, './debug/spotify.json')
+
+
   embed_html = utils.get_url_html(url)
   if not embed_html:
     return None
@@ -25,8 +63,8 @@ def get_content(url, args, save_debug=False):
     return None
 
   embed_json = json.loads(unquote_plus(el.string))
-  if save_debug:
-    utils.write_file(embed_json, './debug/spotify.json')
+  #if save_debug:
+  #  utils.write_file(embed_json, './debug/spotify.json')
 
   item = {}
   if '/embed/track/' in url:
@@ -71,46 +109,37 @@ def get_content(url, args, save_debug=False):
     item['url'] = embed_json['external_urls']['spotify']
     item['title'] = embed_json['name']
 
+    # Assume first track is the most recent addition
+    dt = datetime.fromisoformat(embed_json['tracks']['items'][0]['added_at'].replace('Z', '+00:00'))
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
     item['author'] = {}
     item['author']['name'] = embed_json['owner']['display_name']
 
     item['_image'] = embed_json['images'][0]['url']
     item['summary'] = embed_json['description']
 
-    newest_dt = datetime(2000, 1, 1)
-    item['content_html'] = '<center><table style="width:640px;"><tr><td colspan="3"><img width="100%" src="{}"></td></tr>'.format(item['_image'])
+    poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small></td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], item['author']['name'])
+    if 'max' in args:
+      i_max = int(args['max'])
+    else:
+      i_max = -1
     for i, track in enumerate(embed_json['tracks']['items']):
-      if i == 5 and args and 'embed' in args:
-        item['content_html'] += '<tr><td colspan="3" style="text-align: center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
+      if i == i_max:
+        item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
         break
-
-      query = track['track']['name']
-
-      dt = datetime.fromisoformat(track['added_at'].replace('Z', '+00:00'))
-      if newest_dt.timestamp() < dt.timestamp():
-        newest_dt = dt
-
       artists = []
+      byline = []
       for artist in track['track']['artists']:
-        artists.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-        query += ' {}'.format(artist['name'])
-      byline = ', '.join(artists)
-
-      item['content_html'] += '<tr style="vertical-align:top;"><td>{}.</td><td style="width:50%; height:3em;"><a href="{}">{}</a><br /><small> by {}'.format(i+1, track['track']['external_urls']['spotify'], track['track']['name'], byline)
-      if track['track'].get('album'):
-        item['content_html'] += '<br />from <a href="{}">{}</a>'.format(track['track']['album']['external_urls']['spotify'], track['track']['album']['name'])
-
-      yt_id = youtube.search(query)
-      if yt_id:
-        yt_stream = '{}/audio?url='.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + yt_id))
-        item['content_html'] += '</small></td><td><audio controls><source src="{}" type="audio/mpeg"></audio><br /><a href="https://www.youtube.com/watch?v={}"><small>Play track</small></a></td></tr>'.format(yt_stream, yt_id)
-      else:
-        item['content_html'] += '</small></td><td><audio controls><source src="{0}" type="audio/mpeg"></audio><br /><a href="{0}"><small>Play track</small></a></td></tr>'.format(track['track']['preview_url'])
+        artists.append(artist['name'])
+        byline.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
+      item['content_html'] += '<li><a href="{}">{}</a><br/><small>by {}</small></li>'.format(track['track']['external_urls']['spotify'], track['track']['name'], ', '.join(byline))
+    if i != i_max:
+      item['content_html'] += '</ol></td></tr>'
     item['content_html'] += '</table></center>'
-
-    item['date_published'] = newest_dt.isoformat()
-    item['_timestamp'] = newest_dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(newest_dt.strftime('%b'), dt.day, dt.year)
 
   elif '/embed-podcast/' in url:
     item['id'] = embed_json['data']['entity']['id']

@@ -576,7 +576,7 @@ def add_apple_podcast(embed_url, save_debug=True):
     print('unable to parse podcast id from ' + embed_url)
     return ''
   print(m.group(1))
-  json_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/1042433465?include=episodes'.format(m.group(1))
+  json_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
 
   s = requests.Session()
   headers = {
@@ -646,3 +646,17 @@ def add_apple_podcast(embed_url, save_debug=True):
     podcast_html += '<li><a style="text-decoration:none;" href="{}">&#9658;</a>&nbsp;<a href="{}">{}</a> ({}, {})</li>'.format(episode['attributes']['assetUrl'], episode['attributes']['url'], episode['attributes']['name'], date, ' , '.join(time))
   podcast_html += '</ol></td></tr></table></center>'
   return podcast_html
+
+def add_audio_track(track_info):
+  desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>'.format(track_info['url'], track_info['title'])
+  if track_info.get('artist'):
+    desc += '<small>by {}<br/>'.format(track_info['artist'])
+  if track_info.get('album'):
+    if track_info.get('artist'):
+      desc += '<br/>'
+    else:
+      desc += '<small>'
+    desc += 'from '.format(track_info['album'])
+  if track_info.get('artist') or track_info.get('album'):
+    desc += '</small>'
+  return '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(track_info['audio_src'], track_info['image'], desc)
