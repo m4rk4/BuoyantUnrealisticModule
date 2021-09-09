@@ -1,6 +1,6 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 from html import unescape
 from urllib.parse import urlsplit
 
@@ -8,6 +8,154 @@ import utils
 
 import logging
 logger = logging.getLogger(__name__)
+
+def get_chart_content(url, args, save_debug=False):
+  page_html = utils.get_url_html(url)
+  if not page_html:
+    return None
+  soup = BeautifulSoup(page_html, 'html.parser')
+  el = soup.find(id='charts')
+  if el and el.has_attr('data-charts'):
+    charts_json = json.loads(unescape(el['data-charts']))
+    if save_debug:
+      utils.write_file(charts_json, './debug/charts.json')
+
+    if not el['data-chart-date'] in url:
+      if not url.endswith('/'):
+        url += '/'
+      url += el['data-chart-date']
+
+    item = {}
+    item['id'] = url
+    item['url'] = url
+    item['title'] = '{} - {}'.format(el['data-page-title'], el['data-chart-date-formatted'])
+
+    # The chart date is the end of the week (Sat), so the published date is 6 days prior
+    dt_pub = datetime.fromisoformat(el['data-chart-date']) - timedelta(days=6)
+    item['date_published'] = dt_pub.isoformat()
+    item['_timestamp'] = dt_pub.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt_pub.strftime('%b'), dt_pub.day, dt_pub.year)
+
+    it = soup.find('img', class_='charts__header__promo__title_logo')
+    if it:
+      item['_image'] = it['src']
+    else:
+      item['_image'] = el['data-chart-logo']
+
+    item['content_html'] = utils.add_image(item['_image'])
+    item['content_html'] += '<p>For the week ending {}</p>'.format(el['data-chart-date-formatted'])
+    item['content_html'] += '<table><tr><th>&nbsp;</th><th>&nbsp;</th><th style="text-align:center;">Last week</th><th style="text-align:center;">Peak</th><th style="text-align:center;">Wks on chart</th></tr><th>&nbsp;</th>'
+    for data in charts_json:
+      item['content_html'] += '<tr><td style="text-align:center; font-size:2em;">{}</td>'.format(data['rank'])
+      artist = ''
+      title = ''
+      if data.get('artist_name'):
+        artist = data['artist_name']
+        if data.get('artist_url'):
+          artist = '<a href="https://www.billboard.com{}">{}</a>'.format(data['artist_url'], data['artist_name'])
+      if data.get('title'):
+        title = data['title']
+        m = re.search(r'([^\/]+)\s\/\s(@.+)', data['title'])
+        if m:
+          title = m.group(1)
+          artist = m.group(2)
+        if data.get('title_content_url'):
+          title = '<a href="https://www.billboard.com{}">{}</a>'.format(data['title_content_url'], title)
+      if title and artist:
+        item['content_html'] += '<td style="padding:0.5em 0 0.5em 1em;"><b>{}</b><br/>{}</td>'.format(title, artist)
+      else:
+        item['content_html'] += '<td style="padding:0.5em 0 0.5em 1em;"><b>{}</b></td>'.format(title)
+      if data['history'].get('last_week'):
+        item['content_html'] += '<td style="text-align:center;">{}</td>'.format(data['history']['last_week'])
+      else:
+        item['content_html'] += '<td style="text-align:center;">-</td>'
+      item['content_html'] += '<td style="text-align:center;">{}</td>'.format(data['history']['peak_rank'])
+      item['content_html'] += '<td style="text-align:center;">{}</td>'.format(data['history']['weeks_on_chart'])
+      img_src = ''
+      for images in ['title_images', 'artist_images']:
+        if data.get(images) and not img_src:
+          for size in ['small', 'medium', 'detail-med']:
+            if size in data[images]['sizes']:
+              img_src = data[images]['sizes'][size]['Name']
+              break
+      if img_src:
+        item['content_html'] += '<td style="text-align:center;"><img height="87px" src="https://charts-static.billboard.com{}" /></td></tr>'.format(img_src)
+      else:
+        item['content_html'] += '<td style="height:87px; text-align:center;">&nbsp;</td></tr>'
+    item['content_html'] += '</table>'
+
+  else:
+    el = soup.find(class_='print-chart__week')
+    dt = datetime.strptime(el.get_text().strip(), 'The week of %B %d, %Y')
+    date = dt.strftime('%Y-%m-%d')
+    if not date in url:
+      if not url.endswith('/'):
+        url += '/'
+      url += date
+    formatted_date = '{} {}, {}'.format(dt.strftime('%B'), dt.day, dt.year)
+
+    item = {}
+    item['id'] = url
+    item['url'] = url
+
+    el = soup.find('meta', attrs={"name": "title"})
+    item['title'] = '{} - {}'.format(unescape(el['content']), formatted_date)
+
+    dt_pub = dt -  - timedelta(days=6)
+    item['date_published'] = dt_pub.isoformat()
+    item['_timestamp'] = dt_pub.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt_pub.strftime('%b'), dt_pub.day, dt_pub.year)
+
+    el = soup.find('img', class_='print-chart__logo')
+    item['_image'] = el['src']
+
+    item['content_html'] = ''
+    item['content_html'] = utils.add_image(item['_image'])
+    item['content_html'] += '<p>For the week ending {}</p>'.format(formatted_date)
+    item['content_html'] += '<table><tr><th>&nbsp;</th><th>&nbsp;</th><th style="text-align:center;">Last week</th><th style="text-align:center;">Peak</th><th style="text-align:center;">Wks on chart</th></tr><th>&nbsp;</th>'
+    for el in soup.find_all(class_='chart-list-item', attrs={"data-rank": True}):
+      item['content_html'] += '<tr><td style="text-align:center; font-size:2em;">{}</td>'.format(el['data-rank'])
+      if el['data-title']:
+        it = el.find(class_='chart-list-item__title')
+        if it.a:
+          title = '<a href="https://www.billboard.com{}">{}</a>'.format(it.a['href'], el['data-title'])
+        else:
+          title = el['data-title']
+      else:
+        title = ''
+      if el['data-artist']:
+        it = el.find(class_='chart-list-item__artist')
+        if it.a:
+          artist = '<a href="https://www.billboard.com{}">{}</a>'.format(it.a['href'], el['data-artist'])
+        else:
+          artist = el['data-artist']
+      else:
+        artist = ''
+      if title and artist:
+        item['content_html'] += '<td style="padding:0.5em 0 0.5em 1em;"><b>{}</b><br/>{}</td>'.format(title, artist)
+      else:
+        item['content_html'] += '<td style="padding:0.5em 0 0.5em 1em;"><b>{}</b></td>'.format(title)
+      it = el.find(class_='chart-list-item__ministats')
+      m = re.search(r'([\d\-]+)\s+Last\s+([\d\-]+)\s+Peak\s+([\d\-]+)\s+Weeks', it.get_text().strip())
+      item['content_html'] += '<td style="text-align:center;">{}</td>'.format(m.group(1))
+      item['content_html'] += '<td style="text-align:center;">{}</td>'.format(m.group(2))
+      item['content_html'] += '<td style="text-align:center;">{}</td>'.format(m.group(3))
+      img_src = ''
+      #it = el.find('img', attrs={"data-srcset": True})
+      it = el.find(class_='chart-list-item__image')
+      if it:
+        if it.has_attr('data-srcset'):
+          img_src = utils.image_from_srcset(it['data-srcset'], 87)
+        elif it.has_attr('data-src'):
+          img_src = it['data-src']
+        elif it.has_attr('src') and it['src'].startswith('https'):
+          img_src = it['src']
+      if img_src:
+        item['content_html'] += '<td style="text-align:center;"><img height="87px" src="{}" /></td></tr>'.format(img_src)
+      else:
+        item['content_html'] += '<td style="height:87px; text-align:center;">&nbsp;</td></tr>'
+    item['content_html'] += '</table>'
+  return item
 
 def get_video_item(video_id, args, save_debug=False):
   jwp_json = utils.get_url_json(
@@ -69,6 +217,8 @@ def get_content(url, args, save_debug=False):
   split_url = urlsplit(url)
   if split_url.path.startswith('/video/'):
     return get_video_content(url, args, save_debug)
+  elif split_url.path.startswith('/charts/'):
+    return get_chart_content(url, args, save_debug)
 
   json_url = '{}://{}/json{}'.format(split_url.scheme, split_url.netloc, split_url.path)
   article_json = utils.get_url_json(json_url)
@@ -230,6 +380,35 @@ def get_content(url, args, save_debug=False):
   item['content_html'] = content_html
   return item
 
+def get_chart_feed(args, save_debug=False):
+  items = []
+  split_url = urlsplit(args['url'])
+  if split_url.path == '/charts' or split_url.path == '/charts/':
+    page_html = utils.get_url_html(args['url'])
+    if not page_html:
+      return None
+    soup = BeautifulSoup(page_html, 'html.parser')
+    for a in soup.find_all('a', class_='chart-panel__link', attrs={"data-chart-code": True}):
+      url = 'https://www.billboard.com' + a['href']
+      if save_debug:
+        logger.debug('getting content for ' + url)
+      item = get_chart_content(url, args, save_debug)
+      if item:
+        if utils.filter_item(item, args) == True:
+          items.append(item)
+  else:
+    if save_debug:
+      logger.debug('getting content for ' + args['url'])
+    item = get_chart_content(args['url'], args, save_debug)
+    if item:
+      if utils.filter_item(item, args) == True:
+        items.append(item)
+
+  feed = utils.init_jsonfeed(args)
+  del feed['items']
+  feed['items'] = items.copy()
+  return feed
+
 def get_video_feed(args, save_debug=False):
   page_html = utils.get_url_html(args['url'])
   if not page_html:
@@ -292,6 +471,8 @@ def get_feed(args, save_debug=False):
 
   if split_url.path == '/videos' or split_url.path == '/videos/':
     return get_video_feed(args, save_debug)
+  elif split_url.path == '/charts' or split_url.path.startswith('/charts/'):
+    return get_chart_feed(args, save_debug)
   elif split_url.path.startswith('/series/'):
     json_url = '{}://{}/fe_data{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     if json_url.endswith('/'):
@@ -303,7 +484,7 @@ def get_feed(args, save_debug=False):
       posts = page_json
   elif split_url.path.startswith('/music/'):
     artist = split_url.path.split('/')[2]
-    json_url = '{}://{}/fe_data/news/artist/{}/10/1'.format(split_url.scheme, split_url.netloc, artist)
+    json_url = '{}://{}/fe_data/news/artist/{}/10/0'.format(split_url.scheme, split_url.netloc, artist)
     page_json = utils.get_url_json(json_url)
     if page_json:
       posts = page_json
