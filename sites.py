@@ -80,6 +80,12 @@ handlers = {
   "ign": {
     "module": "ign"
   },
+  "businessinsider": {
+    "module": "insider"
+  },
+  "insider": {
+    "module": "insider"
+  },
   "instagram": {
     "module": "instagram"
   },

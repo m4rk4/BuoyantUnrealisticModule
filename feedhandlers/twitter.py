@@ -248,7 +248,7 @@ def get_content(url, args, save_debug=False):
   # url can be just the id
   if url.startswith('https'):
     clean_url = utils.clean_url(url)
-    m = re.search('https:\/\/twitter\.com\/([^\/]+)\/status\/(\d+)', clean_url)
+    m = re.search('https:\/\/twitter\.com\/([^\/]+)\/statuse?s?\/(\d+)', clean_url)
     if m:
       tweet_user = m.group(1)
       tweet_id = m.group(2)  

@@ -50,24 +50,26 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
       proxies = {"http": "http://69.167.174.17"}
     else:
       proxies = None
+    r = None
     try:
       r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
       r.raise_for_status()
     except Exception as e:
-      if r.status_code != 402:
+      if r != None and r.status_code == 402:
+        return r
+      logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
+      # Try again using the proxy
+      proxies = {"http": "http://69.167.174.17"}
+      try:
+        r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
+        r.raise_for_status()
+      except Exception as e:
         logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
-        # Try again using the proxy
-        proxies = {"http": "http://69.167.174.17"}
-        try:
-          r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
-          r.raise_for_status()
-        except Exception as e:
-          logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
   return r
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
   r = get_request(url, user_agent, headers, retries, use_proxy)
-  if r.status_code == 200 or r.status_code == 402:
+  if r != None and (r.status_code == 200 or r.status_code == 402):
     try:
       return r.json()
     except:
@@ -79,7 +81,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=F
 
 def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy=False):
   r = get_request(url, user_agent, headers, retries, use_proxy)
-  if r.status_code == 200 or r.status_code == 402:
+  if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
 
