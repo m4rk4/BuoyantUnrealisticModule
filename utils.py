@@ -45,26 +45,26 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
     headers = {}
     headers['user-agent'] = ua
 
-    # First time us proxy if specified
-    if use_proxy:
-      proxies = {"http": "http://69.167.174.17"}
-    else:
-      proxies = None
-    r = None
+  if use_proxy:
+    proxies = {"http": "http://69.167.174.17"}
+  else:
+    proxies = None
+
+  r = None
+  try:
+    r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
+    r.raise_for_status()
+  except Exception as e:
+    if r != None and r.status_code == 402:
+      return r
+    logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
+    # Try again using the proxy
+    proxies = {"http": "http://69.167.174.17"}
     try:
       r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
       r.raise_for_status()
     except Exception as e:
-      if r != None and r.status_code == 402:
-        return r
       logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
-      # Try again using the proxy
-      proxies = {"http": "http://69.167.174.17"}
-      try:
-        r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-      except Exception as e:
-        logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
   return r
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
@@ -313,7 +313,7 @@ def add_pullquote(quote, author=''):
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
-def add_image(img_src, caption='', width=None, height=None, attr='', background='', link='', gawker=False):
+def add_image(img_src, caption='', width=None, height=None, attr='', background='', link='', gawker=False, style=''):
   if width:
     img_width = 'width="{}"'.format(width)
   else:
@@ -329,15 +329,21 @@ def add_image(img_src, caption='', width=None, height=None, attr='', background=
   else:
     img_attr = ''
 
-  if background:
-    bg_style = ' style="background:url({});"'.format(background)
+  if style:
+    if background:
+      img_style = ' style="{} background:url({});"'.format(style, background)
+    else:
+      img_style = ' style="{}"'.format(style)
   else:
-    bg_style = ''
+    if background:
+      img_style = ' style="background:url({});"'.format(background)
+    else:
+      img_style = ''
 
   begin_html = '<figure>'
   if link:
     begin_html += '<a href="{}">'.format(link)
-  begin_html += '<img {}{}{}{} src="{}" />'.format(img_width, img_height, img_attr, bg_style, img_src)
+  begin_html += '<img {}{}{}{} src="{}" />'.format(img_width, img_height, img_attr, img_style, img_src)
   if link:
     begin_html += '</a>'
   end_html = '</figure>'
