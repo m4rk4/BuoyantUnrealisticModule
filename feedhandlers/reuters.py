@@ -87,7 +87,8 @@ def get_feed(args, save_debug=False):
   section = split_url.path
   if section.endswith('/'):
     section = section[:-1]
-  query = '{{"fetch_type":"section","id":"{}","orderby":"last_updated_date:desc","size":10,"website":"reuters"}}'.format(section)
+  #query = '{{"fetch_type":"section","id":"{}","orderby":"last_updated_date:desc","size":10,"website":"reuters"}}'.format(section)
+  query = '{{"uri":"/technology/","website":"reuters","id":"{0}","fetch_type":"collection","orderby":"last_updated_date:desc","size":"20","section_id":"{0}","arc-site":"reuters"}}'.format(section)
   api_url = 'https://www.reuters.com/pf/api/v3/content/fetch/articles-by-section-alias-or-id-v1?query={}&d={}&_website=reuters'.format(quote_plus(query), d)
   section_json = utils.get_url_json(api_url)
   if not section_json:
