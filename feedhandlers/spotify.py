@@ -1,7 +1,6 @@
-import json, re
-from bs4 import BeautifulSoup
+import math, re, requests
 from datetime import datetime
-from urllib.parse import quote_plus, unquote_plus
+from urllib.parse import quote_plus
 
 import config, utils
 from feedhandlers import youtube
@@ -13,156 +12,182 @@ def get_authorization_header():
   # Top Songs - USA
   url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
   spotify_html = utils.get_url_html(url)
+  #utils.write_file(spotify_html, './debug/debug.html')
   m = re.search(r'"accessToken":"([^"]+)', spotify_html)
   if not m:
     return None
   header = {}
   header['authorization'] = 'Bearer ' + m.group(1)
+  #print(header)
   return header
 
 def get_content(url, args, save_debug=False):
-  m = re.search(r'https:\/\/open\.spotify\.com\/([^\/]+)\/([0-9a-zA-Z]+)', url)
+  m = re.search(r'https:\/\/open\.spotify\.com\/embed\/([^\/]+)\/([0-9a-zA-Z]+)', url)
   if not m:
-    m = re.search(r'https:\/\/open\.spotify\.com\/embed\/([^\/]+)\/([0-9a-zA-Z]+)', url)
+    m = re.search(r'https:\/\/open\.spotify\.com\/([^\/]+)\/([0-9a-zA-Z]+)', url)
   if not m:
     logger.warning('unable to parse Spotify url ' + url)
     return None
 
   content_type = m.group(1)
   content_id = m.group(2)
+
   api_url = 'https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id)
   if content_type == 'album' or content_type == 'playlist':
     api_url += '/tracks'
-  if content_typ == 'show':
+  if content_type == 'show':
     api_url += '/episodes'
   if 'max' in args:
-    api_url += '?limit=' + args['max']
+    api_url += '?limit={}'.format(args['max'])
 
   headers = get_authorization_header()
   if not headers:
     logger.warning('unable to get Spotify authorization token')
     return None
-  api_json = utils.get_url_json(api_url, headers=headers)
-  if not api_json:
-    return None
-  if save_debug:
-    utils.write_file(api_json, './debug/spotify.json')
-
-
-  embed_html = utils.get_url_html(url)
-  if not embed_html:
-    return None
-
-  soup = BeautifulSoup(embed_html, 'html.parser')
-  if '/embed/' in url:
-    el = soup.find('script', id='resource')
-  elif '/embed-podcast/' in url:
-    el = soup.find('script', id='preloaded-state')
-  if not el:
-    print('no embed json found')
-    return None
-
-  embed_json = json.loads(unquote_plus(el.string))
-  #if save_debug:
-  #  utils.write_file(embed_json, './debug/spotify.json')
 
   item = {}
-  if '/embed/track/' in url:
-    item['id'] = embed_json['id']
-    item['url'] = embed_json['external_urls']['spotify']
+  if content_type == 'track':
+    track_json = utils.get_url_json('https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id), headers=headers)
+    if not track_json:
+      return None
+    if save_debug:
+      utils.write_file(track_json, './debug/spotify.json')
 
-    query = embed_json['name']
+    item['id'] = track_json['id']
+    item['url'] = track_json['external_urls']['spotify']
+    item['title'] = track_json['name']
+
     artists = []
-    byline = []
-    for artist in embed_json['artists']:
+    bylines = []
+    for artist in track_json['artists']:
       artists.append(artist['name'])
-      byline.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-      query += ' {}'.format(artist['name'])
+      bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
     item['author'] = {}
     item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+    byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(bylines))
 
-    item['title'] = '{} by {}'.format(embed_json['name'], item['author']['name'])
-
-    if embed_json['album']['album_type'] == 'single':
-      dt = datetime.strptime(embed_json['album']['release_date'], '%Y-%m-%d')
-      item['date_published'] = dt.isoformat()
-      item['_timestamp'] = dt.timestamp()
-      item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-      item['_image'] = embed_json['album']['images'][0]['url']
-    else:
-      logger.warning('unhandled album type {} for a track'.format(embed_json['album']['album_type']))
-
-    #item['summary'] = embed_json['data']['entity']['description']
-
-    item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img style="height:8em;" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr>'.format(item['_image'], embed_json['external_urls']['spotify'], embed_json['name'])
-    item['content_html'] += '<tr><td><small>from <a href="{}">{}</a><br />by {}</small></td></tr>'.format(embed_json['album']['external_urls']['spotify'], embed_json['album']['name'], ', '.join(byline))
-    yt_id = youtube.search(query)
-    if yt_id:
-      item['_audio'] = '{}/audio?url='.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + yt_id))
-      item['content_html'] += '<tr><td><audio controls><source src="{}"></audio><br /><a href="https://www.youtube.com/watch?v={}"><small>Play track</small></a></td></tr></table></center>'.format(item['_audio'], yt_id)
-    else:
-      item['_audio'] = embed_json['preview_url']
-      item['content_html'] += '<tr><td><audio controls><source src="{0}"></audio><br /><a href="{0}"><small>Play track</small></a></td></tr></table></center>'.format(item['_audio'])
-
-  elif '/embed/playlist/' in url:
-    item['id'] = embed_json['id']
-    item['url'] = embed_json['external_urls']['spotify']
-    item['title'] = embed_json['name']
-
-    # Assume first track is the most recent addition
-    dt = datetime.fromisoformat(embed_json['tracks']['items'][0]['added_at'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(track_json['album']['release_date'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
-    item['author'] = {}
-    item['author']['name'] = embed_json['owner']['display_name']
-
-    item['_image'] = embed_json['images'][0]['url']
-    item['summary'] = embed_json['description']
+    item['_image'] = track_json['album']['images'][0]['url']
 
     poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
-    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small></td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], item['author']['name'])
-    if 'max' in args:
+    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td>'.format(track_json['external_urls']['spotify'], poster)
+    item['content_html'] += '<td style="padding-left:0.5em; vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>'.format(track_json['external_urls']['spotify'], track_json['name'])
+    item['content_html'] += 'from <a href="{}">{}</a>'.format(track_json['album']['external_urls']['spotify'], track_json['album']['name'])
+    item['content_html'] += '<br/>by {}</small>'.format(byline)
+    item['content_html'] += '</td></tr></table></center>'
+
+  elif content_type == 'album' or content_type == 'playlist':
+    playlist_json = utils.get_url_json('https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id), headers=headers)
+    if not playlist_json:
+      return None
+    if save_debug:
+      utils.write_file(playlist_json, './debug/spotify.json')
+
+    item['id'] = playlist_json['id']
+    item['url'] = playlist_json['external_urls']['spotify']
+    item['title'] = playlist_json['name']
+
+    dt = None
+    byline = ''
+    item['author'] = {}
+    if content_type == 'playlist':
+      item['author']['name'] = playlist_json['owner']['display_name']
+      byline = '<a href="{}">{}</a>'.format(playlist_json['owner']['external_urls']['spotify'], playlist_json['owner']['display_name'])
+      # Assume first track is the most recent addition
+      dt = datetime.fromisoformat(playlist_json['tracks']['items'][0]['added_at'].replace('Z', '+00:00'))
+    elif content_type == 'album':
+      artists = []
+      bylines = []
+      for artist in  playlist_json['artists']:
+        artists.append(artist['name'])
+        bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
+      item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+      byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(bylines))
+      dt = datetime.fromisoformat(playlist_json['release_date'])
+    if dt:
+      item['date_published'] = dt.isoformat()
+      item['_timestamp'] = dt.timestamp()
+      item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
+    item['_image'] = playlist_json['images'][0]['url']
+
+    if playlist_json.get('description'):
+      item['summary'] = playlist_json['description']
+
+    poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small></td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], byline)
+    if 'max' in args and content_type == 'playlist':
       i_max = int(args['max'])
     else:
       i_max = -1
-    for i, track in enumerate(embed_json['tracks']['items']):
+    for i, track_item in enumerate(playlist_json['tracks']['items']):
+      if content_type == 'playlist':
+        track = track_item['track']
+      else:
+        track = track_item
       if i == i_max:
         item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
         break
       artists = []
-      byline = []
-      for artist in track['track']['artists']:
+      bylines = []
+      for artist in track['artists']:
         artists.append(artist['name'])
-        byline.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-      item['content_html'] += '<li><a href="{}">{}</a><br/><small>by {}</small></li>'.format(track['track']['external_urls']['spotify'], track['track']['name'], ', '.join(byline))
+        bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
+      if content_type == 'playlist':
+        item['content_html'] += '<li><a href="{}">{}</a><br/><small>by {}</small></li>'.format(track['external_urls']['spotify'], track['name'], ', '.join(bylines))
+      else:
+        item['content_html'] += '<li><a href="{}">{}</a>'.format(track['external_urls']['spotify'], track['name'])
     if i != i_max:
       item['content_html'] += '</ol></td></tr>'
     item['content_html'] += '</table></center>'
 
-  elif '/embed-podcast/' in url:
-    item['id'] = embed_json['data']['entity']['id']
-    item['url'] = embed_json['data']['entity']['external_urls']['spotify']
-    item['title'] = embed_json['data']['entity']['name']
+  elif content_type == 'show':
+    show_json = utils.get_url_json('https://api.spotify.com/v1/shows/{}?market=US'.format(content_id), headers=headers)
+    if not show_json:
+      return None
+    if save_debug:
+      utils.write_file(show_json, './debug/spotify.json')
 
-    dt = datetime.strptime(embed_json['data']['entity']['release_date'], '%Y-%m-%d')
+    item['id'] = show_json['id']
+    item['url'] = show_json['external_urls']['spotify']
+    item['title'] = show_json['name']
+
+    dt = datetime.fromisoformat(show_json['episodes']['items'][0]['release_date'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
     item['author'] = {}
-    item['author']['name'] = embed_json['data']['entity']['show']['publisher']
+    item['author']['name'] = show_json['publisher']
 
-    item['_image'] = embed_json['data']['entity']['images'][0]['url']
-    item['_audio'] = embed_json['data']['entity']['external_playback_url']
+    item['_image'] = show_json['images'][0]['url']
+    #item['_audio'] = show_json['external_playback_url']
 
-    item['summary'] = embed_json['data']['entity']['description']
+    item['summary'] = show_json['description']
 
-    item['content_html'] = '<center><table style="width:480px;"><tr><td width="30%" rowspan="3"><img width="100%" src="{}"></td><td><a href="{}"><b>{}</b></a></td></tr><tr><td><small>'.format(item['_image'], item['url'], item['title'])
-    item['content_html'] += '<a href="{}">{}</a></small></td></tr>'.format(embed_json['data']['entity']['show']['external_urls']['spotify'], embed_json['data']['entity']['show']['name'])
-    item['content_html'] += '<tr><td><audio controls><source src="{0}" type="audio/mpeg"><a href="{0}">Play track</a></audio></td></tr></table></center>'.format(item['_audio'])
-    item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small></td></tr><tr><td colspan="2">Episodes:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], item['author']['name'])
+    if 'max' in args:
+      i_max = int(args['max'])
+    else:
+      i_max = -1
+    for i, episode in enumerate(show_json['episodes']['items']):
+      # Get the actual playback url if it goes through a redirect service
+      r = requests.head(episode['external_playback_url'], allow_redirects=False)
+      while r.status_code == 302:
+        r = requests.head(r.headers['location'], allow_redirects=False)
+      if i == i_max:
+        item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View all episodes</a></td></tr>'.format(config.server, quote_plus(url))
+        break
+      minutes = math.ceil(episode['duration_ms'] / 1000 / 60)
+      item['content_html'] += '<li><a href="{}">{}</a><br/><small>{} &ndash; {} min</small></li>'.format(r.url, episode['name'], episode['release_date'], minutes)
+    if i != i_max:
+      item['content_html'] += '</ol></td></tr>'
+    item['content_html'] += '</table></center>'
 
   return item
 
