@@ -57,6 +57,11 @@ def get_content(url, args, save_debug=False):
     item['url'] = track_json['external_urls']['spotify']
     item['title'] = track_json['name']
 
+    dt = datetime.fromisoformat(track_json['album']['release_date'])
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
     artists = []
     bylines = []
     for artist in track_json['artists']:
@@ -65,12 +70,6 @@ def get_content(url, args, save_debug=False):
     item['author'] = {}
     item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
     byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(bylines))
-
-    dt = datetime.fromisoformat(track_json['album']['release_date'])
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
     item['_image'] = track_json['album']['images'][0]['url']
 
     poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
@@ -176,18 +175,47 @@ def get_content(url, args, save_debug=False):
     else:
       i_max = -1
     for i, episode in enumerate(show_json['episodes']['items']):
-      # Get the actual playback url if it goes through a redirect service
-      r = requests.head(episode['external_playback_url'], allow_redirects=False)
-      while r.status_code == 302:
-        r = requests.head(r.headers['location'], allow_redirects=False)
+      playback_url = utils.get_redirect_url(episode['external_playback_url'])
       if i == i_max:
         item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View all episodes</a></td></tr>'.format(config.server, quote_plus(url))
         break
       minutes = math.ceil(episode['duration_ms'] / 1000 / 60)
-      item['content_html'] += '<li><a href="{}">{}</a><br/><small>{} &ndash; {} min</small></li>'.format(r.url, episode['name'], episode['release_date'], minutes)
+      item['content_html'] += '<li><a href="{}">{}</a><br/><small>{} &ndash; {} min</small></li>'.format(playback_url, episode['name'], episode['release_date'], minutes)
     if i != i_max:
       item['content_html'] += '</ol></td></tr>'
     item['content_html'] += '</table></center>'
+
+  elif content_type == 'episode':
+    episode_json = utils.get_url_json('https://api.spotify.com/v1/episodes/{}?market=US'.format(content_id), headers=headers)
+    if not episode_json:
+      return None
+    if save_debug:
+      utils.write_file(episode_json, './debug/spotify.json')
+
+    item['id'] = episode_json['id']
+    item['url'] = episode_json['external_urls']['spotify']
+    item['title'] = episode_json['name']
+
+    dt = datetime.fromisoformat(episode_json['release_date'])
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
+    item['author'] = {}
+    item['author']['name'] = episode_json['show']['publisher']
+
+    item['_image'] = episode_json['images'][0]['url']
+    item['summary'] = episode_json['html_description']
+
+    playback_url = utils.get_redirect_url(episode_json['external_playback_url'])
+    minutes = math.ceil(episode_json['duration_ms'] / 1000 / 60)
+    poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td>'.format(playback_url, poster)
+    item['content_html'] += '<td style="padding-left:0.5em; vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>'.format(item['url'], item['title'])
+    item['content_html'] += 'from <a href="{}">{}</a> by {}<br/>'.format(episode_json['show']['external_urls']['spotify'], episode_json['show']['name'], item['author']['name'])
+    item['content_html'] += '{} &ndash; {} min.</small>'.format(item['_display_date'], minutes)
+    item['content_html'] += '</td></tr></table></center>'
+
 
   return item
 
