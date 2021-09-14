@@ -86,9 +86,11 @@ def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy
   return None
 
 def get_redirect_url(url):
-  r = requests.head(url, allow_redirects=False)
-  while r.status_code == 302:
-    r = requests.head(r.headers['location'], allow_redirects=False)
+  i = 0
+  r = requests.head(url, allow_redirects=True)
+  while r.status_code != 200 and i < 5:
+    r = requests.head(r.headers['location'], allow_redirects=True)
+    i += 1
   return r.url
 
 def get_url_title_desc(url):
