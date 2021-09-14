@@ -175,7 +175,10 @@ def get_content(url, args, save_debug=False):
   elif '/story/' in clean_url:
     return get_story_content(clean_url, args, save_debug)
 
-  amp_url = '{}://{}/amp{}'.format(split_url.scheme, split_url.netloc, split_url.path)
+  if split_url.path.startswith('/amp/'):
+    amp_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
+  else:
+    amp_url = '{}://{}/amp{}'.format(split_url.scheme, split_url.netloc, split_url.path)
   article_html = utils.get_url_html(amp_url, 'googlebot')
   if not article_html:
     return None
@@ -213,7 +216,10 @@ def get_content(url, args, save_debug=False):
     else: #media-object-image
       content_html += convert_amp_image(lead)
 
-  article = soup.find(class_="articleBody").find(attrs={"amp-access":"access", "class":False})
+  article_body = soup.find(class_="articleBody")
+  article = article_body.find('section', attrs={"subscriptions-section": "content"})
+  if not article:
+    article = article_body.find(attrs={"amp-access": "access", "class": False})
 
   el = article.find(class_='paywall')
   if el:
