@@ -14,6 +14,9 @@ handlers = {
   "billboard": {
     "module": "billboard"
   },
+  "carbuzz": {
+    "module": "carbuzz"
+  },
   "cleveland": {
     "module": "cleveland"
   },
