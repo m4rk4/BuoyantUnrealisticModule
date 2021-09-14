@@ -217,7 +217,6 @@ def get_content(url, args, save_debug=False):
     item['content_html'] += '<br/>{} &ndash; {} min.'.format(item['_display_date'], minutes)
     item['content_html'] += '</small></td></tr></table></center>'
 
-
   return item
 
 def get_feed(args, save_debug=False):
