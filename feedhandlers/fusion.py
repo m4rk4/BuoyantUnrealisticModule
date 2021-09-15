@@ -1,5 +1,6 @@
-import json, re
+import pytz, re
 from bs4 import BeautifulSoup
+from datetime import datetime
 from urllib.parse import urlsplit
 
 import utils
@@ -153,8 +154,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     else:
       video_json = element
     if False:
-      with open('./debug/debug.json', 'w') as file:
-        json.dump(video_json, file, indent=4)
+      utils.write_file(video_json, './debug/video.json')
     # Use an mp4 stream closest to default width
     widths = []
     streams = []
@@ -185,13 +185,27 @@ def process_content_element(element, url, func_resize_image, gallery=None):
         else:
           logger.warning('unable to add tweet {} in {}'.format(el['href'], url))
 
+  elif element['type'] == 'story':
+    # This may be Wapo specific
+    element_html += '<hr><h2>{}</h2>'.format(element['headlines']['basic'])
+    authors = []
+    for author in element['credits']['by']:
+      authors.append(author['name'])
+    byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    tz_est = pytz.timezone('US/Eastern')
+    dt = datetime.fromisoformat(element['display_date'].replace('Z', '+00:00')).astimezone(tz_est)
+    date = '{}. {}, {} {}'.format(dt.strftime('%b'), dt.day, dt.year, dt.strftime('%I:%M %p').lstrip('0'))
+    element_html += '<p>by {} (updated {})</p>'.format(byline, date)
+    element_html += get_content_html(element, '', func_resize_image, url)
+
   elif element['type'] == 'interstitial_link':
     pass
+
   else:
     logger.warning('unhandled element type "{}" in {}'.format(element['type'], url))
   return element_html
 
-def get_content_html(content, lead_image, func_resize_image, url, save_debug):
+def get_content_html(content, lead_image, func_resize_image, url, save_debug=False):
   content_html = ''
   # Add a lead image if it's not in the article (except galleries because those are moved to the end)
   if not (content['content_elements'][0]['type'] == 'image' or (content['content_elements'][0]['type'] == 'oembed_response' and content['content_elements'][0]['subtype'] == 'youtube')):

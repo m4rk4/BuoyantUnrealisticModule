@@ -51,19 +51,12 @@ def get_item(content, url, args, save_debug):
   return item
 
 def get_content(url, args, save_debug=False):
-  item = None
-  content = None
-  split_url = urlsplit(url)
-
   next_json = nextjs.get_next_data_json(url, save_debug, 'mobile')
   if not next_json:
     return None
-
   content = next_json['props']['pageProps']['globalContent']
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(content, file, indent=4)
-
+    utils.write_file(content, './debug/debug.json')
   return get_item(content, url, args, save_debug)
 
 def get_feed(args, save_debug=False):
