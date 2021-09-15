@@ -8,7 +8,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_apple_data(api_url, save_debug=False):
-  print('get_apple_data ' + api_url)
   s = requests.Session()
   headers = {
     "accept": "*/*",
