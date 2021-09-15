@@ -79,14 +79,23 @@ def get_story(story_json, args, save_debug=False):
 
   content_html = story_json['story'].replace('\n', '')
 
+  if not re.search(r'<p>', content_html):
+    content_html = content_html.replace('\r', '<br/><br/>')
+  else:
+    content_html = content_html.replace('\r', '')
+
+  content_html = content_html.replace('class="floatleft"', 'style="float:left; margin-top:0.25em; margin-right:0.5em;"')
+
   # Add lead video or image
   item['content_html'] = ''
-  if not re.search(r'<video\d+>', content_html) and story_json.get('video'):
-    vid_src, vid_type, poster, caption = get_video(story_json['video'][0])
-    item['content_html'] += utils.add_video(vid_src, vid_type, poster, caption)
-  elif not re.search(r'<photo\d+>', content_html) and story_json.get('images'):
-    img_src, caption = get_image(story_json['images'][0])
-    item['content_html'] += utils.add_image(resize_image(img_src), caption)
+  m = re.search(r'<photo\d+>|<video\d+>', content_html[:20])
+  if not m:
+    if story_json.get('video'):
+      vid_src, vid_type, poster, caption = get_video(story_json['video'][0])
+      item['content_html'] += utils.add_video(vid_src, vid_type, poster, caption)
+    elif story_json.get('images'):
+      img_src, caption = get_image(story_json['images'][0])
+      item['content_html'] += utils.add_image(resize_image(img_src), caption)
 
   def replace_photo(matchobj):
     nonlocal story_json
@@ -100,16 +109,18 @@ def get_story(story_json, args, save_debug=False):
   def replace_video(matchobj):
     nonlocal story_json
     n = int(matchobj.group(1)) - 1
-    video = story_json['video'][n]
-    vid_src, vid_type, poster, caption = get_video(video)
-    return utils.add_video(vid_src, vid_type, poster, caption)
+    if n < len(story_json['video']):
+      video = story_json['video'][n]
+      vid_src, vid_type, poster, caption = get_video(video)
+      return utils.add_video(vid_src, vid_type, poster, caption)
+    logger.warning('video {} not found in {}'.format(n, story_json['links']['web']['href']))
   content_html = re.sub(r'<p><video(\d+)>\s?<\/video\d+><\/p>', replace_video, content_html)
 
   if re.search(r'<inline\d>', content_html):
     story_html = utils.get_url_html(url)
     if story_html:
       story_soup = BeautifulSoup(story_html, 'html.parser')
-      inlines = story_soup.find_all(class_=['instagram-media', 'twitter-tweet', 'pull-quote', 'module-iframe-wrapper', 'inline-track'])
+      inlines = story_soup.find_all(class_=['instagram-media', 'twitter-tweet', 'pull-quote', 'module-iframe-wrapper', 'inline'])
 
       def replace_inline(matchobj):
         nonlocal inlines
@@ -135,14 +146,14 @@ def get_story(story_json, args, save_debug=False):
               it.decompose()
             quote = re.sub(r'^"|"$', '', el.get_text().strip())
             return utils.add_pullquote(quote, author)
-          elif 'inline-track' in el['class']:
+          elif 'inline-track' in el['class'] or el.name == 'aside':
             # Skip
             return ''
           elif 'module-iframe-wrapper' in el['class']:
             it = el.find('iframe')
             logger.warning('skipping iframe ' + it['src'])
             return ''
-        logger.warning('unhandled inline in ' + url)
+        logger.warning('unhandled inline{} in {}'.format(n+1, url))
         return matchobj.group(0)
       content_html = re.sub(r'<p><inline(\d+)><\/p>', replace_inline, content_html)
       content_html = re.sub(r'<inline(\d+)>', replace_inline, content_html)
@@ -153,13 +164,11 @@ def get_story(story_json, args, save_debug=False):
   return item
 
 def get_content(url, args, save_debug=False):
-  story_html = ''
   m = re.search(r'\/id\/(\d+)\/', url)
   if not m:
     story_html = utils.get_url_html(url)
     if story_html:
       m = re.search(r'data-id="(\d+)"', story_html)
-
   if not m:
     logger.warning('unable to parse story id in ' + url)
     return None

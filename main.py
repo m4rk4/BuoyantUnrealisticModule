@@ -1,4 +1,4 @@
-import glob, importlib, os, requests, sys, tldextract
+import glob, importlib, os, re, requests, sys, tldextract
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from io import BytesIO
@@ -100,7 +100,7 @@ def content():
 
   module = get_module(args)
   if module:
-    if 'youtube.com' in args['url']:
+    if re.search(r'youtube\.com|espn\.com', args['url']):
       url = args['url']
     else:
       url = utils.clean_url(args['url'])
