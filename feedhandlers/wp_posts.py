@@ -183,10 +183,15 @@ def get_post_content(post, args, save_debug=False):
     el.decompose()
 
   for el in soup.find_all('iframe'):
-    if el.get('src') and re.search(r'www\.youtube\.com\/', el['src']):
-      new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
+    if el.get('src'):
+      if re.search(r'www\.youtube\.com\/', el['src']):
+        new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
+      else:
+        new_el = BeautifulSoup('<p>Embedded content: <a href="{0}">{0}</a></p>'.format(el['src']), 'html.parser')
       el.insert_after(new_el)
       el.decompose()
+    else:
+      logger.warning('unhandled iframe with no src ' + item['url'])
 
   for el in soup.find_all(class_='blogstyle__iframe'):
     iframe = el.find('iframe')
