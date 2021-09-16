@@ -9,6 +9,32 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
+def get_gallery_content(url):
+  gallery_content = ''
+  gallery_html = utils.get_url_html(url)
+  if gallery_html:
+    gallery_soup = BeautifulSoup(gallery_html, 'html.parser')
+    gallery = gallery_soup.find(class_='photoGallery')
+    gallery_items = gallery.find_all('li', class_='image')
+    n = len(gallery_items)
+    for it in gallery_items:
+      img = it.find('img')
+      if img.get('data-src'):
+        img_src = img['data-src']
+      else:
+        img_src = img['src']
+      caption = '[{}/{}] '.format(it['data-image-index'], n)
+      title = it.find(class_='subtitle')
+      if title:
+        caption += title.get_text()
+      body = it.find(class_='galleryBody')
+      if title and body:
+        caption += '. '
+      if body:
+        caption += body.decode_contents()
+      gallery_content += utils.add_image(img_src, caption)
+  return gallery_content
+
 def get_content(url, args, save_debug=False):
   split_url = urlsplit(url)
   clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
@@ -111,18 +137,10 @@ def get_content(url, args, save_debug=False):
 
     item['summary'] = ld_json['description']
 
-    item['content_html'] = ''
     if '/pictures/' in clean_url:
-      gallery = soup.find(class_='photoGallery')
-      for el in gallery.find_all('li', class_='image'):
-        img = el.find('img')
-        if img.get('data-src'):
-          img_src = img['data-src']
-        else:
-          img_src = img['src']
-        details = el.find(class_='details')
-        item['content_html'] += utils.add_image(img_src) + str(details)
+      item['content_html'] = get_gallery_content(clean_url)
     else:
+      item['content_html'] = ''
       article_body = soup.find(class_='storyBody')
 
       for el in article_body.find_all('script'):
@@ -151,38 +169,42 @@ def get_content(url, args, save_debug=False):
         el.decompose()
 
       for el in article_body.find_all(class_='shortcodeGalleryWrapper'):
-        gallery = ''
-        for it in el.find_all('img', class_="lazy"):
-          name = it['data-original'].split('/')[-1]
-          img = soup.find('img', attrs={"alt": "{}".format(name)})
-          if img:
-            if img.get('data-original'):
-              gallery += utils.add_image(img['data-original'])
-            elif img.get('src'):
-              gallery += utils.add_image(img['src'])
-        if gallery:
-          new_el = BeautifulSoup('<h3>Gallery</h3>' + gallery, 'html.parser')
-          el.insert_after(new_el)
-        el.decompose()
+        it = el.find('a', class_='full-gallery')
+        gallery_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, it['href'])
+        gallery_content = get_gallery_content(gallery_url)
+        if gallery_content:
+          new_el = BeautifulSoup('<h3><a href="{}">Gallery</a></h3>{}'.format(gallery_url, gallery_content), 'html.parser')
+          #el.insert_after(new_el)
+          # Move galleries to end
+          article_body.append(new_el)
+          el.decompose()
 
       for el in article_body.find_all(class_='video'):
         player = el.find(class_='videoPlayer')
         if player:
           new_el = None
           video_options = json.loads(player['data-zdnet-video-options'])
-          if 'mp4' in video_options['videos'][0]:
-            new_el = BeautifulSoup(utils.add_video(video_options['videos'][0]['mp4'], 'video/mp4', video_options['videos'][0]['previewImg']), 'html.parser')
-          elif 'm3u8' in video_options['videos'][0]:
-            new_el = BeautifulSoup(utils.add_video(video_options['videos'][0]['m3u8'], 'application/x-mpegURL', video_options['videos'][0]['previewImg']), 'html.parser')
+          video = video_options['videos'][0]
+          if 'mp4' in video:
+            new_el = BeautifulSoup(utils.add_video(video['mp4'], 'video/mp4', video['previewImg'], video['title']), 'html.parser')
+          elif 'm3u8' in video:
+            new_el = BeautifulSoup(utils.add_video(video['m3u8'], 'application/x-mpegURL', video['previewImg'], video['title']), 'html.parser')
           if new_el:
-            el.insert_after(new_el)
+            # Insert as lead if there's none
+            has_lead = False
+            for i in range(2):
+              if article_body.contents[i].name and article_body.contents[i].name == 'figure':
+                has_lead = True
+            if not has_lead:
+              article_body.insert(0, new_el)
+            else:
+              el.insert_after(new_el)
             el.decompose()
 
       for el in article_body.find_all(class_='shortcode'):
         if 'media-source' in el['class']:
           it = el.find('iframe')
           if it and it.get('id') and 'iframe_youtube' in it['id']:
-            print(it)
             new_el = BeautifulSoup(utils.add_video(it['data-src'], 'youtube'), 'html.parser')
             el.insert_after(new_el)
             el.decompose()
@@ -239,12 +261,15 @@ def get_content(url, args, save_debug=False):
           pass
 
       # Add a lead image if one is not present
-      if article_body.contents[1].name != 'figure':
+      has_lead = False
+      for i in range(2):
+        if article_body.contents[i].name and article_body.contents[i].name == 'figure':
+          has_lead = True
+      if not has_lead:
         if item.get('_image'):
-          item['content_html'] = utils.add_image(item['_image']) + item['content_html']
+          article_body.insert(0, BeautifulSoup(utils.add_image(item['_image']), 'html.parser'))
 
-      item['content_html'] += str(article_body)
-  
+      item['content_html'] += article_body.decode_contents()
   return item
 
 def get_feed(args, save_debug=False):
