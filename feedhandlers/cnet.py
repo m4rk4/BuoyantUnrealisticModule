@@ -1,6 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 import utils
 from feedhandlers import rss
@@ -14,18 +15,81 @@ def get_leads_tracker_link(a_tag):
     if a_tag.get('data-leads-tracker-options'):
       leads_json = json.loads(a_tag['data-leads-tracker-options'])
       if leads_json['trackingData'].get('_destCat'):
-        dest_url = leads_json['trackingData']['_destCat']
+        dest_url = utils.get_redirect_url(leads_json['trackingData']['_destCat'])
       else:
-        dest_url = utils.clean_referral_link(leads_json['trackingData']['destUrl'])
+        dest_url = utils.get_redirect_url(leads_json['trackingData']['destUrl'])
   return dest_url
 
 def get_video_content(url, args, save_debug=False):
+  split_url = urlsplit(url)
+  if split_url.path.endswith('/'):
+    slug = split_url.path.split('/')[-2]
+  else:
+    slug = split_url.path.split('/')[-1]
+  video_url = 'https://cmg-prod.apigee.net/v1/xapi/videos/cnet/{}/web'.format(slug)
+  video_json = utils.get_url_json(video_url)
+  if video_json:
+    if save_debug:
+      utils.write_file(video_json, './debug/video.json')
+    item = {}
+    item['id'] = video_json['data']['item']['id']
+    item['url'] = url
+    item['title'] = video_json['data']['item']['headline']
+
+    dt = datetime.strptime(video_json['data']['item']['datePublished']['date'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    dt = datetime.strptime(video_json['data']['item']['dateUpdated']['date'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+    item['date_modified'] = dt.isoformat()
+
+    if video_json['data']['item']['author'].get('firstName'):
+      item['author'] = {}
+      item['author']['name'] = '{} {}'.format(video_json['data']['item']['author']['firstName'], video_json['data']['item']['author']['lastName'])
+
+    if video_json['data']['item'].get('tags'):
+      item['tags'] = []
+      for tag in video_json['data']['item']['tags']:
+        item['tags'].append(tag['name'])
+    if video_json['data']['item'].get('topics'):
+      if not item.get('tags'):
+        item['tags'] = []
+      for tag in video_json['data']['item']['topics']:
+        item['tags'].append(tag['name'])
+
+    if video_json['data']['item'].get('image'):
+      item['_image'] = video_json['data']['item']['image']['path']
+
+    if video_json['data']['item'].get('files'):
+      videos = []
+      for video in video_json['data']['item']['files']:
+        if video['format'] == 'MPEG-4':
+          videos.append(video)
+      video = utils.closest_dict(videos, 'height', 360)
+      item['_video'] = video['streamingUrl']
+    elif video_json['data']['item'].get('mp4Url'):
+      item['_video'] = video_json['data']['item']['mp4Url']
+    else:
+      logger.warning('unable to determine mp4 video url for ' + video_url)
+
+    if item.get('_video'):
+      item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
+
+    if video_json['data']['item'].get('description'):
+      item['summary'] = video_json['data']['item']['description']
+      item['content_html'] += '<p>{}</p>'.format(video_json['data']['item']['description'])
+
+    transcript_url = 'https://cmg-prod.apigee.net/v1/xapi/videos/cnet/captions/txt/{}.txt'.format(slug)
+    transcript = utils.get_url_html(transcript_url)
+    if transcript:
+      item['content_html'] += '<h4>Transcript:</h4><blockquote>{}</blockquote>'.format(transcript.replace('\n', '<br/><br/>'))
+    return item
+
   article_html = utils.get_url_html(url)
   if not article_html:
     return None
   if save_debug:
-    with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-      f.write(article_html)
+    utils.write_file(article_html, './debug/debug.html')
 
   soup = BeautifulSoup(article_html, 'html.parser')
   video_player = soup.find(class_='videoPlayer')
@@ -33,36 +97,34 @@ def get_video_content(url, args, save_debug=False):
     video_data = json.loads(video_player['data-video-player-options'])
     # Assume it's the first video in the playlist
     video_info = video_data['playlist'][0]
-  else:
-    logger.warning('unable to load video player data in ' + url)
-    return None
+    if save_debug:
+      utils.write_file(video_info, './debug/debug.json')
 
-  if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(video_info, file, indent=4)
+    item = {}
+    item['id'] = video_info['id']
+    item['url'] = url
+    item['title'] = video_info['title']
+    dt = datetime.strptime(video_info['datePublished'], '%Y-%m-%d %H:%M:%S')
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    item['author'] = {}
+    item['author']['name'] = '{} {}'.format(video_info['author']['firstName'], video_info['author']['lastName'])
+    item['_image'] = video_info['thumbnail']
+    item['_video'] = video_info['mp4']
+    item['summary'] = video_info['description']
 
-  item = {}
-  item['id'] = video_info['id']
-  item['url'] = url
-  item['title'] = video_info['title']
-  dt = datetime.strptime(video_info['datePublished'], '%Y-%m-%d %H:%M:%S')
-  item['date_published'] = dt.isoformat()
-  item['_timestamp'] = dt.timestamp()
-  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-  item['author'] = {}
-  item['author']['name'] = '{} {}'.format(video_info['author']['firstName'], video_info['author']['lastName'])
-  item['_image'] = video_info['thumbnail']
-  item['_video'] = video_info['mp4']
-  item['summary'] = video_info['description']
+    item['content_html'] = utils.add_video(video_info['mp4'], 'video/mp4', video_info['thumbnail'])
 
-  item['content_html'] = utils.add_video(video_info['mp4'], 'video/mp4', video_info['thumbnail'])
+    for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
+      ld_json = json.loads(el.string)
+      if ld_json.get('@type') and ld_json['@type'] == 'VideoObject':
+        if ld_json.get('transcript'):
+          item['content_html'] += '<h4>Transcript:</h4><blockquote>{}</blockquote>'.format(ld_json['transcript'])
+    return item
 
-  for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
-    ld_json = json.loads(el.string)
-    if ld_json.get('@type') and ld_json['@type'] == 'VideoObject':
-      if ld_json.get('transcript'):
-        item['content_html'] += '<h4>Transcript:</h4><p>{}</p>'.format(ld_json['transcript'])
-  return item
+  logger.warning('unable to get video content for ' + url)
+  return None
 
 def get_content(url, args, save_debug=False):
   item = {}
@@ -263,7 +325,8 @@ def get_content(url, args, save_debug=False):
         el.decompose()
 
     for el in article.find_all('amp-video-iframe'):
-      video_content = get_video_content(el['src'], None, save_debug)
+      video_src = el['src'].replace('/share/', '/')
+      video_content = get_video_content(video_src, {}, save_debug)
       if video_content:
         video_src = video_content['_video']
         poster = video_content['_image']
@@ -359,9 +422,9 @@ def get_content(url, args, save_debug=False):
           if a.get('data-leads-tracker-options'):
             leads_json = json.loads(a['data-leads-tracker-options'])
             if leads_json['trackingData'].get('_destCat'):
-              dest_url = leads_json['trackingData']['_destCat']
+              dest_url = utils.get_redirect_url(leads_json['trackingData']['_destCat'])
             else:
-              dest_url = utils.clean_referral_link(leads_json['trackingData']['destUrl'])
+              dest_url = utils.get_redirect_url(leads_json['trackingData']['destUrl'])
             if i == 0:
               new_html += '<p>'
             else:
@@ -461,9 +524,9 @@ def get_content(url, args, save_debug=False):
         if el.get('data-leads-tracker-options'):
           leads_json = json.loads(el['data-leads-tracker-options'])
           if leads_json['trackingData'].get('_destCat'):
-            dest_url = leads_json['trackingData']['_destCat']
+            dest_url = utils.get_redirect_url(leads_json['trackingData']['_destCat'])
           else:
-            dest_url = utils.clean_referral_link(leads_json['trackingData']['destUrl'])
+            dest_url = utils.get_redirect_url(leads_json['trackingData']['destUrl'])
         else:
           dest_url = el['href']
         el['href'] = dest_url
