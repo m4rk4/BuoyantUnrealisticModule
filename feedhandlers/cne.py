@@ -320,35 +320,38 @@ def get_content(url, args, save_debug=False):
     body_html += endtag
     return
 
-  iter_body(body_json)
+  if body_json:
+    iter_body(body_json)
 
   if page_type == 'gallery':
     for it in article_json[page_type]['items']:
       body_html += '<hr />'
       if it.get('image'):
-        caption = ''
-        if 'caption' in it['image']:
+        caption = []
+        if it['image'].get('caption'):
           m = re.search(r'<p>(.*)<\/p>', it['image']['caption'])
           if m:
-            caption = m.group(1)
+            caption.append(m.group(1))
           else:
-            caption = it['image']['caption']
-        if 'credit' in it['image']:
-          caption += ' ' + it['image']['credit']
-
+            caption.append(it['image']['caption'])
+        if it['image'].get('credit'):
+          caption.append(it['image']['credit'])
         if img_size in it['image']['segmentedSources']:
           images = it['image']['segmentedSources'][img_size]
         else:
           # Default to sm
           images = it['image']['segmentedSources']['sm']
-        for image in images:
-          if image['height'] > 480 and image['height'] < 1000:
-            break
-        body_html += utils.add_image(image['url'], caption.strip())
-      body_html += '<h3>{}</h3><h4>{} {}</h4>'.format(it['dangerousHed'], it['brand'], it['name'])
-      iter_body(it['dek'])
-      for offer in it['offers']:
-        body_html += '<p><a href="{}">{} at {}</a></p>'.format(offer['offerUrl'], offer['price'], offer['sellerName'])
+        image = utils.closest_dict(images, 'width', 1000)
+        body_html += utils.add_image(image['url'], ' | '.join(caption))
+      if it.get('dangerousHed'):
+        body_html += '<h3>{}</h3>'.format(it['dangerousHed'])
+      if it.get('brand') and it.get('name'):
+        body_html += '<h4>{} {}</h4>'.format(it['brand'], it['name'])
+      if it.get('dek'):
+        iter_body(it['dek'])
+      if it.get('offers'):
+        for offer in it['offers']:
+          body_html += '<p><a href="{}">{} at {}</a></p>'.format(offer['offerUrl'], offer['price'], offer['sellerName'])
 
   def sub_lead_in_text_callout(matchobj):
     return '{}{}{}'.format(matchobj.group(1), matchobj.group(2).upper(), matchobj.group(3))

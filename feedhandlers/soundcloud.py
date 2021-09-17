@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,14 +56,16 @@ def get_track_content(track_id, client_id, secret_token, save_debug):
     return None
 
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(track_json, file, indent=4)
+    utils.write_file(track_json, './debug/debug.json')
 
   item = get_item_info(track_json)
   if not item:
     return None
 
-  poster = '/image?width=100&url=' + quote_plus(item['_image'])
+  if item.get('_image'):
+    poster = '{}/image?width=100&overlay=audio&url={}'.format(config.server, item['_image'])
+  else:
+    poster = '{}/image?width=100&height=100&color=grey&overlay=audio'.format(config.server)
   audio_url = '/audio?url=' + quote_plus(item['url'])
 
   item['content_html'] = '<center><table style="width:480px; border:1px solid black; border-radius:10px; border-spacing:0;">'
