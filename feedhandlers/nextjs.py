@@ -118,8 +118,7 @@ def get_next_data_json(url, save_debug=False, user_agent='desktop'):
   if not url_html:
     return None
   if save_debug:
-    with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-      f.write(url_html)
+    utils.write_file(url_html, './debug/debug.html')
 
   soup = BeautifulSoup(url_html, 'html.parser')
   next_data = soup.find('script', id='__NEXT_DATA__')
@@ -133,8 +132,7 @@ def get_next_data_json(url, save_debug=False, user_agent='desktop'):
     logger.warning('error converting NEXT_DATA to json in ' + url)
     return None
   if save_debug:
-    with open('./debug/debug.json', 'w') as file:
-      json.dump(next_json, file, indent=4)
+    utils.write_file(next_json, './debug/debug.json')
   return next_json
 
 def get_content(url, args, save_debug=False):
