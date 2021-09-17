@@ -184,7 +184,7 @@ def get_post_content(post, args, save_debug=False):
 
   for el in soup.find_all('iframe'):
     if el.get('src'):
-      if re.search(r'www\.youtube\.com\/', el['src']):
+      if re.search(r'www\.youtube\.com\/|youtu\.be', el['src']):
         new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
       else:
         new_el = BeautifulSoup('<p>Embedded content: <a href="{0}">{0}</a></p>'.format(el['src']), 'html.parser')
