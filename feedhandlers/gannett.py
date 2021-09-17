@@ -312,7 +312,7 @@ def get_content(url, args, save_debug=False):
     if not href.startswith('http'):
       href = base_url + href
     el.attrs = {}
-    el['href'] = utils.clean_referral_link(href)
+    el['href'] = utils.get_redirect_url(href)
 
   # Clear remaining attrs
   article.attrs = {}

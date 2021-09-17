@@ -118,7 +118,7 @@ def get_content_html(content_uri):
         content_html += get_content_html(desc['_ref'])
       content_html += '<ul>'
       for merch in content_json['agora']['merchants']:
-        content_html += '<li><a href="{}">{}</a>: ${}</li>'.format(utils.clean_referral_link(merch['buyUrl']), merch['name'], merch['price'])
+        content_html += '<li><a href="{}">{}</a>: ${}</li>'.format(utils.get_redirect_url(merch['buyUrl']), merch['name'], merch['price'])
       content_html += '</ul>'
     else:
       logger.warning('unhandled content in https://' + content_uri)

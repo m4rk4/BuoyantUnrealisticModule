@@ -238,7 +238,7 @@ def get_content(url, args, save_debug=False):
                 img_src = img['src']
               new_listicle += utils.add_image(img_src)
             else:
-              new_listicle += '<a href="{}">{}</a><br />'.format(utils.clean_referral_link(it['href']), it.get_text().strip())
+              new_listicle += '<a href="{}">{}</a><br />'.format(utils.get_redirect_url(it['href']), it.get_text().strip())
           else:
             new_listicle += str(it)
         el.insert_after(BeautifulSoup(new_listicle, 'html.parser'))

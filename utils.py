@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from urllib.parse import quote_plus, unquote, urlsplit
+from urllib.parse import parse_qs, quote_plus, unquote_plus, urlsplit
 
 import config
 from feedhandlers import instagram, twitter, vimeo, youtube
@@ -75,8 +75,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=F
     except:
       logger.warning('error converting response to json from request {}'.format(url))
       if False:
-        with open('./debug/debug.txt', 'w', encoding='utf-8') as f:
-          f.write(r.text)
+        write_file(r.text, './debug/debug.txt')
   return None
 
 def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy=False):
@@ -86,12 +85,26 @@ def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy
   return None
 
 def get_redirect_url(url):
+  # It would be better to use requests.head because some servers may not support the Range header and the whole file will be downloaded; however, request.get seems to work better for getting redirects
   i = 0
-  r = requests.head(url, allow_redirects=True)
-  while r.status_code != 200 and i < 5:
-    r = requests.head(r.headers['location'], allow_redirects=True)
+  r = requests.get(url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
+  while r.is_redirect and i < 5:
+    r = requests.get(r.headers['location'], headers={"Range": "bytes=0-100"}, allow_redirects=False)
     i += 1
-  return r.url
+  redirect_url = r.url
+
+  # Check for a url in the query parameters
+  check_query = True
+  while check_query:
+    check_query = False
+    split_url = urlsplit(redirect_url)
+    if split_url.query:
+      for key, val in parse_qs(split_url.query).items():
+        if val[0].startswith('http://') or val[0].startswith('https://'):
+          redirect_url = val[0]
+          check_query = True
+          break
+  return redirect_url
 
 def get_url_title_desc(url):
   html = get_url_html(url)
@@ -182,22 +195,6 @@ def image_from_srcset(srcset, target):
 def clean_url(url):
   split_url = urlsplit(url)
   return '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
-
-def clean_referral_link(link):
-  if '/assoc-redirect.amazon.com' in link:
-    m = re.search(r'\/(https:\/\/www\.amazon\.com\/dp\/\w+)', link)
-    if m:
-      return m.group(1)
-  elif 'anrdoezrs.net' in link:
-    m = re.search(r'\/(https?:\/\/.*)', link)
-    if m:
-      return m.group(1)
-  else:
-    for it in urlsplit(link).query.split('&'):
-      m = re.search(r'=(https?(%|:).*)', it)
-      if m:
-        return clean_referral_link(unquote(m.group(1)))
-  return link
 
 def init_jsonfeed(args):
   parsed = urlsplit(args['url'])
