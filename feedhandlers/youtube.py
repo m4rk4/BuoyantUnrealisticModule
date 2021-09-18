@@ -48,7 +48,7 @@ def get_content(url, args, save_debug=False):
   if not yt_html:
     return None
   if save_debug:
-    utils.write_file(yt_html, './debug/debug.html')
+    utils.write_file(yt_html, './debug/youtube.html')
 
   m = re.search(r'ytInitialPlayerResponse = (.+?);(<\/script>|var)', yt_html)
   if not m:
@@ -59,8 +59,8 @@ def get_content(url, args, save_debug=False):
     utils.write_file(m.group(1), './debug/debug.txt')
 
   yt_json = json.loads(m.group(1))
-  if save_debug:
-    utils.write_file(yt_json, './debug/debug.json')
+  if True:
+    utils.write_file(yt_json, './debug/youtube.json')
 
   if yt_json['playabilityStatus']['status'] != 'OK':
     logger.warning('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
@@ -87,15 +87,31 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = utils.add_image(item['_image'], yt_json['playabilityStatus']['reason'])
   else:
     if save_debug:
-      utils.write_file(yt_json['streamingData'], './debug/video.json')
+      utils.write_file(yt_json['streamingData'], './debug/youtube.json')
 
     h = 480
     if args and args.get('height'):
       h = int(args['height'])
 
     streams = {}
-    streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', h)
-    streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
+    if yt_json['streamingData'].get('formats'):
+      streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', h)
+    else:
+      yt_streams = []
+      for yt_stream in yt_json['streamingData']['adaptiveFormats']:
+        if 'video/mp4' in yt_stream['mimeType']:
+          yt_streams.append(yt_stream)
+      if yt_streams:
+        streams['_video'] = utils.closest_dict(yt_streams, 'height', h)
+
+    yt_streams = []
+    for yt_stream in yt_json['streamingData']['adaptiveFormats']:
+      if 'audio/mp4' in yt_stream['mimeType']:
+        yt_streams.append(yt_stream)
+    if yt_streams:
+      streams['_audio'] = utils.closest_dict(yt_streams, 'bitrate', 128000)
+
+    #streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
 
     stream_url = ''
     for key, stream in streams.items():
