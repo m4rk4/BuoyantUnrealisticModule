@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import unquote_plus
 
-from feedhandlers import rss, soundcloud
+from feedhandlers import rss
 import utils
 
 import logging
@@ -157,10 +157,11 @@ def get_content(url, args, save_debug=False):
     for el in article_text.find_all('figure'):
       if el.has_attr('class') and 'iframe-container' in el['class']:
         it = el.find('iframe')
-        if it and 'youtube.com' in it['src']:
+        if it and it.has_attr('src'):
+          new_html = utils.add_embed(it['src'])
           if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
             el = el.parent
-          el.insert_after(BeautifulSoup(utils.add_video(it['src'], 'youtube'), 'html.parser'))
+          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
           el.decompose()
       else:
         img = el.find('img')
@@ -214,50 +215,35 @@ def get_content(url, args, save_debug=False):
 
     for el in article_text.find_all('div', id=re.compile(r'[0-9a-f]{32}')):
       it = el.find('iframe')
-      if it and 'youtube.com' in it['src']:
-        el.insert_after(BeautifulSoup(utils.add_video(it['src'], 'youtube'), 'html.parser'))
+      if it and it.has_attr('src'):
+        new_html = utils.add_embed(it['src'])
+        el.insert_after(new_html, 'html.parser')
         el.decompose()
 
     for el in article_text.find_all('iframe'):
-      new_html = ''
       if el.has_attr('src'):
-        if 'youtube.com' in el['src']:
-          new_html = utils.add_video(el['src'])
-        elif 'soundcloud.com' in el['src']:
-          embed = soundcloud.get_content(el['src'], {}, save_debug)
-          if embed:
-            new_html = embed['content_html']
-        else:
-          logger.warning('unhandled iframe in ' + url)
-        if new_html:
-          if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
-            el = el.parent
-          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-          el.decompose()
+        new_html = utils.add_embed(el['src'])
+        if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
+          el = el.parent
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
       else:
         logger.warning('unhandled iframe in ' + url)
 
     for el in article_text.find_all('blockquote'):
       if el.has_attr('class'):
-        embed_html = ''
+        new_html = ''
         if 'twitter-tweet' in el['class']:
-          tweet_url = ''
-          for a in el.find_all('a'):
-            tweet_url = a['href']
-          if tweet_url:
-            embed_html = utils.add_twitter(tweet_url)
-            if not embed_html:
-              logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
+          tweet_urls = el.find_all('a')
+          new_html = utils.add_embed(tweet_urls[-1])
         elif 'instagram-media' in el['class']:
-          embed_html = utils.add_instagram(el['data-instgrm-permalink'])
-          if not embed_html:
-            logger.warning('unable to embed instagram post {} in {}'.format(el['data-instgrm-permalink'], url))
+          new_html = utils.add_embed(el['data-instgrm-permalink'])
         else:
           logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
-        if embed_html:
+        if new_html:
           if el.parent.name == 'div' and el.parent.has_attr('id') and re.search(r'[0-9a-f]{32}', el.parent['id']):
             el = el.parent
-          el.insert_after(BeautifulSoup(embed_html, 'html.parser'))
+          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
           el.decompose()
       else:
         if el.p:

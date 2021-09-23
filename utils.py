@@ -1,15 +1,43 @@
-import json, math, os, random, re, requests, string
+import importlib, json, math, os, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
-from urllib.parse import parse_qs, quote_plus, unquote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import config
+import config, sites
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
 logger = logging.getLogger(__name__)
+
+def get_module(url, handler=''):
+  module = None
+  module_name = ''
+  if url:
+    if 'wp-json' in url:
+      module_name = '.wp_posts'
+    else:
+      tld = tldextract.extract(url)
+      if tld.domain == 'youtu' and tld.suffix == 'be':
+        domain = 'youtu.be'
+      elif tld.domain == 'feedburner':
+        domain = urlsplit(url).path.split('/')[1]
+      else:
+        domain = tld.domain
+      if sites.handlers.get(domain):
+        module_name = '.{}'.format(sites.handlers[domain]['module'])
+  if handler and not module_name:
+    module_name = '.{}'.format(handler)
+  if module_name:
+    try:
+      module = importlib.import_module(module_name, 'feedhandlers')
+    except:
+      logger.warning('unable to load module ' + module_name)
+      module = None
+  else:
+    logger.warning('unknown module for ' + url)
+  return module
 
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
 # https://findwork.dev/blog/advanced-usage-python-requests-timeouts-retries-hooks/#retry-on-failure
@@ -51,20 +79,25 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
     proxies = None
 
   r = None
-  try:
-    r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
-    r.raise_for_status()
-  except Exception as e:
-    if r != None and r.status_code == 402:
-      return r
-    logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
-    # Try again using the proxy
-    proxies = {"http": "http://69.167.174.17"}
+  for i in range(2):
     try:
       r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
       r.raise_for_status()
     except Exception as e:
-      logger.warning('request error {} getting {}'.format(e.__class__.__name__, url))
+      if r != None:
+        if r.status_code == 402:
+          return r
+        else:
+          status_code = ' status code {}'.format(r.status_code)
+      else:
+        status_code = ''
+      logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+      r = None
+    if r:
+      break
+    else:
+      # Try again using the proxy
+      proxies = {"http": "http://69.167.174.17"}
   return r
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
@@ -85,13 +118,32 @@ def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy
   return None
 
 def get_redirect_url(url):
+  if 'cloudfront.net' in url:
+    url_html = get_url_html(url)
+    m = re.search(r'"redirect":"([^"]+)"', url_html)
+    if m:
+      return m.group(1)
+
   # It would be better to use requests.head because some servers may not support the Range header and the whole file will be downloaded; however, request.get seems to work better for getting redirects
   i = 0
-  r = requests.get(url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
-  while r.is_redirect and i < 5:
-    r = requests.get(r.headers['location'], headers={"Range": "bytes=0-100"}, allow_redirects=False)
-    i += 1
-  redirect_url = r.url
+  r = None
+  try:
+    redirect_url = url
+    r = requests.get(url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
+    while r.is_redirect and i < 5:
+      if not re.search(r'^https?:\/\/', r.headers['location']):
+        break
+      redirect_url = r.headers['location']
+      r = requests.get(redirect_url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
+      i += 1
+    redirect_url = r.url
+  except Exception as e:
+    if r:
+      status_code = r.status_code
+    else:
+      status_code = ''
+    logger.warning('exception error {}{} getting {}'.format(e.__class__.__name__, status_code, redirect_url))
+    return redirect_url
 
   # Check for a url in the query parameters
   check_query = True
@@ -100,7 +152,8 @@ def get_redirect_url(url):
     split_url = urlsplit(redirect_url)
     if split_url.query:
       for key, val in parse_qs(split_url.query).items():
-        if val[0].startswith('http://') or val[0].startswith('https://'):
+        # val[0].startswith('http://') or val[0].startswith('https://')
+        if re.search(r'^https?:\/\/', val[0]):
           redirect_url = val[0]
           check_query = True
           break
@@ -114,14 +167,14 @@ def get_url_title_desc(url):
     if el:
       title = el.get_text()
     else:
-      title = it['url']
+      title = url
     el = soup.find('meta', attrs={"name": "description"})
     if el:
       desc = el['content']
     else:
       desc = None
   else:
-    title = it['url']
+    title = url
     desc = None
   return title, desc
 
@@ -440,58 +493,44 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
-def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
+def get_youtube_url(ytstr):
   # ytstr can be either:
   # - the 11 digit id only, e.g. D4gPQDyOixQ
   # - the watch url, e.g. https://www.youtube.com/watch?v=D4gPQDyOixQ
   # - the embed url, e.g. https://www.youtube.com/embed/D4gPQDyOixQ
   # - the short url, e.g. https://yout.be/D4gPQDyOixQ
+  # - also from www.youtube-nocookie.com
   yt_id = ''
-  if 'https' in ytstr:
-    if 'youtube' in ytstr:
-      # Watch url 
-      m = re.search(r'youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})', ytstr)
-      if m:
-        yt_id = m.group(1)
-      else:
-        # Embed url
-        m = re.search(r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
-        if m:
-          yt_id = m.group(1)
-
-      # In the case of an iframe, extract the for width & height to get the proper aspect ratio
-      if 'iframe' in ytstr:
-        m = re.search(r'width="(\d+)"', ytstr)
-        if m:
-          width = int(m.group(1))
-        m = re.search(r'height="(\d+)"', ytstr)
-        if m:
-          height = int(m.group(1))
-    elif 'youtu.be' in ytstr:
-      m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
-      if m:
-        yt_id = m.group(1)
-  elif len(ytstr) == 11:
+  if len(ytstr) == 11:
     # id only
     yt_id = ytstr
   else:
+    # Watch url
+    m = re.search(r'youtube(-nocookie)?\.com\/watch\?v=([a-zA-Z0-9_-]{11})', ytstr)
+    if m:
+      yt_id = m.group(2)
+    else:
+      # Embed url
+      m = re.search(r'youtube(-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
+      if m:
+        yt_id = m.group(2)
+      else:
+        # Shortened url
+        m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
+        if m:
+          yt_id = m.group(1)
+  if not yt_id:
     logger.warning('unknown Youtube embed ' + ytstr)
     return ''
 
-  if not yt_id:
-    logger.warning('Youtube id not found in ' + ytstr)
-    return ''
-
   yt_url = 'https://www.youtube-nocookie.com/embed/{}'.format(yt_id)
+  return yt_url, yt_id
 
-  # Scale all to 640x360
-  w = 640
-  h = 360
-  # maintain aspect ratio if width & height are given
-  if width and height:
-    h = math.ceil(w*int(height)/int(width))
-
-  return add_video(yt_url, 'youtube', '', caption, w, h, gawker)
+def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
+  yt_url, yt_id = get_youtube_url(ytstr)
+  if not yt_url:
+    return ''
+  return add_embed(yt_url, False)
 
 def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
@@ -519,8 +558,17 @@ def add_vimeo(vimeo_str, width=None, height=None, caption='', gawker=False):
 
   return add_video('https://vimeo.com/' + vimeo_id, 'vimeo', '', caption, gawker)
 
-def add_twitter(url):
-  # Can be a url or id
+def get_twitter_url(tweet_id):
+  tweet_json = get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
+  if not tweet_json:
+    return ''
+  return 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_id)
+
+def add_twitter(tweet_url, tweet_id=''):
+  if tweet_url:
+    url = tweet_url
+  elif tweet_id:
+    url = get_twitter_url(tweet_id)
   tweet = twitter.get_content(url, {}, False)
   if not tweet:
     return ''
@@ -673,3 +721,18 @@ def add_audio_track(track_info):
   if track_info.get('artist') or track_info.get('album'):
     desc += '</small>'
   return '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(track_info['audio_src'], track_info['image'], desc)
+
+def add_embed(url, save_debug=False):
+  logger.debug('embed content from ' + url)
+  if url.startswith('//'):
+    embed_url = 'https:' + url
+  else:
+    embed_url = url
+  if 'cloudfront.net' in url:
+    embed_url = get_redirect_url(embed_url)
+  module = get_module(embed_url)
+  if module:
+    content = module.get_content(embed_url, {"embed": True}, save_debug)
+    if content:
+      return content['content_html']
+  return '<p>Embedded content from <a href="{0}">{0}</a></p>'.format(url)

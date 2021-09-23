@@ -1,12 +1,10 @@
-import glob, importlib, os, re, requests, sys, tldextract
+import glob, os, re, requests, sys
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from io import BytesIO
 from PIL import Image, ImageDraw
-from urllib.parse import urlsplit
 
 import utils
-from sites import handlers
 
 app = Flask(__name__)
 
@@ -29,46 +27,6 @@ logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('tldextract').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
-def get_module(args):
-  module = None
-  if args.get('url'):
-    tld = tldextract.extract(args['url'])
-    if tld.domain == 'youtu' and tld.suffix == 'be':
-      domain = 'youtu.be'
-    elif tld.domain == 'feedburner':
-      domain = urlsplit(args['url']).path.split('/')[1]
-    else:
-      domain = tld.domain
-    if handlers.get(domain):
-      try:
-        module_name = '.{}'.format(handlers[domain]['module'])
-        module = importlib.import_module(module_name, 'feedhandlers')
-      except:
-        logger.warning('unable to load module ' + module_name)
-        module = None
-    else:
-      logger.warning('unknown feedhandler module for domain ' + domain)
-
-  if not module:
-    feedhandler = ''
-    if args.get('feedhandler'):
-      feedhandler = args['feedhandler']
-    elif args.get('feedtype'):
-      feedhandler = args['feedtype']
-    elif args.get('url') and 'wp-json' in args['url']:
-      feedhandler = 'wp_posts'
-    if feedhandler:
-      if feedhandler == 'wp-posts':
-        feedhandler = 'wp_posts'
-      try:
-        module_name = '.{}'.format(feedhandler)
-        module = importlib.import_module(module_name, 'feedhandlers')
-      except:
-        logger.warning('unable to load module ' + module_name)
-        module = None
-
-  return module
-
 @app.route('/')
 def home():
   return 'Hello! You must be lost :('
@@ -81,7 +39,14 @@ def feed():
   else:
     save_debug = False
 
-  module = get_module(args)
+  if args.get('feedhandler'):
+    handler = args['feedhandler']
+  elif args.get('feedtype'):
+    handler = args['feedtype']
+  else:
+    handler = ''
+
+  module = utils.get_module(args['url'], handler)
   if module:
     feed = module.get_feed(args, save_debug)
     if not feed:
@@ -98,7 +63,14 @@ def content():
   else:
     save_debug = False
 
-  module = get_module(args)
+  if args.get('feedhandler'):
+    handler = args['feedhandler']
+  elif args.get('feedtype'):
+    handler = args['feedtype']
+  else:
+    handler = ''
+
+  module = utils.get_module(args['url'], handler)
   if module:
     if re.search(r'youtube\.com|espn\.com', args['url']):
       url = args['url']
@@ -123,7 +95,14 @@ def audio():
   else:
     save_debug = False
 
-  module = get_module(args)
+  if args.get('feedhandler'):
+    handler = args['feedhandler']
+  elif args.get('feedtype'):
+    handler = args['feedtype']
+  else:
+    handler = ''
+
+  module = utils.get_module(args['url'], handler)
   if not module:
     return 'No content module for this url'
 
@@ -145,7 +124,14 @@ def video():
   else:
     save_debug = False
 
-  module = get_module(args)
+  if args.get('feedhandler'):
+    handler = args['feedhandler']
+  elif args.get('feedtype'):
+    handler = args['feedtype']
+  else:
+    handler = ''
+
+  module = utils.get_module(args['url'], handler)
   if not module:
     return 'No content module for this url'
 

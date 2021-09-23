@@ -77,6 +77,9 @@ handlers = {
   "theonion": {
     "module": "gawker"
   },
+  "gfycat": {
+    "module": "gfycat"
+  },
   "theguardian": {
     "module": "guardian"
   },

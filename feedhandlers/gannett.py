@@ -301,11 +301,12 @@ def get_content(url, args, save_debug=False):
     el.insert_after(new_el)
     el.decompose()
 
-  # These are usually ads but can also be Twitter embeds (and more?)
   for el in article.find_all('aside'):
     if el.has_attr('data-gl-method') and el['data-gl-method'] == 'loadTwitter':
-      new_el = BeautifulSoup(utils.add_twitter(el['data-v-id']), 'html.parser')
+      tweet = utils.add_embed(utils.get_twitter_url(el['data-v-id']))
+      new_el = BeautifulSoup(tweet, 'html.parser')
       el.insert_after(new_el)
+    # Remove these because they are usually ads if not Twitter
     el.decompose()
 
   # Fix local href links
@@ -315,7 +316,7 @@ def get_content(url, args, save_debug=False):
     if not href.startswith('http'):
       href = base_url + href
     el.attrs = {}
-    el['href'] = utils.get_redirect_url(href)
+    el['href'] = href
 
   # Clear remaining attrs
   article.attrs = {}

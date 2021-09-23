@@ -1,6 +1,6 @@
-import json, operator, re
+import html, json, operator, re, requests
 from datetime import datetime, timezone
-from urllib.parse import urlsplit, unquote
+from urllib.parse import parse_qs, urlsplit
 
 from feedhandlers import rss, twitter
 import utils
@@ -13,11 +13,36 @@ graphql_json = None
 def medium_image_src(image_id, width=800):
   return 'https://miro.medium.com/max/{}/{}'.format(width, image_id)
 
+def get_graphql(url, save_debug=False):
+  split_url = urlsplit(url)
+
+  s = requests.Session()
+  headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
+             "sec-ch-ua": "\"Google Chrome\";v=\"93\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"93\""}
+  r = s.get(url, headers=headers)
+  if r.status_code == 200:
+    body = {"operationName":"PostViewerEdgeContent","variables":{"postId":"","postMeteringOptions":{"referrer":""}},"query":"query PostViewerEdgeContent($postId: ID!, $postMeteringOptions: PostMeteringOptions) {\n  post(id: $postId) {\n    ... on Post {\n      id\n      viewerEdge {\n        id\n        fullContent(postMeteringOptions: $postMeteringOptions) {\n          isLockedPreviewOnly\n          validatedShareKey\n          bodyModel {\n            ...PostBody_bodyModel\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment PostBody_bodyModel on RichText {\n  sections {\n    name\n    startIndex\n    textLayout\n    imageLayout\n    backgroundImage {\n      id\n      originalHeight\n      originalWidth\n      __typename\n    }\n    videoLayout\n    backgroundVideo {\n      videoId\n      originalHeight\n      originalWidth\n      previewImageId\n      __typename\n    }\n    __typename\n  }\n  paragraphs {\n    id\n    ...PostBodySection_paragraph\n    __typename\n  }\n  ...normalizedBodyModel_richText\n  __typename\n}\n\nfragment normalizedBodyModel_richText on RichText {\n  paragraphs {\n    markups {\n      type\n      __typename\n    }\n    ...getParagraphHighlights_paragraph\n    ...getParagraphPrivateNotes_paragraph\n    __typename\n  }\n  sections {\n    startIndex\n    ...getSectionEndIndex_section\n    __typename\n  }\n  ...getParagraphStyles_richText\n  ...getParagraphSpaces_richText\n  __typename\n}\n\nfragment getParagraphHighlights_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment getParagraphPrivateNotes_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment getSectionEndIndex_section on Section {\n  startIndex\n  __typename\n}\n\nfragment getParagraphStyles_richText on RichText {\n  paragraphs {\n    text\n    type\n    __typename\n  }\n  sections {\n    ...getSectionEndIndex_section\n    __typename\n  }\n  __typename\n}\n\nfragment getParagraphSpaces_richText on RichText {\n  paragraphs {\n    layout\n    metadata {\n      originalHeight\n      originalWidth\n      __typename\n    }\n    type\n    ...paragraphExtendsImageGrid_paragraph\n    __typename\n  }\n  ...getSeriesParagraphTopSpacings_richText\n  ...getPostParagraphTopSpacings_richText\n  __typename\n}\n\nfragment paragraphExtendsImageGrid_paragraph on Paragraph {\n  layout\n  type\n  __typename\n  id\n}\n\nfragment getSeriesParagraphTopSpacings_richText on RichText {\n  paragraphs {\n    id\n    __typename\n  }\n  sections {\n    startIndex\n    __typename\n  }\n  __typename\n}\n\nfragment getPostParagraphTopSpacings_richText on RichText {\n  paragraphs {\n    layout\n    text\n    __typename\n  }\n  sections {\n    startIndex\n    __typename\n  }\n  __typename\n}\n\nfragment PostBodySection_paragraph on Paragraph {\n  name\n  ...PostBodyParagraph_paragraph\n  __typename\n  id\n}\n\nfragment PostBodyParagraph_paragraph on Paragraph {\n  name\n  type\n  ...ImageParagraph_paragraph\n  ...TextParagraph_paragraph\n  ...IframeParagraph_paragraph\n  ...MixtapeParagraph_paragraph\n  __typename\n  id\n}\n\nfragment IframeParagraph_paragraph on Paragraph {\n  iframe {\n    mediaResource {\n      id\n      iframeSrc\n      iframeHeight\n      iframeWidth\n      title\n      __typename\n    }\n    __typename\n  }\n  layout\n  ...getEmbedlyCardUrlParams_paragraph\n  ...Markups_paragraph\n  __typename\n  id\n}\n\nfragment getEmbedlyCardUrlParams_paragraph on Paragraph {\n  type\n  iframe {\n    mediaResource {\n      iframeSrc\n      __typename\n    }\n    __typename\n  }\n  __typename\n  id\n}\n\nfragment Markups_paragraph on Paragraph {\n  name\n  text\n  hasDropCap\n  dropCapImage {\n    ...MarkupNode_data_dropCapImage\n    __typename\n    id\n  }\n  markups {\n    type\n    start\n    end\n    href\n    anchorType\n    userId\n    linkMetadata {\n      httpStatus\n      __typename\n    }\n    __typename\n  }\n  __typename\n  id\n}\n\nfragment MarkupNode_data_dropCapImage on ImageMetadata {\n  ...DropCap_image\n  __typename\n  id\n}\n\nfragment DropCap_image on ImageMetadata {\n  id\n  originalHeight\n  originalWidth\n  __typename\n}\n\nfragment ImageParagraph_paragraph on Paragraph {\n  href\n  layout\n  metadata {\n    id\n    originalHeight\n    originalWidth\n    focusPercentX\n    focusPercentY\n    alt\n    __typename\n  }\n  ...Markups_paragraph\n  ...ParagraphRefsMapContext_paragraph\n  ...PostAnnotationsMarker_paragraph\n  __typename\n  id\n}\n\nfragment ParagraphRefsMapContext_paragraph on Paragraph {\n  id\n  name\n  text\n  __typename\n}\n\nfragment PostAnnotationsMarker_paragraph on Paragraph {\n  ...PostViewNoteCard_paragraph\n  __typename\n  id\n}\n\nfragment PostViewNoteCard_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment TextParagraph_paragraph on Paragraph {\n  type\n  hasDropCap\n  ...Markups_paragraph\n  ...ParagraphRefsMapContext_paragraph\n  __typename\n  id\n}\n\nfragment MixtapeParagraph_paragraph on Paragraph {\n  text\n  type\n  mixtapeMetadata {\n    href\n    thumbnailImageId\n    __typename\n  }\n  markups {\n    start\n    end\n    type\n    href\n    __typename\n  }\n  __typename\n  id\n}\n"}
+    body['variables']['postId'] = split_url.path.split('-')[-1]
+    gql_url = '{}://{}/_/graphql'.format(split_url.scheme, split_url.netloc)
+    r = s.post(gql_url, json=body)
+    if r.status_code == 200:
+      gql_json = r.json()
+      utils.write_file(gql_json, './debug/medium.json')
+      return gql_json
+  return None
+
 def get_content(url, args, save_debug=False):
   clean_url = utils.clean_url(url)
-  article_html = utils.get_url_html(clean_url)
-  if not article_html:
+  split_url = urlsplit(clean_url)
+
+  s = utils.requests_retry_session()
+  headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
+             "sec-ch-ua": "\"Google Chrome\";v=\"93\", \" Not;A Brand\";v=\"99\", \"Chromium\";v=\"93\""}
+  r = s.get(url, headers=headers)
+  if r.status_code != 200:
     return None
+
+  article_html = r.text
   if save_debug:
     utils.write_file(article_html, './debug/debug.html')
 
@@ -80,17 +105,35 @@ def get_content(url, args, save_debug=False):
   if post.get('previewContent'):
     item['summary'] = post['previewContent']['subtitle']
 
+  # Try to get the full content from graphql query
+  gql_data = {"operationName":"PostViewerEdgeContent","variables":{"postId":"","postMeteringOptions":{"referrer":""}},"query":"query PostViewerEdgeContent($postId: ID!, $postMeteringOptions: PostMeteringOptions) {\n  post(id: $postId) {\n    ... on Post {\n      id\n      viewerEdge {\n        id\n        fullContent(postMeteringOptions: $postMeteringOptions) {\n          isLockedPreviewOnly\n          validatedShareKey\n          bodyModel {\n            ...PostBody_bodyModel\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment PostBody_bodyModel on RichText {\n  sections {\n    name\n    startIndex\n    textLayout\n    imageLayout\n    backgroundImage {\n      id\n      originalHeight\n      originalWidth\n      __typename\n    }\n    videoLayout\n    backgroundVideo {\n      videoId\n      originalHeight\n      originalWidth\n      previewImageId\n      __typename\n    }\n    __typename\n  }\n  paragraphs {\n    id\n    ...PostBodySection_paragraph\n    __typename\n  }\n  ...normalizedBodyModel_richText\n  __typename\n}\n\nfragment normalizedBodyModel_richText on RichText {\n  paragraphs {\n    markups {\n      type\n      __typename\n    }\n    ...getParagraphHighlights_paragraph\n    ...getParagraphPrivateNotes_paragraph\n    __typename\n  }\n  sections {\n    startIndex\n    ...getSectionEndIndex_section\n    __typename\n  }\n  ...getParagraphStyles_richText\n  ...getParagraphSpaces_richText\n  __typename\n}\n\nfragment getParagraphHighlights_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment getParagraphPrivateNotes_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment getSectionEndIndex_section on Section {\n  startIndex\n  __typename\n}\n\nfragment getParagraphStyles_richText on RichText {\n  paragraphs {\n    text\n    type\n    __typename\n  }\n  sections {\n    ...getSectionEndIndex_section\n    __typename\n  }\n  __typename\n}\n\nfragment getParagraphSpaces_richText on RichText {\n  paragraphs {\n    layout\n    metadata {\n      originalHeight\n      originalWidth\n      __typename\n    }\n    type\n    ...paragraphExtendsImageGrid_paragraph\n    __typename\n  }\n  ...getSeriesParagraphTopSpacings_richText\n  ...getPostParagraphTopSpacings_richText\n  __typename\n}\n\nfragment paragraphExtendsImageGrid_paragraph on Paragraph {\n  layout\n  type\n  __typename\n  id\n}\n\nfragment getSeriesParagraphTopSpacings_richText on RichText {\n  paragraphs {\n    id\n    __typename\n  }\n  sections {\n    startIndex\n    __typename\n  }\n  __typename\n}\n\nfragment getPostParagraphTopSpacings_richText on RichText {\n  paragraphs {\n    layout\n    text\n    __typename\n  }\n  sections {\n    startIndex\n    __typename\n  }\n  __typename\n}\n\nfragment PostBodySection_paragraph on Paragraph {\n  name\n  ...PostBodyParagraph_paragraph\n  __typename\n  id\n}\n\nfragment PostBodyParagraph_paragraph on Paragraph {\n  name\n  type\n  ...ImageParagraph_paragraph\n  ...TextParagraph_paragraph\n  ...IframeParagraph_paragraph\n  ...MixtapeParagraph_paragraph\n  __typename\n  id\n}\n\nfragment IframeParagraph_paragraph on Paragraph {\n  iframe {\n    mediaResource {\n      id\n      iframeSrc\n      iframeHeight\n      iframeWidth\n      title\n      __typename\n    }\n    __typename\n  }\n  layout\n  ...getEmbedlyCardUrlParams_paragraph\n  ...Markups_paragraph\n  __typename\n  id\n}\n\nfragment getEmbedlyCardUrlParams_paragraph on Paragraph {\n  type\n  iframe {\n    mediaResource {\n      iframeSrc\n      __typename\n    }\n    __typename\n  }\n  __typename\n  id\n}\n\nfragment Markups_paragraph on Paragraph {\n  name\n  text\n  hasDropCap\n  dropCapImage {\n    ...MarkupNode_data_dropCapImage\n    __typename\n    id\n  }\n  markups {\n    type\n    start\n    end\n    href\n    anchorType\n    userId\n    linkMetadata {\n      httpStatus\n      __typename\n    }\n    __typename\n  }\n  __typename\n  id\n}\n\nfragment MarkupNode_data_dropCapImage on ImageMetadata {\n  ...DropCap_image\n  __typename\n  id\n}\n\nfragment DropCap_image on ImageMetadata {\n  id\n  originalHeight\n  originalWidth\n  __typename\n}\n\nfragment ImageParagraph_paragraph on Paragraph {\n  href\n  layout\n  metadata {\n    id\n    originalHeight\n    originalWidth\n    focusPercentX\n    focusPercentY\n    alt\n    __typename\n  }\n  ...Markups_paragraph\n  ...ParagraphRefsMapContext_paragraph\n  ...PostAnnotationsMarker_paragraph\n  __typename\n  id\n}\n\nfragment ParagraphRefsMapContext_paragraph on Paragraph {\n  id\n  name\n  text\n  __typename\n}\n\nfragment PostAnnotationsMarker_paragraph on Paragraph {\n  ...PostViewNoteCard_paragraph\n  __typename\n  id\n}\n\nfragment PostViewNoteCard_paragraph on Paragraph {\n  name\n  __typename\n  id\n}\n\nfragment TextParagraph_paragraph on Paragraph {\n  type\n  hasDropCap\n  ...Markups_paragraph\n  ...ParagraphRefsMapContext_paragraph\n  __typename\n  id\n}\n\nfragment MixtapeParagraph_paragraph on Paragraph {\n  text\n  type\n  mixtapeMetadata {\n    href\n    thumbnailImageId\n    __typename\n  }\n  markups {\n    start\n    end\n    type\n    href\n    __typename\n  }\n  __typename\n  id\n}\n"}
+  gql_data['variables']['postId'] = post_id
+  gql_url = 'https://{}/_/graphql'.format(split_url.netloc)
+  r = s.post(gql_url, json=gql_data)
+  if r.status_code == 200:
+    gql_json = r.json()
+    paragraphs = gql_json['data']['post']['viewerEdge']['fullContent']['bodyModel']['paragraphs']
+    if save_debug:
+      utils.write_file(gql_json, './debug/medium.json')
+  else:
+    # If that failed, use what content was embedded
+    for key in post.keys():
+      if key.startswith('content({\"postMeteringOptions'):
+        paragraphs = post[key]['bodyModel']['paragraphs']
+        break
+
   is_list = ''
   content_html = ''
-  for key in post.keys():
-    if key.startswith('content({\"postMeteringOptions'):
-      break
-  for p in post[key]['bodyModel']['paragraphs']:
-    paragraph = article_json[p['__ref']]
+  for p in paragraphs:
+    if p.get('__ref'):
+      paragraph = article_json[p['__ref']]
+    else:
+      paragraph = p
+
     paragraph_type = paragraph['type'].lower()
 
-    # The first 2 paragraphs are often the title and subtext
-    if (p['__ref'].endswith('_0') and paragraph_type == 'h3') or (p['__ref'].endswith('_1') and paragraph_type == 'h4'):
+    # Skip the first paragraph if since it's usually the title
+    if paragraph['id'].endswith('_0') and paragraph_type == 'h3':
       continue
 
     if is_list and not (paragraph_type == 'oli' or paragraph_type == 'uli'):
@@ -99,16 +142,29 @@ def get_content(url, args, save_debug=False):
     else:
       start_tag = ''
   
-    if paragraph_type == 'p' or paragraph_type == 'h1' or paragraph_type == 'h2' or paragraph_type == 'h3' or paragraph_type == 'h4' or paragraph_type == 'pre':
+    if paragraph_type == 'p' or paragraph_type == 'h1' or paragraph_type == 'h2' or paragraph_type == 'h3' or paragraph_type == 'h4':
       start_tag += '<{}>'.format(paragraph_type)
       end_tag = '</{}>'.format(paragraph_type)
       paragraph_text = paragraph['text']
 
     elif paragraph_type == 'img':
-      image = article_json[paragraph['metadata']['__ref']]
+      if paragraph['metadata'].get('__ref'):
+        image = article_json[paragraph['metadata']['__ref']]
+      else:
+        image = paragraph['metadata']
       start_tag += '<div class="image"><figure><img width="100%" src="{}" /><figcaption><small>'.format(medium_image_src(image['id']))
       end_tag = '</small></figcaption></figure></div>'
       paragraph_text = paragraph['text']
+
+    elif paragraph_type == 'pre':
+      start_tag += '<pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">'
+      end_tag = '</pre>'
+      if not paragraph.get('markups'):
+        # Escape HTML characters so they are not rendered
+        paragraph_text = html.escape(paragraph['text'])
+      else:
+        # If there are markups, escaping the characters will mess up the alignment
+        paragraph_text = paragraph['text']
 
     elif paragraph_type == 'bq' or paragraph_type == 'pq':
       start_tag += '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">'
@@ -129,74 +185,51 @@ def get_content(url, args, save_debug=False):
       paragraph_text = paragraph['text']
 
     elif paragraph_type == 'iframe':
-      media_resource = article_json[paragraph['iframe']['mediaResource']['__ref']]
-      iframe_src = media_resource['iframeSrc']
-      if iframe_src:
-        if 'youtube' in iframe_src:
-          split_url = urlsplit(iframe_src)
-          m = re.search(r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})', unquote(split_url.query))
-          if m:
-            start_tag += utils.add_video('https://www.youtube-nocookie.com/embed/' + m.group(1), 'youtube')
-            end_tag = ''
-            paragraph_text = ''
-            iframe_src = ''
-
-        elif 'twitter' in iframe_src:
-          split_url = urlsplit(iframe_src)
-          m = re.search(r'https:\/\/twitter\.com\/[^\/]+\/status\/\d+', unquote(split_url.query))
-          if m:
-            tweet = utils.add_twitter(m.group(0))
-            if tweet:
-              start_tag += tweet
-              end_tag = ''
-              paragraph_text = ''
-              iframe_src = ''
-            else:
-              logger.warning('unable to get tweet {} in {}'.format(m.group(0), url))
-
-        else:
-          logger.warning('unhandled iframe_src {} in {}'.format(iframe_src, url))
-
+      if paragraph['iframe']['mediaResource'].get('__ref'):
+        media_resource = article_json[paragraph['iframe']['mediaResource']['__ref']]
       else:
-        split_url = urlsplit(url)
-        iframe_src = '{}://{}/media/{}'.format(split_url.scheme, split_url.netloc,  media_resource['id'])
-        iframe_html = utils.get_url_html(iframe_src)
-        if iframe_html:
+        media_resource = paragraph['iframe']['mediaResource']
+
+      iframe_src = media_resource['iframeSrc']
+      if iframe_src.startswith('https://cdn.embedly.com'):
+        # This is usually embeded media
+        iframe_query = parse_qs(urlsplit(iframe_src).query)
+        if 'src' in iframe_query:
+          iframe_src = iframe_query['src'][0]
+        elif 'url' in iframe_query:
+          iframe_src = iframe_query['url'][0]
+        start_tag += utils.add_embed(iframe_src, save_debug)
+        end_tag = ''
+        paragraph_text = ''
+      elif not iframe_src:
+        # This is usually code from a github gist
+        r = s.get('{}://{}/media/{}'.format(split_url.scheme, split_url.netloc,  media_resource['id']))
+        if r.status_code == 200:
+          iframe_html = r.text
           if save_debug:
-            utils.write_file(iframe_html, './debug/debug.html')
+            utils.write_file(iframe_html, './debug/iframe.html')
           m = re.search(r'src="https:\/\/gist\.github\.com\/([^\/]+)\/([^\.]+)\.js"', iframe_html)
           if m:
-            iframe_html = utils.get_url_html('https://gist.githubusercontent.com/{}/{}/raw'.format(m.group(1), m.group(2)))
-            if iframe_html:
-              start_tag = '<pre style="margin-left:2em;">{}</pre>'.format(iframe_html)
+            r = s.get('https://gist.githubusercontent.com/{}/{}/raw'.format(m.group(1), m.group(2)))
+            if r.status_code == 200:
+              iframe_html = r.text
+              start_tag += '<pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">{}</pre>'.format(iframe_html)
               end_tag = ''
               paragraph_text = ''
-              iframe_src = ''
-          else:
-            logger.warning('unhandled Medium media iframe in ' + url)
-            iframe_src = ''
-
-      if iframe_src:
-        width = 640
-        if 'iframeWidth' in paragraph['iframe']['mediaResource'] and paragraph['iframe']['mediaResource']['iframeWidth'] > 0:
-          width = paragraph['iframe']['mediaResource']['iframeWidth']
-
-        height = 480
-        if 'iframeHeight' in paragraph['iframe']['mediaResource'] and paragraph['iframe']['mediaResource']['iframeHeight'] > 0:
-          height = paragraph['iframe']['mediaResource']['iframeHeight']
-
-        title = ''
-        if paragraph['iframe']['mediaResource'].get('title'):
-          title = " title={}".format(paragraph['iframe']['mediaResource']['title'])
-        start_tag += '<iframe src="{}" width="{}" height="{}"{} frameborder="0" scrolling="auto">'.format(iframe_src, width, height, title)
-        end_tag = '</iframe>'
+        if r.status_code != 200 or not m:
+          logger.warning('unhandled Medium media iframe in ' + url)
+      else:
+        logger.warning('unhandled Medium iframe content in ' + url)
+        start_tag += '<p>Embedded content from <a href="{0}">{0}</a></p>'.format(iframe_src)
+        end_tag = ''
         paragraph_text = ''
 
     elif paragraph_type == 'mixtape_embed':
       mixtape = paragraph['mixtapeMetadata']
-      start_tag += '<table style="width:80%; height:5em; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><tr><td><a style="text-decoration:none;" href="{}"><small>'.format(mixtape['href'])
-      end_tag = '</small></a></td><td style="padding:0;"><img style="height:5em; display:block; border-top-right-radius:10px; border-bottom-right-radius:10px;" src="{}" /></td></tr></table>'.format(medium_image_src(mixtape['thumbnailImageId'], 200))
-
+      #start_tag += '<table style="width:80%; height:5em; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><tr><td><a style="text-decoration:none;" href="{}"><small>'.format(mixtape['href'])
+      #end_tag = '</small></a></td><td style="padding:0;"><img style="height:5em; display:block; border-top-right-radius:10px; border-bottom-right-radius:10px;" src="{}" /></td></tr></table>'.format(medium_image_src(mixtape['thumbnailImageId'], 200))
+      start_tag += '<blockquote><ul><li>'
+      end_tag = '</li></ul></blockquote>'
       paragraph_text = paragraph['text']
 
     else:

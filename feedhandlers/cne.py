@@ -141,9 +141,7 @@ def get_content(url, args, save_debug=False):
           body_html += utils.add_image(it['image']['sources'][img_size]['url'], caption.strip())
 
       elif body_json[1]['type'] == 'video':
-        if 'youtube' in body_json[1]['props']['url']:
-          body_html += utils.add_video(body_json[1]['props']['url'], 'youtube')
-          #body_html += utils.add_youtube(body_json[1]['props']['url'], body_json[1]['props']['width'], body_json[1]['props']['height'])
+        body_html += utils.add_embed(body_json[1]['props']['url'], save_debug)
 
       elif body_json[1]['type'] == 'clip':
         m = re.search(r'<p>(.*)<\/p>', body_json[1]['props']['dangerousCaption'])
@@ -202,50 +200,8 @@ def get_content(url, args, save_debug=False):
             else:
               logger.warning('unable to get video info for videoId {} in {}'.format(video_id, url))
 
-      elif body_json[1]['type'] == 'instagram':
-        body_html += utils.add_instagram(body_json[1]['props']['url'])
-  
-      elif body_json[1]['type'] == 'twitter':
-        tweet_url = body_json[1]['props']['url']
-        tweet = utils.add_twitter(tweet_url)
-        if tweet:
-          body_html += tweet
-        else:
-          logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
-
-      elif body_json[1]['type'] == 'iframe':
-        if 'youtube' in body_json[1]['props']['url']:
-          body_html += utils.add_video(body_json[1]['props']['url'], 'youtube')
-
-        elif 'podcasts.apple' in body_json[1]['props']['url']:
-          body_html += utils.add_apple_podcast(body_json[1]['props']['url'])
-
-        elif re.search('(music|podcasts)\.apple', body_json[1]['props']['url']):
-          embed = apple.get_content(body_json[1]['props']['url'], {"max": 5}, False)
-          if embed:
-            body_html += embed['content_html']
-
-        elif 'bandcamp' in body_json[1]['props']['url']:
-          embed = bandcamp.get_content(body_json[1]['props']['url'], {}, False)
-          if embed:
-            body_html += embed['content_html']
-
-        elif 'soundcloud' in body_json[1]['props']['url']:
-          embed = soundcloud.get_content(body_json[1]['props']['url'], {}, False)
-          if embed:
-            body_html += embed['content_html']
-
-        elif 'spotify' in body_json[1]['props']['url']:
-          embed = spotify.get_content(body_json[1]['props']['url'], {"max": 5}, False)
-          if embed:
-            body_html += embed['content_html']
-
-        elif 'megaphone' in body_json[1]['props']['url']:
-          body_html += utils.add_megaphone(body_json[1]['props']['url'])
-
-        else:
-          logger.warning('unhandled iframe {} in {}'.format(body_json[1]['props']['url'], url))
-          body_html += '<iframe width="{}" height="{}" frameBorder="0" src="{}"></iframe>'.format(body_json[1]['props']['width'], body_json[1]['props']['height'], body_json[1]['props']['url'])
+      elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'instagram' or body_json[1]['type'] == 'twitter':
+        body_html += utils.add_embed(body_json[1]['props']['url'], False)
 
       elif body_json[1]['type'] == 'product':
         if not 'subscribe.wired.com' in body_json[1]['props']['offerUrl']:

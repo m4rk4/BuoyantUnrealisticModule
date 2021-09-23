@@ -2,8 +2,8 @@ import json, pytube, re, sys
 from pytube.cipher import Cipher
 from urllib.parse import parse_qs, quote_plus
 
+import config, utils
 from feedhandlers import rss
-import utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -25,24 +25,11 @@ def search(query, save_debug=False):
   return ''
 
 def get_content(url, args, save_debug=False):
-  yt_id = ''
-  if 'watch' in url:
-    # Watch url
-    m = re.search(r'youtube(-nocookie)?\.com\/watch\?v=([a-zA-Z0-9_-]{11})', url)
-    if m:
-      yt_id = m.group(2)
-  elif 'embed' in url:
-    # Embed url
-    m = re.search(r'youtube(-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})', url)
-    if m:
-      yt_id = m.group(2)
-  elif 'youtu.be' in url:
-    m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', url)
-    if m:
-      yt_id = m.group(1)
+  item = {}
 
-  if not yt_id:
-    logger.warning('unable to determine Youtube video id in ' + url)
+  yt_url, yt_id = utils.get_youtube_url(url)
+  if not yt_url:
+    return ''
 
   yt_html = utils.get_url_html('https://www.youtube.com/watch?v=' + yt_id)
   if not yt_html:
@@ -66,7 +53,6 @@ def get_content(url, args, save_debug=False):
     logger.warning('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
     return None
 
-  item = {}
   item['id'] = yt_id
   item['url'] = 'https://www.youtube.com/watch?v=' + yt_id
   item['title'] = yt_json['videoDetails']['title']
@@ -113,7 +99,6 @@ def get_content(url, args, save_debug=False):
 
     #streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
 
-    stream_url = ''
     for key, stream in streams.items():
       if stream.get('url'):
         item[key] = stream['url']
@@ -133,10 +118,19 @@ def get_content(url, args, save_debug=False):
         logger.warning('unable to get the {} stream in {}'.format(key, url))
 
     item['content_html'] = ''
-    if args and 'audio' in args and item.get('_audio'):
-      item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
-    elif item.get('_video'):
-      item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
+    if args and args.get('embed'):
+      if args and 'audio' in args and item.get('_audio'):
+        item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
+      elif item.get('_video'):
+        video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
+        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+        item['content_html'] = utils.add_video(video_src, 'video/mp4', item['_image'], caption)
+      return item
+    else:
+      if args and 'audio' in args and item.get('_audio'):
+        item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
+      elif item.get('_video'):
+        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
 
   # Format the summary
   summary_html = yt_json['videoDetails']['shortDescription'].replace('\n', ' <br /> ')

@@ -9,7 +9,70 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content_review(url, args, save_debug=False):
+def get_video_content(url, args, save_debug=False):
+  video_html = utils.get_url_html(url)
+  if not video_html:
+    return None
+
+  video_id = ''
+  video_soup = BeautifulSoup(video_html, 'html.parser')
+  for el in video_soup.find_all('iframe'):
+    if el.has_attr('src'):
+      print(el['src'])
+      m = re.search(r'\/cne-player\/player\.html\?autoplay=true&video=([0-9a-f]+)', el['src'])
+      if m:
+        video_id = m.group(1)
+        break
+
+  if not video_id:
+    logger.warning('unable to find video id in ' + url)
+    return None
+
+  video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId={}'.format(video_id))
+  if not video_json:
+    return None
+  if save_debug:
+    utils.write_file(video_json, './debug/debug.json')
+
+  item = {}
+  item['id'] = video_json['video']['id']
+  item['url'] = url
+  item['title'] = video_json['video']['title']
+
+  dt = datetime.fromisoformat(video_json['video']['premiere_date'])
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
+  item['author'] = {}
+  item['author']['name'] = 'Pitchfork'
+
+  item['tags'] = video_json['video']['tags'].copy()
+
+  el = video_soup.find('meta', attrs={"name": "description"})
+  if el and el.get('content'):
+    item['summary'] = el['content']
+    caption = el['content']
+  else:
+    caption = ''
+
+  item['_image'] = video_json['video']['poster_frame']
+  item['_image'] = re.sub(r',h_\d{2,4}', '', item['_image'])
+  item['_image'] = re.sub(r'w_\d{2,4}', 'w_1000', item['_image'])
+
+  def get_video(videos):
+    for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
+      for video in videos:
+        if video['type'] == video_type:
+          return video
+    return None
+  video = get_video(video_json['video']['sources'])
+  if video:
+    item['_video'] = video['src']
+    item['content_html'] = utils.add_video(video['src'], video['type'], item['_image'], caption)
+  return item
+
+def get_review_content(url, args, save_debug=False):
   json_url = 'https://pitchfork.com/api/v2' + urlsplit(url).path
   review_json = utils.get_url_json(json_url)
   if not review_json:
@@ -92,29 +155,25 @@ def get_content_review(url, args, save_debug=False):
 
   if result_json.get('audio_files'):
     for audio in result_json['audio_files']:
-      audio_embed = ''
-      if 'bandcamp' in audio['embedUrl']:
-        audio_embed = bandcamp.get_content(audio['embedUrl'], {}, save_debug)
-      elif 'soundcloud' in audio['embedUrl']:
-        audio_embed = soundcloud.get_content(audio['embedUrl'], {}, save_debug)
-      if audio_embed:
-        content_html += audio_embed['content_html'] + '<hr width="80%" />'
+      audio_embed = utils.add_embed(audio['embedUrl'], save_debug)
+      content_html += audio_embed + '<hr width="80%" />'
 
   soup = BeautifulSoup(result_json['body']['en'], 'html.parser')
   for el in soup.find_all('figure', class_='contents__embed'):
     if el.iframe and el.iframe.has_attr('src'):
-      if re.search(r'youtu\.?be', el.iframe['src']):
-        new_el = utils.add_youtube(el.iframe['src'])
-        el.insert_after(BeautifulSoup(new_el, 'html.parser'))
-        el.decompose()
+      embed_html = utils.add_embed(el.iframe['src'], save_debug)
+      el.insert_after(BeautifulSoup(embed_html, 'html.parser'))
+      el.decompose()
     else:
       logger.warning('unhandled embed in ' + url)
   item['content_html'] = content_html + str(soup)
   return item
 
 def get_content(url, args, save_debug=False):
-  if 'pitchfork.com/reviews' in url:
-    return get_content_review(url, args, save_debug)
+  if '/reviews/' in url:
+    return get_review_content(url, args, save_debug)
+  elif '/tv/' in url:
+    return get_video_content(url, args, save_debug)
   return cne.get_content(url, args, save_debug)
 
 def get_feed(args, save_debug=False):
