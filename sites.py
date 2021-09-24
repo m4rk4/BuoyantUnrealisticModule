@@ -45,7 +45,7 @@ handlers = {
     "module": "crains"
   },
   "engadget": {
-    "module": "engadget"
+    "module": "yahoo"
   },
   "espn": {
     "module": "espn"
@@ -143,6 +143,9 @@ handlers = {
   "vanityfair": {
     "module": "vanityfair"
   },
+  "vidible": {
+    "module": "vidible"
+  },
   "vimeo": {
     "module": "vimeo"
   },
@@ -169,6 +172,9 @@ handlers = {
   },
   "dj": {
     "module": "wsj"
+  },
+  "yahoo": {
+    "module": "yahoo"
   },
   "youtube": {
     "module": "youtube"

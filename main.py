@@ -72,7 +72,7 @@ def content():
 
   module = utils.get_module(args['url'], handler)
   if module:
-    if re.search(r'youtube\.com|espn\.com', args['url']):
+    if re.search(r'espn\.com|vidible\.tv|youtube\.com', args['url']):
       url = args['url']
     else:
       url = utils.clean_url(args['url'])
