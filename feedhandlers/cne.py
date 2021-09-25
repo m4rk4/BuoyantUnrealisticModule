@@ -1,4 +1,5 @@
-import json, re
+import re
+from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
@@ -55,46 +56,7 @@ def get_content(url, args, save_debug=False):
 
   page_type = article_json['head.pageType']
   body_json = article_json[page_type]['body']
-
-  # Add lede image to article
   body_html = ''
-  caption = ''
-  img_url = ''
-  if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
-    lede = article_json[page_type]['headerProps']['lede']
-    if lede.get('contentType') == 'photo':
-      if lede.get('caption'):
-        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
-        if m:
-          caption = m.group(1)
-        else:
-          caption = lede['caption']
-      if lede.get('credit'):
-        caption += ' ' + lede['credit']
-      img_url = lede['sources'][img_size]['url']
-    elif lede.get('contentType') == 'clip':
-      if lede.get('caption'):
-        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
-        if m:
-          caption = m.group(1)
-        else:
-          caption = lede['caption']
-      if lede.get('credit'):
-        caption += ' ' + lede['credit']
-      body_html += utils.add_video(lede['sources']['640w']['url'], 'video/mp4', caption=caption.strip())
-    elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
-      video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
-      if video_json:
-        for it in video_json['video']['sources']:
-          if it['type'].find('mp4') > 0:
-            body_html += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
-  elif 'head.og.image' in article_json:
-    img_url = article_json['head.og.image']
-  elif item.get('_image'):
-    img_url = item['_image']
-
-  if img_url:
-    body_html += utils.add_image(img_url, caption.strip())
 
   if page_type == 'review':
     body_html += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><hr/>'.format(article_json['review']['rating'], article_json['review']['bestRating'], article_json['review']['pros'], article_json['review']['cons'])
@@ -313,7 +275,64 @@ def get_content(url, args, save_debug=False):
     return '{}{}{}'.format(matchobj.group(1), matchobj.group(2).upper(), matchobj.group(3))
   body_html = re.sub(r'(lead-in-text-callout[^>]*>)([^<]*)(<)', sub_lead_in_text_callout, body_html)
 
-  item['content_html'] = body_html
+  def sub_has_dropcap(matchobj):
+    return '{}<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}{}'.format(matchobj.group(1), matchobj.group(2), matchobj.group(3), matchobj.group(4))
+  body_html = re.sub(r'(has-dropcap[^>]*>)(\w)([^<]*)(<)', sub_has_dropcap, body_html)
+
+  # Clean up html
+  body_soup = BeautifulSoup(body_html, 'html.parser')
+  for el in body_soup.find_all('a', attrs={"isaffiliatelink": True}):
+    if el.has_attr('href'):
+      href = utils.get_redirect_url(el['href'])
+      el.attrs = {}
+      el['href'] = href
+
+  for el in body_soup.find_all(re.compile(r'p|h\d|span'), class_=['has-dropcap', 'lead-in-text-callout', 'paywall']):
+    el.attrs = {}
+
+  # Add lede image to article
+  lead_html = ''
+  caption = ''
+  img_url = ''
+  if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
+    lede = article_json[page_type]['headerProps']['lede']
+    if lede.get('contentType') == 'photo':
+      if lede.get('caption'):
+        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
+        if m:
+          caption = m.group(1)
+        else:
+          caption = lede['caption']
+      if lede.get('credit'):
+        caption += ' ' + lede['credit']
+      img_url = lede['sources'][img_size]['url']
+    elif lede.get('contentType') == 'clip':
+      if lede.get('caption'):
+        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
+        if m:
+          caption = m.group(1)
+        else:
+          caption = lede['caption']
+      if lede.get('credit'):
+        caption += ' ' + lede['credit']
+      lead_html = utils.add_video(lede['sources']['640w']['url'], 'video/mp4', caption=caption.strip())
+    elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
+      video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
+      if video_json:
+        for it in video_json['video']['sources']:
+          if it['type'].find('mp4') > 0:
+            lead_html = utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
+  elif 'head.og.image' in article_json:
+    img_url = article_json['head.og.image']
+  elif item.get('_image'):
+    img_url = item['_image']
+  if img_url:
+    lead_html = utils.add_image(img_url, caption.strip())
+
+  item['content_html'] = ''
+  if lead_html:
+    item['content_html'] += lead_html
+  item['content_html'] += body_soup.div.decode_contents()
   return item
 
 def get_feed(args, save_debug=False):
