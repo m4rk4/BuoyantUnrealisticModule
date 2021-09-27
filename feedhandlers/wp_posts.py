@@ -184,14 +184,17 @@ def get_post_content(post, args, save_debug=False):
 
   for el in soup.find_all('iframe'):
     if el.get('src'):
-      if re.search(r'www\.youtube\.com\/|youtu\.be', el['src']):
-        new_el = BeautifulSoup(utils.add_youtube(el['src']), 'html.parser')
-      else:
-        new_el = BeautifulSoup('<p>Embedded content: <a href="{0}">{0}</a></p>'.format(el['src']), 'html.parser')
+      src = el['src']
+    elif el.get('data-src'):
+      src = el['data-src']
+    else:
+      src = ''
+    if src:
+      new_el = BeautifulSoup(utils.add_embed(src), 'html.parser')
       el.insert_after(new_el)
       el.decompose()
     else:
-      logger.warning('unhandled iframe with no src ' + item['url'])
+      logger.warning('unknown iframe src in ' + url)
 
   for el in soup.find_all(class_='blogstyle__iframe'):
     iframe = el.find('iframe')
@@ -200,24 +203,23 @@ def get_post_content(post, args, save_debug=False):
         src = iframe['src']
       elif iframe.get('data-src'):
         src = iframe['data-src']
-      if 'youtube' in src:
-        new_el = BeautifulSoup(utils.add_youtube(src), 'html.parser')
+      else:
+        src = ''
+      if src:
+        new_el = BeautifulSoup(utils.add_embed(src), 'html.parser')
         el.insert_after(new_el)
         el.decompose()
       else:
-        logger.warning('unhandled iframe src {} in {}'.format(src, item['url']))
-    elif el.find(class_='twitter-tweet'):
-      m = re.search(r'<a href=\"(https:\/\/twitter\.com\/[^\/]+\/status\/\d+)', str(el))
-      if m:
-        tweet = utils.get_twitter(m.group(1))
-        if tweet:
-          new_el = BeautifulSoup(tweet, 'html.parser')
-          el.insert_after(new_el)
-          el.decompose()
-        else:
-          logger.warning('unable to add tweet {} in {}'.format(m.group(1), item['url']))
+        logger.warning('unknown iframe src in ' + url)
     else:
-      logger.warning('unhandled blogstyle__iframe in ' + item['url'])
+      it = el.find(class_='twitter-tweet')
+      if it:
+        links = el.find_all('a')
+        new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+      else:
+        logger.warning('unhandled blogstyle__iframe in ' + item['url'])
 
   item['content_html'] = str(soup)
   return item
