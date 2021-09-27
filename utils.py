@@ -735,4 +735,4 @@ def add_embed(url, save_debug=False):
     content = module.get_content(embed_url, {"embed": True}, save_debug)
     if content:
       return content['content_html']
-  return '<p>Embedded content from <a href="{0}">{0}</a></p>'.format(url)
+  return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(url)
