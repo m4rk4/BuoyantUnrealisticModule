@@ -46,7 +46,9 @@ def feed():
   else:
     handler = ''
 
-  module = utils.get_module(args['url'], handler)
+  url = args.get('url')
+
+  module = utils.get_module(url, handler)
   if module:
     feed = module.get_feed(args, save_debug)
     if not feed:
@@ -70,12 +72,12 @@ def content():
   else:
     handler = ''
 
-  module = utils.get_module(args['url'], handler)
+  url = args.get('url')
+
+  module = utils.get_module(url, handler)
   if module:
-    if re.search(r'espn\.com|vidible\.tv|youtube\.com', args['url']):
-      url = args['url']
-    else:
-      url = utils.clean_url(args['url'])
+    if not re.search(r'espn\.com|vidible\.tv|vimeo\.com|youtube\.com', url):
+      url = utils.clean_url(url)
     content = module.get_content(url, args, save_debug)
     if 'json' in args:
       return jsonify(content)
