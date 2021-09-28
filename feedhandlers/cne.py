@@ -332,7 +332,7 @@ def get_content(url, args, save_debug=False):
   item['content_html'] = ''
   if lead_html:
     item['content_html'] += lead_html
-  item['content_html'] += body_soup.div.decode_contents()
+  item['content_html'] += str(body_soup)
   return item
 
 def get_feed(args, save_debug=False):
