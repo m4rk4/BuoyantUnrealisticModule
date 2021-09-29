@@ -295,38 +295,40 @@ def image():
       save = True
 
     elif arg == 'overlay':
+      im_overlay = None
       if val == 'video':
-        overlay_sizes = [
-          {"width": 512, "height": 360, "name": "video_play_button-512x360.png"},
-          {"width": 384, "height": 270, "name": "video_play_button-384x270.png"},
-          {"width": 256, "height": 180, "name": "video_play_button-256x180.png"},
-          {"width": 192, "height": 135, "name": "video_play_button-192x135.png"},
-          {"width": 128, "height": 90, "name": "video_play_button-128x90.png"},
-          {"width": 97, "height": 68, "name": "video_play_button-97x68.png"},
-          {"width": 64, "height": 45, "name": "video_play_button-64x45.png"},
-          {"width": 48, "height": 34, "name": "video_play_button-48x34.png"}]
-      else:
-        overlay_sizes = [
-          {"width": 512, "height": 512, "name": "play_button-512x512.png"},
-          {"width": 384, "height": 384, "name": "play_button-384x384.png"},
-          {"width": 256, "height": 256, "name": "play_button-256x256.png"},
-          {"width": 192, "height": 192, "name": "play_button-192x192.png"},
-          {"width": 128, "height": 128, "name": "play_button-128x128.png"},
-          {"width": 96, "height": 96, "name": "play_button-96x96.png"},
-          {"width": 64, "height": 64, "name": "play_button-64x64.png"},
-          {"width": 48, "height": 48, "name": "play_button-48x48.png"},
-          {"width": 32, "height": 32, "name": "play_button-32x32.png"}]
-      w_size = utils.closest_dict(overlay_sizes, 'width', w//5)
-      h_size = utils.closest_dict(overlay_sizes, 'height', h//5)
-      if h_size['width'] <= w_size['width']:
-        overlay_name = h_size['name']
-      else:
-        overlay_name = w_size['name']
-      im_overlay = Image.open('./static/' + overlay_name)
-      x = (w - im_overlay.width) // 2
-      y = (h - im_overlay.height) // 2
-      im.paste(im_overlay, (x, y), mask=im_overlay)
-      save = True
+        overlays = [{"width": 512, "height": 360, "url": "./static/video_play_button-512x360.png"},
+                    {"width": 384, "height": 270, "url": "./static/video_play_button-384x270.png"},
+                    {"width": 256, "height": 180, "url": "./static/video_play_button-256x180.png"},
+                    {"width": 192, "height": 135, "url": "./static/video_play_button-192x135.png"},
+                    {"width": 128, "height": 90, "url": "./static/video_play_button-128x90.png"},
+                    {"width": 97, "height": 68, "url": "./static/video_play_button-97x68.png"},
+                    {"width": 64, "height": 45, "url": "./static/video_play_button-64x45.png"},
+                    {"width": 48, "height": 34, "url": "./static/video_play_button-48x34.png"}]
+        overlay = utils.closest_dict(overlays, 'height', h // 5)
+        im_overlay = Image.open(overlay['url'])
+      elif val == 'audio':
+        overlays = [{"width": 512, "height": 512, "url": "./static/play_button-512x512.png"},
+                    {"width": 384, "height": 384, "url": "./static/play_button-384x384.png"},
+                    {"width": 256, "height": 256, "url": "./static/play_button-256x256.png"},
+                    {"width": 192, "height": 192, "url": "./static/play_button-192x192.png"},
+                    {"width": 128, "height": 128, "url": "./static/play_button-128x128.png"},
+                    {"width": 96, "height": 96, "url": "./static/play_button-96x96.png"},
+                    {"width": 64, "height": 64, "url": "./static/play_button-64x64.png"},
+                    {"width": 48, "height": 48, "url": "./static/play_button-48x48.png"},
+                    {"width": 32, "height": 32, "url": "./static/play_button-32x32.png"}]
+        overlay = utils.closest_dict(overlays, 'height', h // 5)
+        im_overlay = Image.open(overlay['url'])
+      elif val.startswith('http'):
+        r = requests.get(val)
+        if r.status_code == 200:
+          io_overlay = BytesIO(r.content)
+          im_overlay = Image.open(io_overlay)
+      if im_overlay:
+        x = (w - im_overlay.width) // 2
+        y = (h - im_overlay.height) // 2
+        im.paste(im_overlay, (x, y), mask=im_overlay)
+        save = True
 
     elif arg == 'mask':
       if val == 'ellipse':
