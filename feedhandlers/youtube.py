@@ -25,13 +25,14 @@ def search(query, save_debug=False):
   return ''
 
 def get_content(url, args, save_debug=False):
-  item = {}
+  yt_video_id, yt_list_id = utils.get_youtube_id(url)
+  if not yt_video_id:
+    return None
 
-  yt_url, yt_id = utils.get_youtube_url(url)
-  if not yt_url:
-    return ''
+  yt_embed_url = 'https://www.youtube-nocookie.com/embed/{}'.format(yt_video_id)
+  yt_watch_url = 'https://www.youtube.com/watch?v={}'.format(yt_video_id)
 
-  yt_html = utils.get_url_html('https://www.youtube.com/watch?v=' + yt_id)
+  yt_html = utils.get_url_html(yt_watch_url)
   if not yt_html:
     return None
   if save_debug:
@@ -49,8 +50,9 @@ def get_content(url, args, save_debug=False):
   if save_debug:
     utils.write_file(yt_json, './debug/youtube.json')
 
-  item['id'] = yt_id
-  item['url'] = 'https://www.youtube.com/watch?v=' + yt_id
+  item = {}
+  item['id'] = yt_video_id
+  item['url'] = yt_watch_url
 
   if yt_json['playabilityStatus']['status'] == 'ERROR':
     item['title'] = yt_json['playabilityStatus']['reason']
@@ -62,7 +64,7 @@ def get_content(url, args, save_debug=False):
     caption = yt_json['playabilityStatus']['reason']
     if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
       caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
-    item['content_html'] = utils.add_image(poster, caption, link=yt_url)
+    item['content_html'] = utils.add_image(poster, caption, link=yt_embed_url)
     return item
 
   item['title'] = yt_json['videoDetails']['title']
@@ -128,27 +130,31 @@ def get_content(url, args, save_debug=False):
       else:
         logger.warning('unable to get the {} stream in {}'.format(key, url))
 
+    caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+    if yt_list_id:
+      caption += ' | <a href="{}&list={}">View playlist</a>'.format(yt_watch_url, yt_list_id)
+
     item['content_html'] = ''
     if args and 'embed' in args:
       if args and 'audio' in args and item.get('_audio'):
         item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
       elif item.get('_video'):
         video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
-        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
         item['content_html'] = utils.add_video(video_src, 'video/mp4', item['_image'], caption)
     else:
       if args and 'audio' in args and item.get('_audio'):
         item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
       elif item.get('_video'):
-        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
         item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'], caption)
   else:
     overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
     if overlay.startswith('//'):
       overlay = 'https:' + overlay
     poster = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(item['_image']), quote_plus(overlay))
-    caption = '{} | {} | <a href="{}">Watch on YouTube</a>'.format(yt_json['playabilityStatus']['reason'], item['title'], yt_url)
-    item['content_html'] = utils.add_image(poster, caption, link=yt_url)
+    caption = '{} | {} | <a href="{}">Watch on YouTube</a>'.format(yt_json['playabilityStatus']['reason'], item['title'], yt_embed_url)
+    if yt_list_id:
+      caption += ' | <a href="{}&list={}">View playlist</a>'.format(yt_watch_url, yt_list_id)
+    item['content_html'] = utils.add_image(poster, caption, link=yt_embed_url)
 
   if args and 'embed' in args:
     return item

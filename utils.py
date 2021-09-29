@@ -493,38 +493,51 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
 
   return add_image(poster, caption, link=video_src, gawker=gawker)
 
-def get_youtube_url(ytstr):
+def get_youtube_id(ytstr):
   # ytstr can be either:
-  # - the 11 digit id only, e.g. D4gPQDyOixQ
-  # - the watch url, e.g. https://www.youtube.com/watch?v=D4gPQDyOixQ
-  # - the embed url, e.g. https://www.youtube.com/embed/D4gPQDyOixQ
-  # - the short url, e.g. https://yout.be/D4gPQDyOixQ
+  # - 11 digit id only, e.g. D4gPQDyOixQ
+  # - watch url, e.g. https://www.youtube.com/watch?v=D4gPQDyOixQ
+  # - embed url, e.g. https://www.youtube.com/embed/D4gPQDyOixQ
+  # - short url, e.g. https://yout.be/D4gPQDyOixQ
+  # - playlist, e.g. https://www.youtube.com/playlist?list=PL0vZL9uwyfOFezIOiBjkdW3TTdn0Q_AKL
+  # - embed playlist, e.g. https://www.youtube.com/embed/videoseries?list=PLPDkqknt-rAi5yTQ2-UgtuTvMbV84M9ci
+  # - video + playlist, e.g. https://www.youtube.com/watch?v=YxkPuEmIX4U&list=PL0vZL9uwyfOFezIOiBjkdW3TTdn0Q_AKL
   # - also from www.youtube-nocookie.com
-  yt_id = ''
+  yt_list_id = ''
+  if 'list=' in ytstr:
+    m = re.search(r'list=([a-zA-Z0-9_-]+)', ytstr)
+    if m:
+      yt_list_id = m.group(1)
+    else:
+      logger.warning('unable to determine Youtube playlist id in ' + ytstr)
+
+  yt_video_id = ''
   if len(ytstr) == 11:
     # id only
-    yt_id = ytstr
-  else:
-    # Watch url
+    yt_video_id = ytstr
+  elif '/watch?' in ytstr:
     m = re.search(r'youtube(-nocookie)?\.com\/watch\?v=([a-zA-Z0-9_-]{11})', ytstr)
     if m:
-      yt_id = m.group(2)
-    else:
-      # Embed url
-      m = re.search(r'youtube(-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
-      if m:
-        yt_id = m.group(2)
-      else:
-        # Shortened url
-        m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
-        if m:
-          yt_id = m.group(1)
-  if not yt_id:
-    logger.warning('unknown Youtube embed ' + ytstr)
-    return ''
+      yt_video_id = m.group(2)
+  elif '/embed/' in ytstr:
+    m = re.search(r'youtube(-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
+    if m and m.group(2) != 'videoseries':
+      yt_video_id = m.group(2)
+  elif 'youtu.be' in ytstr:
+    m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
+    if m:
+      yt_video_id = m.group(1)
 
-  yt_url = 'https://www.youtube-nocookie.com/embed/{}'.format(yt_id)
-  return yt_url, yt_id
+  if yt_list_id and not yt_video_id:
+    yt_html = get_url_html('https://www.youtube.com/embed/videoseries?list={}'.format(yt_list_id))
+    if yt_html:
+      # Use the first videoId found
+      m = re.search(r'"videoId\\":\\"([a-zA-Z0-9_-]{11})\\"', yt_html)
+      if m:
+        yt_video_id = m.group(1)
+  if not yt_video_id:
+    logger.warning('unable to determine Youtube video id in ' + ytstr)
+  return yt_video_id, yt_list_id
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
   yt_url, yt_id = get_youtube_url(ytstr)

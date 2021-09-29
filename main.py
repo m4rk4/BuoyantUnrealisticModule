@@ -76,8 +76,8 @@ def content():
 
   module = utils.get_module(url, handler)
   if module:
-    if not re.search(r'espn\.com|vidible\.tv|vimeo\.com|youtube\.com', url):
-      url = utils.clean_url(url)
+    #if not re.search(r'espn\.com|vidible\.tv|vimeo\.com|youtube\.com', url):
+    #  url = utils.clean_url(url)
     content = module.get_content(url, args, save_debug)
     if 'json' in args:
       return jsonify(content)
