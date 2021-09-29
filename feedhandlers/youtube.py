@@ -46,15 +46,25 @@ def get_content(url, args, save_debug=False):
     utils.write_file(m.group(1), './debug/debug.txt')
 
   yt_json = json.loads(m.group(1))
-  if True:
+  if save_debug:
     utils.write_file(yt_json, './debug/youtube.json')
-
-  if yt_json['playabilityStatus']['status'] != 'OK':
-    logger.warning('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
-    return None
 
   item['id'] = yt_id
   item['url'] = 'https://www.youtube.com/watch?v=' + yt_id
+
+  if yt_json['playabilityStatus']['status'] == 'ERROR':
+    item['title'] = yt_json['playabilityStatus']['reason']
+    logger.warning('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
+    overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
+    if overlay.startswith('//'):
+      overlay = 'https:' + overlay
+    poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus(overlay))
+    caption = yt_json['playabilityStatus']['reason']
+    if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
+      caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+    item['content_html'] = utils.add_image(poster, caption, link=yt_url)
+    return item
+
   item['title'] = yt_json['videoDetails']['title']
 
   item['author'] = {}
@@ -65,14 +75,15 @@ def get_content(url, args, save_debug=False):
 
   images = yt_json['videoDetails']['thumbnail']['thumbnails'] + yt_json['microformat']['playerMicroformatRenderer']['thumbnail']['thumbnails']
   image = utils.closest_dict(images, 'height', 1080)
-  item['_image'] = image['url']
+  if image['height'] < 360:
+    item['_image'] = image['url'].split('?')[0]
+  else:
+    item['_image'] = image['url']
 
   item['summary'] = yt_json['videoDetails']['shortDescription']
 
-  if yt_json['playabilityStatus']['status'] == 'LIVE_STREAM_OFFLINE':
-    item['content_html'] = utils.add_image(item['_image'], yt_json['playabilityStatus']['reason'])
-  else:
-    if save_debug:
+  if yt_json['playabilityStatus']['status'] == 'OK':
+    if False:
       utils.write_file(yt_json['streamingData'], './debug/youtube.json')
 
     h = 480
@@ -118,21 +129,30 @@ def get_content(url, args, save_debug=False):
         logger.warning('unable to get the {} stream in {}'.format(key, url))
 
     item['content_html'] = ''
-    if args and args.get('embed'):
+    if args and 'embed' in args:
       if args and 'audio' in args and item.get('_audio'):
         item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
       elif item.get('_video'):
         video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
         item['content_html'] = utils.add_video(video_src, 'video/mp4', item['_image'], caption)
-      return item
     else:
       if args and 'audio' in args and item.get('_audio'):
         item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
       elif item.get('_video'):
-        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
+        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'], caption)
+  else:
+    overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
+    if overlay.startswith('//'):
+      overlay = 'https:' + overlay
+    poster = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(item['_image']), quote_plus(overlay))
+    caption = '{} | {} | <a href="{}">Watch on YouTube</a>'.format(yt_json['playabilityStatus']['reason'], item['title'], yt_url)
+    item['content_html'] = utils.add_image(poster, caption, link=yt_url)
 
-  # Format the summary
+  if args and 'embed' in args:
+    return item
+
   summary_html = yt_json['videoDetails']['shortDescription'].replace('\n', ' <br /> ')
   def replace_link(matchobj):
     return '<a href="{0}">{0}</a>'.format(matchobj.group(0))
