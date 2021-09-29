@@ -116,7 +116,10 @@ def get_content(url, args, save_debug=False):
   article_json = caas_json['items'][0]['schema']['default']
   item = {}
   item['id'] = post_id
-  item['url'] = article_json['mainEntityOfPage']
+  if article_json.get('mainEntityOfPage'):
+    item['url'] = article_json['mainEntityOfPage']
+  else:
+    item['url'] = caas_json['items'][0]['data']['partnerData']['url']
   item['title'] = article_json['headline']
 
   dt = datetime.fromisoformat(article_json['datePublished'].replace('Z', '+00:00'))
