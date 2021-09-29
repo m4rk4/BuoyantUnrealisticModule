@@ -20,7 +20,14 @@ def get_content_html(content_uri):
   content_json = utils.get_url_json('https://' + content_uri)
   if content_json:
     if '/clay-paragraph/' in content_uri:
-      content_html = '<p>{}</p>'.format(content_json['text'])
+      if content_json.get('componentVariation') and content_json['componentVariation'] == 'clay-paragraph_drop-cap':
+        if content_json['text'].startswith('<'):
+          n = content_json['text'].find('>') + 1
+        else:
+          n = 0
+        content_html = '<p>{}<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}</p>'.format(content_json['text'][0:n], content_json['text'][n], content_json['text'][n+1:])
+      else:
+        content_html = '<p>{}</p>'.format(content_json['text'])
 
     elif '/clay-subheader/' in content_uri:
       #content_html = '<hr width="80%"><h3>{}</h3>'.format(content_json['text'])
