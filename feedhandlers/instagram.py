@@ -171,7 +171,7 @@ def get_content(url, args, save_debug=False):
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<table style="width:500px; margin-left:auto; margin-right:auto; padding:10px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:50px;"><img style="vertical-align: middle;" src="{0}" /></td><td><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr><tr><td colspan="2" style="text-align:center;">'.format(avatar, username)
+  item['content_html'] = '<table style="width:500px !important; margin-left:auto; margin-right:auto; padding:10px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:50px;"><img style="vertical-align: middle;" src="{0}" /></td><td><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr><tr><td colspan="2" style="text-align:center;">'.format(avatar, username)
 
   if post_media:
     item['content_html'] += post_media.replace('<img width="100%"', '<img')
