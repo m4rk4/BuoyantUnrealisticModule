@@ -244,7 +244,7 @@ def get_content_from_html(url, args, save_debug=False):
     if dt_pub:
       item['date_published'] = dt_pub.isoformat()
       item['_timestamp'] = dt_pub.timestamp()
-      item['_display_date'] = dt_pub.strftime('%b %-d, %Y')
+      item['_display_date'] = '{}. {}, {}'.format(dt_pub.strftime('%b'), dt_pub.day, dt_pub.year)
 
     if info.get('dateModified'):
       dt_mod = datetime.fromisoformat(info['dateModified'].replace('Z', '+00:00'))
