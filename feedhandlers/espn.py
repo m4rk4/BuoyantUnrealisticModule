@@ -115,6 +115,8 @@ def get_story(story_json, args, save_debug=False):
       return utils.add_video(vid_src, vid_type, poster, caption)
     logger.warning('video {} not found in {}'.format(n, story_json['links']['web']['href']))
   content_html = re.sub(r'<p><video(\d+)>\s?<\/video\d+><\/p>', replace_video, content_html)
+  content_html = re.sub(r'<p><video(\d+)><\/p>', replace_video, content_html)
+  content_html = re.sub(r'<p><video><\/p>', '', content_html)
 
   if re.search(r'<inline\d>', content_html):
     story_html = utils.get_url_html(url)
