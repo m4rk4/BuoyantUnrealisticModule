@@ -162,7 +162,7 @@ handlers = {
     "module": "wp_posts"
   },
   "variety": {
-    "module": "wp_posts"
+    "module": "variety"
   },
   "wksu": {
     "module": "wksu"
