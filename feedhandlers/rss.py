@@ -80,8 +80,8 @@ def get_feed(args, save_debug=False, func_get_content=None):
     elif 'updated_parsed' in entry:
       ts = entry.updated_parsed
     if ts:
-      dt = datetime(*ts[0:7])
-      item['date_published'] = dt.replace(tzinfo=timezone.utc).isoformat()
+      dt = datetime(*ts[0:7]).replace(tzinfo=timezone.utc)
+      item['date_published'] = dt.isoformat()
       item['_timestamp'] = dt.timestamp()
       item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 

@@ -74,6 +74,7 @@ def get_content(url, args, save_debug=False):
   post = utils.get_url_json('https://variety.com/wp-json/wp/v2/posts/' + m.group(1))
   if not post:
     return None
+
   return wp_posts.get_post_content(post, args, save_debug)
 
 

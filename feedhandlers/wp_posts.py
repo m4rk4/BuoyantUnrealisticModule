@@ -29,6 +29,8 @@ def get_post_content(post, args, save_debug=False):
 
   if 'age' in args:
     if not utils.check_age(item, args):
+      if save_debug:
+        logger.debug('skipping old post ({} {}) '.format(item['date_published'], item['_timestamp'], item['url']))
       return None
 
   # Authors
