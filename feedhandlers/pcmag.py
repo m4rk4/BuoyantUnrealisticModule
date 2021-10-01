@@ -98,6 +98,12 @@ def get_content(url, args, save_debug=False):
 
   article.attrs = {}
 
+  for el in article.find_all('p'):
+    for it in el.find_all('strong'):
+      if it.a and it.a['href'] == 'https://www.pcmag.com/newsletter_manage':
+        el.decompose()
+        break
+
   for el in article.find_all('img'):
     img_src = get_image_src(el)
     caption = ''
@@ -112,27 +118,25 @@ def get_content(url, args, save_debug=False):
     el.insert_after(new_el)
     el.decompose()
 
-  for el in article.children:
-    if el.name == 'ins':
+  for el in article.find_all('blockquote'):
+    if el.has_attr('class') and 'twitter-tweet' in el['class']:
+      new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
+      el.insert_before(new_el)
       el.decompose()
-    elif el.name == 'div':
+
+  for el in article.find_all('ins'):
+      el.decompose()
+
+  for el in article.children:
+    if el.name == 'div':
       if el.has_attr('x-data'):
         el.decompose()
       elif el.has_attr('id') and ('comments' in el['id'] or 'similar-products' in el['id']):
         el.decompose()
       elif el.has_attr('class') and 'review-card' in el['class']:
         el.decompose()
-      elif el.h3 and re.search(r'Recommended by Our Editors', el.h3.get_text()):
+      elif el.h3 and re.search(r'Recommended by Our Editors', el.h3.get_text(), flags=re.I):
         el.decompose()
-      elif el.iframe:
-        if el.iframe.has_attr('loading') and el.iframe['loading'] == 'lazy':
-          iframe_src = el.iframe['data-image-loader']
-        else:
-          iframe_src = el.iframe['src']
-        if 'youtube.com' in iframe_src:
-          new_el = BeautifulSoup(utils.add_video(iframe_src, 'youtube'), 'html.parser')
-          el.insert_after(new_el)
-          el.decompose()
       elif el.find(id=re.compile(r'video-container-')):
         video_json = None
         for it in el.parent.find_all('script'):
@@ -153,26 +157,10 @@ def get_content(url, args, save_debug=False):
           if videos:
             video_src = utils.closest_dict(videos, '480')
           new_el = BeautifulSoup(utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], video_json['title']), 'html.parser')
-          el.insert_after(new_el)
+          el.insert_before(new_el)
           el.decompose()
         else:
           logger.warning('unable to parse video json data in ' + url)
-
-    elif el.name == 'blockquote':
-      if el.has_attr('class') and 'twitter-tweet' in el['class']:
-        tweet = utils.add_twitter(el.a['href'])
-        if tweet:
-          new_el = BeautifulSoup(tweet, 'html.parser')
-          el.insert_after(new_el)
-          el.decompose()
-        else:
-          logger.warning('unable to add tweet {} in {}'.format(el.a['href'], url))
-
-    elif el.name == 'p':
-      for it in el.find_all('strong'):
-        if it.a and it.a['href'] == 'https://www.pcmag.com/newsletter_manage':
-          el.decompose()
-          break
 
   if '/reviews/' in url:
     review_html = ''
