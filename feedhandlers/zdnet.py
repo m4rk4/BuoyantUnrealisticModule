@@ -211,6 +211,14 @@ def get_content(url, args, save_debug=False):
         elif not 'listicle' in el['class']:
           logger.warning('unhandled shortcode class {} in {}'.format(el['class'], url))
 
+      for el in article_body.find_all(class_='embed'):
+        if 'embed--type-instagram' in el['class']:
+          new_el = BeautifulSoup(utils.add_embed(el.blockquote['data-instgrm-permalink']), 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+        else:
+          logger.warning('unhandled embed type {} in {}'.format(el['class'], url))
+
       # Review Pros/Cons
       for el in article_body.find_all(class_='row'):
         pros = el.find('ul', class_='pros')
