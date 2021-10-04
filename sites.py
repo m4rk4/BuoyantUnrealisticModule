@@ -155,6 +155,9 @@ handlers = {
   "wired": {
     "module": "wired"
   },
+  "nbcsports": {
+    "module": "wp_posts"
+  },
   "rollingstone": {
     "module": "wp_posts"
   },

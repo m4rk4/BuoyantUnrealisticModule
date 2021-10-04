@@ -223,6 +223,12 @@ def get_post_content(post, args, save_debug=False):
       else:
         logger.warning('unhandled blogstyle__iframe in ' + item['url'])
 
+  for el in soup.find_all(class_='twitter-tweet'):
+    links = el.find_all('a')
+    new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
+    el.insert_after(new_el)
+    el.decompose()
+
   item['content_html'] = str(soup)
   return item
 
