@@ -540,10 +540,10 @@ def get_youtube_id(ytstr):
   return yt_video_id, yt_list_id
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
-  yt_url, yt_id = get_youtube_url(ytstr)
-  if not yt_url:
+  yt_id = get_youtube_id(ytstr)
+  if not yt_id:
     return ''
-  return add_embed(yt_url, False)
+  return add_embed('https://www.youtube.com/watch?v={}'.format(yt_id), False)
 
 def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
