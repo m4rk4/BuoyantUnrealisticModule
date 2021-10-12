@@ -137,6 +137,9 @@ handlers = {
   "spotify": {
     "module": "spotify"
   },
+  "tiktok": {
+    "module": "tiktok"
+  },
   "twitter": {
     "module": "twitter"
   },
