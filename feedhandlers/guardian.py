@@ -183,12 +183,7 @@ def get_content(url, args, save_debug=False):
 
     for el in article_body.find_all('figure', class_='element-video'):
       if el.get('data-canonical-url') and 'youtube' in el['data-canonical-url']:
-        fig_caption = el.find('figcaption')
-        if fig_caption:
-          caption = fig_caption.get_text()
-        else:
-          caption = ''
-        new_el = BeautifulSoup(utils.add_youtube(el['data-canonical-url'], caption=caption), 'html.parser')
+        new_el = BeautifulSoup(utils.add_embed(el['data-canonical-url']), 'html.parser')
         el.insert_after(new_el)
         el.decompose()
 
