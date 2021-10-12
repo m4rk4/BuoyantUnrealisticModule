@@ -71,18 +71,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     element_html += '<h{0}>{1}</h{0}>'.format(element['level'], element['content'])
 
   elif element['type'] == 'oembed_response':
-    if 'https://www.youtube.com/embed/' in element['raw_oembed']['html']:
-      element_html += utils.add_youtube(element['raw_oembed']['html'])
-    elif 'twitter-tweet' in element['raw_oembed']['html']:
-      tweet = utils.add_twitter(element['raw_oembed']['url'])
-      if tweet:
-        element_html += tweet
-      else:
-        logger.warning('unable to add tweet {} in {}'.format(element['raw_oembed']['url'], url))
-        element_html += element['raw_oembed']['html'].replace('\n', '')
-    else:
-      element_html += element['raw_oembed']['html'].replace('\n', '')
-      #element_html += re.sub(r'\n', '', element['raw_oembed']['html'])
+    element_html += utils.add_embed(element['raw_oembed']['_id'])
 
   elif element['type'] == 'list':
     if element['list_type'] == 'unordered':
@@ -143,7 +132,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
               if caption:
                 caption += ' '
               caption += '({})'.format(element['credits']['by'][0]['byline'])
-      element_html += utils.add_image(img_src, caption, attr=alt)
+      element_html += utils.add_image(img_src, caption, img_attr=alt)
 
   elif element['type'] == 'video':
     if 'washingtonpost.com' in split_url.netloc:
