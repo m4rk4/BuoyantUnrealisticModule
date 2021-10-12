@@ -117,6 +117,12 @@ def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy
     return r.text
   return None
 
+def get_url_content(url, user_agent='googlebot', headers=None, retries=3, use_proxy=False):
+  r = get_request(url, user_agent, headers, retries, use_proxy)
+  if r != None and (r.status_code == 200 or r.status_code == 402):
+    return r.content
+  return None
+
 def get_redirect_url(url):
   if 'cloudfront.net' in url:
     url_html = get_url_html(url)
@@ -345,10 +351,8 @@ def filter_item(item, args):
   return True
 
 def bs_get_inner_html(soup):
-  html = ''
-  for child in soup.children:
-    html += str(child)
-  return html
+  # Also strips \n
+  return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
 def add_blockquote(text):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
@@ -371,39 +375,37 @@ def add_pullquote(quote, author=''):
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
-def add_image(img_src, caption='', width=None, height=None, attr='', background='', link='', gawker=False, style=''):
-  if width:
-    img_width = 'width="{}"'.format(width)
+def add_image(img_src, caption='', width=None, height=None, link='', img_attr='', img_style='', fig_style='', gawker=False):
+  begin_html = '<figure'
+  if fig_style:
+    begin_html += ' style={}>'.format(fig_style)
   else:
-    img_width = 'width="100%"'
+    begin_html += '>'
 
-  if height:
-    img_height = ' height="{}"'.format(height)
-  else:
-    img_height = ''
-
-  if attr:
-    img_attr = ' {}'.format(attr)
-  else:
-    img_attr = ''
-
-  if style:
-    if background:
-      img_style = ' style="{} background:url({});"'.format(style, background)
-    else:
-      img_style = ' style="{}"'.format(style)
-  else:
-    if background:
-      img_style = ' style="background:url({});"'.format(background)
-    else:
-      img_style = ''
-
-  begin_html = '<figure>'
   if link:
     begin_html += '<a href="{}">'.format(link)
-  begin_html += '<img {}{}{}{} src="{}" />'.format(img_width, img_height, img_attr, img_style, img_src)
+
+  begin_html += '<img src="{}"'.format(img_src)
+
+  if width:
+    begin_html += ' width="{}"'.format(width)
+  else:
+    begin_html += ' width="100%"'
+
+  if height:
+    begin_html += ' height="{}"'.format(height)
+
+  if img_attr:
+    begin_html += ' {}'.format(img_attr)
+
+  if img_style:
+    begin_html += ' style="{}"'.format(img_style)
+
+  begin_html += '/>'
+
   if link:
     begin_html += '</a>'
+
   end_html = '</figure>'
 
   if caption:
@@ -454,7 +456,7 @@ def add_megaphone(url):
     return ''
   return add_audio(data_json['episodes'][0]['audioUrl'], 'audio/mpeg', data_json['episodes'][0]['imageUrl'], data_json['episodes'][0]['title'], data_json['episodes'][0]['subtitle'], data_json['episodes'][0]['dataClipboardText'])
 
-def add_video(video_url, video_type, poster='', caption='', width=640, height=360, gawker=False):
+def add_video(video_url, video_type, poster='', caption='', width=640, height=360, img_style='', fig_style='', gawker=False):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -491,7 +493,7 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
   else:
     poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server)
 
-  return add_image(poster, caption, link=video_src, gawker=gawker)
+  return add_image(poster, caption, link=video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -540,10 +542,10 @@ def get_youtube_id(ytstr):
   return yt_video_id, yt_list_id
 
 def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
-  yt_id = get_youtube_id(ytstr)
-  if not yt_id:
+  yt_video_id, yt_list_id = get_youtube_id(ytstr)
+  if not yt_video_id:
     return ''
-  return add_embed('https://www.youtube.com/watch?v={}'.format(yt_id), False)
+  return add_embed('https://www.youtube.com/watch?v={}'.format(yt_video_id), False)
 
 def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
