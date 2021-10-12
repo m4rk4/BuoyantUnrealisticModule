@@ -3,8 +3,8 @@ from datetime import datetime
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
 
+import config, utils
 from feedhandlers import rss
-import utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -236,12 +236,10 @@ def get_content(url, args, save_debug=False):
             image = it['image']
 
           if 'overlay' in it:
-            img_src = get_image_src(it['overlay']['id'], it['overlay']['format'], it['overlay']['width'])
-            bg_src = get_image_src(image['id'], image['format'], image['width'])
+            img_src = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(get_image_src(image['id'], image['format'], image['width'])), quote_plus(get_image_src(it['overlay']['id'], it['overlay']['format'], it['overlay']['width'])))
           else:
             img_src = get_image_src(image['id'], image['format'], image['width'])
-            bg_src = ''
-          begin_html, end_html = utils.add_image(img_src, background=bg_src, gawker=True)
+          begin_html, end_html = utils.add_image(img_src, gawker=True)
           body_html += begin_html
 
           caption = None
@@ -313,10 +311,10 @@ def get_content(url, args, save_debug=False):
           logger.warning('unable to add tweet {} in {}'.format(it['id'], url))
 
       elif it['type'] == 'TikTok':
-        body_html += utils.add_tiktok(it['id'])
+        body_html += utils.add_embed('https://www.tiktok.com/embed/v2/{}?lang=en-US'.format(it['id']))
 
       elif it['type'] == 'Instagram':
-        body_html += utils.add_instagram('https://www.instagram.com/p/' + it['id'])
+        body_html += utils.add_embed('https://www.instagram.com/p/' + it['id'])
 
       elif it['type'] == 'Iframe':
         if 'youtube.com' in it['source']:
