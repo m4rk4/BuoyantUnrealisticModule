@@ -159,7 +159,7 @@ def get_content(url, args, save_debug=False):
   split_url = urlsplit(url)
   if save_debug:
     logger.debug('getting content from ' + url)
-  article_html = utils.get_url_html(url, user_agent='desktop')
+  article_html = utils.get_url_html(url)
   if article_html:
     if save_debug:
       utils.write_file(article_html, './debug/debug.html')

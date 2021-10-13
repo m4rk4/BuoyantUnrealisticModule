@@ -28,7 +28,7 @@ def get_image_src(el_img, width=1000, height=''):
   return img_src
 
 def get_content(url, args, save_debug=False):
-  article_html = utils.get_url_html(url, 'desktop')
+  article_html = utils.get_url_html(url)
   if not article_html:
     return None
   if save_debug:
@@ -236,7 +236,7 @@ def get_content(url, args, save_debug=False):
   return item
 
 def get_feed(args, save_debug=False):
-  page_html = utils.get_url_html(args['url'], 'desktop')
+  page_html = utils.get_url_html(args['url'])
   if not page_html:
     return None
   if save_debug:

@@ -137,7 +137,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
   elif element['type'] == 'video':
     if 'washingtonpost.com' in split_url.netloc:
       video_json_url = 'https://video-api.washingtonpost.com/api/v1/ansvideos/findByUuid?uuid=' + element['_id']
-      video_json = utils.get_url_json(video_json_url, 'desktop')
+      video_json = utils.get_url_json(video_json_url)
       if video_json:
         video_json = video_json[0]
     else:

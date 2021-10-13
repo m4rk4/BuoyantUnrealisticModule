@@ -25,7 +25,7 @@ def get_content(url, args, save_debug=False):
     return None
 
   ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(1), m.group(2))
-  ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1', 'desktop')
+  ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1')
   if not ig_embed:
     return ''
   if save_debug:

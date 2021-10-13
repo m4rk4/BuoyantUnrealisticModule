@@ -114,7 +114,7 @@ def get_post_content(post, args, save_debug=False):
   return item
 
 def get_next_data_json(url, save_debug=False, user_agent='desktop'):
-  url_html = utils.get_url_html(url, user_agent)
+  url_html = utils.get_url_html(url, user_agent=user_agent)
   if not url_html:
     return None
   if save_debug:

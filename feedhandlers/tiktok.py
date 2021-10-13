@@ -85,7 +85,7 @@ def get_content(url, args, save_debug=False):
     # url is the video id
     page_url = 'https://www.tiktok.com/embed/v2/{}?lang=en-US'.format(url)
 
-  page_html = utils.get_url_html(page_url, 'desktop')
+  page_html = utils.get_url_html(page_url)
   if not page_html:
     return None
 
@@ -104,7 +104,7 @@ def get_content(url, args, save_debug=False):
   return get_item(next_json['props']['pageProps']['itemInfo']['itemStruct'], args, save_debug)
 
 def get_feed(args, save_debug=False):
-  page_html = utils.get_url_html(args['url'], 'desktop')
+  page_html = utils.get_url_html(args['url'])
   if not page_html:
     return None
   if False:

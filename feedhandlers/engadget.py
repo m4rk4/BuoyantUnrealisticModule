@@ -20,7 +20,7 @@ def get_full_image(img_src):
 
 def get_content(url, args, save_debug=False):
   # Some content is blocked without this header
-  article_html = utils.get_url_html(url, 'desktop', {"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"})
+  article_html = utils.get_url_html(url, headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"})
   if save_debug:
     utils.write_file(article_html, './debug/debug.html')
 
