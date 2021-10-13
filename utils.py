@@ -111,7 +111,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=F
         write_file(r.text, './debug/debug.txt')
   return None
 
-def get_url_html(url, user_agent='googlebot', headers=None, retries=3, use_proxy=False):
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
   r = get_request(url, user_agent, headers, retries, use_proxy)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text

@@ -1,6 +1,5 @@
-import feedparser, json
+import feedparser
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
 
 import utils
 
