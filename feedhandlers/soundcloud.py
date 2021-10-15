@@ -162,7 +162,6 @@ def get_content(url, args, save_debug):
   # If the url is the widget, we need to find the real url
   secret_token = ''
   if url.startswith('https://w.soundcloud.com/player/'):
-    #print(url)
     m = re.search(r'secret_token%3D([^&]+)', url)
     if m:
       secret_token = m.group(1)
@@ -176,12 +175,10 @@ def get_content(url, args, save_debug):
   # Find the client id
   client_id = ''
   for script in soup.find_all('script', src=re.compile(r'^https:\/\/a-v2\.sndcdn\.com\/assets\/\d+-\w+\.js')):
-    #print(script['src'])
     script_html = utils.get_url_html(script['src'])
     m = re.search(r'client_id=(\w+)', script_html)
     if m:
       client_id = m.group(1)
-      #print(client_id)
       break
 
   el = soup.find('link', href=re.compile(r'^(android|ios)-app:'))

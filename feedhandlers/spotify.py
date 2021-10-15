@@ -18,7 +18,6 @@ def get_authorization_header():
     return None
   header = {}
   header['authorization'] = 'Bearer ' + m.group(1)
-  #print(header)
   return header
 
 def get_content(url, args, save_debug=False):

@@ -315,7 +315,6 @@ def get_content(url, args, save_debug=False):
   if tweet_json.get('parent'):
     parent = get_tweet_json(tweet_json['parent']['id_str'])
     while parent:
-      print('parent ' + parent['id_str'])
       tweet_thread.insert(0, parent)
       if parent.get('parent'):
         parent = get_tweet_json(parent['parent']['id_str'])

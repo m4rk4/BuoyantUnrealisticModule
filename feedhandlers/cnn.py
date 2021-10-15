@@ -424,7 +424,6 @@ def get_content_from_initial_state(url, args, save_debug=False):
 
 def get_live_news_content(url, args, save_debug=False):
   livestory_id = url.split('/')[-1]
-  print(livestory_id)
   headers = {
     "accept": "*/*",
     "accept-language": "en-US,en;q=0.9",
@@ -509,7 +508,6 @@ def get_feed(args, save_debug=False):
     # Skip non- cnn.com urls
     # Skip coupons/deals
     # Skip podcasts - they have their own rss feeds
-    #print(feed_item['url'])
     if not 'cnn.com' in feed_item['url'] or re.search(r'coupons\.cnn\.com|\/podcasts\/|\/specials\/', feed_item['url']):
       if save_debug:
         logger.debug('skipping ' + feed_item['url'])

@@ -195,7 +195,6 @@ def get_content(url, args, save_debug=False):
       it = el.find(class_='VideoEnhancement-title')
       if it:
         caption = it.get_text()
-        print(caption)
       new_html = utils.add_video(el.iframe['src'], 'youtube')
 
     else:

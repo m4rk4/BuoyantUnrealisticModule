@@ -18,7 +18,6 @@ def get_video_content(url, args, save_debug=False):
   video_soup = BeautifulSoup(video_html, 'html.parser')
   for el in video_soup.find_all('iframe'):
     if el.has_attr('src'):
-      print(el['src'])
       m = re.search(r'\/cne-player\/player\.html\?autoplay=true&video=([0-9a-f]+)', el['src'])
       if m:
         video_id = m.group(1)

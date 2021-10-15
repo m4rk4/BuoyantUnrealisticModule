@@ -345,7 +345,6 @@ def get_content(url, args, save_debug=False):
         logger.warning('unhandled dynamic-inset-fallback in ' + clean_url)
 
     else:
-      print(str(el))
       it = el.find(class_=re.compile('media-object-'))
       if it:
         logger.warning('unhandled media-object {} in {}'.format(it['class'], clean_url))

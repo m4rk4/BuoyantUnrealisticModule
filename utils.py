@@ -649,9 +649,8 @@ def add_apple_podcast(embed_url, save_debug=True):
   # https://embed.podcasts.apple.com/us/podcast/little-gold-men/id1042433465?itsct=podcast_box_player&itscg=30200&theme=auto
   m = re.search(r'\/id(\d+)', embed_url)
   if not m:
-    print('unable to parse podcast id from ' + embed_url)
+    logger.warning('unable to parse podcast id from ' + embed_url)
     return ''
-  print(m.group(1))
   json_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
 
   s = requests.Session()
@@ -674,7 +673,7 @@ def add_apple_podcast(embed_url, save_debug=True):
   }
   preflight = s.options(json_url, headers=headers)
   if preflight.status_code != 204:
-    print('status code {} getting preflight podcast info from {}'.format(preflight.status_code, embed_url))
+    logger.warning('status code {} getting preflight podcast info from {}'.format(preflight.status_code, embed_url))
     return ''
 
   headers = {
@@ -697,7 +696,7 @@ def add_apple_podcast(embed_url, save_debug=True):
   }
   r = s.get(json_url, headers=headers)
   if r.status_code != 200:
-    print('status code {} getting request podcast info from {}'.format(r.status_code, embed_url))
+    logger.warning('status code {} getting request podcast info from {}'.format(r.status_code, embed_url))
     return ''
 
   req_json = r.json()

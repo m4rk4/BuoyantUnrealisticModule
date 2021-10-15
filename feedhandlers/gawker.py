@@ -283,7 +283,6 @@ def get_content(url, args, save_debug=False):
           body_html += end_html
 
       elif it['type'] == 'YoutubeVideo' or it['type'] == 'YoutubePlaylist':
-        print(it['id'])
         if it['type'] == 'YoutubeVideo':
           yt_url = 'https://www.youtube-nocookie.com/embed/' + it['id']
         else: # YoutubePlaylist

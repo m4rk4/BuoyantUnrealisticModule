@@ -171,7 +171,6 @@ def get_content(url, args, save_debug=False):
         lead = True
       else:
         for m in re.findall(r'"videoId":"([a-f0-9]+)","thumbnailUrl":"([^"]+)","url":"([^"]+)"', article_html):
-          print(m[0])
           if m[0] == page_json['relatedMediaId']:
             video_url = 'https://www.ign.com/' + m[2]
             logger.debug('checking video content from ' + video_url)

@@ -81,7 +81,6 @@ def get_content_from_html(article_html, url, args, save_debug):
   for el in article.find_all(class_=re.compile(r'rad-cover|photo')):
     img = el.find('img')
     if not img:
-      #print(str(el))
       continue
     if img.has_attr('class') and 'rad-lazy' in img['class']:
       images = json.loads(img['data-widths'])
