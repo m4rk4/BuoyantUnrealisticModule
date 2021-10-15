@@ -18,7 +18,7 @@ def get_module(url, handler=''):
     if 'wp-json' in url:
       module_name = '.wp_posts'
     else:
-      tld = tldextract.extract(url)
+      tld = tldextract.extract(url.strip())
       if tld.domain == 'youtu' and tld.suffix == 'be':
         domain = 'youtu.be'
       elif tld.domain == 'feedburner':
