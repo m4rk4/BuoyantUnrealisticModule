@@ -246,10 +246,18 @@ def get_content(url, args, save_debug=False):
                 img_src = img['src']
               new_listicle += utils.add_image(img_src)
             else:
+              print(it['href'])
               new_listicle += '<a href="{}">{}</a><br />'.format(utils.get_redirect_url(it['href']), it.get_text().strip())
           else:
             new_listicle += str(it)
         el.insert_after(BeautifulSoup(new_listicle, 'html.parser'))
+        el.decompose()
+
+      for el in article_body.find_all(class_='lead-link'):
+        new_link = '<a href="{}">{}</a>'.format(utils.get_redirect_url(el['href']), el.get_text().strip())
+        if el.parent.has_attr('class') and 'listicle-links' in el.parent['class']:
+          el.parent.attrs.clear()
+        el.insert_after(BeautifulSoup(new_link, 'html.parser'))
         el.decompose()
 
       for el in article_body.find_all(['p','h3']):
