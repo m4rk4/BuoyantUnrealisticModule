@@ -21,6 +21,10 @@ def get_module(url, handler=''):
       tld = tldextract.extract(url.strip())
       if tld.domain == 'youtu' and tld.suffix == 'be':
         domain = 'youtu.be'
+      elif tld.domain == 'megaphone' and tld.suffix == 'fm':
+        domain = 'megaphone.fm'
+      elif tld.domain == 'go':
+        domain = tld.subdomain
       elif tld.domain == 'feedburner':
         domain = urlsplit(url).path.split('/')[1]
       else:

@@ -1,4 +1,7 @@
 handlers = {
+  "abcnews": {
+    "module": "abcnews"
+  },
   "apnews": {
     "module": "apnews"
   },
@@ -100,6 +103,9 @@ handlers = {
   },
   "medium": {
     "module": "medium"
+  },
+  "megaphone.fm": {
+    "module": "megaphonefm"
   },
   "hackernoon": {
     "module": "nextjs"
