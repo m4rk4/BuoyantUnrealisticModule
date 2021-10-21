@@ -84,7 +84,7 @@ def process_element(element, url, save_debug=False):
     if re.search(r'\bjs-cnn-erm\b|Click to subscribe|float:left;|float:right;', element_contents['html'], flags=re.I):
       pass
     else:
-      raw_soup = BeautifulSoup(element_contents['html'])
+      raw_soup = BeautifulSoup(element_contents['html'], 'html.parser')
       if raw_soup.video:
         it = raw_soup.find(class_=re.compile(r'cap_\d+'))
         if it:
