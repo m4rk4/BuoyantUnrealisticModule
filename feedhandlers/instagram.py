@@ -1,5 +1,6 @@
 import json, re
 from bs4 import BeautifulSoup
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
 
 import config
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def format_caption_links(matchobj):
   if matchobj.group(1) == '#':
-    return '<a href="https://www.instagram.com/explore/tags/{0}/">#{0}</a>'.format(matchobj.group(2))
+    return '<a href="https://www.instagram.com/explore/tags/{0}/"> #{0}</a>'.format(matchobj.group(2))
   elif matchobj.group(1) == '@':
     return '<a href="https://www.instagram.com/{0}/">@{0}</a>'.format(matchobj.group(2))
 
@@ -29,7 +30,7 @@ def get_content(url, args, save_debug=False):
   if not ig_embed:
     return ''
   if save_debug:
-    utils.write_file(ig_embed, './debug/debug.html')
+    utils.write_file(ig_embed, './debug/instagram.html')
 
   soup = BeautifulSoup(ig_embed, 'html.parser')
 
@@ -53,7 +54,7 @@ def get_content(url, args, save_debug=False):
 
   if ig_data:
     if save_debug:
-      utils.write_file(ig_data, './debug/debug.json')
+      utils.write_file(ig_data, './debug/instagram.json')
     avatar = ig_data['shortcode_media']['owner']['profile_pic_url']
     username = ig_data['shortcode_media']['owner']['username']
   else:
@@ -123,7 +124,7 @@ def get_content(url, args, save_debug=False):
         img_src = utils.image_from_srcset(el['srcset'], 640)
       else:
         img_src = el['src']
-      figure = utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src), width=480), link=img_src)
+      figure = utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), width=480, link=img_src)
       post_media += figure[8:-9]
 
   elif media_type == 'GraphVideo':
@@ -168,15 +169,23 @@ def get_content(url, args, save_debug=False):
     item['title'] = title[:50] + '...'
   else:
     item['title'] = title
+
+  if ig_data and ig_data['shortcode_media'].get('taken_at_timestamp'):
+    # Assuming it's UTC
+    dt = datetime.fromtimestamp(ig_data['shortcode_media']['taken_at_timestamp']).replace(tzinfo=timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<table style="width:500px !important; margin-left:auto; margin-right:auto; padding:10px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:50px;"><img style="vertical-align: middle;" src="{0}" /></td><td><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr><tr><td colspan="2" style="text-align:center;">'.format(avatar, username)
+  item['content_html'] = '<blockquote style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div style="display:flex; align-items:center;"><img src="{0}"/><span>&nbsp;<a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/>'.format(avatar, username)
 
   if post_media:
-    item['content_html'] += post_media.replace('<img width="100%"', '<img')
+    item['content_html'] += post_media
 
-  item['content_html'] += '<tr><td colspan="2">{}</td></tr></table>'.format(post_caption)
+  item['content_html'] += '<p>{}</p></blockquote>'.format(post_caption)
   return item
 
 def get_feed(args, save_debug=False):
