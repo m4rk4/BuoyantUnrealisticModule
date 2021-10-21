@@ -131,8 +131,7 @@ def get_content(url, args, save_debug=False):
     if ig_data:
       video_src = ig_data['shortcode_media']['video_url']
       img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
-      poster = '{}/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
-      figure = utils.add_video(video_src, 'video/mp4', poster)
+      figure = utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width=480, link=video_src)
       post_media += figure[8:-9]
     else:
       el = soup.find('img', class_='EmbeddedMediaImage')
@@ -153,8 +152,7 @@ def get_content(url, args, save_debug=False):
         elif edge['node']['__typename'] == 'GraphVideo':
           video_src = edge['node']['video_url']
           img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
-          poster = '{}/image?url={}&width=480'.format(config.server, quote_plus(img['src']))
-          figure = utils.add_video(video_src, 'video/mp4', poster)
+          figure = utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width=480, link=video_src)
           post_media += figure[8:-9]
 
         post_media += '<br/><br/>'
