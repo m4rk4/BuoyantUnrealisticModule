@@ -81,8 +81,19 @@ def process_element(element, url, save_debug=False):
     element_html += '<blockquote><b>{}</b><br> &ndash; {}</blockquote>'.format(element_contents['quote'], element_contents['author'])
 
   elif element['contentType'] == 'raw-html':
-    if not re.search(r'\bjs-cnn-erm\b|Click to subscribe|float:left;|float:right;', element_contents['html'], flags=re.I):
-      element_html += re.sub(r'(\/\/[^\.]*.cnn\.com)', r'https:\1', element_contents['html'])
+    if re.search(r'\bjs-cnn-erm\b|Click to subscribe|float:left;|float:right;', element_contents['html'], flags=re.I):
+      pass
+    else:
+      raw_soup = BeautifulSoup(element_contents['html'])
+      if raw_soup.video:
+        it = raw_soup.find(class_=re.compile(r'cap_\d+'))
+        if it:
+          caption = it.get_text()
+        else:
+          caption = ''
+        element_html += utils.add_video('https:' + raw_soup.source['src'], raw_soup.source['type'], 'https:' + raw_soup.video['poster'], caption)
+      else:
+        element_html += re.sub(r'(\/\/[^\.]*.cnn\.com)', r'https:\1', element_contents['html'])
 
   elif element['contentType'] == 'image':
     image = get_resized_image(element_contents['cuts'])
@@ -142,28 +153,28 @@ def process_element(element, url, save_debug=False):
 
   elif element['contentType'] == 'youtube':
     if element_contents.get('embedUrl'):
-      element_html += utils.add_youtube(element_contents['embedUrl'])
+      element_html += utils.add_embed(element_contents['embedUrl'])
     elif element_contents.get('embedHtml'):
       element_html += utils.add_youtube(element_contents['embedHtml'])
     else:
       logger.warning('trouble embedding YouTube video in ' + url)
 
   elif element['contentType'] == 'instagram':
-    logger.warning('CNN instagram embed in ' + url)
-    #element_html += element_contents['embedHtml']
-    element_html += utils.add_instagram(element_contents['embedHtml'])
+    if element_contents.get('embedUrl'):
+      element_html += utils.add_embed(element_contents['embedUrl'])
+    else:
+      logger.warning('CNN instagram embed in ' + url)
+      element_html += utils.add_instagram(element_contents['embedHtml'])
 
   elif element['contentType'] == 'twitter':
-    #logger.warning('CNN twitter embed in ' + url)
-    #element_html += element_contents['embedHtml']
-    tweet = utils.add_twitter(element_contents['embedUrl'])
-    if tweet:
-      element_html += tweet
+    if element_contents.get('embedUrl'):
+      element_html += utils.add_embed(element_contents['embedUrl'])
     else:
-      logger.warning('unable to add tweet {} in {}'.format(element_contents['embedUrl'], url))
-      m = re.search(r'^(<blockquote.*<\/blockquote>)', element_contents['embedHtml'])
+      m = re.findall(r'(https:\/\/twitter\.com\/[^\/]+\/status/\d+)', element_contents['embedHtml'])
       if m:
-        element_html += m.group(1)
+        element_html += utils.add_embed(m[-1])
+      else:
+        logger.warning('unable to find embed Twitter url in {} ' + url)
 
   else:
     logger.warning('unhandled element type {} in {}'.format(element['contentType'], url))
