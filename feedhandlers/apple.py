@@ -7,7 +7,31 @@ import config, utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_apple_data(api_url, save_debug=False):
+def get_token(url):
+  js = utils.get_url_html('https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/musickit-components.esm.js')
+  if not js:
+    return ''
+
+  m = re.search(r'JSON\.parse\(\'\[\["([^"]+)"', js)
+  if not m:
+    return ''
+
+  js = utils.get_url_html('https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/{}.entry.js'.format(m.group(1)))
+  if not js:
+    return ''
+
+  jsfiles = re.findall(r'(from|import)"\.\/(p-[0-9a-f]+\.js)"', js)
+  for jsfile in jsfiles:
+    js = utils.get_url_html('https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/{}'.format(jsfile[1]))
+    if not js:
+      continue
+    m = re.search('podcasts:\{prod:"([^"]+)"', js)
+    if m:
+      return m.group(1)
+
+  return ''
+
+def get_apple_data(api_url, url, save_debug=False):
   s = requests.Session()
   headers = {
     "accept": "*/*",
@@ -28,14 +52,14 @@ def get_apple_data(api_url, save_debug=False):
   }
   preflight = s.options(api_url, headers=headers)
   if preflight.status_code != 204:
-    logger.warning('unexpected status code {} getting preflight podcast info from {}'.format(preflight.status_code, embed_url))
+    logger.warning('unexpected status code {} getting preflight info from {}'.format(preflight.status_code, url))
     return ''
 
   headers = {
     "accept": "*/*",
     "accept-encoding": "gzip, deflate, br",
     "accept-language": "en-US,en;q=0.9",
-    "authorization": "Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjI4NTEwOTQ3LCJleHAiOjE2MzQ3MzE3NDcsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.4hpyCflT_5hmcLsD2NpwXMaE9ZhznHcoK0T60XVj7bfeIwibz-fiUao_sH3p8WECcw5f-6v0pFN1VwvSr7klkw",
+    "authorization": "Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjMzNDUzNzU2LCJleHAiOjE2Mzk2NzQ1NTYsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.qlGFbohnsbm6faxvdKrr1yF5_n4Ni09UkJcXOYaWLZeF7ogVJGhSVCxocP975k3fQpTSfCt5aU8SN5ooi8syzQ",
     "cache-control": "no-cache",
     "dnt": "1",
     "origin": "https://embed.podcasts.apple.com",
@@ -51,18 +75,41 @@ def get_apple_data(api_url, save_debug=False):
   }
   r = s.get(api_url, headers=headers)
   if r.status_code != 200:
-    logger.warning('unexpected status code {} getting request podcast info from {}'.format(r.status_code, embed_url))
+    # The token might be expired, try to get a new one
+    token = get_token(url)
+    if token:
+      logger.debug('trying new Apple token to ' + token)
+      headers['authorization'] = 'Bearer ' + token
+      r = s.get(api_url, headers=headers)
+  if r.status_code != 200:
+    logger.warning('unexpected status code {} getting request info from {}'.format(r.status_code, url))
     return ''
 
-  r_json = r.json()
-  if save_debug:
-    utils.write_file(r_json, './debug/apple.json')
-  return r_json
+  return r.json()
 
-def get_apple_playlist(api_url, args, save_debug=False):
-  api_json = get_apple_data(api_url)
+def get_apple_playlist(url, args, save_debug=False):
+  api_url = ''
+  if '/podcast/' in url:
+    m = re.search(r'\/id(\d+)', url)
+    if m:
+      api_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
+  elif '/playlist/' in url:
+    m = re.search(r'\/pl\.([0-9a-f]+)', url)
+    if m:
+      api_url = 'https://api.music.apple.com/v1/catalog/us/playlists?ids=pl.{}&include=curator'.format(m.group(1))
+  elif '/album/' in url:
+    m = re.search(r'\/album\/[^\/]+\/(\d+)', url)
+    if m:
+      api_url = 'https://api.music.apple.com/v1/catalog/us/albums?ids={}&include=artists'.format(m.group(1))
+
+  if not api_url:
+    logger.warning('unable to parse id from ' + url)
+    return None
+  api_json = get_apple_data(api_url, url, save_debug)
   if not api_json:
     return None
+  if save_debug:
+    utils.write_file(api_json, './debug/apple.json')
 
   api_data = api_json['data'][0]
   if api_data['type'] == 'playlists':
@@ -76,6 +123,11 @@ def get_apple_playlist(api_url, args, save_debug=False):
     list_items = api_data['relationships']['episodes']['data']
     # Use the date from the most recent episode
     dt = datetime.fromisoformat(api_data['relationships']['episodes']['data'][0]['attributes']['releaseDateTime'].replace('Z', '+00:00'))
+  elif api_data['type'] == 'albums':
+    byline = api_data['attributes']['artistName']
+    list_title = 'Tracks'
+    list_items = api_data['relationships']['tracks']['data']
+    dt = datetime.fromisoformat(api_data['attributes']['releaseDate'])
   else:
     logger.warning('unknown playlist type {} in {}'.format(api_data['type'], api_url))
     return None
@@ -94,11 +146,17 @@ def get_apple_playlist(api_url, args, save_debug=False):
   if api_data['attributes'].get('genreNames'):
     item['tags'] = api_data['attributes']['genreNames'].copy()
   item['_image'] = api_data['attributes']['artwork']['url'].replace('{w}', '640').replace('{h}', '640').replace('{f}', 'jpg')
-  if api_data['attributes']['description'].get('standard'):
+  if api_data['attributes'].get('description'):
     item['summary'] = api_data['attributes']['description']['standard']
+  elif api_data['attributes'].get('editorialNotes'):
+    item['summary'] = api_data['attributes']['editorialNotes']['standard']
 
   poster = api_data['attributes']['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
-  item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small></td></tr><tr><td colspan="2">{}:<ol style="margin-top:0;">'.format(api_data['attributes']['url'], poster, api_data['attributes']['url'], api_data['attributes']['name'], byline, list_title)
+  desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small>'.format(api_data['attributes']['url'], api_data['attributes']['name'], byline)
+  item['content_html'] = '<blockquote><div style="display:flex; align-items:center;"><a href="{}"><img style="margin-right:8px;" src="{}"/></a><span>{}</a></span></div>'.format(api_data['attributes']['url'], poster, desc)
+  item['content_html'] += '<h4 style="margin-top:0; margin-bottom:0.5em;">{}:</h4>'.format(list_title)
+  if api_data['type'] == 'playlists' or api_data['type'] == 'albums':
+    item['content_html'] += '<ol>'
 
   if 'max' in args:
     i_max = int(args['max'])
@@ -106,42 +164,35 @@ def get_apple_playlist(api_url, args, save_debug=False):
     i_max = -1
   for i, li in enumerate(list_items):
     if i == i_max:
-      item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(item['url']))
+      item['content_html'] += '<a href="{}/content?url={}">View all {}</a><hr/>'.format(config.server, quote_plus(item['url']), list_title.lower())
       break
-    if api_data['type'] == 'playlists':
-      item['content_html'] += '<li><a href="{}">{}</a><br/><small>by {}</small></li>'.format(li['attributes']['url'], li['attributes']['name'], li['attributes']['artistName'])
-    elif api_data['type'] == 'podcasts':
+
+    if api_data['type'] == 'podcasts':
       dt = datetime.fromisoformat(li['attributes']['releaseDateTime'].replace('Z', '+00:00'))
       date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-      time = []
+      duration = []
       t = math.floor(li['attributes']['durationInMilliseconds'] / 3600000)
       if t >= 1:
-        time.append('{} hr'.format(t))
+        duration.append('{} hr'.format(t))
       t = math.ceil((li['attributes']['durationInMilliseconds'] - 3600000*t) / 60000)
       if t > 0:
-        time.append('{} min.'.format(t))
-      item['content_html'] += '<li><a style="text-decoration:none;" href="{}">&#9658;</a>&nbsp;<a href="{}">{}</a><br/><small>{}, {}</small></li>'.format(li['attributes']['assetUrl'], li['attributes']['url'], li['attributes']['name'], date, ' , '.join(time))
+        duration.append('{} min.'.format(t))
+      item['content_html'] += '<small>{}</small><br/><a href="{}">{}</a><br/><small>{}</small><br/><a style="text-decoration:none;" href="{}">&#9658; Play</a>&nbsp;<small>{}</small><hr/>'.format(date, li['attributes']['url'], li['attributes']['name'], li['attributes']['description']['short'], li['attributes']['assetUrl'], ' , '.join(duration))
 
-  if i != i_max:
-    item['content_html'] += '</ol></td></tr>'
-  item['content_html'] += '</table></center>'
+    elif api_data['type'] == 'playlists':
+      item['content_html'] += '<li><a href="{}">{}</a> <small>by {}</small></li>'.format(li['attributes']['url'], li['attributes']['name'], li['attributes']['artistName'])
+
+    elif api_data['type'] == 'albums':
+      item['content_html'] += '<li><a href="{}">{}</a></li>'.format(li['attributes']['url'], li['attributes']['name'])
+
+  if api_data['type'] == 'playlists' or api_data['type'] == 'albums':
+    item['content_html'] += '</ol>'
+  item['content_html'] += '</blockquote>'
   return item
 
 def get_content(url, args, save_debug=False):
-  if '/podcast/' in url:
-    m = re.search(r'\/id(\d+)', url)
-    if not m:
-      logger.warning('unable to parse Apple podcast id from ' + url)
-      return ''
-    api_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
-    return get_apple_playlist(api_url, args, save_debug)
-  elif '/playlist/' in url:
-    m = re.search(r'\/pl\.([0-9a-f]+)', url)
-    if not m:
-      logger.warning('unable to parse Apple playlist id from ' + url)
-      return ''
-    api_url = 'https://api.music.apple.com/v1/catalog/us/playlists?ids=pl.{}&include=curator'.format(m.group(1))
-    return get_apple_playlist(api_url, args, save_debug)
+  if '/podcast/' in url or '/playlist/' in url or '/album' in url:
+    return get_apple_playlist(url, args, save_debug)
   return None
 
 def get_feed(args, save_debug=False):
