@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
 
-import config
-import utils
+import config, utils
+from feedhandlers import rss
 
 import logging
 logger = logging.getLogger(__name__)
@@ -20,9 +20,12 @@ def get_content(url, args, save_debug=False):
   #imageproxy = 'https://bibliogram.snopyta.org/imageproxy?url='
 
   # Extract the post id
-  m = re.search(r'instagram\.com\/([^\/]+)\/([^\/]+)', url)
+  if args.get('bibliogram'):
+    m = re.search(r'{}\/([^\/]+)\/([^\/]+)'.format(args['bibliogram']), url)
+  else:
+    m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)\/([^\/]+)', url)
   if not m:
-    logger.warning('unable to parse instgram url ' + url)
+    logger.warning('unable to parse Instgram url ' + url)
     return None
 
   ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(1), m.group(2))
@@ -187,4 +190,19 @@ def get_content(url, args, save_debug=False):
   return item
 
 def get_feed(args, save_debug=False):
+  rssargs = args.copy()
+  m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)', args['url'])
+  if not m:
+    return None
+  username = m.group(1)
+
+  bibliograms = utils.get_url_json('https://bibliogram.art/api/instances')
+  for bibliogram in bibliograms['data']:
+    if bibliogram['rss_enabled'] == True:
+      logger.debug('trying to get Instagram rss feed from ' + bibliogram['address'])
+      rssargs['bibliogram'] = bibliogram['address']
+      rssargs['url'] = '{}/u/{}/rss.xml'.format(bibliogram['address'], username)
+      feed = rss.get_feed(rssargs, save_debug, get_content)
+      if feed:
+        return feed
   return None
