@@ -181,12 +181,12 @@ def get_content(url, args, save_debug=False):
   item['author'] = {}
   item['author']['name'] = username
 
-  item['content_html'] = '<blockquote style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div style="display:flex; align-items:center;"><img src="{0}"/><span>&nbsp;<a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/>'.format(avatar, username)
+  item['content_html'] = '<blockquote style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;">'.format(avatar, username)
 
   if post_media:
     item['content_html'] += post_media
 
-  item['content_html'] += '<p>{}</p></blockquote>'.format(post_caption)
+  item['content_html'] += '</div><p>{}</p></blockquote>'.format(post_caption)
   return item
 
 def get_feed(args, save_debug=False):

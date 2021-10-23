@@ -153,10 +153,10 @@ def get_apple_playlist(url, args, save_debug=False):
 
   poster = api_data['attributes']['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small>'.format(api_data['attributes']['url'], api_data['attributes']['name'], byline)
-  item['content_html'] = '<blockquote><div style="display:flex; align-items:center;"><a href="{}"><img style="margin-right:8px;" src="{}"/></a><span>{}</a></span></div>'.format(api_data['attributes']['url'], poster, desc)
-  item['content_html'] += '<h4 style="margin-top:0; margin-bottom:0.5em;">{}:</h4>'.format(list_title)
+  item['content_html'] = '<blockquote><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</a></div>'.format(api_data['attributes']['url'], poster, desc)
+  item['content_html'] += '<h4 style="clear:left; margin-top:0; margin-bottom:0.5em;">{}:</h4>'.format(list_title)
   if api_data['type'] == 'playlists' or api_data['type'] == 'albums':
-    item['content_html'] += '<ol>'
+    item['content_html'] += '<ol style="margin-top:0;">'
 
   if 'max' in args:
     i_max = int(args['max'])
