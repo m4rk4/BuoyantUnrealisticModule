@@ -121,7 +121,7 @@ def get_content(url, args, save_debug=False):
   if '/videos/' in url:
     return get_video_content(url, args, save_debug)
 
-  article_html = utils.get_url_html(url)
+  article_html = utils.get_url_html(url, user_agent='googlebot')
   if save_debug:
     utils.write_file(article_html, './debug/debug.html')
 
