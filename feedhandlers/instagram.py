@@ -190,6 +190,7 @@ def get_content(url, args, save_debug=False):
   return item
 
 def get_feed(args, save_debug=False):
+  # For tags there is a json feed at https://www.instagram.com/explore/tags/trending/?__a=1 but it seems to be ip restricted
   rssargs = args.copy()
   m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)', args['url'])
   if not m:
