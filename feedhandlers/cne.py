@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
-from feedhandlers import apple, bandcamp, rss, soundcloud, spotify, wp_posts
-import utils
+import config, utils
+from feedhandlers import rss, wp_posts
 
 import logging
 logger = logging.getLogger(__name__)
@@ -167,19 +167,22 @@ def get_content(url, args, save_debug=False):
 
       elif body_json[1]['type'] == 'product':
         if not 'subscribe.wired.com' in body_json[1]['props']['offerUrl']:
-          h = 2
           offer_html = ''
           if body_json[1]['props'].get('multipleOffers'):
             for offer in body_json[1]['props']['multipleOffers']:
-              offer_html += '<li><a href="{}">{} &ndash; {}</a></li>'.format(offer['offerUrl'], offer['sellerName'], offer['price'])
-              h = h + 2
+              if offer_html:
+                offer_html += '<br/>'
+              offer_html += '&bull;&nbsp;<a href="{}">{}'.format(offer['offerUrl'], offer['sellerName'])
+              if offer.get('price'):
+                offer_html += ' &ndash; {}'.format(offer['price'])
+              offer_html += '</a>'
           else:
-            offer_html += '<li><a href="{}">{}</a></li>'.format(offer['offerUrl'], offer['offerRetailer'])
-            h += 2
+            offer_html += '&bull;&nbsp;<a href="{}">{}</a>'.format(offer['offerUrl'], offer['offerRetailer'])
           if body_json[1]['props'].get('image'):
-            body_html += '<table><tr><td style="padding:10px;"><img style="height:{}em;" src={} /></td><td><b>{}</b><ul>{}</ul></td></tr></table>'.format(h, body_json[1]['props']['image']['sources']['sm']['url'], body_json[1]['props']['dangerousHed'], offer_html)
+            poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(body_json[1]['props']['image']['sources']['sm']['url']))
+            body_html += '<blockquote><img style="float:left; margin-right:8px;" src="{}"/></a><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><div>{}</div><div style="clear:left;"></div></blockquote>'.format(poster, body_json[1]['props']['dangerousHed'], offer_html)
           else:
-            body_html += '<p><b>{}</b></p><ul>{}</ul>'.format(body_json[1]['props']['dangerousHed'], offer_html)
+            body_html += '<h4 style="clear:left; margin-top:0; margin-bottom:0.5em;">{}</h4>{}'.format(body_json[1]['props']['dangerousHed'], offer_html)
 
       elif body_json[1]['type'] == 'callout:align-center':
         body_html += '<div style="text-align: center">'
