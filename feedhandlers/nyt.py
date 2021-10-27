@@ -1,9 +1,10 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import urlsplit
 
-from feedhandlers import rss
 import utils
+from feedhandlers import rss
 
 import logging
 logger = logging.getLogger(__name__)
@@ -102,8 +103,6 @@ def get_content_from_html(article_html, url, args, save_debug):
   return item
 
 def get_content(url, args, save_debug=False):
-  item = {}
-  content_html = ''
   has_audiotranscript = None
 
   article_html = utils.get_url_html(url)
@@ -323,15 +322,10 @@ def get_content(url, args, save_debug=False):
             block_html = ''
 
     elif block['__typename'] == 'YouTubeEmbedBlock':
-      block_html += utils.add_video('https://www.youtube.com/embed/' + block['youTubeId'], 'youtube')
+      block_html += utils.add_embed('https://www.youtube.com/embed/' + block['youTubeId'])
 
     elif block['__typename'] == 'TwitterEmbedBlock':
-      tweet = utils.add_twitter(block['twitterUrl'])
-      if tweet:
-        block_html += tweet
-      else:
-        logger.warning('unable to add tweet {} in {}'.format(block['html'], url))
-        block_html += block['html']
+      block_html += utils.add_embed(block['twitterUrl'])
 
     elif block['__typename'] == 'AudioBlock':
       block_html += format_block(block['media']['id'])
@@ -383,10 +377,10 @@ def get_content(url, args, save_debug=False):
       block_html += '</small></p>'
 
     elif block['__typename'] == 'SummaryBlock':
-      block_html += '<p>'
+      block_html += '<p><em>'
       for content in block['content']:
         block_html += format_block(content['id'])
-      block_html += '</p><hr />'
+      block_html += '</em></p>'
 
     elif block['__typename'] == 'BylineBlock':
       authors= ''
@@ -397,17 +391,27 @@ def get_content(url, args, save_debug=False):
       block_html += '<h4>{}</h4>'.format(re.sub(r'(,)([^,]+)$', r' and\2', authors))
 
     elif block['__typename'] == 'Byline':
-      authors = ''
+      authors = []
       for creator in block['creators']:
-        if authors:
-          authors += ', '
-        authors += format_block(creator['id'])
+        author = format_block(creator['id'])
+        if author:
+          authors.append(author)
       if block.get('prefix'):
-        block_html += block['prefix'] + ' '
-      block_html += re.sub(r'(,)([^,]+)$', r' and\2', authors)
+        byline = block['prefix'] + ' '
+      else:
+        byline = ''
+      if authors:
+        byline += re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+      else:
+        if block.get('renderedRepresentation'):
+          byline += re.sub(r'^By ', '', block['renderedRepresentation'])
+      block_html += byline
 
     elif block['__typename'] == 'Person':
-      block_html += block['displayName']
+      if block.get('displayName'):
+        block_html += block['displayName']
+      else:
+        block_html += ''
 
     elif block['__typename'] == 'TimestampBlock':
       dt = datetime.fromisoformat(block['timestamp'].replace('Z', '+00:00'))
@@ -418,48 +422,67 @@ def get_content(url, args, save_debug=False):
 
     return block_html
 
+  split_url = urlsplit(url)
+  article_id = ''
   if 'ROOT_QUERY' in initial_state:
-    for root_key, root_val in initial_state['ROOT_QUERY'].items():
-      article_id = root_val['id']
-      item['id'] = article_id
-      item['url'] = url
-      item['title'] = format_block(initial_state[article_id]['headline']['id'])
-      dt = datetime.fromisoformat(initial_state[article_id]['firstPublished'].replace('Z', '+00:00'))
-      item['date_published'] = dt.isoformat()
-      item['_timestamp'] = dt.timestamp()
-      item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-      dt = datetime.fromisoformat(initial_state[article_id]['lastModified'].replace('Z', '+00:00'))
-      item['date_modified'] = dt.isoformat()
-      authors = []
-      for byline in initial_state[article_id]['bylines']:
-        authors.append(format_block(byline['id']))
-      if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-      tags = []
-      for tag in initial_state[article_id]['timesTags@filterEmpty']:
-        tags.append(initial_state[tag['id']]['displayName'])
-      if len(tags) > 0:
-        item['tags'] = tags
-      image = ''
-      media = initial_state[article_id].get('promotionalMedia')
-      if media:
-        if media['typename'] == 'Image':
-          image_html = format_block(media['id'])
-          m = re.search(r'src="([^"]+)"', image_html)
-          image = m.group(1)
-        if image:
-          item['_image'] = image
-      item['summary'] = initial_state[article_id]['summary']
+    for key, val in initial_state['ROOT_QUERY'].items():
+      if split_url.path in key:
+        article_id = val['id']
 
-      body_id = initial_state[article_id]['sprinkledBody']['id']
-      for block in initial_state[body_id]['content@filterEmpty']:
-        content_html += format_block(block['id'])
+  if not article_id:
+    logger.warning('unable to determine article id  in ' + url)
+    return None
 
-      if has_audiotranscript:
-        content_html += '<hr />' + format_block(has_audiotranscript)
-      
-      item['content_html'] = content_html
+  item = {}
+  item['id'] = article_id
+  item['url'] = url
+  item['title'] = format_block(initial_state[article_id]['headline']['id'])
+  dt = datetime.fromisoformat(initial_state[article_id]['firstPublished'].replace('Z', '+00:00'))
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  dt = datetime.fromisoformat(initial_state[article_id]['lastModified'].replace('Z', '+00:00'))
+  item['date_modified'] = dt.isoformat()
+  authors = []
+  for byline in initial_state[article_id]['bylines']:
+    author = format_block(byline['id'])
+    if author:
+      authors.append(author)
+  if authors:
+    item['author'] = {}
+    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+  tags = []
+  for tag in initial_state[article_id]['timesTags@filterEmpty']:
+    tags.append(initial_state[tag['id']]['displayName'])
+  if len(tags) > 0:
+    item['tags'] = tags
+  image = ''
+  media = initial_state[article_id].get('promotionalMedia')
+  if media:
+    if media['typename'] == 'Image':
+      image_html = format_block(media['id'])
+      m = re.search(r'src="([^"]+)"', image_html)
+      image = m.group(1)
+    if image:
+      item['_image'] = image
+  item['summary'] = initial_state[article_id]['summary']
+
+  content_html = ''
+  if initial_state[article_id]['__typename'] == 'Video':
+    content_html += format_block(article_id)
+
+  if initial_state[article_id].get('sprinkledBody'):
+    body_id = initial_state[article_id]['sprinkledBody']['id']
+    for block in initial_state[body_id]['content@filterEmpty']:
+      content_html += format_block(block['id'])
+
+  if initial_state[article_id].get('transcript'):
+    content_html += '<h4>Transcript:</h4><p>{}</p>'.format(initial_state[article_id]['transcript'])
+
+  if has_audiotranscript:
+    content_html += '<hr />' + format_block(has_audiotranscript)
+
+  item['content_html'] = content_html
   return item
 
 def get_feed(args, save_debug=False):
