@@ -2,7 +2,7 @@ import html, json, operator, re, requests
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlsplit
 
-from feedhandlers import rss, twitter
+from feedhandlers import rss
 import utils
 
 import logging
