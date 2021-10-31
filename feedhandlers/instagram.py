@@ -198,12 +198,16 @@ def get_feed(args, save_debug=False):
   username = m.group(1)
 
   bibliograms = utils.get_url_json('https://bibliogram.art/api/instances')
-  for bibliogram in bibliograms['data']:
-    if bibliogram['rss_enabled'] == True:
-      logger.debug('trying to get Instagram rss feed from ' + bibliogram['address'])
-      rssargs['bibliogram'] = bibliogram['address']
-      rssargs['url'] = '{}/u/{}/rss.xml'.format(bibliogram['address'], username)
-      feed = rss.get_feed(rssargs, save_debug, get_content)
-      if feed:
-        return feed
+  if bibliograms:
+    for bibliogram in bibliograms['data']:
+      if bibliogram['rss_enabled'] == True:
+        logger.debug('trying to get Instagram rss feed from ' + bibliogram['address'])
+        rssargs['bibliogram'] = bibliogram['address']
+        rssargs['url'] = '{}/u/{}/rss.xml'.format(bibliogram['address'], username)
+  else:
+    rssargs['url'] = 'https://bibliogram.snopyta.org/u/{}/rss.xml'.format(username)
+
+  feed = rss.get_feed(rssargs, save_debug, get_content)
+  if feed:
+    return feed
   return None
