@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 graphql_json = None
 
-def medium_image_src(image_id, width=800):
+def medium_image_src(image_id, width=1000):
   return 'https://miro.medium.com/max/{}/{}'.format(width, image_id)
 
 def get_graphql(url, save_debug=False):
