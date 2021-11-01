@@ -14,6 +14,9 @@ handlers = {
   "bandcamp": {
     "module": "bandcamp"
   },
+  "barrons": {
+    "module": "wsj"
+  },
   "billboard": {
     "module": "billboard"
   },
