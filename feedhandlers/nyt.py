@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import urlsplit
 
 import utils
-from feedhandlers import rss
+from feedhandlers import rss, wirecutter
 
 import logging
 logger = logging.getLogger(__name__)
@@ -103,21 +103,19 @@ def get_content_from_html(article_html, url, args, save_debug):
   return item
 
 def get_content(url, args, save_debug=False):
-  has_audiotranscript = None
+  if '/wirecutter/' in url:
+    return wirecutter.get_content(url, args, save_debug)
 
   article_html = utils.get_url_html(url)
   if not article_html:
-    logger.warning('Error loading ' + url)
-    return ''
-
+    return None
   if save_debug:
     utils.write_file(article_html, './debug/debug.html')
 
   m = re.search(r'<script>window\.__preloadedData = (.+);<\/script>', article_html)
   if not m:
     logger.warning('No preloadData found in ' + url)
-    return ''
-
+    return None
   try:
     json_data = json.loads(m.group(1))
   except:
@@ -129,6 +127,7 @@ def get_content(url, args, save_debug=False):
     utils.write_file(json_data, './debug/debug.json')
 
   initial_state = json_data['initialState']
+  has_audiotranscript = None
 
   def format_text(block_id):
     nonlocal url
