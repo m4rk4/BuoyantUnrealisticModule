@@ -281,8 +281,8 @@ def get_content(url, args, save_debug=False):
     if el.name == 'figure':
       img_src, caption = get_image(el)
       new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
-    elif el.name == 'aside' and el.button:
-      if el.button.has_attr('data-c-vpdata'):
+    elif el.name == 'aside':
+      if el.button and el.button.has_attr('data-c-vpdata'):
         video_json = json.loads(el.button['data-c-vpdata'])
         if video_json:
           video_url = video_json['url']
@@ -291,6 +291,8 @@ def get_content(url, args, save_debug=False):
           video = get_video_content(video_url, {}, save_debug)
           if video:
             new_el = BeautifulSoup(utils.add_video(video['_video'], 'video/mp4', video['_image'], video['summary']), 'html.parser')
+      elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
+        new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
     if new_el:
       article.insert(0, new_el)
       el.decompose()
