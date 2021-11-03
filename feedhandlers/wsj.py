@@ -217,6 +217,12 @@ def get_content(url, args, save_debug=False):
       content_html += convert_amp_image(lead)
 
   article_body = soup.find(class_="articleBody")
+  if not article_body:
+    article_body = soup.find(class_="article__body")
+    if not article_body:
+      logger.warning('unable to find article body in ' + clean_url)
+      return item
+
   article = article_body.find('section', attrs={"subscriptions-section": "content"})
   if not article:
     article = article_body.find(attrs={"amp-access": "access", "class": False})
