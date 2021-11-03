@@ -316,16 +316,7 @@ def get_content(url, args, save_debug=False):
         body_html += utils.add_embed('https://www.instagram.com/p/' + it['id'])
 
       elif it['type'] == 'Iframe':
-        if 'youtube.com' in it['source']:
-          body_html += utils.add_video(it['source'], 'youtube')
-        else:
-          width = str(it['width']['value'])
-          if it['width']['unit'] == 'Percent':
-            width += '%'
-          height = str(it['height']['value'])
-          if it['height']['unit'] == 'Percent':
-            height += '%'
-          body_html += '<iframe width="{}" height="{}" style="border:none;" src="{}"></iframe>'.format(width, height, it['source'])
+        body_html += utils.add_embed(it['source'])
 
       elif it['type'] == 'ReplyInset':
         m = re.search(r'\/(\d+)$', it['url'])
