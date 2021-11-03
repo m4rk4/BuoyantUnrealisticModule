@@ -1,7 +1,4 @@
 import json, re
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from html import unescape
 from urllib.parse import urlsplit
 
 from feedhandlers import rss, wp_posts
