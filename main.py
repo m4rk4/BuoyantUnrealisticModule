@@ -342,6 +342,23 @@ def image():
         mimetype = 'image/png'
         save = True
 
+    elif arg == 'border':
+      b = int(val)
+      color = (0,0,0,0)
+      if 'color' in args:
+        if args.get('color'):
+          color = tuple(map(int, args['color'][1:-1].split(',')))
+      if len(color) < 3 or len(color) > 4:
+        color = (0,0,0,0)
+      if len(color) == 4:
+        new_im = Image.new("RGBA", (w + 2*b, h + 2*b), color)
+      else:
+        new_im = Image.new("RGB", (w + 2*b, h + 2*b), color)
+      new_im.paste(im, (b, b))
+      im = new_im
+      mimetype = 'image/png'
+      save = True
+
   if save:
     im_io = BytesIO()
     if mimetype == 'image/png':
