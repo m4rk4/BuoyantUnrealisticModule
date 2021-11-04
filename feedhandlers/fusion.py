@@ -71,7 +71,12 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     element_html += '<h{0}>{1}</h{0}>'.format(element['level'], element['content'])
 
   elif element['type'] == 'oembed_response':
-    element_html += utils.add_embed(element['raw_oembed']['_id'])
+    if element['raw_oembed'].get('_id'):
+      element_html += utils.add_embed(element['raw_oembed']['_id'])
+    elif element['raw_oembed'].get('url'):
+      element_html += utils.add_embed(element['raw_oembed']['url'])
+    else:
+      logger.warning('unknown raw_oembed url for in ' + url)
 
   elif element['type'] == 'list':
     if element['list_type'] == 'unordered':
