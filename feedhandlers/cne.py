@@ -180,7 +180,7 @@ def get_content(url, args, save_debug=False):
             offer_html += '&bull;&nbsp;<a href="{}">{}</a>'.format(offer['offerUrl'], offer['offerRetailer'])
           if body_json[1]['props'].get('image'):
             poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(body_json[1]['props']['image']['sources']['sm']['url']))
-            body_html += '<blockquote><img style="float:left; margin-right:8px;" src="{}"/></a><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><div>{}</div><div style="clear:left;"></div></blockquote>'.format(poster, body_json[1]['props']['dangerousHed'], offer_html)
+            body_html += '<div><img style="float:left; margin-right:8px; height:128px;" src="{}"/><div style="overflow:auto; display:block;"><b>{}</b><br/>{}</div><div style="clear:left;"></div>'.format(poster, body_json[1]['props']['dangerousHed'], offer_html)
           else:
             body_html += '<h4 style="clear:left; margin-top:0; margin-bottom:0.5em;">{}</h4>{}'.format(body_json[1]['props']['dangerousHed'], offer_html)
 
