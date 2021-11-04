@@ -39,7 +39,10 @@ def get_content(url, args, save_debug=False):
   item = {}
   item['id'] = post_json['guid']
   item['url'] = url
-  item['title'] = post_json['metaTitle']
+  if post_json.get('metaTitle'):
+    item['title'] = post_json['metaTitle']
+  else:
+    item['title'] = post_json['title']
 
   dt = datetime.fromisoformat(post_json['modifiedDateISO']).astimezone(timezone.utc)
   item['date_published'] = dt.isoformat()
@@ -192,5 +195,19 @@ def get_content(url, args, save_debug=False):
       item['content_html'] += '<hr/><h3>{}</h3>'.format(chapter['title'])
       for section in chapter['body']:
         item['content_html'] += format_section(section)
+
+  if post_json.get('listSections'):
+    for list in post_json['listSections']:
+      if list.get('title'):
+        item['content_html'] += '<h3><u>{}</u></h3>'.format(list['title'])
+      for product_item in list['productItems']:
+        if product_item.get('title'):
+          item['content_html'] += '<h3>{}</h3>'.format(product_item['title'])
+        if product_item.get('body'):
+          body = json.loads(product_item['body'])
+          for section in body:
+            item['content_html'] += format_section(section)
+        for product in product_item['products']:
+          item['content_html'] += '<div><img style="float:left; margin-right:8px; width:128px;" src="{}"/><div style="overflow:auto; display:block;"><b>{}</b><br/><a href="https://www.nytimes.com/wirecutter{}">{}</a><br/><small>&bull;&nbsp;<a href="{}">${:0.2f} at {}</a></small></div><div style="clear:left;"></div><br/>'.format(product['relatedProductData']['productImageUrl'], product['relatedProductData']['productName'], product['relatedPostLink'], product['title'], product['relatedProductData']['sources'][0]['affiliateLink'], int(product['relatedProductData']['sources'][0]['sourcePrice'])/100, product['relatedProductData']['sources'][0]['merchantName'])
 
   return item
