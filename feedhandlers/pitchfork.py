@@ -100,12 +100,16 @@ def get_review_content(url, args, save_debug=False):
     item['author'] = {}
     item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
+  item['tags'] = []
   if result_json.get('tags'):
-    item['tags'] = result_json['tags'].copy()
+    for tag in result_json['tags']:
+      if isinstance(tag, dict):
+        item['tags'].append(tag['name'])
+      else:
+        item['tags'].append(tag)
   if result_json.get('genres'):
-    if item.get('tags'):
-      for genre in result_json['genres']:
-        item['tags'].append(genre['display_name'])
+    for tag in result_json['genres']:
+      item['tags'].append(tag['display_name'])
 
   if result_json['photos'].get('lede'):
     item['_image'] = result_json['photos']['lede']['sizes']['standard']
@@ -150,12 +154,14 @@ def get_review_content(url, args, save_debug=False):
   content_html += '<center><h3 style="margin:0;">{}</h3><h2 style="margin:0;"><i>{}</i></h2>'.format(artist_name, title)
   if rating:
     content_html += '<h1 style="margin:0;">{}</h1>'.format(rating)
-  content_html += '</center><p>{}</p><hr width="80%" />'.format(result_json['dek'])
+  content_html += '</center><p><i>{}</i></p>'.format(result_json['dek'])
 
   if result_json.get('audio_files'):
     for audio in result_json['audio_files']:
       audio_embed = utils.add_embed(audio['embedUrl'], save_debug)
-      content_html += audio_embed + '<hr width="80%" />'
+      content_html += audio_embed
+  else:
+    content_html += '<hr width="80%" />'
 
   soup = BeautifulSoup(result_json['body']['en'], 'html.parser')
   for el in soup.find_all('figure', class_='contents__embed'):
