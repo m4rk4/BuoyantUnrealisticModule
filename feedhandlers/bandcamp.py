@@ -1,118 +1,131 @@
-import json, re
+import json
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, unquote_plus
 
-import config
-import utils
+import config, utils
 
 import logging
 logger = logging.getLogger(__name__)
 
 def get_content(url, args, save_debug=False):
-  item = None
-  bc_html = utils.get_url_html(url)
-  if bc_html:
+  if '/EmbeddedPlayer/' in url:
+    embed_url = url
+  else:
+    bc_html = utils.get_url_html(url)
+    if not bc_html:
+      return None
     soup = BeautifulSoup(bc_html, 'html.parser')
-    if 'EmbeddedPlayer' in url:
-      el = soup.find('script', attrs={"data-player-data": True})
-      if el:
-        audio_json = json.loads(unquote_plus(el['data-player-data']))
-        if save_debug:
-          utils.write_file(audio_json, './debug/debug.json')
-        # Render just the track
-        m = re.search(r'track=(\d+)', url)
-        if m:
-          for track in audio_json['tracks']:
-            if track['id'] == int(m.group(1)):
-              return get_content(track['title_link'], args, save_debug)
-      # Fallback
-      el = soup.find('input', id='shareurl')
-      if el:
-        return get_content(el['value'], args, save_debug)
+    el = soup.find('meta', attrs={"property":"og:video"})
+    if not el:
+      logger.warning('unable to find the EmbeddedPlayer url in ' + url)
+      return None
+    embed_url = el['content']
 
-    elif '/track/' in url or '/album/' in url:
-      ld_json = soup.find('script', attrs={"type": "application/ld+json"})
-      if ld_json:
-        audio_json = json.loads(str(ld_json.contents[0]))
-        if save_debug:
-          utils.write_file(audio_json, './debug/debug.json')
+  bc_html = utils.get_url_html(embed_url)
+  if not bc_html:
+    return None
 
-        item = {}
-        item['id'] = audio_json['@id']
-        item['url'] = url
-        item['title'] = '{} — {}'.format(audio_json['name'], audio_json['byArtist']['name'])
-        
-        # 09 Jul 2021 00:00:00 GMT
-        dt = datetime.strptime(audio_json['datePublished'], '%d %b %Y %H:%M:%S %Z').replace(tzinfo=timezone.utc)
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-        dt = datetime.strptime(audio_json['dateModified'], '%d %b %Y %H:%M:%S %Z').replace(tzinfo=timezone.utc)
-        item['date_modified'] = dt.isoformat()
+  soup = BeautifulSoup(bc_html, 'html.parser')
+  el = soup.find('script', attrs={"data-player-data": True})
+  if not el:
+    logger.warning('unable to find data-player-data in ' + embed_url)
+    return None
 
-        item['author'] = {}
-        item['author']['name'] = audio_json['byArtist']['name']
-        item['tags'] = audio_json['keywords'].copy()
-        item['_image'] = audio_json['image']
-        poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(audio_json['image']))
+  bc_json = json.loads(unquote_plus(el['data-player-data']))
+  if save_debug:
+    utils.write_file(bc_json, './debug/bandcamp.json')
 
-        if audio_json.get('description'):
-          item['summary'] = audio_json['description']
-        elif audio_json['publisher'].get('description'):
-          item['summary'] = audio_json['publisher']['description']
+  item = {}
+  if '/track=' in embed_url:
+    if bc_json.get('album_id'):
+      album_item = get_content('https://bandcamp.com/EmbeddedPlayer/v=2/album={}/size=large/tracklist=false/artwork=small/'.format(bc_json['album_id']), args, save_debug)
+    else:
+      album_item = None
 
-        if audio_json['@type'] == 'MusicRecording':
-          if audio_json.get('additionalProperty'):
-            for prop in audio_json['additionalProperty']:
-              if 'mp3' in prop['name']:
-                item['_audio'] = prop['value']
-                break
-          audio_src = '{}/audio?url={}'.format(config.server, quote_plus(audio_json['@id']))
-          desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>'.format(audio_json['@id'], audio_json['name'])
-          if audio_json.get('inAlbum') and audio_json['inAlbum'].get('@id'):
-            desc += 'from <a href="{}">{}</a><br/>'.format(audio_json['inAlbum']['@id'], audio_json['inAlbum']['name'])
-          if audio_json.get('byArtist'):
-            if audio_json['byArtist'].get('@id'):
-              desc += 'by <a href="{}">{}</a>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
-            elif audio_json.get('publisher') and audio_json['publisher'].get('@id'):
-              desc += 'by <a href="{}">{}</a>'.format(audio_json['publisher']['@id'], audio_json['byArtist']['name'])
+    track = bc_json['tracks'][0]
+    item['id'] = track['id']
+    item['url'] = track['title_link']
+    item['title'] = track['title']
+    item['author'] = {}
+    item['author']['name'] = track['artist']
+
+    if track.get('file'):
+      for key, val in track['file'].items():
+        if 'mp3' in key:
+          item['_audio'] = val
+          break
+
+    if track.get('art'):
+      item['_image'] = track['art']
+    else:
+      item['_image'] = bc_json['album_art']
+
+    if item.get('_audio'):
+      if 'embed' in args:
+        audio_src = '{}/audio?url={}'.format(config.server, quote_plus(item['url']))
+      else:
+        audio_src = item['_audio']
+      poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
+    else:
+      audio_src = item['url']
+      poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(item['_image']))
+
+    desc = '<b><a href="{}">{}</a></b><br/>'.format(item['url'], item['title'])
+    if track['artist'] == bc_json['artist']:
+      desc += 'by <a href="{}">{}</a><br/>'.format(bc_json['band_url'], track['artist'])
+    else:
+      desc += 'by {}<br/>'.format(track['artist'])
+    if album_item:
+      desc += 'from <a href="{}">{}</a>'.format(album_item['url'], album_item['title'])
+    else:
+      desc += 'from {}'.format(bc_json['album_title'])
+
+    item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px; height:128px;" src="{}"/></a><div style="overflow:auto; display:block;">{}</div><div style="clear:left;"></div></div>'.format(audio_src, poster, desc)
+
+  elif '/album=' in embed_url:
+    item['id'] = bc_json['album_id']
+    item['url'] = bc_json['linkback']
+    item['title'] = bc_json['album_title']
+
+    item['author'] = {}
+    for track in bc_json['tracks']:
+      if track['artist'] != bc_json['artist']:
+        item['author']['name'] = 'Various Artists'
+        break
+    if not item['author'].get('name'):
+      item['author']['name'] = bc_json['artist']
+
+    item['_image'] = bc_json['album_art']
+    poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(item['_image']))
+    audio_src = bc_json['linkback']
+
+    desc = '<b><a href="{}">{}</a></b><br/>'.format(item['url'], item['title'])
+    desc += 'by <a href="{}">{}</a>'.format(bc_json['band_url'], item['author']['name'])
+
+    item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px; height:128px;" src="{}"/></a><div style="overflow:auto; display:block;">{}</div><div style="clear:left;"></div><b>Tracks:</b><ol>'.format(audio_src, poster, desc)
+
+    for track in bc_json['tracks']:
+      item['content_html'] += '<li><a href="{}">{}</a>'.format(track['title_link'], track['title'])
+      if track['artist'] != item['author']['name']:
+        item['content_html'] += ' by {}'.format(track['artist'])
+      if track.get('file'):
+        for key, val in track['file'].items():
+          if 'mp3' in key:
+            if 'embed' in args:
+              audio_src = '{}/audio?url={}'.format(config.server, quote_plus(item['url']))
             else:
-              desc += 'by {}'.format(audio_json['byArtist']['name'])
-          desc += '</small>'
-          item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(audio_src, poster, desc)
+              audio_src = val
+            item['content_html'] += ' <a href="{}">(&#9658;&nbsp;Play)</a>'.format(audio_src)
+            break
+      item['content_html'] += '</li>'
 
-        elif audio_json['@type'] == 'MusicAlbum':
-          poster = '{}/image?url={}&height=128'.format(config.server, audio_json['image'])
-          desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>'.format(audio_json['@id'], audio_json['name'])
-          if audio_json.get('byArtist'):
-            if audio_json['byArtist'].get('@id'):
-              desc += 'by <a href="{}">{}</a><br/>'.format(audio_json['byArtist']['@id'], audio_json['byArtist']['name'])
-            elif audio_json.get('publisher') and audio_json['publisher'].get('@id'):
-              desc += 'by <a href="{}">{}</a><br/>'.format(audio_json['publisher']['@id'], audio_json['byArtist']['name'])
-            else:
-              desc += 'by {}<br/>'.format(audio_json['byArtist']['name'])
-          dt = datetime.strptime(audio_json['datePublished'], '%d %b %Y %H:%M:%S %Z')
-          desc += 'released {}</small>'.format(dt.strftime('%b %d, %Y'))
-          item['content_html'] = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;">{}</td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(audio_json['@id'], poster, desc)
-          for track in audio_json['track']['itemListElement']:
-            audio_url = '{}/audio?url={}'.format(config.server, quote_plus(track['item']['@id']))
-            audio_src = ''
-            if track['item'].get('additionalProperty'):
-              for prop in track['item']['additionalProperty']:
-                if 'mp3' in prop['name']:
-                  audio_src = prop['value']
-                  break
-            item['content_html'] += '<li>'
-            if audio_src:
-              item['content_html'] += '<a style="text-decoration:none;" href="{}">&#9658;</a>&nbsp;'.format(audio_url)
-            item['content_html'] += '<a href="{}">{}</a>'.format(track['item']['@id'], track['item']['name'])
-            if track['item'].get('byArtist') and track['item']['byArtist']['name'] != audio_json['byArtist']['name']:
-              item['content_html'] += ' by {}'.format(track['item']['byArtist']['name'])
-            item['content_html'] += '</li>'
-          item['content_html'] += '</ol></td></tr></table></center>'
-          if args and 'embed' in args and item.get('summary'):
-            item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    item['content_html'] += '</ol></div>'
+
+  dt = datetime.strptime(bc_json['publish_date'], '%d %b %Y %H:%M:%S %Z').replace(tzinfo=timezone.utc)
+  item['date_published'] = dt.isoformat()
+  item['_timestamp'] = dt.timestamp()
+  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
   return item
 
