@@ -173,6 +173,9 @@ handlers = {
   "rollingstone": {
     "module": "wp_posts"
   },
+  "slate": {
+    "module": "clay"
+  },
   "stereogum": {
     "module": "wp_posts"
   },
