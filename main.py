@@ -246,6 +246,9 @@ def image():
   if not im:
     return 'Something went wrong :('
 
+  if im.mode == 'P':
+    im = im.convert('RGBA')
+
   w = im.width
   h = im.height
 
@@ -361,8 +364,10 @@ def image():
 
   if save:
     im_io = BytesIO()
-    if mimetype == 'image/png':
+    print(im.mode)
+    if im.mode in ['RGBA', 'P']:
       im.save(im_io, 'PNG')
+      mimetype = 'image/png'
     else:
       im.save(im_io, 'JPEG')
       mimetype = 'image/jpeg'

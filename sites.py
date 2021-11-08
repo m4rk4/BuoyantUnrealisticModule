@@ -86,6 +86,9 @@ handlers = {
   "gfycat": {
     "module": "gfycat"
   },
+  "giphy": {
+    "module": "giphy"
+  },
   "theguardian": {
     "module": "guardian"
   },
