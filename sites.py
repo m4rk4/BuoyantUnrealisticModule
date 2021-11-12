@@ -20,6 +20,9 @@ handlers = {
   "billboard": {
     "module": "billboard"
   },
+  "bloomberg": {
+    "module": "bloomberg"
+  },
   "carbuzz": {
     "module": "carbuzz"
   },
