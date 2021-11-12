@@ -49,13 +49,20 @@ def feed():
   url = args.get('url')
 
   module = utils.get_module(url, handler)
-  if module:
-    feed = module.get_feed(args, save_debug)
-    if not feed:
-      return 'No feed found'
-    feed['feed_url'] = request.url
-    return jsonify(feed)
-  return 'Something went wrong :(' 
+  if not module:
+    return 'feed handler not found'
+
+  feed = module.get_feed(args, save_debug)
+  if not feed:
+    return 'No feed found'
+
+  feed['feed_url'] = request.url
+
+  if 'read' in args:
+    # Template from https://www.w3schools.com/howto/howto_js_collapsible.asp
+    return render_template('feed.html', title=feed['title'], link=feed['home_page_url'], items=feed['items'])
+
+  return jsonify(feed)
 
 @app.route('/content', methods=['GET'])
 def content():
@@ -75,15 +82,14 @@ def content():
   url = args.get('url')
 
   module = utils.get_module(url, handler)
-  if module:
-    #if not re.search(r'espn\.com|vidible\.tv|vimeo\.com|youtube\.com', url):
-    #  url = utils.clean_url(url)
-    content = module.get_content(url, args, save_debug)
-    if 'json' in args:
-      return jsonify(content)
-    else:
-      return render_template('content.html', content=content)
-  return 'Something went wrong :(' 
+  if not module:
+    return 'content handler not found'
+
+  content = module.get_content(url, args, save_debug)
+  if 'read' in args:
+    return render_template('content.html', content=content)
+
+  return jsonify(content)
 
 @app.route('/audio', methods=['GET'])
 def audio():
@@ -185,20 +191,6 @@ def debug():
   with open('./debug/' + log_file, 'r') as f:
     log = f.read()
   return render_template('debug.html', title=log_file, content=log)
-
-@app.route('/instagram')
-def instagram():
-  args = request.args
-  if 'debug' in args:
-    save_debug = True
-  else:
-    save_debug = False
-
-  if 'url' in args:
-    content_html = utils.add_instagram(args['url'], save_debug)
-  else:
-    content_html = '<h2>Missing url</h2>'
-  return render_template('instagram.html', title=args['url'], content=content_html)
 
 @app.route('/image')
 def image():
