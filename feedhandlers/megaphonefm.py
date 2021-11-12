@@ -50,7 +50,7 @@ def get_content(url, args, save_debug=False):
   if t > 0:
     duration.append('{} min.'.format(t))
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}<br/>{}</small>'.format(item['url'], item['title'], item['author']['name'], ', '.join(duration))
-  item['content_html'] = '<blockquote><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><small>{}</small></div>'.format(item['_audio'], poster, desc, item['summary'])
+  item['content_html'] = '<blockquote><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><small>{}</small></blockquote>'.format(item['_audio'], poster, desc, item['summary'])
   return item
 
 def get_feed(args, save_debug=False):
