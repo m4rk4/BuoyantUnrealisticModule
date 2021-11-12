@@ -80,14 +80,18 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
     headers['user-agent'] = ua
 
   if use_proxy:
-    proxies = {"http": "http://69.167.174.17"}
+    proxies = config.proxies
   else:
     proxies = None
 
   r = None
   for i in range(2):
     try:
-      r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10)
+      if proxies:
+        verify = False
+      else:
+        verify = True
+      r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10, verify=verify)
       r.raise_for_status()
     except Exception as e:
       if r != None:
@@ -103,7 +107,7 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
       break
     else:
       # Try again using the proxy
-      proxies = {"http": "http://69.167.174.17"}
+      proxies = config.proxies
   return r
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
@@ -113,8 +117,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=F
       return r.json()
     except:
       logger.warning('error converting response to json from request {}'.format(url))
-      if False:
-        write_file(r.text, './debug/debug.txt')
+      write_file(r.text, './debug/json.txt')
   return None
 
 def get_url_html(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
