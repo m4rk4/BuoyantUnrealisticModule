@@ -2,6 +2,9 @@ handlers = {
   "abcnews": {
     "module": "abcnews"
   },
+  "acast": {
+    "module": "acast"
+  },
   "apnews": {
     "module": "apnews"
   },
