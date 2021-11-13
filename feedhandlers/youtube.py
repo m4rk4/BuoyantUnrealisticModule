@@ -146,11 +146,15 @@ def get_content(url, args, save_debug=False):
         item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
       elif item.get('_video'):
         item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'], caption)
+
   else:
-    overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
-    if overlay.startswith('//'):
-      overlay = 'https:' + overlay
-    poster = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(item['_image']), quote_plus(overlay))
+    if yt_json['playabilityStatus'].get('errorScreen'):
+      overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
+      if overlay.startswith('//'):
+        overlay = 'https:' + overlay
+      poster = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(item['_image']), quote_plus(overlay))
+    else:
+      poster = '{}/image?url={}'.format(config.server, quote_plus(item['_image']))
     caption = '{} | {} | <a href="{}">Watch on YouTube</a>'.format(yt_json['playabilityStatus']['reason'], item['title'], yt_embed_url)
     if yt_list_id:
       caption += ' | <a href="{}&list={}">View playlist</a>'.format(yt_watch_url, yt_list_id)
