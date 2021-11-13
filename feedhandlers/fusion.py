@@ -1,9 +1,9 @@
 import pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote_plus
 
-import utils
+import config, utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -33,24 +33,19 @@ def process_content_element(element, url, func_resize_image, gallery=None):
   elif element['type'] == 'raw_html':
     # Filter out ad content
     if not re.search(r'amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|nflshop\.com', element['content'], flags=re.I):
-      if 'omny.fm' in element['content']:
-        m = re.search(r'omny\.fm/shows/([^\/]+)\/([^\/]+)', element['content'])
-        if m:
-          audio_json = utils.get_url_json('https://omny.fm/api/embed/shows/{}/clip/{}'.format(m.group(1), m.group(2)))
-          if audio_json:
-            element_html += '<table><tr><td><img width="140px" src="{}" /></td><td><div><b>{}</b><br />{}</div><audio controls><source src="{}" type="audio/mpeg">Your browser does not support the audio element.</audio><br /><a href="{}"><small>Open audio</small></a></td></tr></table>'.format(audio_json['Images']['Medium'], audio_json['Program']['Name'], audio_json['Title'], audio_json['AudioUrl'], audio_json['AudioUrl'])
-      elif 'embed.acast.com' in element['content']:
-        m = re.search(r'embed\.acast\.com\/([^\/]+)\/([^\/"]+)', element['content'])
-        if m:
-          audio_json = utils.get_url_json('https://feeder.acast.com/api/v1/shows/{}/episodes/{}?showInfo=true'.format(m.group(1), m.group(2)))
-          if audio_json:
-            element_html += '<table><tr><td><img width="140px" src="{}" /></td><td><div><b>{}</b><br />{}</div><audio controls><source src="{}" type="audio/mpeg">Your browser does not support the audio element.</audio><br /><a href="{}"><small>Open audio</small></a></td></tr></table>'.format(audio_json['show']['image'], audio_json['show']['title'], audio_json['title'], audio_json['url'], audio_json['url'])
-      elif 'pinecast.com' in element['content']:
-        m = re.search(r'\/player\/([^\?\"]+)', element['content'])
-        if m:
-          element_html += '<audio controls><source src="https://pinecast.com/listen/{0}.mp3" type="audio/mpeg">Your browser does not support the audio element.</audio><br /><a href="https://pinecast.com/listen/{0}.mp3"><small>Open audio</small></a>'.format(m.group(1))
+      raw_soup = BeautifulSoup(element['content'], 'html.parser')
+      if raw_soup.iframe and raw_soup.iframe.get('src'):
+        element_html += utils.add_embed(raw_soup.iframe['src'])
       else:
-        element_html += element['content']
+        logger.warning('unhandled raw_html in ' + url)
+
+  elif element['type'] == 'custom_embed':
+    if element['subtype'] == 'custom-audio':
+      episode = element['embed']['config']['episode']
+      poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
+      element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(episode['audio'], poster, episode['title'], episode['summary'])
+    else:
+      logger.warning('unhandled custome_embed in ' + url)
 
   elif element['type'] == 'divider':
     element_html += '<hr />'
