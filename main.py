@@ -356,7 +356,6 @@ def image():
 
   if save:
     im_io = BytesIO()
-    print(im.mode)
     if im.mode in ['RGBA', 'P']:
       im.save(im_io, 'PNG')
       mimetype = 'image/png'
