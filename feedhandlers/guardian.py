@@ -231,17 +231,24 @@ def get_content(url, args, save_debug=False):
         logger.warning('unable to add tweet {} in {}'.format(el['data-canonical-url'], url))
 
     for el in article_body.find_all('figure', class_='element-embed'):
-      it = el.find('iframe')
-      if it:
-        if 'email-sub__iframe' in it['class']:
+      if el.iframe:
+        if 'email-sub__iframe' in el.iframe['class']:
           el.decompose()
         else:
-          if it.get('srcdoc'):
-            m = re.search(r'data-instgrm-permalink="(https:\/\/www\.instagram\.com\/p\/[^\/]+\/)', it['srcdoc'])
-            if m:
-              new_el = BeautifulSoup(utils.add_instagram(m.group(1)), 'html.parser')
+          if el.iframe.get('srcdoc'):
+            embed_src = ''
+            srcdoc = BeautifulSoup(el.iframe['srcdoc'], 'html.parser')
+            if srcdoc.blockquote:
+              if srcdoc.blockquote.get('data-instgrm-permalink'):
+                embed_src = srcdoc.blockquote['data-instgrm-permalink']
+              elif 'tiktok-embed' in srcdoc.blockquote['class']:
+                embed_src = srcdoc.blockquote['cite']
+            if embed_src:
+              new_el = BeautifulSoup(utils.add_embed(embed_src), 'html.parser')
               el.insert_after(new_el)
               el.decompose()
+            else:
+              logger.warning('unknown iframe type in ' + url)
       else:
         logger.warning('no iframe in element-embed in ' + url)
   
@@ -270,6 +277,8 @@ def get_content(url, args, save_debug=False):
       new_html = '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>'.format(el.get_text())
       new_el = BeautifulSoup(new_html, 'html.parser')
       el.insert_after(new_el)
+      new_el = BeautifulSoup('<div style="clear:left;"></div>', 'html.parser')
+      el.parent.insert_after(new_el)
       el.decompose()
 
     content_html += str(article_body)
