@@ -20,11 +20,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Turn off debuging in some modules
+logging.getLogger('chardet').setLevel(logging.WARNING)
 logging.getLogger('filelock').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
-logging.getLogger('tldextract').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 @app.route('/')
