@@ -179,9 +179,16 @@ def get_content(url, args, save_debug=False):
   for el in caas_body.find_all(class_='twitter-tweet-wrapper'):
     tweet_urls = el.find_all('a')
     new_html = utils.add_embed(tweet_urls[-1]['href'])
-    if new_html:
+    el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+    el.decompose()
+
+  for el in caas_body.find_all(class_='instagram-media-wrapper'):
+    if el.blockquote and el.blockquote.get('data-instgrm-permalink'):
+      new_html = utils.add_embed(el.blockquote['data-instgrm-permalink'])
       el.insert_after(BeautifulSoup(new_html, 'html.parser'))
       el.decompose()
+    else:
+      logger.warning('unhandled instagram-media-wrapper in ' + url)
 
   for el in caas_body.find_all('a'):
     href = el.get('href')
