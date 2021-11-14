@@ -197,7 +197,7 @@ def get_content(url, args, save_debug=False):
         editors_choice = '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
       else:
         editors_choice = ''
-      item['content_html'] += '<br/><div style="width:75%; padding:10px 10px 0 10px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><center>{}<h1 style="margin:0;">{}</h1>{}</center></p><p><i>{}</i></p><p><small>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
+      item['content_html'] += '<br/><div style="width:80%; padding:10px 10px 0 10px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;"><center>{}<h1 style="margin:0;">{}</h1>{}</center></p><p><i>{}</i></p><p><small>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
 
       if page_json['object'].get('objectRegions') and page_json['object']['objectRegions'][0].get('ageRating'):
         if page_json['object']['objectRegions'][0].get('ageRatingDescriptors'):
