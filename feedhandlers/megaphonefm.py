@@ -10,10 +10,12 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, save_debug=False):
   # Only handles single episodes
   # https://playlist.megaphone.fm/?e=ESP3970143369
-  m = re.search(r'e=(\w+)', url)
+  m = re.search(r'playlist\.megaphone\.fm\/\?e=(\w+)', url)
   if not m:
-    logger.warning('unable to parse episode id from ' + url)
-    return None
+    m = re.search(r'player\.megaphone\.fm\/(\w+)', url)
+    if not m:
+      logger.warning('unable to parse episode id from ' + url)
+      return None
 
   podcast_json = utils.get_url_json('https://player.megaphone.fm/playlist/episode/{}'.format(m.group(1)))
   if not podcast_json:
