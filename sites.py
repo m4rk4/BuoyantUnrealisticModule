@@ -180,7 +180,7 @@ handlers = {
     "module": "wp_posts"
   },
   "rollingstone": {
-    "module": "wp_posts"
+    "module": "rollingstone"
   },
   "slate": {
     "module": "clay"
