@@ -203,19 +203,23 @@ def get_content(url, args, save_debug=False):
     item['author'] = {}
     item['author']['name'] = episode_json['show']['publisher']
 
-    item['_image'] = episode_json['images'][0]['url']
     item['summary'] = episode_json['html_description']
-
+    item['_image'] = episode_json['images'][0]['url']
     playback_url = utils.get_redirect_url(episode_json['external_playback_url'])
-    minutes = math.ceil(episode_json['duration_ms'] / 1000 / 60)
-    poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-    item['content_html'] = '<center><table style="width:520px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td>'.format(playback_url, poster)
-    item['content_html'] += '<td style="padding-left:0.5em; vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.2em;"><a href="{}">{}</a></h4><small>'.format(item['url'], item['title'])
-    item['content_html'] += '<div style="margin-bottom:0.2em;">{}...</div>'.format(episode_json['description'][:100])
-    item['content_html'] += 'from <a href="{}">{}</a> by {}'.format(episode_json['show']['external_urls']['spotify'], episode_json['show']['name'], item['author']['name'])
-    item['content_html'] += '<br/>{} &ndash; {} min.'.format(item['_display_date'], minutes)
-    item['content_html'] += '</small></td></tr></table></center>'
+    item['_audio'] = playback_url
 
+    #minutes = math.ceil(episode_json['duration_ms'] / 1000 / 60)
+    duration = []
+    t = math.floor(float(episode_json['duration_ms']) / 3600000)
+    if t >= 1:
+      duration.append('{} hr'.format(t))
+    t = math.ceil((float(episode_json['duration_ms']) - 3600000 * t) / 60)
+    if t > 0:
+      duration.append('{} min.'.format(t))
+
+    poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
+    desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a><br/>by {}</small>'.format(item['url'], item['title'], episode_json['show']['external_urls']['spotify'], episode_json['show']['name'], item['author']['name'], ', '.join(duration))
+    item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(item['_audio'], poster, desc, item['summary'])
   return item
 
 def get_feed(args, save_debug=False):
