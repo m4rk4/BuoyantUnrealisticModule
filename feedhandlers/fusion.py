@@ -114,9 +114,6 @@ def process_content_element(element, url, func_resize_image, gallery=None):
   elif element['type'] == 'image':
     img_src = func_resize_image(element, default_image_width)
     if img_src:
-      alt = ''
-      if element.get('alt_text'):
-        alt = 'alt="{}"'.format(element['alt_text'])
       if gallery:
         caption = '[{}/{}] '.format(gallery[0], gallery[1])
       else:
@@ -132,7 +129,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
               if caption:
                 caption += ' '
               caption += '({})'.format(element['credits']['by'][0]['byline'])
-      element_html += utils.add_image(img_src, caption, img_attr=alt)
+      element_html += utils.add_image(img_src, caption)
 
   elif element['type'] == 'video':
     if 'washingtonpost.com' in split_url.netloc:
