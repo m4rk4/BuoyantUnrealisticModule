@@ -522,21 +522,18 @@ def get_youtube_id(ytstr):
       logger.warning('unable to determine Youtube playlist id in ' + ytstr)
 
   yt_video_id = ''
-  if len(ytstr) == 11:
-    # id only
-    yt_video_id = ytstr
-  elif '/watch?' in ytstr:
-    m = re.search(r'youtube(-nocookie)?\.com\/watch\?v=([a-zA-Z0-9_-]{11})', ytstr)
-    if m:
-      yt_video_id = m.group(2)
+  if '/watch?' in ytstr:
+    m = re.search(r'v=([a-zA-Z0-9_-]{11})', ytstr)
   elif '/embed/' in ytstr:
-    m = re.search(r'youtube(-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
-    if m and m.group(2) != 'videoseries':
-      yt_video_id = m.group(2)
+    m = re.search(r'\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
   elif 'youtu.be' in ytstr:
     m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
-    if m:
-      yt_video_id = m.group(1)
+  if m:
+    yt_video_id = m.group(1)
+  else:
+    # id only
+    if len(ytstr) == 11:
+      yt_video_id = ytstr
 
   if yt_list_id and not yt_video_id:
     yt_html = get_url_html('https://www.youtube.com/embed/videoseries?list={}'.format(yt_list_id))
