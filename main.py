@@ -3,6 +3,7 @@ import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from io import BytesIO
 from PIL import Image, ImageDraw
+from urllib.parse import quote_plus
 
 import utils
 
@@ -26,6 +27,10 @@ logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
+
+@app.template_filter()
+def make_thumbnail(img_src):
+  return '/image?url={}&height=100&crop=120,100'.format(quote_plus(img_src))
 
 @app.route('/')
 def home():
@@ -59,9 +64,15 @@ def feed():
   feed['feed_url'] = request.url
 
   if 'read' in args:
-    # Template from https://www.w3schools.com/howto/howto_js_collapsible.asp
     return render_template('feed.html', title=feed['title'], link=feed['home_page_url'], items=feed['items'])
+  return jsonify(feed)
 
+@app.route('/test', methods=['GET'])
+def test():
+  args = request.args
+  feed = utils.read_json_file('./debug/test.json')
+  if 'read' in args:
+    return render_template('feed.html', title=feed['title'], link=feed['home_page_url'], items=feed['items'])
   return jsonify(feed)
 
 @app.route('/content', methods=['GET'])
