@@ -384,7 +384,7 @@ def add_pullquote(quote, author=''):
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_attr='', img_style='', fig_style='', gawker=False):
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
   begin_html = '<figure'
   if fig_style:
     begin_html += ' style={}>'.format(fig_style)
@@ -403,9 +403,6 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_attr=''
 
   if height:
     begin_html += ' height="{}"'.format(height)
-
-  if img_attr:
-    begin_html += ' {}'.format(img_attr)
 
   if img_style:
     begin_html += ' style="{}"'.format(img_style)
@@ -453,19 +450,7 @@ def add_audio(audio_src, audio_type, poster='', title='', desc='', link=''):
 
   return audio_html
 
-def add_megaphone(url):
-  split_url = urlsplit(url)
-  m = re.search(r'e=(\w+)', split_url.query)
-  if not m:
-    logger.warning('unable to parse ' + url)
-    return ''
-  data_json = get_url_json('https://player.megaphone.fm/playlist/episode/' + m.group(1))
-  if not data_json:
-    logger.warning('unable to parse ' + url)
-    return ''
-  return add_audio(data_json['episodes'][0]['audioUrl'], 'audio/mpeg', data_json['episodes'][0]['imageUrl'], data_json['episodes'][0]['title'], data_json['episodes'][0]['subtitle'], data_json['episodes'][0]['dataClipboardText'])
-
-def add_video(video_url, video_type, poster='', caption='', width=640, height=360, img_style='', fig_style='', gawker=False):
+def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='', fig_style='', gawker=False):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -498,11 +483,25 @@ def add_video(video_url, video_type, poster='', caption='', width=640, height=36
     return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
 
   if poster:
-    poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(poster))
+    poster = '{}/image?url={}'.format(config.server, quote_plus(poster))
+    if width:
+      poster += '&width={}'.format(width)
+    if height:
+      poster += '&height={}'.format(height)
+    poster += '&overlay=video'
   else:
     poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server)
+    if width:
+      poster += '?width={}'.format(width)
+    else:
+      poster += '?width=1280'
+    if height:
+      poster += '&height={}'.format(height)
+    else:
+      poster += '&height=720'
+    poster += '&overlay=video'
 
-  return add_image(poster, caption, link=video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
+  return add_image(poster, caption, width, height, video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
