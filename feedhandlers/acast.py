@@ -33,7 +33,15 @@ def get_content(url, args, save_debug=False):
 
   #if audio_json.get('keywords'):
 
-  item['_image'] = audio_json['image']
+  if audio_json.get('image'):
+    item['_image'] = audio_json['image']
+  elif audio_json['images'].get('original'):
+    item['_image'] = audio_json['images']['original']
+  elif audio_json['show'].get('image'):
+    item['_image'] = audio_json['show']['image']
+  elif audio_json['show']['images'].get('original'):
+    item['_image'] = audio_json['show']['images']['original']
+
   item['_audio'] = audio_json['url']
   item['summary'] = audio_json['subtitle']
 
@@ -47,5 +55,5 @@ def get_content(url, args, save_debug=False):
 
   poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="{}">{}</a><br/>{}</small>'.format(item['url'], item['title'], audio_json['show']['link'], item['author']['name'], ', '.join(duration))
-  item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><small>{}</small></div>'.format(item['_audio'], poster, desc, item['summary'])
+  item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(item['_audio'], poster, desc, item['summary'])
   return item
