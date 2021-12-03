@@ -267,6 +267,10 @@ def get_content(url, args, save_debug=False):
       if it and re.search(r'update', it.get_text(), flags=re.I):
         el.decompose()
 
+    for el in article_body.find_all(class_=re.compile(r'affiliate')):
+      if el.a:
+        el.a['href'] = utils.get_redirect_url(el.a['href'])
+
     for el in article_body.find_all('button', class_='article-info-table-btn'):
       el.decompose()
 
