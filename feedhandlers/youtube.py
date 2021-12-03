@@ -54,16 +54,25 @@ def get_content(url, args, save_debug=False):
   item['id'] = yt_video_id
   item['url'] = yt_watch_url
 
-  if yt_json['playabilityStatus']['status'] == 'ERROR':
-    item['title'] = yt_json['playabilityStatus']['reason']
-    logger.warning('Unhandled Youtube playability status = ' + yt_json['playabilityStatus']['status'])
-    overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
-    if overlay.startswith('//'):
-      overlay = 'https:' + overlay
-    poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus(overlay))
-    caption = yt_json['playabilityStatus']['reason']
-    if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
-      caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+  if yt_json['playabilityStatus']['status'] == 'ERROR' or yt_json['playabilityStatus']['status'] == 'LOGIN_REQUIRED':
+    if yt_json['playabilityStatus'].get('reason'):
+      caption = yt_json['playabilityStatus']['reason']
+      if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
+        caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+    elif yt_json['playabilityStatus'].get('messages'):
+      caption = ' '.join(yt_json['playabilityStatus']['messages'])
+    else:
+      caption = ''
+    item['title'] = caption
+
+    if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('thumbnail'):
+      overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
+      if overlay.startswith('//'):
+        overlay = 'https:' + overlay
+      poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus(overlay))
+    else:
+      poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server)
+
     item['content_html'] = utils.add_image(poster, caption, link=yt_embed_url)
     return item
 

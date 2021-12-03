@@ -5,6 +5,9 @@ handlers = {
   "acast": {
     "module": "acast"
   },
+  "androidpolice": {
+    "module": "androidpolice"
+  },
   "apnews": {
     "module": "apnews"
   },

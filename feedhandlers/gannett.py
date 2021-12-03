@@ -22,7 +22,7 @@ def resize_image(img_src, width=1000):
 
 def get_image(el):
   if el.name == 'img':
-    img = el_img
+    el_img = el
   else:
     el_img = el.find('img')
   if not el_img:
@@ -276,6 +276,10 @@ def get_content(url, args, save_debug=False):
 
   # Lead image
   el = soup.find(class_='gnt_em__fp')
+  if not el:
+    el = soup.find('h1', class_=re.compile(r'gnt_\w+_hl'))
+    if el:
+      el = el.next_sibling
   if el:
     new_el = None
     if el.name == 'figure':
