@@ -5,13 +5,14 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import config, sites
+import config
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
 logger = logging.getLogger(__name__)
 
 def get_module(url, handler=''):
+  sites_json = read_json_file('./sites.json')
   module = None
   module_name = ''
   if url:
@@ -29,8 +30,8 @@ def get_module(url, handler=''):
         domain = urlsplit(url).path.split('/')[1]
       else:
         domain = tld.domain
-      if sites.handlers.get(domain):
-        module_name = '.{}'.format(sites.handlers[domain]['module'])
+      if sites_json.get(domain):
+        module_name = '.{}'.format(sites_json[domain]['module'])
   if handler and not module_name:
     module_name = '.{}'.format(handler)
   if module_name:
