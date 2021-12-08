@@ -21,12 +21,11 @@ def get_feed(args, save_debug=False, func_get_content=None):
   try:
     d = feedparser.parse(rss_feed)
   except:
-    logger.warning('Feedparser error {} ' + rss_url)
+    logger.warning('Feedparser error ' + rss_url)
     return None
 
   if save_debug:
-    with open('./debug/feed.txt', 'w', encoding='utf-8') as f:
-      f.write(str(d))
+    utils.write_file(str(d), './debug/feed.txt')
 
   feed = utils.init_jsonfeed(args)
 
