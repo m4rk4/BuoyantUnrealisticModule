@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup, Comment
 from datetime import datetime
 from urllib.parse import urlsplit
 
+import config, utils
 from feedhandlers import rss
-import utils
 
 import logging
 logger = logging.getLogger(__name__)
@@ -166,9 +166,6 @@ def get_content(url, args, save_debug=False):
     for el in article_body.find_all(class_=re.compile(r'\bad\b')):
       el.decompose()
 
-    for el in article_body.find_all('script'):
-      el.decompose()
-
     for el in article_body.find_all(class_='img-article-item'):
       new_html = add_image(el.figure)
       el.insert_after(BeautifulSoup(new_html, 'html.parser'))
@@ -235,11 +232,13 @@ def get_content(url, args, save_debug=False):
       poster = ''
       it = el.find(id=True)
       if it:
-        m = re.search(r'window.arrayOfEmbeds\["{}"\] = .*<img src="([^"]+)"'.format(it['id']), article_html)
-        if m:
-          poster = m.group(1)
+        for script in article_body.find_all('script'):
+          m = re.search(r'window.arrayOfEmbeds\["{}"\] = .*<img src="([^"\']+)"'.format(it['id']), script.string, flags=re.S)
+          if m:
+            poster = m.group(1)
+            break
       if not poster:
-        poster = '{}/image?width=128&height=128'
+        poster = '{}/image?width=128&height=128'.format(config.server)
       new_html = '<div><a href="{}"><img style="height:128px; float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"></div>'.format(link, poster, desc)
       el.insert_after(BeautifulSoup(new_html, 'html.parser'))
       el.decompose()
@@ -262,6 +261,18 @@ def get_content(url, args, save_debug=False):
           it['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
         el.unwrap()
 
+      for el in article_body.find_all('blockquote'):
+        it = el.find(class_='pullquote')
+        if it:
+          quote = ''
+          for p in it.find_all('p'):
+            if quote:
+              quote += '<br/><br/>'
+            quote += re.sub(r'^<[^>]+>|<\/[^>]+>$', '', str(p).strip()).strip()
+          new_html = utils.add_pullquote(quote)
+          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+          el.decompose()
+
     for el in article_body.find_all(class_='article-jumplink'):
       it = el.find(class_='jumplink-title')
       if it and re.search(r'update', it.get_text(), flags=re.I):
@@ -272,6 +283,9 @@ def get_content(url, args, save_debug=False):
         el.a['href'] = utils.get_redirect_url(el.a['href'])
 
     for el in article_body.find_all('button', class_='article-info-table-btn'):
+      el.decompose()
+
+    for el in article_body.find_all('script'):
       el.decompose()
 
     # Remove comment sections
