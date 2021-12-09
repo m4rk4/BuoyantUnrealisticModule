@@ -1,7 +1,7 @@
 import html, json, re
 from bs4 import BeautifulSoup, Comment
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote_plus
 
 import config, utils
 from feedhandlers import rss
@@ -232,11 +232,11 @@ def get_content(url, args, save_debug=False):
       poster = ''
       it = el.find(id=True)
       if it:
-        for script in article_body.find_all('script'):
-          m = re.search(r'window.arrayOfEmbeds\["{}"\] = .*<img src="([^"\']+)"'.format(it['id']), script.string, flags=re.S)
+        script = article_body.find('script', string=re.compile(r'window\.arrayOfEmbeds\["{}"\]'.format(it['id'])))
+        if script:
+          m = re.search(r'<img src="([^"\']+)"', script.string, flags=re.S)
           if m:
-            poster = m.group(1)
-            break
+            poster = '{}/image?url={}&width=128&height=128'.format(config.server, quote_plus(m.group(1)))
       if not poster:
         poster = '{}/image?width=128&height=128'.format(config.server)
       new_html = '<div><a href="{}"><img style="height:128px; float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"></div>'.format(link, poster, desc)
