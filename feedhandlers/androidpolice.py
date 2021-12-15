@@ -146,12 +146,12 @@ def get_content(url, args, save_debug=False):
         it.name = 'h2'
       it = el.find(class_=re.compile(r'review-item-rai?ting'))
       if it:
-        it.name = 'h3'
+        it['style'] = 'font-size:1.5em; font-weight:bold;'
       it = el.find(class_='w-review-item-img')
       if it:
         for img in it.find_all(class_='review-item-gallery-thumbnail'):
           src = img.find('source')
-          new_html = utils.add_image(resize_image(src['data-srcset']))
+          new_html = utils.add_image(resize_image(src['data-srcset']), '&nbsp;')
           it.insert_before(BeautifulSoup(new_html, 'html.parser'))
         it.decompose()
       it = el.find(class_='item-buy')
@@ -180,7 +180,7 @@ def get_content(url, args, save_debug=False):
         if it.figcaption:
           caption = it.figcaption.get_text()
         else:
-          caption = ''
+          caption = '&nbsp;'
         new_html += utils.add_image(resize_image(it['data-img-url']), caption)
       el.insert_after(BeautifulSoup(new_html, 'html.parser'))
       el.decompose()
