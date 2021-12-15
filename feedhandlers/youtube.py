@@ -58,7 +58,10 @@ def get_content(url, args, save_debug=False):
     if yt_json['playabilityStatus'].get('reason'):
       caption = yt_json['playabilityStatus']['reason']
       if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
-        caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+        if yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason'].get('simpleText'):
+          caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+        elif yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason'].get('runs'):
+          caption += '. ' + yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['runs'][0]['text']
     elif yt_json['playabilityStatus'].get('messages'):
       caption = ' '.join(yt_json['playabilityStatus']['messages'])
     else:

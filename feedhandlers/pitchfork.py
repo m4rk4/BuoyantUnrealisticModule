@@ -158,7 +158,7 @@ def get_review_content(url, args, save_debug=False):
 
   if result_json.get('audio_files'):
     for audio in result_json['audio_files']:
-      audio_embed = utils.add_embed(audio['embedUrl'], save_debug)
+      audio_embed = utils.add_embed(audio['embedUrl'])
       content_html += audio_embed
   else:
     content_html += '<hr width="80%" />'
@@ -166,7 +166,7 @@ def get_review_content(url, args, save_debug=False):
   soup = BeautifulSoup(result_json['body']['en'], 'html.parser')
   for el in soup.find_all('figure', class_='contents__embed'):
     if el.iframe and el.iframe.has_attr('src'):
-      embed_html = utils.add_embed(el.iframe['src'], save_debug)
+      embed_html = utils.add_embed(el.iframe['src'])
       el.insert_after(BeautifulSoup(embed_html, 'html.parser'))
       el.decompose()
     else:

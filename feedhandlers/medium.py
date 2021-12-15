@@ -198,7 +198,7 @@ def get_content(url, args, save_debug=False):
           iframe_src = iframe_query['src'][0]
         elif 'url' in iframe_query:
           iframe_src = iframe_query['url'][0]
-        start_tag += utils.add_embed(iframe_src, save_debug)
+        start_tag += utils.add_embed(iframe_src)
         end_tag = ''
         paragraph_text = ''
       elif not iframe_src:

@@ -197,9 +197,15 @@ def get_url_title_desc(url):
 def post_url(url, data, headers=None):
   try:
     if headers:
-      r = requests.post(url, headers=headers, json=data)
+      if isinstance(data, dict):
+        r = requests.post(url, json=data, headers=headers)
+      else:
+        r = requests.post(url, data=data, headers=headers)
     else:
-      r = requests.post(url, json=data)
+      if isinstance(data, dict):
+        r = requests.post(url, json=data)
+      else:
+        r = requests.post(url, data=data)
     r.raise_for_status()
   except requests.exceptions.HTTPError as e:
     status_code = e.response.status_code
@@ -551,7 +557,7 @@ def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
   yt_video_id, yt_list_id = get_youtube_id(ytstr)
   if not yt_video_id:
     return ''
-  return add_embed('https://www.youtube.com/watch?v={}'.format(yt_video_id), False)
+  return add_embed('https://www.youtube.com/watch?v={}'.format(yt_video_id))
 
 def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
@@ -742,7 +748,13 @@ def add_audio_track(track_info):
     desc += '</small>'
   return '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(track_info['audio_src'], track_info['image'], desc)
 
-def add_embed(url, save_debug=False):
+def add_embed(url, args={}, save_debug=False):
+  embed_args = args.copy()
+  embed_args['embed'] = True
+  # limit playlists to 10 items
+  if re.search(r'(apple|bandcamp|soundcloud|spotify)', url):
+    embed_args['max'] = 10
+
   logger.debug('embed content from ' + url)
   if url.startswith('//'):
     embed_url = 'https:' + url
@@ -752,7 +764,7 @@ def add_embed(url, save_debug=False):
     embed_url = get_redirect_url(embed_url)
   module = get_module(embed_url)
   if module:
-    content = module.get_content(embed_url, {"embed": True}, save_debug)
+    content = module.get_content(embed_url, embed_args, save_debug)
     if content:
       return content['content_html']
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(url)

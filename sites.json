@@ -12,7 +12,8 @@
         "module": "apnews"
     },
     "apple": {
-        "module": "apple"
+        "module": "apple",
+        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjMzNDUzNzU2LCJleHAiOjE2Mzk2NzQ1NTYsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.qlGFbohnsbm6faxvdKrr1yF5_n4Ni09UkJcXOYaWLZeF7ogVJGhSVCxocP975k3fQpTSfCt5aU8SN5ooi8syzQ"
     },
     "art19": {
         "module": "art19"
@@ -108,6 +109,12 @@
     "theguardian": {
         "module": "guardian"
     },
+    "hackernoon": {
+        "module": "hackernoon",
+        "buildId": "CImmHl2g0QHc5wfoICG0T",
+        "x-algolia-application-id": "mo7dwh9y8c",
+        "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340"
+    },
     "ign": {
         "module": "ign"
     },
@@ -128,9 +135,6 @@
     },
     "megaphone.fm": {
         "module": "megaphonefm"
-    },
-    "hackernoon": {
-        "module": "nextjs"
     },
     "curbed": {
         "module": "nymag"
@@ -158,6 +162,9 @@
     },
     "reuters": {
         "module": "reuters"
+    },
+    "seekingalpha": {
+        "module": "seekingalpha"
     },
     "soundcloud": {
         "module": "soundcloud"
@@ -200,6 +207,9 @@
     },
     "variety": {
         "module": "variety"
+    },
+    "vogue": {
+        "module": "cne"
     },
     "wksu": {
         "module": "wksu"

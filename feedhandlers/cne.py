@@ -103,7 +103,7 @@ def get_content(url, args, save_debug=False):
           body_html += utils.add_image(it['image']['sources'][img_size]['url'], caption.strip())
 
       elif body_json[1]['type'] == 'video':
-        body_html += utils.add_embed(body_json[1]['props']['url'], save_debug)
+        body_html += utils.add_embed(body_json[1]['props']['url'])
 
       elif body_json[1]['type'] == 'clip':
         m = re.search(r'<p>(.*)<\/p>', body_json[1]['props']['dangerousCaption'])
@@ -163,7 +163,7 @@ def get_content(url, args, save_debug=False):
               logger.warning('unable to get video info for videoId {} in {}'.format(video_id, url))
 
       elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'instagram' or body_json[1]['type'] == 'twitter':
-        body_html += utils.add_embed(body_json[1]['props']['url'], False)
+        body_html += utils.add_embed(body_json[1]['props']['url'])
 
       elif body_json[1]['type'] == 'product':
         if not 'subscribe.wired.com' in body_json[1]['props']['offerUrl']:
