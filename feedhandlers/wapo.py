@@ -1,6 +1,5 @@
-import json, re
+import re
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
 
 from feedhandlers import fusion, nextjs, rss
 import utils
@@ -38,7 +37,7 @@ def get_item(content, url, args, save_debug):
     item['tags'] = content['tracking']['content_topics'].split(';')
 
   lead_image = None
-  if content['promo_items']['basic']['type'] == 'image':
+  if content.get('promo_items') and content['promo_items']['basic']['type'] == 'image':
     lead_image = content['promo_items']['basic']
     item['_image'] = lead_image['url']
 

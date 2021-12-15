@@ -58,7 +58,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
       text = ''
       for el in element['content_elements']:
         text += process_content_element(el, url, func_resize_image, gallery)
-      element_html += '<blockquote>{}</blockquote>'.format(text)
+      element_html += '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
     else:
       logger.warning('unhandled quote item type "{}" in {}'.format(element['subtype'], url))
 
