@@ -73,6 +73,9 @@
     "espn": {
         "module": "espn"
     },
+    "ft": {
+        "module": "ft"
+    },
     "beaconjournal": {
         "module": "gannett"
     },
