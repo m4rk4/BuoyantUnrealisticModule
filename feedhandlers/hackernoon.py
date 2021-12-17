@@ -76,11 +76,17 @@ def get_content(url, args, save_debug):
     return item
 
   md = re.sub(r':::info\n+(.+?)\n+:::', r'> ***&#x24D8;&nbsp;Info:***\n\1\n\n', md, flags=re.S)
-  md = re.sub(r':::tip\n+(.+?)\n+:::', r'> ***&starf;&nbsp;Tip:***\n\1\n\n', md, flags=re.S)
+  md = re.sub(r':::tip\n+(.+?)\n+:::', r'> ***&#x2605;&nbsp;Tip:***\n\1\n\n', md, flags=re.S)
   md = re.sub(r'\\\n|\\n', '', md, flags=re.S)
+  def sub_underline(matchobj):
+    return '<u>{}</u>'.format(matchobj.group(1))
+  md = re.sub(r'__(.+?)__', sub_underline, md, flags=re.S)
+  def sub_mark(matchobj):
+    return '<mark style="background:rgb(156, 255, 163);">{}</mark>'.format(matchobj.group(1))
+  md = re.sub(r'==(.+?)==', sub_mark, md, flags=re.S)
   #md = md.replace('\n', '<br/>')
 
-  soup = BeautifulSoup(markdown(md, extras=['fenced-code-blocks', 'tables']), 'html.parser')
+  soup = BeautifulSoup(markdown(md, extras=['code-friendly', 'fenced-code-blocks', 'tables']), 'html.parser')
   for el in soup.find_all(class_='paragraph'):
     el.name = 'p'
     el.attrs = {}

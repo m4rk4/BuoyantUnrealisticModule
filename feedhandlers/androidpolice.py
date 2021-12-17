@@ -282,6 +282,12 @@ def get_content(url, args, save_debug=False):
       if el.a:
         el.a['href'] = utils.get_redirect_url(el.a['href'])
 
+    for el in article_body.find_all(class_='affiliate-single'):
+      el.name = 'ul'
+      el.attrs = {}
+      for it in el.find_all('a'):
+        it.wrap(soup.new_tag('li'))
+
     for el in article_body.find_all('button', class_='article-info-table-btn'):
       el.decompose()
 

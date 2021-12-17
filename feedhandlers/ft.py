@@ -18,10 +18,14 @@ def get_content(url, args, save_debug=False):
   if url.startswith('://'):
     url = url.replace('://', 'https://www.ft.com')
 
-  if '/video/' in url:
+  if '/reports/' in url:
+    # skip
+    return None
+  elif '/video/' in url:
     article_url = url
   else:
     article_url = url.replace('www.ft.com', 'amp.ft.com')
+
   article_html = utils.get_url_html(article_url, user_agent='googlebot')
   if not article_html:
     return None

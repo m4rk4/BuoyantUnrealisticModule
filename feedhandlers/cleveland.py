@@ -12,6 +12,16 @@ def resize_image(image_item, width_target):
   # Skip ad images
   if image_item['_id'] == '4K7PGY6HLZBTJGKNNZBXD3Z7XE' or image_item['_id'] == 'MLVRVZ6SGRHKJCNR4655R6VUCQ' or image_item['_id'] == 'YB4XJEM2RJAHVHQP5VTXZ43WIM':
     return None
+  if image_item.get('credits'):
+    if image_item['credits'].get('affiliation'):
+      for it in image_item['credits']['affiliation']:
+        if 'Fanatics' in it['name']:
+          return None
+    if image_item['credits'].get('by'):
+      for it in image_item['credits']['by']:
+        if 'Fanatics' in it['name']:
+          return None
+
   images = []
   if image_item.get('width'):
     image = {}
