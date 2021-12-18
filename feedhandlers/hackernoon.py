@@ -94,7 +94,7 @@ def get_content(url, args, save_debug):
     el.name = 'p'
     el.attrs = {}
 
-  # unnest blockquotes
+  # Unnest blockquotes
   for el in soup.find_all('blockquote'):
     for it in el.find_all('blockquote'):
       it.unwrap()
