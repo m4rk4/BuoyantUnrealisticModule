@@ -77,6 +77,10 @@ def get_content(url, args, save_debug):
 
   md = re.sub(r':::info\n+(.+?)\n+:::', r'> ***&#x24D8;&nbsp;Info:***\n\1\n\n', md, flags=re.S)
   md = re.sub(r':::tip\n+(.+?)\n+:::', r'> ***&#x2605;&nbsp;Tip:***\n\1\n\n', md, flags=re.S)
+
+  # This fixes lists being nested, but probably breaks actual nested lists
+  md = md.replace('\n\n  \\\n', '\n\n\\\n')
+
   md = re.sub(r'\\\n|\\n', '', md, flags=re.S)
   def sub_underline(matchobj):
     return '<u>{}</u>'.format(matchobj.group(1))
@@ -84,12 +88,29 @@ def get_content(url, args, save_debug):
   def sub_mark(matchobj):
     return '<mark style="background:rgb(156, 255, 163);">{}</mark>'.format(matchobj.group(1))
   md = re.sub(r'==(.+?)==', sub_mark, md, flags=re.S)
-  #md = md.replace('\n', '<br/>')
 
-  soup = BeautifulSoup(markdown(md, extras=['code-friendly', 'fenced-code-blocks', 'tables']), 'html.parser')
+  soup = BeautifulSoup(markdown(md, extras=['break-on-newline', 'code-friendly', 'fenced-code-blocks', 'tables']), 'html.parser')
   for el in soup.find_all(class_='paragraph'):
     el.name = 'p'
     el.attrs = {}
+
+  # unnest blockquotes
+  for el in soup.find_all('blockquote'):
+    for it in el.find_all('blockquote'):
+      it.unwrap()
+
+  for el in soup.find_all('blockquote'):
+    if el.p:
+      quote = ''
+      for it in el.find_all('p'):
+        if quote:
+          quote += '<br/><br/>'
+        quote += utils.bs_get_inner_html(it)
+    else:
+      quote = utils.bs_get_inner_html(el)
+    new_html = utils.add_blockquote(quote)
+    el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+    el.decompose()
 
   for el in soup.find_all(class_='youtube-container'):
     new_html = utils.add_embed(el.iframe['src'])
