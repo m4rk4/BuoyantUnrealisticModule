@@ -176,6 +176,17 @@ def get_content(url, args, save_debug=False):
       el.insert_after(BeautifulSoup(new_html, 'html.parser'))
       el.decompose()
 
+  for el in caas_body.find_all(class_='caas-pull-quote-wrapper'):
+    logger.debug('caas-pull-quote-wrapper in ' + url)
+    quote = ''
+    for it in el.find_all('p'):
+      if quote:
+        quote += '<br/><br/>'
+      quote += utils.bs_get_inner_html(it)
+    new_html = utils.add_pullquote(quote)
+    el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+    el.decompose()
+
   for el in caas_body.find_all(class_='twitter-tweet-wrapper'):
     tweet_urls = el.find_all('a')
     new_html = utils.add_embed(tweet_urls[-1]['href'])
