@@ -337,20 +337,16 @@ def get_content(url, args, save_debug=False):
     logger.warning('TwitterSearchScraper exception {} in {}'.format(e.__class__, clean_url))
 
   if search_scraper:
-    search_items = None
     try:
-      search_items = search_scraper.get_items()
-    except Exception as e:
-      logger.warning('TwitterSearchScraper.get_items exception {} in {}'.format(e.__class__, clean_url))
-
-    if search_items:
       tweet_replies = []
-      for i,tweet in enumerate(search_items):
+      for i,tweet in enumerate(search_scraper.get_items()):
         tweet_json = get_tweet_json(tweet.id)
         if tweet_json.get('in_reply_to_screen_name') and tweet_json['in_reply_to_screen_name'] == tweet_user:
           tweet_replies.append(tweet_json)
       for i,tweet_json in reversed(list(enumerate(tweet_replies))):
         content_html += make_tweet(tweet_json, is_reply=i+1)
+    except Exception as e:
+      logger.warning('TwitterSearchScraper.get_items exception {} in {}'.format(e.__class__, clean_url))
 
   content_html += '</table>'
   item['content_html'] = content_html
