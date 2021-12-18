@@ -47,7 +47,14 @@ def get_content(url, args, save_debug=False):
 
   item = {}
   item['id'] = url
-  item['url'] = url
+
+  if ld_json.get('mainEntityofPage'):
+    item['url'] = ld_json['mainEntityofPage']
+  elif ld_json.get('url'):
+    item['url'] = ld_json['url']
+  else:
+    item['url'] = url
+
   if ld_json.get('headline'):
     item['title'] = ld_json['headline']
   elif ld_json.get('name'):
@@ -79,7 +86,7 @@ def get_content(url, args, save_debug=False):
 
   if ld_json['@type'] == 'VideoObject':
     item['_video'] = ld_json['contentUrl']
-    caption = '{}. {}'.format(item['title'], item['summary'])
+    caption = '<a href="{}">{}</a>. {}'.format(item['url'], item['title'], item['summary'])
     item['content_html'] += utils.add_video(ld_json['contentUrl'], 'video/mp4', ld_json['thumbnailUrl'], caption)
     if args and 'embed' in args:
       return item
