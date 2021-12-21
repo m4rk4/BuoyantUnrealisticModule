@@ -77,18 +77,109 @@ def get_story(story_json, args, save_debug=False):
 
   item['summary'] = story_json['description']
 
-  content_html = story_json['story'].replace('\n', '')
+  story_soup = BeautifulSoup(story_json['story'], 'html.parser')
+  if save_debug:
+    utils.write_file(str(story_soup), './debug/debug.html')
 
-  if not re.search(r'<p>', content_html):
-    content_html = content_html.replace('\r', '<br/><br/>')
-  else:
-    content_html = content_html.replace('\r', '')
+  for el in story_soup.find_all(class_='floatleft'):
+    el['style'] = 'float:left; margin-top:0.25em; margin-right:0.5em;'
+    it = story_soup.new_tag('div')
+    it['style'] = 'clear:left;'
+    a = el.find_next('h2')
+    if not a:
+      a = el.find_next('p')
+    a.insert_after(it)
 
-  content_html = content_html.replace('class="floatleft"', 'style="float:left; margin-top:0.25em; margin-right:0.5em;"')
+  for el in story_soup.find_all('img', src=re.compile(r'gn-arrow|rd-arrow|sw_ye_40')):
+    it = story_soup.new_tag('span')
+    if 'gn-arrow' in el['src']:
+      it['style'] = 'color:green;'
+      it.string = '▲'
+    elif 'rd-arrow' in el['src']:
+      it['style'] = 'color:red;'
+      it.string = '▼'
+    else:
+      it['style'] = 'color:orange;'
+      it.string = '⬌'
+    el.insert_after(it)
+    el.decompose()
+
+  for el in story_soup.find_all(re.compile('photo\d+')):
+    m = re.search(r'\d+$', el.name)
+    n = int(m.group(0)) - 1
+    image = story_json['images'][n]
+    img_src, caption = get_image(image)
+    new_html = utils.add_image(resize_image(img_src), caption)
+    el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+    el.decompose()
+
+  for el in story_soup.find_all(re.compile('video\d+')):
+    m = re.search(r'\d+$', el.name)
+    n = int(m.group(0)) - 1
+    if n < len(story_json['video']):
+      video = story_json['video'][n]
+      vid_src, vid_type, poster, caption = get_video(video)
+      new_html = utils.add_video(vid_src, vid_type, poster, caption)
+      el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+      el.decompose()
+    else:
+      logger.warning('video index out of range in ' + url)
+
+  inlines = None
+  if story_soup.find(re.compile('inline\d+')):
+    # Fetch article html to parse the inlines
+    article_html = utils.get_url_html(url)
+    if not article_html:
+      logger.warning('unable to parse inlines in ' + url)
+    article_soup = BeautifulSoup(article_html, 'html.parser')
+    inlines = article_soup.find_all(class_=['instagram-media', 'twitter-tweet', 'pull-quote', 'module-iframe-wrapper', 'inline'])
+
+  if inlines:
+    for el in story_soup.find_all(re.compile('inline\d+')):
+      m = re.search(r'\d+$', el.name)
+      n = int(m.group(0)) - 1
+      if n > len(inlines):
+        logger.warning('inline index out of range ' + url)
+        continue
+      it = inlines[n]
+      new_html = ''
+      if 'instagram-media' in it['class']:
+        new_html = utils.add_embed(it['data-instgrm-permalink'])
+
+      elif 'twitter-tweet' in it['class']:
+        a = a.find_all('a')
+        new_html = utils.add_embed(a[-1]['href'])
+
+      elif 'pull-quote' in it['class']:
+        author = ''
+        a = it.find('cite')
+        if a:
+          author = a.get_text().strip()
+          a.decompose()
+        quote = re.sub(r'^"|"$', '', a.get_text().strip())
+        new_html = utils.add_pullquote(quote, author)
+
+      elif 'module-iframe-wrapper' in it['class']:
+        a = it.find('iframe')
+        new_html = utils.add_embed(a['src'])
+
+      elif 'inline-track' in it['class'] or it.name == 'aside':
+        pass
+
+      if new_html:
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
+
+  for el in story_soup.find_all(['alsosee', 'offer']):
+    if el.parent and el.parent.name == 'p':
+      el.parent.decompose()
+    else:
+      el.decompose()
+
+  item['content_html'] = ''
 
   # Add lead video or image
-  item['content_html'] = ''
-  m = re.search(r'<photo\d+>|<video\d+>', content_html[:20])
+  m = re.search(r'<photo\d+>|<video\d+>', story_json['story'][:20])
   if not m:
     if story_json.get('video'):
       vid_src, vid_type, poster, caption = get_video(story_json['video'][0])
@@ -97,72 +188,7 @@ def get_story(story_json, args, save_debug=False):
       img_src, caption = get_image(story_json['images'][0])
       item['content_html'] += utils.add_image(resize_image(img_src), caption)
 
-  def replace_photo(matchobj):
-    nonlocal story_json
-    n = int(matchobj.group(1)) - 1
-    image = story_json['images'][n]
-    img_src, caption = get_image(image)
-    return utils.add_image(resize_image(img_src), caption)
-  content_html = re.sub(r'<p><photo(\d+)><\/p>', replace_photo, content_html)
-  content_html = re.sub(r'<photo(\d+)>', replace_photo, content_html)
-
-  def replace_video(matchobj):
-    nonlocal story_json
-    n = int(matchobj.group(1)) - 1
-    if n < len(story_json['video']):
-      video = story_json['video'][n]
-      vid_src, vid_type, poster, caption = get_video(video)
-      return utils.add_video(vid_src, vid_type, poster, caption)
-    logger.warning('video {} not found in {}'.format(n, story_json['links']['web']['href']))
-  content_html = re.sub(r'<p><video(\d+)>\s?<\/video\d+><\/p>', replace_video, content_html)
-  content_html = re.sub(r'<p><video(\d+)><\/p>', replace_video, content_html)
-  content_html = re.sub(r'<p><video><\/p>', '', content_html)
-
-  if re.search(r'<inline\d>', content_html):
-    story_html = utils.get_url_html(url)
-    if story_html:
-      story_soup = BeautifulSoup(story_html, 'html.parser')
-      inlines = story_soup.find_all(class_=['instagram-media', 'twitter-tweet', 'pull-quote', 'module-iframe-wrapper', 'inline'])
-
-      def replace_inline(matchobj):
-        nonlocal inlines
-        nonlocal url
-        n = int(matchobj.group(1)) - 1
-        if n < len(inlines):
-          el = inlines[n]
-          if 'instagram-media' in el['class']:
-            return utils.add_instagram(el['data-instgrm-permalink'])
-          elif 'twitter-tweet' in el['class']:
-            it = el.find_all('a')
-            tweet_url = it[-1]['href']
-            tweet = utils.add_twitter(tweet_url)
-            if tweet:
-              return tweet
-            else:
-              logger.warning('unable to add tweet {} in {}'.format(tweet_url, url))
-          elif 'pull-quote' in el['class']:
-            author = ''
-            it = el.find('cite')
-            if it:
-              author = it.get_text().strip()
-              it.decompose()
-            quote = re.sub(r'^"|"$', '', el.get_text().strip())
-            return utils.add_pullquote(quote, author)
-          elif 'inline-track' in el['class'] or el.name == 'aside':
-            # Skip
-            return ''
-          elif 'module-iframe-wrapper' in el['class']:
-            it = el.find('iframe')
-            logger.warning('skipping iframe ' + it['src'])
-            return ''
-        logger.warning('unhandled inline{} in {}'.format(n+1, url))
-        return matchobj.group(0)
-      content_html = re.sub(r'<p><inline(\d+)><\/p>', replace_inline, content_html)
-      content_html = re.sub(r'<inline(\d+)>', replace_inline, content_html)
-
-  content_html = re.sub(r'(<p>)?<alsosee><\/p>', '', content_html)
-
-  item['content_html'] += content_html
+  item['content_html'] += str(story_soup)
   return item
 
 def get_content(url, args, save_debug=False):
