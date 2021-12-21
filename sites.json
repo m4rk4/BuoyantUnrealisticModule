@@ -63,6 +63,9 @@
     "tirebusiness": {
         "module": "crains"
     },
+    "thedailybeast": {
+        "module": "dailybeast"
+    },
     "discovermagazine": {
         "module": "discovermag",
         "buildId": "945a192"
