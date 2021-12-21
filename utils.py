@@ -1,6 +1,7 @@
 import importlib, json, math, os, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
+from PIL import ImageFile
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -390,6 +391,19 @@ def add_pullquote(quote, author=''):
     quote = quote[1:-1]
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
+
+def get_image_size(img_src):
+  r = requests.get(img_src, headers={"Range": "bytes=0-1024"})
+  if r.status_code == 200 or r.status_code == 206:
+    try:
+      p = ImageFile.Parser()
+      p.feed(r.content)
+      if p.image:
+        return p.image.size
+    except:
+      logger.debug('invalid')
+      pass
+  return None
 
 def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
   begin_html = '<figure'
