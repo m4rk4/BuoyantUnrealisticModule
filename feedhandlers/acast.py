@@ -55,5 +55,8 @@ def get_content(url, args, save_debug=False):
 
   poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="{}">{}</a><br/>{}</small>'.format(item['url'], item['title'], audio_json['show']['link'], item['author']['name'], ', '.join(duration))
-  item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(item['_audio'], poster, desc, item['summary'])
+  item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;">'.format(item['_audio'], poster, desc)
+  if not 'embed' in args:
+    item['content_html'] += '<blockquote><small>{}</small></blockquote>'.format(item['summary'])
+  item['content_html'] += '</div>'
   return item
