@@ -374,15 +374,19 @@ def get_feed(args, save_debug=False):
   query = 'from:{}'.format(user)
   if args.get('age'):
     query += ' within_time:{}h'.format(args['age'])
-  for i,tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
-    item = get_content('https://twitter.com/{}/status/{}'.format(user, tweet.id), args, save_debug)
-    if item:
-      if utils.filter_item(item, args) == True:
-        items.append(item)
-        n += 1
-        if 'max' in args:
-          if n == int(args['max']):
-            break
-  feed['items'] = items.copy()
-  #tweets_list.append([tweet.date, tweet.id, tweet.content, tweet.username])
+  try:
+    for i,tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
+      item = get_content('https://twitter.com/{}/status/{}'.format(user, tweet.id), args, save_debug)
+      if item:
+        if utils.filter_item(item, args) == True:
+          items.append(item)
+          n += 1
+          if 'max' in args:
+            if n == int(args['max']):
+              break
+    feed['items'] = items.copy()
+    #tweets_list.append([tweet.date, tweet.id, tweet.content, tweet.username])
+  except Exception as e:
+    logger.warning('TwitterSearchScraper(query).get_items() exception {} in {}'.format(e.__class__, args['url']))
+    return None
   return feed
