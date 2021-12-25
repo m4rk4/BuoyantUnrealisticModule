@@ -50,12 +50,18 @@ def get_story(story_json, args, save_debug=False):
   else:
     logger.warning('unknown title for ' + url)
 
-  dt = datetime.fromisoformat(story_json['published'].replace('Z', '+00:00'))
-  item['date_published'] = dt.isoformat()
-  item['_timestamp'] = dt.timestamp()
-  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-  dt = datetime.fromisoformat(story_json['lastModified'].replace('Z', '+00:00'))
-  item['date_modified'] = dt.isoformat()
+  if story_json.get('published'):
+    dt = datetime.fromisoformat(story_json['published'].replace('Z', '+00:00'))
+  elif story_json.get('originalPublishDate'):
+    dt = datetime.fromisoformat(story_json['originalPublishDate'].replace('Z', '+00:00'))
+  if dt:
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  if story_json.get('lastModified'):
+    dt = datetime.fromisoformat(story_json['lastModified'].replace('Z', '+00:00'))
+    item['date_modified'] = dt.isoformat()
+
   if args.get('age'):
     if not utils.check_age(item, args):
       if save_debug:
@@ -86,6 +92,10 @@ def get_story(story_json, args, save_debug=False):
 
   item['summary'] = story_json['description']
 
+  if '/video/' in url:
+    item['content_html'] = utils.add_video(story_json['links']['source']['full']['href'], 'video/mp4', story_json['posterImages']['default']['href'], story_json['caption'])
+    return item
+
   story_html = story_json['story']
   if story_json['type'] == 'BlogEntry':
     story_html = re.sub(r'^<br \/>([^\s])', r'<p>\1', story_html, flags=re.M)
@@ -93,6 +103,8 @@ def get_story(story_json, args, save_debug=False):
     story_html = re.sub(r'<!--(\w+)-->', r'<\1></\1>', story_html)
   elif story_json['type'] == 'Preview':
     story_html = story_html.replace('\n\n\r\n', '<br/><br/>')
+  story_html = re.sub(r'<(inline\d*|photo\d*|video\d*)>(?!\s*<\/(inline\d*|photo\d*|video\d*)>)', r'<\1></\1>', story_html)
+  print(story_html)
   story_soup = BeautifulSoup(story_html, 'html.parser')
   if save_debug:
     utils.write_file(str(story_soup), './debug/debug.html')
@@ -209,15 +221,20 @@ def get_story(story_json, args, save_debug=False):
   # Add lead video or image
   m = re.search(r'<figure', str(story_soup)[:20])
   if not m:
-    if story_json.get('video'):
-      vid_src, vid_type, poster, caption = get_video(story_json['video'][0])
-      item['content_html'] += utils.add_video(vid_src, vid_type, poster, caption)
-    elif story_json.get('images'):
+    if story_json.get('images'):
       img_src, caption = get_image(story_json['images'][0])
       item['content_html'] += utils.add_image(resize_image(img_src), caption)
+    elif story_json.get('video'):
+      vid_src, vid_type, poster, caption = get_video(story_json['video'][0])
+      item['content_html'] += utils.add_video(vid_src, vid_type, poster, caption)
 
   item['content_html'] += str(story_soup)
   return item
+
+def get_video_content(url, args, save_debug=False):
+  #https://watch.auth.api.espn.com/video/auth/getclip/61c1d744be6ab32ca6587f0d?apikey=uiqlbgzdwuru14v627vdusswb
+  video_html = utils.get_url_html(url)
+
 
 def get_content(url, args, save_debug=False):
   if '/blog/' in url:
@@ -225,6 +242,19 @@ def get_content(url, args, save_debug=False):
     api_json = utils.get_url_json(api_url)
     if api_json:
       story_json = api_json['content']
+    else:
+      return None
+  elif '/video/' in url:
+    m = re.search('id=(\d+)', url)
+    if not m:
+      m = re.search('\/_\/id\/(\d+)', url)
+    if not m:
+      logger.warning('unable to parse video id from ' + url)
+      return None
+    api_url = 'http://api-app.espn.com/v1/video/clips/' + m.group(1)
+    api_json = utils.get_url_json(api_url)
+    if api_json:
+      story_json = api_json['videos'][0]
     else:
       return None
   else:
@@ -258,16 +288,30 @@ def get_feed(args, save_debug=False):
   # Browns: https://now.core.api.espn.com/v1/sports/football/nfl/teams/5/news
   # Steelers: https://now.core.api.espn.com/v1/sports/football/nfl/teams/23/news
   # Penguins: https://now.core.api.espn.com/v1/sports/hockey/nhl/teams/16/news
+  # Blogs: https://www.espn.com/blog/cleveland-browns
 
-  feed_json = utils.get_url_json(args['url'] + '?enable=inlines')
+  if '/blog/' in args['url']:
+    split_url = urlsplit(args['url'])
+    feed_url = 'https://secure.espn.com/core{}?xhr=1&device=desktop&country=us&lang=en&region=us&site=espn&edition-host=espn.com&site-type=full'.format(split_url.path)
+  else:
+    feed_url = args['url'] + '?enable=inlines'
+  feed_json = utils.get_url_json(feed_url)
   if not feed_json:
     return None
   if save_debug:
     utils.write_file(feed_json, './debug/feed.json')
 
+  stories = None
+  if feed_json.get('newsFeed'):
+    stories = feed_json['newsFeed']
+  elif feed_json.get('headlines'):
+    stories = feed_json['headlines']
+  if not stories:
+    return None
+
   n = 0
   items = []
-  for story in feed_json['headlines']:
+  for story in stories:
     url = story['links']['web']['href']
     if not 'espn.com' in url:
       if save_debug:
@@ -275,7 +319,10 @@ def get_feed(args, save_debug=False):
       continue
     if save_debug:
       logger.debug('getting content for ' + url)
-    item = get_story(story, args, save_debug)
+    if story.get('story'):
+      item = get_story(story, args, save_debug)
+    else:
+      item = get_content(url, args, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)
