@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from feedhandlers import fusion, nextjs, rss
 import utils
@@ -8,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def resize_image(image_item, width_target):
-  return 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(image_item['url'], width_target)
+  return 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(quote_plus(image_item['url']), width_target)
 
 def get_item(content, url, args, save_debug):
   item = {}
