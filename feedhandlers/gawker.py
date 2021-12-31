@@ -339,7 +339,10 @@ def get_content(url, args, save_debug=False):
     featured_media.append(article_data['featuredMedia'])
     iter_body(featured_media)
 
-  iter_body(article_json['data'][0]['body'])
+  if article_json['data'][0].get('body'):
+    iter_body(article_json['data'][0]['body'])
+  elif article_json['data'][0].get('subhead'):
+    iter_body(article_json['data'][0]['subhead'])
 
   item['content_html'] = body_html
 
