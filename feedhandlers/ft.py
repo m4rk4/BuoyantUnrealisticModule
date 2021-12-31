@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
   if '/__origami/' in img_src:
-    return re.sub(r'width=\d+', 'width={}'.format, img_src)
+    return re.sub(r'width=\d+', 'width={}'.format(width), img_src)
   return 'https://www.ft.com/__origami/service/image/v2/images/raw/{}?source=google-amp&fit=scale-down&width={}'.format(quote_plus(img_src), width)
 
 def get_content(url, args, save_debug=False):
@@ -119,7 +119,7 @@ def get_content(url, args, save_debug=False):
     else:
       caption = ''
     img = el.find('amp-img')
-    new_html = utils.add_image(img['src'], caption)
+    new_html = utils.add_image(resize_image(img['src']), caption)
     el.insert_after(BeautifulSoup(new_html, 'html.parser'))
     el.decompose()
 
