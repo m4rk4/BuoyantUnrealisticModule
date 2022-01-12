@@ -43,7 +43,7 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     if element['subtype'] == 'custom-audio':
       episode = element['embed']['config']['episode']
       poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
-      element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(episode['audio'], poster, episode['title'], episode['summary'])
+      element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"></div><blockquote><small>{}</small></blockquote></div>'.format(episode['audio'], poster, episode['title'], episode['summary'])
     else:
       logger.warning('unhandled custome_embed in ' + url)
 
