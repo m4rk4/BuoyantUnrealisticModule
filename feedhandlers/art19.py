@@ -133,7 +133,7 @@ def get_content(url, args, save_debug=False):
       dt = datetime(*ts[0:7]).replace(tzinfo=timezone.utc)
       display_date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
       desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}/episodes/{}">{}</a></h4><small>{}<br/>{}</small>'.format(item['url'], episode, entry['title'], display_date, ', '.join(duration))
-      item['content_html'] += '<div><a href="https://rss.art19.com/episodes/{}.mp3"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><br/>'.format(episode, poster, desc)
+      item['content_html'] += '<div><a href="https://rss.art19.com/episodes/{}.mp3"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"></div><br/>'.format(episode, poster, desc)
       if i == max:
         break
     if i == max:
