@@ -18,8 +18,11 @@
     "art19": {
         "module": "art19"
     },
-    "theathletic": {
-        "module": "athletic"
+    "autonews": {
+        "module": "crains"
+    },
+    "avclub": {
+        "module": "gawker"
     },
     "bandcamp": {
         "module": "bandcamp"
@@ -27,11 +30,17 @@
     "barrons": {
         "module": "wsj"
     },
+    "beaconjournal": {
+        "module": "gannett"
+    },
     "billboard": {
         "module": "billboard"
     },
     "bloomberg": {
         "module": "bloomberg"
+    },
+    "businessinsider": {
+        "module": "insider"
     },
     "carbuzz": {
         "module": "carbuzz"
@@ -45,26 +54,14 @@
     "cnet": {
         "module": "cnet"
     },
-    "autonews": {
-        "module": "crains"
-    },
     "crainscleveland": {
         "module": "crains"
     },
-    "european-rubber-journal": {
-        "module": "crains"
+    "curbed": {
+        "module": "nymag"
     },
-    "plasticsnews": {
-        "module": "crains"
-    },
-    "rubbernews": {
-        "module": "crains"
-    },
-    "tirebusiness": {
-        "module": "crains"
-    },
-    "thedailybeast": {
-        "module": "dailybeast"
+    "dj": {
+        "module": "wsj"
     },
     "discovermagazine": {
         "module": "discovermag",
@@ -76,35 +73,11 @@
     "espn": {
         "module": "espn"
     },
+    "european-rubber-journal": {
+        "module": "crains"
+    },
     "ft": {
         "module": "ft"
-    },
-    "beaconjournal": {
-        "module": "gannett"
-    },
-    "usatoday": {
-        "module": "gannett"
-    },
-    "avclub": {
-        "module": "gawker"
-    },
-    "gizmodo": {
-        "module": "gawker"
-    },
-    "jalopnik": {
-        "module": "gawker"
-    },
-    "kotaku": {
-        "module": "gawker"
-    },
-    "lifehacker": {
-        "module": "gawker"
-    },
-    "theinventory": {
-        "module": "gawker"
-    },
-    "theonion": {
-        "module": "gawker"
     },
     "gfycat": {
         "module": "gfycat"
@@ -112,8 +85,8 @@
     "giphy": {
         "module": "giphy"
     },
-    "theguardian": {
-        "module": "guardian"
+    "gizmodo": {
+        "module": "gawker"
     },
     "hackernoon": {
         "module": "hackernoon",
@@ -124,14 +97,23 @@
     "ign": {
         "module": "ign"
     },
-    "businessinsider": {
-        "module": "insider"
-    },
     "insider": {
         "module": "insider"
     },
     "instagram": {
         "module": "instagram"
+    },
+    "jalopnik": {
+        "module": "gawker"
+    },
+    "jwplayer": {
+        "module": "jwplayer"
+    },
+    "kotaku": {
+        "module": "gawker"
+    },
+    "lifehacker": {
+        "module": "gawker"
     },
     "mashable": {
         "module": "mashable"
@@ -142,23 +124,20 @@
     "megaphone.fm": {
         "module": "megaphonefm"
     },
-    "curbed": {
-        "module": "nymag"
-    },
     "grubstreet": {
         "module": "nymag"
+    },
+    "nbcsports": {
+        "module": "wp_posts"
     },
     "nymag": {
         "module": "nymag"
     },
-    "thecut": {
-        "module": "nymag"
-    },
-    "vulture": {
-        "module": "nymag"
-    },
     "nytimes": {
         "module": "nyt"
+    },
+    "omny": {
+        "module": "omnyfm"
     },
     "pcmag": {
         "module": "pcmag"
@@ -166,8 +145,20 @@
     "pitchfork": {
         "module": "pitchfork"
     },
+    "plasticsnews": {
+        "module": "crains"
+    },
+    "post-gazette": {
+        "module": "pg"
+    },
     "reuters": {
         "module": "reuters"
+    },
+    "rollingstone": {
+        "module": "rollingstone"
+    },
+    "rubbernews": {
+        "module": "crains"
     },
     "seekingalpha": {
         "module": "seekingalpha"
@@ -178,11 +169,50 @@
     "spotify": {
         "module": "spotify"
     },
+    "slate": {
+        "module": "clay"
+    },
+    "stereogum": {
+        "module": "wp_posts"
+    },
+    "theathletic": {
+        "module": "athletic"
+    },
+    "thecut": {
+        "module": "nymag"
+    },
+    "thedailybeast": {
+        "module": "dailybeast"
+    },
+    "theguardian": {
+        "module": "guardian"
+    },
+    "TheHackersNews": {
+        "module": "extractor"
+    },
+    "theinventory": {
+        "module": "gawker"
+    },
+    "theonion": {
+        "module": "gawker"
+    },
+    "theplayerstribune": {
+        "module": "playerstribune"
+    },
     "tiktok": {
         "module": "tiktok"
     },
+    "tirebusiness": {
+        "module": "crains"
+    },
     "twitter": {
         "module": "twitter"
+    },
+    "usatoday": {
+        "module": "gannett"
+    },
+    "variety": {
+        "module": "variety"
     },
     "vanityfair": {
         "module": "vanityfair"
@@ -193,37 +223,22 @@
     "vimeo": {
         "module": "vimeo"
     },
+    "vogue": {
+        "module": "cne"
+    },
+    "vulture": {
+        "module": "nymag"
+    },
     "washingtonpost": {
         "module": "wapo"
     },
     "wired": {
         "module": "wired"
     },
-    "nbcsports": {
-        "module": "wp_posts"
-    },
-    "rollingstone": {
-        "module": "rollingstone"
-    },
-    "slate": {
-        "module": "clay"
-    },
-    "stereogum": {
-        "module": "wp_posts"
-    },
-    "variety": {
-        "module": "variety"
-    },
-    "vogue": {
-        "module": "cne"
-    },
     "wksu": {
         "module": "wksu"
     },
     "wsj": {
-        "module": "wsj"
-    },
-    "dj": {
         "module": "wsj"
     },
     "yahoo": {
@@ -240,8 +255,5 @@
     },
     "zdnet": {
         "module": "zdnet"
-    },
-    "TheHackersNews": {
-        "module": "extractor"
     }
 }
