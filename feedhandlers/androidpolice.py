@@ -234,7 +234,7 @@ def get_content(url, args, save_debug=False):
       if it:
         script = article_body.find('script', string=re.compile(r'window\.arrayOfEmbeds\["{}"\]'.format(it['id'])))
         if script:
-          m = re.search(r'<img src="([^"\']+)"', script.string, flags=re.S)
+          m = re.search(r'<img src="([^"\']+)"', html.unescape(script.string), flags=re.S)
           if m:
             poster = '{}/image?url={}&width=128&height=128'.format(config.server, quote_plus(m.group(1)))
       if not poster:
