@@ -1,6 +1,6 @@
-import re
+import json, re
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 from feedhandlers import fusion
 import utils
@@ -105,7 +105,46 @@ def get_content(url, args, save_debug=False, d=''):
     utils.write_file(content, './debug/debug.json')
   return get_item(content, url, args, save_debug)
 
+def get_search_feed(args, save_debug=False):
+  split_url = urlsplit(args['url'])
+  d = fusion.get_domain_value('https://www.cleveland.com')
+  if not d:
+    return None
+
+  query = parse_qs(split_url.query)['q'][0]
+
+  react_js = utils.get_url_html('https://www.cleveland.com/pf/dist/engine/react.js?d=' + d)
+  for m in re.findall(r'function\(e\)\{e\.exports=JSON\.parse\(\'(\{.+?\})\'\)', react_js):
+    m_js = json.loads(m.replace("\'", "\\'"))
+    if m_js.get('querylyKey') and m_js['domain'] == 'cleveland.com':
+      break
+
+  queryly = utils.get_url_html('https://api.queryly.com/v4/search.aspx?queryly_key={}&initialized=1&&query={}&endindex=0&batchsize=20&callback=&extendeddatafields=&timezoneoffset=300&uiversion=1'.format(m_js['querylyKey'], query))
+  m = re.search(r'results = JSON\.parse\(\'(.+?)\'\);\s', queryly)
+  if not m:
+    debugg.warning('no queryly results found for ' + args['url'])
+    return None
+
+  queryly_results = json.loads(m.group(1))
+  n = 0
+  items = []
+  for result in queryly_results['items']:
+    item = get_content(result['link'], args, save_debug)
+    if item:
+      if utils.filter_item(item, args) == True:
+        items.append(item)
+        n += 1
+        if 'max' in args:
+          if n == int(args['max']):
+            break
+  feed = utils.init_jsonfeed(args)
+  feed['items'] = items.copy()
+  return feed
+
 def get_feed(args, save_debug=False):
+  if '/search/'in args['url']:
+    return get_search_feed(args, save_debug)
+
   split_url = urlsplit(args['url'])
   d = fusion.get_domain_value('{}://{}'.format(split_url.scheme, split_url.netloc))
   if not d:
