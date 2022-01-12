@@ -181,13 +181,14 @@ def get_story(story_json, args, save_debug=False):
         inline = story_json['inlines'][n]
         if inline['type'] == 'iFrame':
           inline_soup = BeautifulSoup(inline['body'], 'html.parser')
-          if inline_soup.blockquote and 'twitter-tweet' in inline_soup.blockquote['class']:
-            it = inline_soup.blockquote.find_all('a')
-            new_html = utils.add_embed(it[-1]['href'])
-          elif inline_soup.blockquote and 'instagram-media' in inline_soup.blockquote['class']:
-            new_html = utils.add_embed(inline_soup.blockquote['data-instgrm-permalink'])
-          else:
-            logger.warning('unhandled inline iframe {} in {}'.format(el.name, url))
+          for bq in inline_soup.find_all('blockquote'):
+            if 'twitter-tweet' in bq['class']:
+              it = bq.find_all('a')
+              new_html += utils.add_embed(it[-1]['href'])
+            elif 'instagram-media' in bq['class']:
+              new_html += utils.add_embed(bq['data-instgrm-permalink'])
+            else:
+              logger.warning('unhandled inline iframe {} in {}'.format(el.name, url))
 
         elif inline['type'] == 'Module':
           if inline['moduleType'] == 'pullquote':
