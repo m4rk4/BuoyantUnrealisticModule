@@ -224,14 +224,22 @@ def get_content(url, args, save_debug=False):
 
   item['summary'] = article_json['description']
 
-  item['content_html'] = ''
+  hero = ''
   if article_json.get('hero'):
-    if article_json['hero'].get('image'):
-      item['content_html'] += add_image(article_json['hero']['image'])
     if article_json['hero'].get('video'):
-      logger.warning('unhandled hero video in ' + url)
-  elif article_json.get('main_image'):
-    item['content_html'] += add_image(article_json['main_image'])
+      if article_json['hero']['video']['type'] == 'jw':
+        m = re.search(r'src="([^"]+)"', article_json['hero']['video']['mixedContent'])
+        hero = utils.add_embed(m.group(1))
+      else:
+        logger.warning('unhandled hero video type {} in {}'.format(article_json['hero']['video']['type'], url))
+    if not hero and article_json['hero'].get('image'):
+      hero = add_image(article_json['hero']['image'])
+  if not hero and article_json.get('main_image'):
+    hero = add_image(article_json['main_image'])
+
+  item['content_html'] = ''
+  if hero:
+    item['content_html'] = hero
 
   if article_json.get('body'):
     cards = article_json['body']['cards']
