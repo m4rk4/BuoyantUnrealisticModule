@@ -195,10 +195,19 @@ def get_content(url, args, save_debug=False):
       el.decompose()
 
     for el in article_body.find_all(class_='w-twitter'):
+      tweet_url = ''
       it = el.find(class_='twitter-tweet')
-      new_html = utils.add_embed(utils.get_twitter_url(it['id']))
-      el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-      el.decompose()
+      if it:
+        tweet_url = utils.get_twitter_url(it['id'])
+      else:
+        if el.get('id') and re.search('^\d+$', el['id']):
+          tweet_url = utils.get_twitter_url(el['id'])
+      if tweet_url:
+        new_html = utils.add_embed(tweet_url)
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
+      else:
+        logger.warning('unhandled tweet in ' + url)
 
     for el in article_body.find_all(class_='w-youtube'):
       new_html = utils.add_embed('https://www.youtube.com/watch?v=' + el['id'])
