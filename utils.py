@@ -384,8 +384,13 @@ def bs_get_inner_html(soup):
   # Also strips \n
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
-def add_blockquote(text):
-  return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
+def add_blockquote(quote):
+  if quote.startswith('<p>'):
+    quote = quote.replace('<p>', '')
+    quote = quote.replace('</p>', '<br/><br/>')
+    if quote.endswith('<br/><br/>'):
+      quote = quote[:-10]
+  return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
   return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td style="padding-top:0.5em;"><em>'
@@ -399,6 +404,11 @@ def close_pullquote(author=''):
   return end_html
 
 def add_pullquote(quote, author=''):
+  if quote.startswith('<p>'):
+    quote = quote.replace('<p>', '')
+    quote = quote.replace('</p>', '<br/><br/>')
+    if quote.endswith('<br/><br/>'):
+      quote = quote[:-10]
   # Strip quotes
   if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
     quote = quote[1:-1]

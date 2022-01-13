@@ -54,11 +54,13 @@ def process_content_element(element, url, func_resize_image, gallery=None):
     element_html += '<blockquote><b>{}</b><br>{}</blockquote>'.format(element['correction_type'].upper(), element['text'])
 
   elif element['type'] == 'quote':
+    text = ''
+    for el in element['content_elements']:
+      text += process_content_element(el, url, func_resize_image, gallery)
     if element['subtype'] == 'blockquote':
-      text = ''
-      for el in element['content_elements']:
-        text += process_content_element(el, url, func_resize_image, gallery)
-      element_html += '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(text)
+      element_html += utils.add_blockquote(text)
+    elif element['subtype'] == 'pullquote':
+      element_html += utils.add_pullquote(text)
     else:
       logger.warning('unhandled quote item type "{}" in {}'.format(element['subtype'], url))
 
