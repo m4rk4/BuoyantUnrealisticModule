@@ -270,17 +270,21 @@ def get_content(url, args, save_debug=False):
           it['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
         el.unwrap()
 
-      for el in article_body.find_all('blockquote'):
-        it = el.find(class_='pullquote')
-        if it:
-          quote = ''
-          for p in it.find_all('p'):
-            if quote:
-              quote += '<br/><br/>'
-            quote += re.sub(r'^<[^>]+>|<\/[^>]+>$', '', str(p).strip()).strip()
-          new_html = utils.add_pullquote(quote)
-          el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-          el.decompose()
+    for el in article_body.find_all('blockquote'):
+      new_html = ''
+      it = el.find(class_='pullquote')
+      if it:
+        quote = ''
+        for p in it.find_all('p'):
+          if quote:
+            quote += '<br/><br/>'
+          quote += re.sub(r'^<[^>]+>|<\/[^>]+>$', '', str(p).strip()).strip()
+        new_html = utils.add_pullquote(quote)
+      else:
+        new_html = utils.add_blockquote(utils.bs_get_inner_html(el))
+      if new_html:
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
 
     for el in article_body.find_all(class_='article-jumplink'):
       it = el.find(class_='jumplink-title')
