@@ -103,8 +103,7 @@ def get_story(story_json, args, save_debug=False):
     story_html = re.sub(r'<!--(\w+)-->', r'<\1></\1>', story_html)
   elif story_json['type'] == 'Preview':
     story_html = story_html.replace('\n\n\r\n', '<br/><br/>')
-  story_html = re.sub(r'<(inline\d*|photo\d*|video\d*)>(?!\s*<\/(inline\d*|photo\d*|video\d*)>)', r'<\1></\1>', story_html)
-  print(story_html)
+  story_html = re.sub(r'<(inline\d*|photo\d*|video\d*)[^>]*>(?!\s*<\/(inline\d*|photo\d*|video\d*))', r'<\1></\1>', story_html)
   story_soup = BeautifulSoup(story_html, 'html.parser')
   if save_debug:
     utils.write_file(str(story_soup), './debug/debug.html')
@@ -193,6 +192,25 @@ def get_story(story_json, args, save_debug=False):
         elif inline['type'] == 'Module':
           if inline['moduleType'] == 'pullquote':
             new_html = utils.add_pullquote(inline['body'], inline['byline'])
+          elif inline['moduleType'] == 'table':
+            new_html = '<table style="min-width:80%; margin-left:auto; margin-right:auto; border:1px solid black; border-collapse:collapse;">'
+            if inline['json'].get('headline'):
+              new_html += '<caption>{}</caption>'.format(inline['json']['headline'])
+            if inline['json'].get('header'):
+              new_html += '<tr>'
+              for it in inline['json']['header']:
+                new_html += '<th style="border:1px solid black;">{}</th>'.format(it)
+              new_html += '</tr>'
+            for row in inline['json']['body']:
+              new_html += '<tr>'
+              for i, it in enumerate(row):
+                if i == 0:
+                  new_html += '<td style="border:1px solid black;">{}</td>'.format(it)
+                else:
+                  new_html += '<td style="border:1px solid black; text-align:center;">{}</td>'.format(it)
+              new_html += '</tr>'
+            new_html += '</table>'
+
           elif inline['moduleType'] == 'default':
             pass
           else:
