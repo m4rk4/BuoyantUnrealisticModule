@@ -23,12 +23,12 @@ def get_content(url, args, save_debug=False):
   if args.get('bibliogram'):
     m = re.search(r'{}\/([^\/]+)\/([^\/]+)'.format(args['bibliogram']), url)
   else:
-    m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)\/([^\/]+)', url)
+    m = re.search(r'https?:\/\/(www\.)?instagram\.com\/([^\/]+)\/([^\/]+)', url)
   if not m:
     logger.warning('unable to parse Instgram url ' + url)
     return None
 
-  ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(1), m.group(2))
+  ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(2), m.group(3))
   ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1')
   if not ig_embed:
     return ''

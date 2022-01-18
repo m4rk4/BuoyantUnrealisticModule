@@ -156,6 +156,12 @@ def get_content(url, args, save_debug=False):
         el.insert_after(BeautifulSoup(utils.add_image(el['href'] + '?width=1000'), 'html.parser'))
         el.decompose()
 
+    for el in page_soup.find_all('blockquote', class_='twitter-tweet'):
+      tweet_url = el.find_all('a')[-1]['href']
+      if re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url):
+        el.insert_after(BeautifulSoup(utils.add_embed(tweet_url), 'html.parser'))
+        el.decompose()
+
     item['content_html'] = ''
     lead = False
     if page_json.get('headerImageUrl'):
@@ -262,16 +268,17 @@ def get_feed(args, save_debug=False):
   page_html = utils.get_url_html(args['url'])
   if not page_html:
     return None
-  if save_debug:
-    utils.write_file(page_html, './debug/debug.html')
+  soup = BeautifulSoup(page_html, 'html.parser')
+  next_data = soup.find('script', id='__NEXT_DATA__')
+  if next_data:
+    next_json = json.loads(next_data.string)
+    if save_debug:
+      utils.write_file(next_json, './debug/feed.json')
 
   n = 0
   items = []
   feed = utils.init_jsonfeed(args)
-
-  soup = BeautifulSoup(page_html, 'html.parser')
-
-  for content_feed in soup.find_all(class_='content-feed-grid-wrapper'):    
+  for content_feed in soup.find_all(class_='content-feed-grid-wrapper'):
     for a in content_feed.find_all('a', class_="item-body"):
       url = a['href']
       if not url.startswith('https://www.ign.com/'):

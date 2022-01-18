@@ -88,6 +88,9 @@
     "gizmodo": {
         "module": "gawker"
     },
+    "grubstreet": {
+        "module": "nymag"
+    },
     "hackernoon": {
         "module": "hackernoon",
         "buildId": "LIj_tmvpWhbhqvGfbg7ih",
@@ -96,6 +99,9 @@
     },
     "ign": {
         "module": "ign"
+    },
+    "iheart": {
+        "module": "iheart"
     },
     "insider": {
         "module": "insider"
@@ -124,8 +130,11 @@
     "megaphone.fm": {
         "module": "megaphonefm"
     },
-    "grubstreet": {
-        "module": "nymag"
+    "msnbc": {
+        "module": "nbcnews"
+    },
+    "nbcnews": {
+        "module": "nbcnews"
     },
     "nbcsports": {
         "module": "wp_posts"

@@ -429,11 +429,10 @@ def get_image_size(img_src):
   return None
 
 def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
-  begin_html = '<figure'
+  begin_html = '<figure style="margin:0; padding:0;'
   if fig_style:
-    begin_html += ' style={}>'.format(fig_style)
-  else:
-    begin_html += '>'
+    begin_html += ' {}'.format(fig_style)
+  begin_html += '">'
 
   if link:
     begin_html += '<a href="{}">'.format(link)
@@ -805,3 +804,10 @@ def add_embed(url, args={}, save_debug=False):
     if content:
       return content['content_html']
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(url)
+
+def get_content(url, args, save_debug=False):
+  content = None
+  module = get_module(url)
+  if module:
+    content = module.get_content(url, args, save_debug)
+  return content
