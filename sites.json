@@ -27,6 +27,12 @@
     "bandcamp": {
         "module": "bandcamp"
     },
+    "bbc": {
+        "module": "bbc"
+    },
+    "bbci": {
+        "module": "bbc"
+    },
     "barrons": {
         "module": "wsj"
     },
@@ -36,11 +42,17 @@
     "billboard": {
         "module": "billboard"
     },
+    "bleacherreport": {
+        "module": "breport"
+    },
     "bloomberg": {
         "module": "bloomberg"
     },
     "businessinsider": {
         "module": "insider"
+    },
+    "brightcove": {
+        "module": "brightcove"
     },
     "carbuzz": {
         "module": "carbuzz"
@@ -93,9 +105,13 @@
     },
     "hackernoon": {
         "module": "hackernoon",
-        "buildId": "LIj_tmvpWhbhqvGfbg7ih",
+        "buildId": "8XvUwliFILfwFfAJeOs9u",
         "x-algolia-application-id": "mo7dwh9y8c",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340"
+    },
+    "hackster": {
+        "module": "hackster",
+        "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDEtMTlUMTM6MzI6NDQrMDAwMCIsImV4cCI6IjIwMjItMDEtMTlUMTU6MzI6NDQrMDAwMCIsInJuZCI6ImE3NjIxMmI5MzkxYzNlYzhhNmZhNDQ2YTc1YTE5NmNmIn0.l4Sq9uEQmA9GbyLl7NJqd9Tm4PpfHgTV6jBxvyAFaYGEeOGlJUn8FgWx67dTYk0YpB7yzn0hx6e4AZ301v9Y9A"
     },
     "ign": {
         "module": "ign"

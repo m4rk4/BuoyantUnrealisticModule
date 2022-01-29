@@ -79,10 +79,22 @@ def get_content(url, args, save_debug=False):
         new_html = add_image(image)
         del article_images[i]
         break
-    if new_html:
-      new_el = BeautifulSoup(new_html, 'html.parser')
-      el.insert_after(new_el)
-      el.decompose()
+    if not new_html:
+      captions = []
+      it = el.find(class_='pg-embedcode-largeimage-text')
+      if it:
+        caption = it.get_text().strip()
+        if caption:
+          captions.append(caption)
+      it = el.find(class_='pg-embedcode-largeimage-credit')
+      if it:
+        caption = it.get_text().strip()
+        if caption:
+          captions.append(caption)
+      new_html = utils.add_image(el.img['src'], ' | '.join(captions))
+    new_el = BeautifulSoup(new_html, 'html.parser')
+    el.insert_after(new_el)
+    el.decompose()
 
   for el in soup.find_all('blockquote', class_='twitter-tweet'):
     tweet_url = el.find_all('a')
@@ -93,11 +105,42 @@ def get_content(url, args, save_debug=False):
       el.insert_after(new_el)
       el.decompose()
 
+  for el in soup.find_all(attrs={"data-ps-embed-type": "slideshow"}):
+    slideshow_html = utils.get_url_html('https://post-gazette.photoshelter.com/embed?type=slideshow&G_ID=' + el['data-ps-embed-gid'])
+    m = re.search(r'"api_key":"(\w+)"', slideshow_html)
+    if m:
+      post_data = {"fields": "*", "f_https_link": "t", "api_key": m.group(1)}
+      slideshow_json = utils.post_url('https://post-gazette.photoshelter.com/psapi/v2.0/gallery/' + el['data-ps-embed-gid'], data=post_data)
+      if slideshow_json:
+        post_data = {"fields": "*", "f_https_link": "t", "page": 1, "ppg": 250, "limit": 250, "offset": 0, "api_key": m.group(1)}
+        images_json = utils.post_url('https://post-gazette.photoshelter.com/psapi/v2.0/gallery/{}/images'.format(el['data-ps-embed-gid']), data=post_data)
+        if images_json:
+          new_html = '<h3>Gallery: {} ({} images)</h3>'.format(slideshow_json['data']['name'], len(images_json['data']['images']))
+          for image in images_json['data']['images']:
+            img_src = '{}/sec={}/fit=1000x800'.format(image['link_elements']['base'], image['link_elements']['token'])
+            caption = image['caption'].replace('#standalone', '').strip()
+            new_html += utils.add_image(img_src, caption) + '<br/>'
+          new_el = BeautifulSoup(new_html, 'html.parser')
+          el.insert_after(new_el)
+          el.decompose()
+
+  for el in soup.find_all('iframe'):
+    new_html = utils.add_embed(el['src'])
+    new_el = BeautifulSoup(new_html, 'html.parser')
+    el_parent = el
+    if el.parent and (el.parent.name == 'p' or el.parent.name == 'div'):
+      el_parent = el.parent
+    el_parent.insert_after(new_el)
+    el_parent.decompose()
+
+  for el in soup.find_all('script'):
+    el.decompose()
+
   item['content_html'] += str(soup)
 
   if article_images:
     for image in article_images:
-      item['content_html'] += add_image(image)
+      item['content_html'] += add_image(image) + '<br/>'
 
   return item
 

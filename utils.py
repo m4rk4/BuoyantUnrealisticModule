@@ -64,7 +64,7 @@ def requests_retry_session(retries=4, proxies=None):
   session.mount('https://', adapter)
   return session
 
-def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
+def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False):
   if user_agent == 'desktop':
     ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36'
   elif user_agent == 'mobile':
@@ -93,7 +93,7 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
         verify = False
       else:
         verify = True
-      r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10, verify=verify)
+      r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, verify=verify)
       r.raise_for_status()
     except Exception as e:
       if r != None:
@@ -112,8 +112,8 @@ def get_request(url, user_agent, headers=None, retries=3, use_proxy=False):
       proxies = config.proxies
   return r
 
-def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, use_proxy)
+def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     try:
       return r.json()
@@ -122,14 +122,14 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, use_proxy=F
       write_file(r.text, './debug/json.txt')
   return None
 
-def get_url_html(url, user_agent='desktop', headers=None, retries=3, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, use_proxy)
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
 
-def get_url_content(url, user_agent='googlebot', headers=None, retries=3, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, use_proxy)
+def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_proxy=False):
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.content
   return None
@@ -195,18 +195,18 @@ def get_url_title_desc(url):
     desc = None
   return title, desc
 
-def post_url(url, data, headers=None):
+def post_url(url, data=None, json_data=None, headers=None):
   try:
-    if headers:
-      if isinstance(data, dict):
-        r = requests.post(url, json=data, headers=headers)
-      else:
+    if data:
+      if headers:
         r = requests.post(url, data=data, headers=headers)
-    else:
-      if isinstance(data, dict):
-        r = requests.post(url, json=data)
       else:
         r = requests.post(url, data=data)
+    elif json_data:
+      if headers:
+        r = requests.post(url, json=json_data, headers=headers)
+      else:
+        r = requests.post(url, json=json_data)
     r.raise_for_status()
   except requests.exceptions.HTTPError as e:
     status_code = e.response.status_code
@@ -390,6 +390,8 @@ def add_blockquote(quote):
     quote = quote.replace('</p>', '<br/><br/>')
     if quote.endswith('<br/><br/>'):
       quote = quote[:-10]
+  if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
+    return add_pullquote(quote)
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
@@ -437,20 +439,17 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   if link:
     begin_html += '<a href="{}">'.format(link)
 
-  begin_html += '<img src="{}"'.format(img_src)
-
+  begin_html += '<img src="{}" style="'.format(img_src)
+  style = ''
   if width:
-    begin_html += ' width="{}"'.format(width)
+    begin_html += 'width:{};'.format(width)
   else:
-    begin_html += ' width="100%"'
-
+    begin_html += 'width:100%;'
   if height:
-    begin_html += ' height="{}"'.format(height)
-
+    begin_html += ' height:{};'.format(height)
   if img_style:
-    begin_html += ' style="{}"'.format(img_style)
-
-  begin_html += '/>'
+    style += ' {}'.format(img_style)
+  begin_html += '"/>'
 
   if link:
     begin_html += '</a>'
@@ -463,7 +462,6 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
 
   if gawker:
     return begin_html, end_html
-
   return begin_html + end_html
 
 def add_audio(audio_src, audio_type, poster='', title='', desc='', link=''):
@@ -533,11 +531,11 @@ def add_video(video_url, video_type, poster='', caption='', width='', height='',
       poster += '&height={}'.format(height)
     poster += '&overlay=video'
   else:
-    poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server)
+    poster = '{}/image?'.format(config.server)
     if width:
-      poster += '?width={}'.format(width)
+      poster += 'width={}'.format(width)
     else:
-      poster += '?width=1280'
+      poster += 'width=1280'
     if height:
       poster += '&height={}'.format(height)
     else:
@@ -564,6 +562,7 @@ def get_youtube_id(ytstr):
     else:
       logger.warning('unable to determine Youtube playlist id in ' + ytstr)
 
+  m = None
   yt_video_id = ''
   if '/watch?' in ytstr:
     m = re.search(r'v=([a-zA-Z0-9_-]{11})', ytstr)
@@ -785,19 +784,21 @@ def add_audio_track(track_info):
   return '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(track_info['audio_src'], track_info['image'], desc)
 
 def add_embed(url, args={}, save_debug=False):
+  embed_url = url
+  if url.startswith('//'):
+    embed_url = 'https:' + url
+  if 'twitter.com' in url:
+    embed_url = clean_url(url)
+  if 'cloudfront.net' in url:
+    embed_url = get_redirect_url(embed_url)
+  logger.debug('embed content from ' + url)
+
   embed_args = args.copy()
   embed_args['embed'] = True
   # limit playlists to 10 items
   if re.search(r'(apple|bandcamp|soundcloud|spotify)', url):
     embed_args['max'] = 10
 
-  logger.debug('embed content from ' + url)
-  if url.startswith('//'):
-    embed_url = 'https:' + url
-  else:
-    embed_url = url
-  if 'cloudfront.net' in url:
-    embed_url = get_redirect_url(embed_url)
   module = get_module(embed_url)
   if module:
     content = module.get_content(embed_url, embed_args, save_debug)

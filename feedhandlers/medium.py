@@ -152,9 +152,10 @@ def get_content(url, args, save_debug=False):
         image = article_json[paragraph['metadata']['__ref']]
       else:
         image = paragraph['metadata']
-      start_tag += '<div class="image"><figure><img width="100%" src="{}" /><figcaption><small>'.format(medium_image_src(image['id']))
-      end_tag = '</small></figcaption></figure></div>'
+      start_tag, end_tag = utils.add_image(medium_image_src(image['id']), gawker=True)
       paragraph_text = paragraph['text']
+      #start_tag += '<figure style="margin:0; padding:0;"><img width="100%" src="{}" /><figcaption><small>'.format(medium_image_src(image['id']))
+      #end_tag = '</small></figcaption></figure></div>'
 
     elif paragraph_type == 'pre':
       start_tag += '<pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">'

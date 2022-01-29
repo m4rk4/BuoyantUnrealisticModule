@@ -688,50 +688,69 @@ def get_block_item(block_id, initial_state):
   sub_items = []
   if block.get('groupings'):
     content_html += '<h2>Groupings</h2>'
-    for group in block['groupings']:
-      if group['typename'] == 'LegacyCollectionGrouping':
-        for container in initial_state[group['id']]['containers']:
-          print(initial_state[container['id']]['name'])
-          for relation in initial_state[container['id']]['relations']:
-            asset = get_block_item(initial_state[relation['id']]['asset']['id'], initial_state)
+    for block_group in block['groupings']:
+      group = initial_state[block_group['id']]
+      if group['__typename'] == 'LegacyCollectionGrouping':
+        for group_container in group['containers']:
+          container = initial_state[group_container['id']]
+          print(container['name'])
+          if container['name'] == 'promos' or container['name'] == 'footer':
+            continue
+          for container_relation in container['relations']:
+            relation = initial_state[container_relation['id']]
+            asset = get_block_item(relation['asset']['id'], initial_state)
             if asset:
-              if initial_state[container['id']]['name'] == 'feed lede':
+              if asset.get('title'):
+                print(asset['title'])
+              else:
+                print(asset['id'])
+              if asset.get('_timestamp'):
+                if not [it for it in sub_items if it['_timestamp'] == asset['_timestamp']]:
+                  sub_items.append(asset)
+              else:
                 content_html += asset['content_html'] + '<hr/>'
-              elif not [it for it in sub_items if it['_timestamp'] == asset['_timestamp']]:
-                sub_items.append(asset)
       else:
         logger.warning('unhandled group type {} in {}'.format(group['typename'], block_id))
 
   if block.get('highlights'):
     content_html += '<h2>Highlights</h2>'
-    if block['highlights']['typename'] == 'AssetsConnection':
-      for edge in initial_state[block['highlights']['id']]['edges']:
+    highlights = initial_state[block['highlights']['id']]
+    if highlights['__typename'] == 'AssetsConnection':
+      for edge in highlights['edges']:
         node = get_block_item(initial_state[edge['id']]['node']['id'], initial_state)
         if node and not [it for it in sub_items if it['_timestamp'] == node['_timestamp']]:
           sub_items.append(node)
     else:
-      logger.warning('unhandled highlights type {} in {}'.format(group['typename'], block_id))
+      logger.warning('unhandled highlights type {} in {}'.format(highlights['__typename'], highlights['id']))
 
   for key, val in block.items():
     if key.startswith('stream('):
       content_html += '<h2>Stream</h2>'
-      if block['highlights']['typename'] == 'AssetsConnection':
-        for edge in initial_state[block['highlights']['id']]['edges']:
-          node = get_block_item(initial_state[edge['id']]['node']['id'], initial_state)
+      stream = initial_state[val['id']]
+      if stream['__typename'] == 'AssetsConnection':
+        for stream_edge in stream['edges']:
+          edge = initial_state[stream_edge['id']]
+          if edge.get('node'):
+            node = get_block_item(edge['node']['id'], initial_state)
+          elif edge.get('node@filterEmpty'):
+            node = get_block_item(edge['node@filterEmpty']['id'], initial_state)
+          else:
+            node = None
           if node and not [it for it in sub_items if it['_timestamp'] == node['_timestamp']]:
             sub_items.append(node)
       else:
-        logger.warning('unhandled stream type {} in {}'.format(group['typename'], block_id))
+        logger.warning('unhandled stream type {} in {}'.format(stream['typename'], stream['id']))
 
   if block.get('associatedAssets'):
     content_html += '<h2>Associated Assets</h2>'
-    if block['highlights']['typename'] == 'AssociatedLegacyCollectionAssetBlock':
-      for ass in block['associatedAssets']:
-        asset = get_block_item(initial_state[ass['id']]['asset']['id'], initial_state)
-        if asset and not [it for it in sub_items if it['_timestamp'] == asset['_timestamp']]:
-          sub_items.append(asset)
-    else:
-      logger.warning('unhandled associatedAssets type {} in {}'.format(group['typename'], block_id))
+    for block_asset in block['associatedAssets']:
+      asset = get_block_item(initial_state[block_asset['id']]['asset']['id'], initial_state)
+      if asset:
+        if asset.get('_timestamp'):
+          if not [it for it in sub_items if it['_timestamp'] == asset['_timestamp']]:
+            sub_items.append(asset)
+        else:
+          content_html += asset['content_html']
 
   if sub_items:
     #uniq_items = {it['_timestamp']: it for it in sub_items}.values()

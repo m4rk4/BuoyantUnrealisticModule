@@ -127,36 +127,31 @@ def get_content(url, args, save_debug=False):
         img_src = utils.image_from_srcset(el['srcset'], 640)
       else:
         img_src = el['src']
-      figure = utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), width=480, link=img_src)
-      post_media += figure[8:-9]
+      post_media += utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), width='480px', link=img_src)
 
   elif media_type == 'GraphVideo':
     if ig_data:
       video_src = ig_data['shortcode_media']['video_url']
       img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
-      figure = utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width=480, link=video_src)
-      post_media += figure[8:-9]
+      post_media += utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width='480px', link=video_src)
     else:
       el = soup.find('img', class_='EmbeddedMediaImage')
       if el:
         poster = '{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(el['src']))
         caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
-        figure = utils.add_image(poster, caption, width=480, link=ig_url)
-        post_media += figure[8:-9]
+        post_media += utils.add_image(poster, caption, width='480px', link=ig_url)
 
   elif media_type == 'GraphSidecar':
     if ig_data:
       for edge in ig_data['shortcode_media']['edge_sidecar_to_children']['edges']:
         if edge['node']['__typename'] == 'GraphImage':
           img_src = edge['node']['display_resources'][0]['src']
-          figure = utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), width=480, link=img_src)
-          post_media += figure[8:-9]
+          post_media += utils.add_image('{}/image?url={}&width=480'.format(config.server, quote_plus(img_src)), width='480px', link=img_src)
 
         elif edge['node']['__typename'] == 'GraphVideo':
           video_src = edge['node']['video_url']
           img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
-          figure = utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width=480, link=video_src)
-          post_media += figure[8:-9]
+          post_media += utils.add_image('{}/image?url={}&width=480&overlay=video'.format(config.server, quote_plus(img['src'])), width='480px', link=video_src)
 
         post_media += '<br/><br/>'
       post_media = post_media[:-10]

@@ -106,19 +106,25 @@ def get_content(url, args, save_debug=False):
         body_html += utils.add_embed(body_json[1]['props']['url'])
 
       elif body_json[1]['type'] == 'clip':
+        captions = []
         m = re.search(r'<p>(.*)<\/p>', body_json[1]['props']['dangerousCaption'])
         if m:
-          caption = m.group(1)
-        else:
-          caption = body_json[1]['props']['dangerousCaption']
-        caption += ' ' + body_json[1]['props']['dangerousCredit']
-
+          captions.append(m.group(1))
+        elif body_json[1]['props']['dangerousCaption'].strip():
+          captions.append(body_json[1]['props']['dangerousCaption'].strip())
+        if body_json[1]['props'].get('dangerousCredit') and body_json[1]['props']['dangerousCredit'].strip():
+          captions.append(body_json[1]['props']['dangerousCredit'].strip())
         videos = []
         for k in list(body_json[1]['props']['image']['sources'].keys()):
           videos.append(body_json[1]['props']['image']['sources'][k])
         video = utils.closest_dict(videos, 'height', 480)
-        if body_html.find(quote_plus(video['url'])) < 0:
-          body_html += utils.add_video(video['url'], 'video/mp4', None, caption.strip(), video['width'], video['height'])
+        img_src = video['url'].replace('.mp4', '.gif')
+        if utils.url_exists(img_src):
+          if body_html.find(quote_plus(img_src)) < 0:
+            body_html += utils.add_image(img_src, ' | '.join(captions))
+        else:
+          if body_html.find(quote_plus(video['url'])) < 0:
+            body_html += utils.add_video(video['url'], 'video/mp4', None, ' | '.join(captions), video['width'], video['height'])
 
       elif body_json[1]['type'] == 'cneembed':
         video_id = ''
@@ -295,30 +301,26 @@ def get_content(url, args, save_debug=False):
 
   # Add lede image to article
   lead_html = ''
-  caption = ''
+  captions = []
   img_url = ''
   if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
     lede = article_json[page_type]['headerProps']['lede']
+    if lede.get('caption'):
+      m = re.search(r'<p>(.*)<\/p>', lede['caption'])
+      if m:
+        captions.append(m.group(1))
+      else:
+        if lede['caption'].strip():
+          captions.append(lede['caption'].strip())
+    if lede.get('credit') and lede['credit'].strip():
+      captions.append(lede['credit'].strip())
     if lede.get('contentType') == 'photo':
-      if lede.get('caption'):
-        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
-        if m:
-          caption = m.group(1)
-        else:
-          caption = lede['caption']
-      if lede.get('credit'):
-        caption += ' ' + lede['credit']
       img_url = lede['sources'][img_size]['url']
     elif lede.get('contentType') == 'clip':
-      if lede.get('caption'):
-        m = re.search(r'<p>(.*)<\/p>', lede['caption'])
-        if m:
-          caption = m.group(1)
-        else:
-          caption = lede['caption']
-      if lede.get('credit'):
-        caption += ' ' + lede['credit']
-      lead_html = utils.add_video(lede['sources']['640w']['url'], 'video/mp4', caption=caption.strip())
+      if utils.url_exists(lede['sources']['640w']['url'].replace('.mp4', '.gif')):
+        img_url = lede['sources']['640w']['url'].replace('.mp4', '.gif')
+      else:
+        lead_html = utils.add_video(lede['sources']['640w']['url'], 'video/mp4', caption=' | '.join(captions))
     elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
       video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
       if video_json:
@@ -330,7 +332,7 @@ def get_content(url, args, save_debug=False):
   elif item.get('_image'):
     img_url = item['_image']
   if img_url:
-    lead_html = utils.add_image(img_url, caption.strip())
+    lead_html = utils.add_image(img_url, ' | '.join(captions))
 
   item['content_html'] = ''
   if lead_html:
