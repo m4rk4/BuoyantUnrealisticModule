@@ -1,4 +1,4 @@
-import math, re, requests
+import math, re
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -9,6 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_authorization_header():
+  # https://open.spotify.com/get_access_token?reason=transport&productType=embed_podcast
   # Top Songs - USA
   url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
   spotify_html = utils.get_url_html(url)
