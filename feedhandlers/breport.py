@@ -1,9 +1,8 @@
-import math, re
+import json, math, re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
-from feedhandlers import rss
-import utils
+import config, utils
 
 import logging
 
@@ -93,6 +92,50 @@ def format_element(element):
     return content_html
 
 
+def get_user_post(url, args, save_debug=False):
+    post_html = utils.get_url_html(url)
+    if not post_html:
+        return None
+    m = re.search(r'<!--\s+window\.INITIAL_STORE_STATE = ({.+?});\s+-->', post_html)
+    if not m:
+        logger.warning('unable to parse INITIAL_STORE_STATE data from ' + url)
+        return None
+    state_json = json.loads(m.group(1))
+    if save_debug:
+        utils.write_file(state_json, './debug/debug.json')
+
+    item = {}
+    item['id'] = state_json['page']['id']
+    item['url'] = state_json['user_post']['shareUrl']
+    item['title'] = state_json['user_post']['content']['description']
+    if len(item['title']) > 50:
+        m = re.search(r'^([\w\W\d\D\s]{50}[^\s]*)', item['title'], flags=re.S | re.U)
+        item['title'] = m.group(1) + '...'
+
+    dt = datetime.fromisoformat(state_json['user_post']['inserted_at'].replace('Z', '+00:00'))
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
+
+    item['author'] = {"name": state_json['user_post']['authorInfo']['username']}
+
+    item['summary'] = state_json['user_post']['content']['description']
+
+    if state_json['user_post']['authorInfo'].get('photo_url'):
+        avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(state_json['user_post']['authorInfo']['photo_url']))
+    else:
+        avatar = '{}/image?width=48&height=48&mask=ellipse'.format(config.server)
+
+    item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><b>{1}</b></span></div><br/><div style="clear:left;"></div>'.format(avatar, item['author']['name'])
+
+    if state_json['user_post'].get('media'):
+        for media in state_json['user_post']['media']:
+            item['content_html'] += media
+
+    item['content_html'] += '<p>{}</p><small>{}</p></div>'.format(item['summary'], item['_display_date'])
+    return item
+
+
 def get_track_content(track, args, save_debug=False):
     if save_debug:
         utils.write_file(track, './debug/debug.json')
@@ -100,6 +143,9 @@ def get_track_content(track, args, save_debug=False):
     url = track['content']['metadata']['share_url']
     if url.startswith('https://bleacherreport.com/articles/'):
         return get_content(url, args, save_debug)
+
+    if '/user_post/' in url:
+        return get_user_post(url, args, save_debug)
 
     if track['content_type'] == 'poll' or track['content_type'] == 'external_article' or track['content_type'] == 'deeplink' or track['content_type'] == 'bet_track':
         logger.warning('skipping track content_type {} in {}'.format(track['content_type'], url))
@@ -145,7 +191,8 @@ def get_track_content(track, args, save_debug=False):
         item['tags'] = []
         item['tags'].append(track['tag']['display_name'])
 
-    item['_image'] = resize_image(track['content']['metadata']['thumbnail_url'])
+    if track['content']['metadata'].get('thumbnail_url'):
+        item['_image'] = resize_image(track['content']['metadata']['thumbnail_url'])
 
     if track['content']['metadata'].get('description'):
         item['summary'] = track['content']['metadata']['description']
@@ -171,6 +218,9 @@ def get_content(url, args, save_debug=False):
         if not post_json:
             return None
         return get_track_content(post_json['tracks'][0], args, save_debug)
+
+    if '/user_post' in url:
+        return get_user_post(url, args, save_debug)
 
     m = re.search(r'\/articles\/(\d+)', url)
     if not m:
