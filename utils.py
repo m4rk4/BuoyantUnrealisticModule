@@ -302,8 +302,8 @@ def init_jsonfeed(args):
   return feed
 
 def format_display_date(dt):
-  dt_est = dt.astimezone(pytz.timezone(config.local_tz))
-  return '{}. {}, {}, {}:{} {} EST'.format(dt_est.strftime('%b'), dt_est.day, dt_est.year, int(dt_est.strftime('%I')), dt_est.strftime('%M'), dt_est.strftime('%p').lower())
+  dt_loc = dt.astimezone(pytz.timezone(config.local_tz))
+  return '{}. {}, {}, {}:{} {} EST'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower())
 
 def random_alphanumeric_string(str_len=8):
   letters_digits = string.ascii_letters + string.digits
