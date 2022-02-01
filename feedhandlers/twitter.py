@@ -399,7 +399,7 @@ def get_content(url, args, save_debug=False):
         except Exception as e:
             logger.warning('TwitterSearchScraper.get_items exception {} in {}'.format(e.__class__, clean_url))
 
-    content_html += '</table>'
+    content_html += '</table><br/>'
     item['content_html'] = content_html
     return item
 
