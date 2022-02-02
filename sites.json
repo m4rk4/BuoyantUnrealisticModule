@@ -13,7 +13,7 @@
     },
     "apple": {
         "module": "apple",
-        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjMzNDUzNzU2LCJleHAiOjE2Mzk2NzQ1NTYsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.qlGFbohnsbm6faxvdKrr1yF5_n4Ni09UkJcXOYaWLZeF7ogVJGhSVCxocP975k3fQpTSfCt5aU8SN5ooi8syzQ"
+        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjQyMDMyNzM0LCJleHAiOjE2NDgyNTM1MzQsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.JP6FzMM2uxxNdjqblsoRzhSsdQRq3j8wZZQlxdd-dw1IwT3cxdRO7CQVRZQ7cRZOPTx0mJ-dkLpz2X2WiRtmEA"
     },
     "art19": {
         "module": "art19"
