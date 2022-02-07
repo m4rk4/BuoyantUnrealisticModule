@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 
 def get_content(url, args, save_debug=False):
   # https://cdn.jwplayer.com/players/QjZKj8Po-AjIcq1uW.js
-  m = re.search(r'\/players\/([^-]+)', url)
+  m = re.search(r'/(players|previews)/([^-]+)', url)
   if not m:
     return None
 
-  video_json = utils.get_url_json('https://cdn.jwplayer.com/v2/media/' + m.group(1))
+  video_json = utils.get_url_json('https://cdn.jwplayer.com/v2/media/' + m.group(2))
   if not video_json:
     return None
   if save_debug:
