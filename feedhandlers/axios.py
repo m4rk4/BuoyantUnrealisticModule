@@ -265,17 +265,17 @@ def get_feed(args, save_debug=False):
     if len(paths) == 0:
         api_url = 'https://api.axios.com/api/render/stream/content/?audience_slug=national&page_size=10'
 
-    elif paths[1] == 'local':
+    elif paths[0] == 'local':
         # Works for https://www.axios.com/local/columbus but not charlotte
-        api_url = 'https://api.axios.com/api/render/stream/content/?audience_slug={}&page_size=10'.format(paths[2])
+        api_url = 'https://api.axios.com/api/render/stream/content/?audience_slug={}&page_size=10'.format(paths[1])
 
-    elif paths[1] == 'authors':
-        api_url = 'https://api.axios.com/api/render/stream/content/?author_username={}&page_size=10'.format(paths[2])
+    elif paths[0] == 'authors':
+        api_url = 'https://api.axios.com/api/render/stream/content/?author_username={}&page_size=10'.format(paths[1])
 
-    elif paths[1] == 'newsletters':
+    elif paths[0] == 'newsletters':
         render_type = 'newsletters'
         if len(paths) > 1:
-            newsletter = paths[2]
+            newsletter = paths[1]
         dt = datetime.utcnow()
         api_url = 'https://api.axios.com/api/render/newsletters/?audience_slug=national&year={}&month={}'.format(dt.year, dt.month)
         api_json = utils.get_url_json(api_url)
