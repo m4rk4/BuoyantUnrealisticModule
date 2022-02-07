@@ -90,16 +90,19 @@ def get_content_html(content_uri):
     else:
       logger.warning('unhandled external video content in https://' + content_uri)
 
-  elif '/blockquote/' in content_uri:
+  elif '/blockquote/' in content_uri or '/slate-blockquote/' in content_uri:
     soup = BeautifulSoup(content_json['text'], 'html.parser')
     if soup:
       for p in soup.find_all('p'):
         p.unwrap()
       text = str(soup)
       text = text.replace('<br/>', '<br/><br/>')
-      content_html = utils.add_blockquote(text)
     else:
-      content_html = utils.add_blockquote(content_json['text'])
+      text = content_json['text']
+    if content_json.get('citation'):
+      content_html = utils.add_pullquote(text, content_json['citation'])
+    else:
+      content_html = utils.add_blockquote(text)
 
   elif '/pull-quote/' in content_uri:
     text = content_json['quote']
