@@ -24,6 +24,9 @@
     "avclub": {
         "module": "gawker"
     },
+    "axios": {
+        "module": "axios"
+    },
     "bandcamp": {
         "module": "bandcamp"
     },
