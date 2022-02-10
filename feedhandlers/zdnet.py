@@ -301,10 +301,11 @@ def get_content_html(soup, item):
         new_html = ''
         it = soup.find('span', class_='score')
         if it:
-            new_html += '<div style="font-size:4em; margin:0; padding:0;">{}</div>'.format(it.get_text())
-        it = soup.find('span', class_='ratingText')
-        if it:
-            new_html += '<div><em>{}</em></div>'.format(it.get_text())
+            new_html += '<div style="font-size:4em; margin:0; padding:0; float:left;">{}</div>'.format(it.get_text())
+            it = soup.find('span', class_='ratingText')
+            if it:
+                new_html += '<div style="padding-top:2.5em; padding-left:1em;"><em>{}</em></div>'.format(it.get_text())
+            new_html += '<div style="clear:left;"></div>'
         it = el.find('ul', class_='pros')
         if it:
             new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">Pros</h4><ul style="margin-top:0;">'
@@ -331,10 +332,11 @@ def get_content_html(soup, item):
         new_html = ''
         it = el.find(class_='rating-number')
         if it:
-            new_html += '<div style="font-size:4em; margin:0; padding:0;">{}</div>'.format(it.get_text())
-        it = el.find(class_='product-score')
-        if it:
-            new_html += '<div><em>{}</em></div>'.format(it.get_text())
+            new_html += '<div style="font-size:4em; margin:0; padding:0; float:left;">{}</div>'.format(it.get_text())
+            it = el.find(class_='product-score')
+            if it:
+                new_html += '<div style="padding-top:2.5em; padding-left:1em;"><em>{}</em></div>'.format(it.get_text())
+            new_html += '<div style="clear:left;"></div>'
         it = el.find('ul', class_='review-card-likes')
         if it:
             new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">{}</h4><ul style="margin-top:0;">'.format(
