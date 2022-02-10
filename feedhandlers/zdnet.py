@@ -391,7 +391,7 @@ def get_content_html(soup, item):
         try:
             if el.strong and re.search(r'^(Also:|Must read:|SEE:|See also:)', el.strong.get_text()):
                 el.decompose()
-            elif el.strong and re.search(r'^(RECENT AND RELATED CONTENT)', el.strong.string):
+            elif el.strong and re.search(r'^(RECENT (AND|&) RELATED CONTENT)', el.strong.string):
                 while ((el.next_sibling.a and el.next_sibling.a.strong) or (
                         el.next_sibling.strong and el.next_sibling.strong.a)):
                     el.next_sibling.decompose()
