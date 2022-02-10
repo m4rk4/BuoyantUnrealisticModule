@@ -346,9 +346,21 @@ def get_content(url, args, save_debug=False):
                                     if i == n and group_caption:
                                         if caption:
                                             group_caption = caption + '<br />' + group_caption
-                                        new_html += utils.add_image(it['json']['media'], group_caption)
+                                        new_html += utils.add_image(it['json']['media'], group_caption) + '<br/>'
                                     else:
-                                        new_html += utils.add_image(it['json']['media'], caption)
+                                        new_html += utils.add_image(it['json']['media'], caption) + '<br/>'
+
+                        elif url_json['subType'] == 'parallax-gallery':
+                            for it in url_json['serverside']['data']['data']['items']:
+                                if it['type'] == 'image':
+                                    caption = it['data'].get('mediaBody')
+                                    if caption and caption.startswith('<p>'):
+                                        caption = caption[3:-4]
+                                    if it['data'].get('mediaCredit'):
+                                        caption += ' | ' + it['data']['mediaCredit']
+                                    new_html += utils.add_image(it['data']['media'], caption) + '<br/>'
+                                else:
+                                    logger.warning('unhandled paralax-gallery item in ' + m.group(1))
 
                         elif url_json['subType'] == 'series-navigation':
                             new_html = '<h4>{}</h4><ul>'.format(url_json['serverside']['data']['data']['data']['title'])
