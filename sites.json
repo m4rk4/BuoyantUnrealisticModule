@@ -158,6 +158,9 @@
     "nbcsports": {
         "module": "wp_posts"
     },
+    "neilyoungarchives": {
+        "module": "nya"
+    },
     "nymag": {
         "module": "nymag"
     },
@@ -190,6 +193,9 @@
     },
     "seekingalpha": {
         "module": "seekingalpha"
+    },
+    "softpedia": {
+        "module": "softpedia"
     },
     "soundcloud": {
         "module": "soundcloud"
