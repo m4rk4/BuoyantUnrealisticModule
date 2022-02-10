@@ -145,7 +145,7 @@ def get_item(content_data, args, save_debug=False):
       if not exists and media.get('externalId'):
         exists = re.search(media['externalId'], item['content_html'])
       if not exists:
-        item['content_html'] += add_media(media)
+        item['content_html'] += add_media(media) + '<br/>'
 
   return item
 
