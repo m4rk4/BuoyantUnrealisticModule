@@ -46,7 +46,14 @@ def format_styles(block, entities):
     for style in block['entityRanges']:
         i = style['offset']
         j = i + style['length']
-        style_text = block['text'][i:j]
+        if i == 0:
+            pre_text = ''
+        else:
+            pre_text = block['text'][i-1]
+        if j == len(block['text']):
+            post_text = ''
+        else:
+            post_text = block['text'][j]
         entity = entities[style['key']]
         if entity['type'] == 'LINK':
             if entity['data'].get('href'):
@@ -55,11 +62,15 @@ def format_styles(block, entities):
                 href = entity['data']['url']
             if 'link.axios.com' in href:
                 href = utils.get_redirect_url(href)
-            style_html = '<a href="{}">{}</a>'.format(href, style_text)
+            # This is a bit hacky to avoid duplicate matches
+            style_text = '{}{}{}'.format(pre_text, block['text'][i:j], post_text)
+            style_html = '{}<a href="{}">{}</a>{}'.format(pre_text, href, block['text'][i:j], post_text)
+            print(style_text, style_html)
             block_html = block_html.replace(style_text, style_html)
         else:
             logger.warning('unhandled entity type ' + entity['type'])
     return block_html
+
 
 def format_blocks(blocks):
     content_html = ''
