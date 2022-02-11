@@ -1,6 +1,5 @@
-import json, pytube, re, sys
-from pytube.cipher import Cipher
-from urllib.parse import parse_qs, quote_plus
+import json, re
+from urllib.parse import quote_plus
 
 import config, utils
 from feedhandlers import rss
@@ -97,68 +96,11 @@ def get_content(url, args, save_debug=False):
   item['summary'] = yt_json['videoDetails']['shortDescription']
 
   if yt_json['playabilityStatus']['status'] == 'OK':
-    if False:
-      utils.write_file(yt_json['streamingData'], './debug/youtube.json')
-
-    h = 480
-    if args and args.get('height'):
-      h = int(args['height'])
-
-    streams = {}
-    if yt_json['streamingData'].get('formats'):
-      streams['_video'] = utils.closest_dict(yt_json['streamingData']['formats'], 'height', h)
-    else:
-      yt_streams = []
-      for yt_stream in yt_json['streamingData']['adaptiveFormats']:
-        if 'video/mp4' in yt_stream['mimeType']:
-          yt_streams.append(yt_stream)
-      if yt_streams:
-        streams['_video'] = utils.closest_dict(yt_streams, 'height', h)
-
-    yt_streams = []
-    for yt_stream in yt_json['streamingData']['adaptiveFormats']:
-      if 'audio/mp4' in yt_stream['mimeType']:
-        yt_streams.append(yt_stream)
-    if yt_streams:
-      streams['_audio'] = utils.closest_dict(yt_streams, 'bitrate', 128000)
-
-    #streams['_audio'] = [stream for stream in yt_json['streamingData']['adaptiveFormats'] if stream['itag'] == 251][0]
-
-    for key, stream in streams.items():
-      if stream.get('url'):
-        item[key] = stream['url']
-      elif stream.get('signatureCipher'):
-        if save_debug:
-          logger.debug('decoding signatureCipher for ' + url)
-        try:
-          cipher_url = parse_qs(stream['signatureCipher'])
-          js_url = pytube.extract.js_url(yt_html)
-          js = utils.get_url_html(js_url)
-          cipher = Cipher(js=js)
-          signature = cipher.get_signature(cipher_url['s'][0])
-          item[key] = cipher_url['url'][0] + '&sig=' + signature
-        except Exception as e:
-          logger.warning('error decoding signatureCipher {} in {}'.format(e.__class__, url))
-      else:
-        logger.warning('unable to get the {} stream in {}'.format(key, url))
-
     caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
     if yt_list_id:
       caption += ' | <a href="{}&list={}">View playlist</a>'.format(yt_watch_url, yt_list_id)
-
-    item['content_html'] = ''
-    if args and 'embed' in args:
-      if args and 'audio' in args and item.get('_audio'):
-        item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
-      elif item.get('_video'):
-        video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
-        item['content_html'] = utils.add_video(video_src, 'video/mp4', item['_image'], caption)
-    else:
-      if args and 'audio' in args and item.get('_audio'):
-        item['content_html'] = '<center><audio controls><source src="{}"></audio'.format(item['_audio'])
-      elif item.get('_video'):
-        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'], caption)
-
+    poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = utils.add_image(poster, caption, link=yt_embed_url)
   else:
     if yt_json['playabilityStatus'].get('errorScreen'):
       overlay = yt_json['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']
