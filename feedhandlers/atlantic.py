@@ -180,12 +180,18 @@ def get_content(url, args, save_debug=False):
 
     item['tags'] = []
     if article_json.get('primaryChannel'):
-        item['tags'].append(article_json['primaryChannel']['displayName'])
+        tag = article_json['primaryChannel']['displayName']
+        if not tag.casefold() in (it.casefold() for it in item['tags']):
+            item['tags'].append(tag)
     if article_json.get('primaryCategory'):
-        item['tags'].append(article_json['primaryCategory']['displayName'])
+        tag = article_json['primaryCategory']['displayName']
+        if not tag.casefold() in (it.casefold() for it in item['tags']):
+            item['tags'].append(tag)
     if article_json.get('categories'):
-        for tag in article_json['categories']:
-            item['tags'].append(tag['slug'])
+        for cat in article_json['categories']:
+            tag = cat['slug'].replace('-', ' ')
+            if not tag.casefold() in (it.casefold() for it in item['tags']):
+                item['tags'].append(tag)
     if len(item['tags']) == 0:
         del item['tags']
 
@@ -281,4 +287,8 @@ def get_content(url, args, save_debug=False):
 
 
 def get_feed(args, save_debug=False):
+    # All: https://www.theatlantic.com/feed/all/
+    # Best of: https://www.theatlantic.com/feed/best-of/
+    # Section: https://www.theatlantic.com/feed/channel/-----
+    # Photos: http://feeds.feedburner.com/theatlantic/infocus
     return rss.get_feed(args, save_debug, get_content)
