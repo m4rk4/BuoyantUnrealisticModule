@@ -395,14 +395,18 @@ def add_blockquote(quote):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
-  return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td style="padding-top:0.5em;"><em>'
+  #return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td style="padding-top:0.5em;"><em>'
+  return '<blockquote style="margin:1.5em 10px; padding:0.5em 10px;"><div style="font-size:3em; float:left; margin-right:8px;">“</div><div style="font-size:3em; float:right; margin-left:8px; margin-top:4px;">”</div><div style="overflow:hidden; padding-top:0.5em;"><em>'
 
 def close_pullquote(author=''):
-  end_html = '</em></td><td style="text-align:left; vertical-align:bottom;"><span style="font-size:2em;">&#x201E;</span></td></tr>'
+  #end_html = '</em></td><td style="text-align:left; vertical-align:bottom;"><span style="font-size:2em;">&#x201E;</span></td></tr>'
+  #if author:
+    #end_html += '<tr><td>&nbsp;</td><td><small>&mdash;&nbsp;{}</small></td><td></td>&nbsp;</tr>'.format(author)
+  #end_html += '</table></blockquote>'
+  end_html = '</em>'
   if author:
-    #end_html += '<br /><small>&mdash;&nbsp;{}</small>'.format(author)
-    end_html += '<tr><td>&nbsp;</td><td><small>&mdash;&nbsp;{}</small></td><td></td>&nbsp;</tr>'.format(author)
-  end_html += '</table></blockquote>'
+    end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
+  end_html += '</div><div style="clear:both;"></div></blockquote>'
   return end_html
 
 def add_pullquote(quote, author=''):
