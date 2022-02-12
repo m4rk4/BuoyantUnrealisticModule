@@ -212,6 +212,9 @@
     "theathletic": {
         "module": "athletic"
     },
+    "theatlantic": {
+        "module": "atlantic"
+    },
     "thecut": {
         "module": "nymag"
     },
