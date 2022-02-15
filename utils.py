@@ -516,7 +516,8 @@ def add_video(video_url, video_type, poster='', caption='', width='', height='',
     if content:
       if content.get('_image'):
         poster = content['_image']
-      video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
+      #video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
+      video_src = video_url
       if not caption:
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
 
