@@ -82,6 +82,9 @@
         "module": "discovermag",
         "buildId": "945a192"
     },
+    "empireonline": {
+        "module": "empire"
+    },
     "engadget": {
         "module": "yahoo"
     },
@@ -133,6 +136,10 @@
     },
     "jwplayer": {
         "module": "jwplayer"
+    },
+    "kerrang": {
+        "module": "kerrang",
+        "buildId": "LnDSbSxopOym9D-E5OtEf"
     },
     "kotaku": {
         "module": "gawker"
