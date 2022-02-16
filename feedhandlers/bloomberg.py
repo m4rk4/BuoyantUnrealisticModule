@@ -349,6 +349,9 @@ def get_content(url, args, save_debug):
 
 
 def get_feed(args, save_debug=False):
+    if args['url'].endswith('.rss'):
+        return rss.get_feed(args, save_debug, get_content)
+
     split_url = urlsplit(args['url'])
     paths = split_url.path[1:].split('/')
     if len(paths) > 1:
