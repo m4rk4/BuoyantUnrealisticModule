@@ -1,4 +1,4 @@
-import json, operator, re
+import html, json, operator, re
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlsplit
 
