@@ -75,7 +75,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 
   if headers:
-    if headers.get('user-agent'):
+    if not (headers.get('user-agent') or headers.get('User-Agent')):
       headers['user-agent'] = ua
   else:
     headers = {}
