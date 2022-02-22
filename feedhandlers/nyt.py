@@ -564,7 +564,7 @@ def format_block(block_id, initial_state, arg1=None, arg2=None):
 
         if block.get('experimentalJsonBlob'):
             json_blob = json.loads(block['experimentalJsonBlob'])
-            # utils.write_file(json_blob, './debug/blob.json')
+            utils.write_file(json_blob, './debug/blob.json')
             for data in json_blob['data']:
                 for data_data in data['data']:
                     if data_data['type'] == 'lede':
@@ -579,6 +579,21 @@ def format_block(block_id, initial_state, arg1=None, arg2=None):
                         for item in data_data['data']['items']:
                             block_html += '<li><b>{}</b><br/>{}</li>'.format(item['subtitle'], item['text'])
                         block_html += '</ul>'
+                    elif data_data['type'] == 'topLinks':
+                        block_html += '<h4>{}</h4>{}<ul>'.format(data_data['data']['title'], data_data['data']['leadIn'])
+                        for item in data_data['data']['bulletedList']:
+                            block_html += '<li>{}</li>'.format(item)
+                        block_html += '</ul>'
+                    elif data_data['type'] == 'guide':
+                        block_html += '<h4>{}</h4>{}'.format(data_data['data']['title'], data_data['data']['leadIn'])
+                        for section in data_data['data']['sections']:
+                            if section['section'][0]['type'] == 'bulletedList':
+                                block_html += '<ul>'
+                                for item in section['section'][0]['value']:
+                                    block_html += '<li>{}</li>'.format(item)
+                                block_html += '</ul>'
+                            else:
+                                logger.warning('unhandled experimentalJsonBlob guide section type {}'.format(section['section'][0]['type']))
                     else:
                         logger.debug('unhandled experimentalJsonBlob data type {}'.format(data_data['type']))
             block_html += '<hr/></div>'
@@ -596,7 +611,6 @@ def get_legacy_collection_group(block_id, initial_state):
     for container in block['containers']:
         for relation in initial_state[container['id']]['relations']:
             asset = initial_state[relation['id']]['asset']
-            print(asset['id'])
             item = get_block_item(asset['id'], initial_state)
             if item:
                 items.append(item)
@@ -609,7 +623,6 @@ def get_assets_connection(block_id, initial_state):
     items = []
     for edge in block['edges']:
         node = initial_state[edge['id']]['node']
-        print(node['id'])
         item = get_block_item(node['id'], initial_state)
         if item:
             items.append(item)
@@ -624,7 +637,6 @@ def get_block_item(block_id, initial_state):
     if block.get('id'):
         item['id'] = block['id']
     else:
-        print('no id in ' + block_id)
         item['id'] = block_id
 
     if block.get('url'):
@@ -710,7 +722,6 @@ def get_block_item(block_id, initial_state):
             if group['__typename'] == 'LegacyCollectionGrouping':
                 for group_container in group['containers']:
                     container = initial_state[group_container['id']]
-                    print(container['name'])
                     if container['name'] == 'promos' or container['name'] == 'footer':
                         continue
                     for container_relation in container['relations']:
@@ -826,12 +837,14 @@ def get_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(article_html, './debug/debug.html')
 
-    m = re.search(r'<script>window\.__preloadedData = (.+);<\/script>', article_html)
+    m = re.search(r'<script>window\.__preloadedData = (.+);</script>', article_html)
     if not m:
         logger.warning('No preloadData found in ' + url)
         return None
+    if save_debug:
+        utils.write_file(m.group(1), './debug/debug.txt')
     try:
-        json_data = json.loads(m.group(1))
+        json_data = json.loads(m.group(1).replace(':undefined', ':""'))
     except:
         logger.warning('Error loading json data from ' + url)
         if save_debug:
