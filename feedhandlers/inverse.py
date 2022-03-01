@@ -207,9 +207,9 @@ def get_content(url, args, save_debug=False):
     graph_url = 'https://graph.bustle.com/?variables=%7B%22includeRelated%22%3Atrue%2C%22path%22%3A%22{}%22%2C%22site%22%3A%22INVERSE%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%223e1601b4aeed246b45902b5bc9c26249ddfb5471ce9a8fd118c0d2689c644655%22%7D%7D&_client=Inverse&_version=f488527'.format(quote_plus(split_url.path))
     graph_json = utils.get_url_json(graph_url)
     if graph_json:
-        logger.debug('graph json successful')
         article_json = graph_json['data']['site']['contentByPath']
     else:
+        logger.debug('graphql unsuccessful, extracting data from ' + url)
         article_html = utils.get_url_html(url)
         if not article_html:
             return None
