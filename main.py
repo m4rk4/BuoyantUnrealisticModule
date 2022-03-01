@@ -1,4 +1,4 @@
-import glob, os, re, requests, sys
+import av, glob, os, requests, sys
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from io import BytesIO
@@ -207,6 +207,9 @@ def debug():
 def image():
   im = None
   args = request.args
+  save = False
+  resized = False
+
   if not 'url' in args:
     w = -1
     h = -1
@@ -237,13 +240,22 @@ def image():
 
   if not im:
     try:
-      #im_overlay = Image.open(requests.get(args['url'].format(size), stream=True).raw)
-      r = requests.get(args['url'])
-      if r.status_code == 200:
-        im_io = BytesIO(r.content)
-        im = Image.open(im_io)
-        mimetype = im.get_format_mimetype()
-    except:
+      if args['url'].endswith('mp4'):
+        container = av.open(args['url'])
+        for frame in container.decode(video=0):
+          im = frame.to_image()
+          break
+        #mimetype = 'image/jpeg'
+        save = True
+      else:
+        #im_overlay = Image.open(requests.get(args['url'].format(size), stream=True).raw)
+        r = requests.get(args['url'])
+        if r.status_code == 200:
+          im_io = BytesIO(r.content)
+          im = Image.open(im_io)
+          mimetype = im.get_format_mimetype()
+    except Exception as e:
+      logger.warning('image exception: ' + str(e))
       im = None
 
   if not im:
@@ -256,8 +268,6 @@ def image():
   h = im.height
 
   # Do operations in the order of the args
-  resized = False
-  save = False
   for arg, val in args.items():
     # Resize specify scale or width and/or height
     if (arg == 'height' or arg == 'width' or arg == 'scale') and resized == False:
