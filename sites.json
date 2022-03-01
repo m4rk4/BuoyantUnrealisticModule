@@ -75,6 +75,9 @@
     "curbed": {
         "module": "nymag"
     },
+    "dwcdn": {
+        "module": "datawrapper"
+    },
     "dj": {
         "module": "wsj"
     },
@@ -131,6 +134,9 @@
     "instagram": {
         "module": "instagram"
     },
+    "inverse": {
+        "module": "inverse"
+    },
     "jalopnik": {
         "module": "gawker"
     },
@@ -155,6 +161,9 @@
     },
     "megaphone.fm": {
         "module": "megaphonefm"
+    },
+    "motortrend": {
+        "module": "motortrend"
     },
     "msnbc": {
         "module": "nbcnews"

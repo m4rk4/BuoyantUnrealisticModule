@@ -79,73 +79,39 @@ def get_post_content(post, args, save_debug=False):
   item['summary'] = post['excerpt']['rendered']
 
   content_html = ''
-  
-  if 'rollingstone.com' in item['url']:
-    # For RS, sometimes the content is just an extract. A simple test is to check for as starting tag
-    if not post['content']['rendered'].startswith('<'):
-      mobile_post = utils.get_url_json('https://www.rollingstone.com/wp-json/mobile-apps/v1/article/{}'.format(post['id']))
-      if mobile_post:
-        if save_debug:
-          with open('./debug/debug.json', 'w') as file:
-            json.dump(mobile_post, file, indent=4)
-        if not item.get('_image') and mobile_post.get('featured-image'):
-          for img in mobile_post['featured-image']['crops']:
-            if img['name'] == 'full':
-              item['_image'] = img['url']
-        if not 'nolead' in args:
-          if mobile_post.get('featured-video'):
-            if re.search(r'youtube|youtu\.be', mobile_post['featured-video']):
-              content_html += utils.add_youtube(mobile_post['featured-video'])
-            else:
-              video_id = mobile_post['featured-video'].split('-')[0]
-              video_json = utils.get_url_json('https://content.jwplatform.com/feeds/{}.json'.format(video_id))
-              if False or video_json:
-                sources = []
-                for video in video_json['playlist'][0]['sources']:
-                  if 'mp4' in video['type'] and 'width' in video:
-                    sources.append(video)
-                video = utils.closest_dict(sources, 'width', 640)
-                poster = utils.closest_dict(video_json['playlist'][0]['images'], 'width', 640)
-                content_html += utils.add_video(video['file'], 'video/mp4', poster['src'], video_json['playlist'][0]['title'])
-              else:
-                logger.warning('unhandled featured-video {} in {}'.format(mobile_post['featured-video'], item['url']))
-          elif item.get('_image'):
-            content_html += utils.add_image(item['_image'])
-        content_html += mobile_post['body']
+  if not 'nolead' in args and item.get('_image'):
+    content_html += utils.add_image(item['_image'])
 
-  if not content_html:
-    if not 'nolead' in args and item.get('_image'):
-      content_html += utils.add_image(item['_image'])
+  if post.get('content') and post['content'].get('rendered'):
+      content_html += post['content']['rendered']
 
-    if post.get('content') and post['content'].get('rendered'):
-        content_html += post['content']['rendered']
-
-    elif post.get('acf'):
-      for module in post['acf']['article_modules']:
-        if module['acf_fc_layout'] == 'text_block':
-          content_html += module['copy']
-        elif module['acf_fc_layout'] == 'list_module':
-          content_html += '<h3>{}</h3>'.format(module['title'])
-          if module['list_type'] == 'video':
-            if 'youtube' in module['video_url']:
-              for yt in re.findall(r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})', module['video_url']):
-                content_html += utils.add_youtube(yt)
-            else:
-              logger.warning('unhandled video_url in ' + item['url'])
+  elif post.get('acf'):
+    for module in post['acf']['article_modules']:
+      if module['acf_fc_layout'] == 'text_block':
+        content_html += module['copy']
+      elif module['acf_fc_layout'] == 'list_module':
+        content_html += '<h3>{}</h3>'.format(module['title'])
+        if module['list_type'] == 'video':
+          if 'youtube' in module['video_url']:
+            for yt in re.findall(r'youtube\.com\/embed\/([a-zA-Z0-9_-]{11})', module['video_url']):
+              content_html += utils.add_youtube(yt)
           else:
-            logger.warning('unhandled list_type {} in {}'.format(module['list_type'], item['url']))
-          content_html += module['copy']
-        elif module['acf_fc_layout'] == 'image_block':
-          content_html += utils.add_image(module['image'], module['caption'])
-        elif module['acf_fc_layout'] == 'affiliates_block' or  module['acf_fc_layout'] == 'inline_recirculation':
-          pass
+            logger.warning('unhandled video_url in ' + item['url'])
         else:
-          logger.warning('unhandled acf_fc_layout module {} in {}'.format(module['acf_fc_layout'], item['url']))
+          logger.warning('unhandled list_type {} in {}'.format(module['list_type'], item['url']))
+        content_html += module['copy']
+      elif module['acf_fc_layout'] == 'image_block':
+        content_html += utils.add_image(module['image'], module['caption'])
+      elif module['acf_fc_layout'] == 'affiliates_block' or  module['acf_fc_layout'] == 'inline_recirculation':
+        pass
+      else:
+        logger.warning('unhandled acf_fc_layout module {} in {}'.format(module['acf_fc_layout'], item['url']))
 
-    else:
-      logger.warning('unknown post content in {}' + item['url'])
+  else:
+    logger.warning('unknown post content in {}' + item['url'])
 
-  soup = BeautifulSoup(content_html, 'html.parser')  
+  soup = BeautifulSoup(content_html, 'html.parser')
+
   for el in soup.find_all(class_='post-content-image'):
     img = el.find('img')
     if img:
@@ -177,6 +143,21 @@ def get_post_content(post, args, save_debug=False):
       new_el = BeautifulSoup(utils.add_image(img['src'], caption), 'html.parser')
       el.insert_after(new_el)
       el.decompose()
+
+  for el in soup.find_all('img', class_=re.compile(r'wp-image-\d+')):
+    if el.get('srcset'):
+      img_src = utils.image_from_srcset(el['srcset'], 1000)
+    else:
+      img_src = el['src']
+    caption = ''
+    if el.parent and el.parent.name == 'p':
+      el_parent = el.parent
+      caption = el_parent.get_text()
+    else:
+      el_parent = el
+    new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
+    el_parent.insert_after(new_el)
+    el_parent.decompose()
 
   for el in soup.find_all(class_='embed-youtube'):
     iframe = el.find('iframe')
@@ -227,6 +208,12 @@ def get_post_content(post, args, save_debug=False):
     links = el.find_all('a')
     new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
     el.insert_after(new_el)
+    el.decompose()
+
+  for el in soup.find_all(id=re.compile(r'\bad\b')):
+    el.decompose()
+
+  for el in soup.find_all(class_=re.compile(r'\bad\b')):
     el.decompose()
 
   item['content_html'] = str(soup)
