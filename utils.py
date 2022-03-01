@@ -146,12 +146,12 @@ def get_redirect_url(url):
   r = None
   try:
     redirect_url = url
-    r = requests.get(url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
+    r = requests.get(url, headers={"Range": "bytes=0-100"}, allow_redirects=False, timeout=5)
     while r.is_redirect and i < 5:
       if not re.search(r'^https?:\/\/', r.headers['location']):
         break
       redirect_url = r.headers['location']
-      r = requests.get(redirect_url, headers={"Range": "bytes=0-100"}, allow_redirects=False)
+      r = requests.get(redirect_url, headers={"Range": "bytes=0-100"}, allow_redirects=False, timeout=5)
       i += 1
     redirect_url = r.url
   except Exception as e:
