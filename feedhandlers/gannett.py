@@ -243,7 +243,7 @@ def get_content(url, args, save_debug=False):
 
     # Photo galleries
     if '/picture-gallery/' in url:
-        item['content_html'] = get_v_content(soup)
+        item['content_html'] = get_gallery_content(soup)
         return item
 
     # News articles
