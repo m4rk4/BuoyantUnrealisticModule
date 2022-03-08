@@ -213,7 +213,13 @@ def get_content(url, args, save_debug=False):
     item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
-    item['author']['name'] = soup.find('meta', attrs={"name": "author"}).get('content')
+    author = soup.find('meta', attrs={"name": "author"})
+    if author:
+        item['author']['name'] = author.get('content')
+    elif soup.find('meta', attrs={"name": "article.type"}).get('content') == 'Letters':
+        item['author']['name'] = 'WSJ Letters'
+    else:
+        item['author']['name'] = 'WSJ'
 
     item['tags'] = soup.find('meta', attrs={"name": "news_keywords"}).get('content').split(',')
 
@@ -221,12 +227,18 @@ def get_content(url, args, save_debug=False):
     item['summary'] = soup.find('meta', attrs={"name": "article.summary"}).get('content')
 
     content_html = ''
-    lead = soup.find(class_=re.compile(r'articleLead|bigTop-hero'))
-    if lead:
-        if lead.find(class_='media-object-video'):
-            content_html += convert_amp_video(lead)
+    lead = ''
+    el = soup.find(class_=re.compile(r'articleLead|bigTop-hero'))
+    if el:
+        if el.find(class_='media-object-video'):
+            lead = convert_amp_video(el)
         else:  # media-object-image
-            content_html += convert_amp_image(lead)
+            lead = convert_amp_image(el)
+    if lead:
+        content_html += lead
+    else:
+        if item.get('_image'):
+            content_html += utils.add_image(item['_image'])
 
     article_body = soup.find(class_="articleBody")
     if not article_body:
@@ -271,6 +283,17 @@ def get_content(url, args, save_debug=False):
         elif el.find(class_='media-object-image'):
             new_html = convert_amp_image(el)
 
+        elif el.find(class_='media-object-slideshow'):
+            new_html = ''
+            it = el.find(class_='wsj-slideshow-title')
+            if it:
+                new_html += '<h3>Slideshow: {}</h3>'.format(it.get_text())
+            it = el.find(class_='wsj-media-dek')
+            if it:
+                new_html += '<p>{}</p>'.format(it.get_text())
+            for it in el.find_all(class_='media-object-slideshow-slide'):
+                new_html += convert_amp_image(it) + '<br/>'
+
         elif el.find(class_='media-object-video'):
             new_html = convert_amp_video(el)
 
@@ -300,10 +323,13 @@ def get_content(url, args, save_debug=False):
                         podcast_json['items'][0]['description'].replace('\n', '<br/>'))
 
         elif el.find(class_='media-object-rich-text'):
-            # List of articles
-            it = el.find('ul', class_='articleList')
-            if it:
-                it.parent.unwrap()
+            if el.ul:
+                # Usually a list of articles
+                el.ul.parent.unwrap()
+                el.unwrap()
+            elif el.h4:
+                # Usually a read more link
+                el.h4.parent.unwrap()
                 el.unwrap()
             else:
                 logger.warning('unhandled media-object-rich-text in ' + clean_url)
@@ -332,14 +358,12 @@ def get_content(url, args, save_debug=False):
                                 if it['sub_type'] == 'Origami Photo':
                                     caption = ''
                                     if it['json'].get('caption'):
-                                        if url_json['serverside']['data']['data']['data']['json'][
-                                            'groupedCaption'] == True:
+                                        if url_json['serverside']['data']['data']['data']['json']['groupedCaption'] == True:
                                             group_caption += it['json']['caption']
                                         else:
                                             caption += it['json']['caption']
                                     if it['json'].get('credit'):
-                                        if url_json['serverside']['data']['data']['data']['json'][
-                                            'groupedCredit'] == True:
+                                        if url_json['serverside']['data']['data']['data']['json']['groupedCredit'] == True:
                                             group_caption += it['json']['credit']
                                         else:
                                             caption += it['json']['credit']
@@ -406,4 +430,49 @@ def get_content(url, args, save_debug=False):
 
 
 def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+    if args['url'].endswith('.xml'):
+        return rss.get_feed(args, save_debug, get_content)
+    # https://www.wsj.com/?id=%7B%22count%22%3A20%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22group%22%3A%7B%22name%22%3A%22WSJ%22%7D%7D%2C%7B%22term%22%3A%7B%22key%22%3A%22SectionType%22%2C%22value%22%3A%22Personal%20Technology%3A%20Joanna%20Stern%22%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22liveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full
+    # https://www.wsj.com/?id=%7B%22count%22%3A10%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22term%22%3A%7B%22key%22%3A%22AuthorId%22%2C%22value%22%3A%227867%22%7D%7D%2C%7B%22terms%22%3A%7B%22key%22%3A%22Product%22%2C%22value%22%3A%5B%22WSJ.com%22%2C%22WSJPRO%22%5D%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22LiveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full
+
+    split_url = urlsplit(args['url'])
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if len(paths) == 2:
+        articles = utils.get_url_json('https://www.wsj.com/?id=%7B%22count%22%3A20%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22group%22%3A%7B%22name%22%3A%22WSJ%22%7D%7D%2C%7B%22term%22%3A%7B%22key%22%3A%22SectionName%22%2C%22value%22%3A%22{}%22%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22liveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(paths[1]))
+
+    elif len(paths) == 3:
+        if paths[1] == 'author':
+            author = utils.get_url_json('https://www.wsj.com/?id={}&type=author'.format(paths[2]))
+            if not author:
+                return None
+            articles = utils.get_url_json('https://www.wsj.com/?id=%7B%22count%22%3A10%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22term%22%3A%7B%22key%22%3A%22AuthorId%22%2C%22value%22%3A%22{}%22%7D%7D%2C%7B%22terms%22%3A%7B%22key%22%3A%22Product%22%2C%22value%22%3A%5B%22WSJ.com%22%2C%22WSJPRO%22%5D%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22LiveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(author['data']['authorId']))
+
+    if not articles:
+        return None
+    if save_debug:
+        utils.write_file(articles, './debug/feed.json')
+
+    n = 0
+    items = []
+    for article in articles['collection']:
+        article_json = utils.get_url_json('https://www.wsj.com/?id={}&type=article%7Ccapi'.format(article['id']))
+        if not article_json:
+            logger.warning('error getting article info for ' + article['id'])
+        if article_json['data']['articleType'] == 'Photos' or article_json['data']['articleType'] == 'Graphics':
+            logger.warning('skipping ' + article_json['data']['url'])
+            continue
+        if save_debug:
+            #utils.write_file(article_json, './debug/debug.json')
+            logger.debug('getting content for ' + article_json['data']['url'])
+        item = get_content(article_json['data']['url'], args, save_debug)
+        if item:
+            if utils.filter_item(item, args) == True:
+                items.append(item)
+                n += 1
+                if 'max' in args:
+                    if n == int(args['max']):
+                        break
+
+    feed = utils.init_jsonfeed(args)
+    feed['items'] = items.copy()
+    return feed
