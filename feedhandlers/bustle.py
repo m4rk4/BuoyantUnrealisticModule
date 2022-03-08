@@ -10,11 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def resize_image(img_src, width=1000):
     split_url = urlsplit(img_src)
     if split_url.netloc != 'imgix.bustle.com':
         return img_src
-    return '{}://{}{}?w=1000&fit=max&auto=format%2Ccompress'.format(split_url.scheme, split_url.netloc, split_url.path, width)
+    return '{}://{}{}?w={}&fit=max&auto=format%2Ccompress'.format(split_url.scheme, split_url.netloc, split_url.path, width)
+
 
 def add_image(image, caption=''):
     img_src = resize_image(image['url'])
@@ -41,7 +43,7 @@ def add_media(media_card):
     media_html = ''
     field_html = ''
     if media_card['fields'].get('caption'):
-        caption = render_body(media_card['fields']['caption'], None)
+        caption = render_body(media_card['fields']['caption'])
     else:
         caption = ''
     m = re.search(r'^<p>(.*)</p>$', caption)
@@ -52,10 +54,14 @@ def add_media(media_card):
         caption = ''
         field_html = '<p>{}</p>'.format(m.group(1))
     if media_card['fields'].get('attribution'):
-        if caption:
-            caption += ' | ' + media_card['fields']['attribution']
+        if media_card['fields'].get('attributionUrl'):
+            attribution = '<a href="{}">{}</a>'.format(media_card['fields']['attributionUrl'], media_card['fields']['attribution'])
         else:
-            caption = media_card['fields']['attribution']
+            attribution = media_card['fields']['attribution']
+        if caption:
+            caption += ' | ' + attribution
+        else:
+            caption = attribution
     if media_card['media']['__typename'] == 'Image':
         if media_card.get('image'):
             media_html += add_image(media_card['image'], caption)
@@ -73,27 +79,30 @@ def add_media(media_card):
     return media_html
 
 
-def render_card(card):
+def render_card(card, article_title='', list_index=0):
     card_html = ''
-    field_html = ''
+    if not card:
+        return card_html
+
     if card['type'] == 'media':
         card_html += add_media(card)
 
     elif card['type'] == 'headline':
-        field_html = render_body(card['fields']['headline'], None)
-        m = re.search(r'^<p>(.*)</p>$', field_html)
+        field_html = render_body(card['fields']['headline'])
+        m = re.search(r'^<[ph]\d?>(.*)</[ph]\d?>$', field_html)
         if m:
             field_html = m.group(1)
-        card_html += '<h3>{}</h3>'.format(field_html)
+        if not (article_title and field_html in article_title):
+            card_html += '<h2>{}</h2>'.format(field_html)
         if card['fields'].get('dek'):
-            card_html += render_body(card['fields']['dek'], None)
+            card_html += render_body(card['fields']['dek'])
         if card.get('image'):
             card_html += add_image(card['image'])
         if card.get('video'):
             card_html += add_video(card['video'])
 
     elif card['type'] == 'paragraph':
-        card_html += render_body(card['fields']['paragraph'], None)
+        card_html += render_body(card['fields']['paragraph'])
         if card.get('image'):
             card_html += add_image(card['image'])
         if card.get('video'):
@@ -104,7 +113,7 @@ def render_card(card):
             card_html += add_image(card['image'])
         if card.get('video'):
             card_html += add_video(card['video'])
-        field_html = render_body(card['fields']['quote'], None)
+        field_html = render_body(card['fields']['quote'])
         m = re.search(r'^<p>(.*)</p>$', field_html)
         if m:
             field_html = m.group(1)
@@ -112,13 +121,13 @@ def render_card(card):
 
     elif card['type'] == 'gallery':
         if card['fields'].get('title'):
-            field_html = render_body(card['fields']['title'], None)
-            m = re.search(r'^<p>(.*)</p>$', field_html)
+            field_html = render_body(card['fields']['title'])
+            m = re.search(r'^<[ph]\d?>(.*)</[ph]\d?>$', field_html)
             if m:
                 field_html = m.group(1)
-            card_html += '<h3>{}</h3>'.format(field_html)
+            card_html += '<h2>{}</h2>'.format(field_html)
         if card['fields'].get('description'):
-            card_html += render_body(card['fields']['description'], None)
+            card_html += render_body(card['fields']['description'])
         for it in card['fields']['items']:
             item = next(node for node in card['items']['nodes'] if node['id'] == it)
             card_html += add_media(item['card']) + '<br/>'
@@ -128,8 +137,47 @@ def render_card(card):
 
     elif card['type'] == 'product':
         poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(card['product']['primaryMedia']['url']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0;"><a href="{}">{}</a></h4>${:.2f} on {}'.format(card['product']['linkUrl'], card['product']['name'], card['product']['price']['amount']/100, card['product']['source'])
+        if card['product'].get('price'):
+            desc = '<h4 style="margin-top:0; margin-bottom:0;"><a href="{}">{}</a></h4>${:.2f} on {}'.format(card['product']['linkUrl'], card['product']['name'], card['product']['price']['amount'] / 100, card['product']['source'])
+        else:
+            desc = '<h4 style="margin-top:0; margin-bottom:0;"><a href="{}">{}</a></h4>From {}'.format(card['product']['linkUrl'], card['product']['name'], card['product']['source'])
         card_html += '<div style="margin-bottom:1em;"><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(card['product']['linkUrl'], poster, desc)
+
+    elif card['type'] == 'productCollection':
+        if card['fields'].get('title'):
+            field_html = render_body(card['fields']['title'])
+            m = re.search(r'^<[ph]\d?>(.*)</[ph]\d?>$', field_html)
+            if m:
+                field_html = m.group(1)
+            card_html += '<h2>{}</h2>'.format(field_html)
+        for node in card['cardZones']['nodes']:
+            card_html += render_card(node['card'])
+
+    elif card['type'] == 'icon':
+        field_html = render_body(card['fields']['description'])
+        m = re.search(r'^<p>(.*)</p>$', field_html)
+        if m:
+            field_html = m.group(1)
+        card_html += '<center><h3>{}</h3></center>'.format(field_html)
+        img_src = '{}/image?url={}&width=1000&overlay={}&overlay_position=(%2C0)'.format(config.server, quote_plus(resize_image(card['image']['url'])), quote_plus(card['icon']['url']))
+        caption = ''
+        if card['image'].get('attribution'):
+            caption += card['image']['attribution']
+        card_html += utils.add_image(img_src, caption)
+
+    elif card['type'] == 'listItem':
+        if card['fields'].get('title'):
+            field_html = render_body(card['fields']['title'])
+            m = re.search(r'^<[ph]\d?>(.*)</[ph]\d?>$', field_html)
+            if m:
+                field_html = m.group(1)
+            if list_index > 0:
+                card_html += '<h2>{}. {}</h2>'.format(list_index, field_html)
+            else:
+                card_html += '<h2>{}</h2>'.format(field_html)
+        if card.get('item'):
+            card_html += render_card(card['item']['card'])
+        card_html += render_body(card['fields']['body'], card['bodyZones'])
 
     else:
         logger.warning('unhandled card type ' + card['type'])
@@ -146,12 +194,16 @@ def render_markers(markers, markups):
             if len(marker[1]) != 0:
                 for i in marker[1]:
                     markup = markups[i]
-                    start_tag += '<' + markup[0]
-                    if len(markup) > 1:
-                        for j in range(0, len(markup[1]), 2):
-                            start_tag += ' {}="{}"'.format(markup[1][j], markup[1][j + 1])
-                    start_tag += '>'
-                    end_tag = '</{}>'.format(markup[0]) + end_tag
+                    if markup[0] == 'u':
+                        start_tag += '<span style="text-transform:uppercase;">'
+                        end_tag = '</span>' + end_tag
+                    else:
+                        start_tag += '<' + markup[0]
+                        if len(markup) > 1:
+                            for j in range(0, len(markup[1]), 2):
+                                start_tag += ' {}="{}"'.format(markup[1][j], markup[1][j + 1])
+                        start_tag += '>'
+                        end_tag = '</{}>'.format(markup[0]) + end_tag
             render_html += start_tag + marker[3] + end_tag
 
         elif marker[0] == 1:
@@ -164,7 +216,7 @@ def render_markup_section(section, markups):
     return '<{0}>{1}</{0}>'.format(section[1], render_markers(section[2], markups))
 
 
-def render_body(body, body_zones):
+def render_body(body, body_zones=None, article_title=''):
     body_html = ''
     for section in body['sections']:
         if section[0] == 1:
@@ -188,7 +240,7 @@ def render_body(body, body_zones):
             if card[0] == 'ZoneCard':
                 zone_card = next((zone for zone in body_zones if zone['id'] == card[1]['id']), None)
                 if zone_card:
-                    body_html += render_card(zone_card['card'])
+                    body_html += render_card(zone_card['card'], article_title)
 
             elif card[0] == 'DividerCard':
                 pass
@@ -204,7 +256,20 @@ def render_body(body, body_zones):
 
 def get_content(url, args, save_debug=False):
     split_url = urlsplit(url)
-    graph_url = 'https://graph.bustle.com/?variables=%7B%22includeRelated%22%3Atrue%2C%22path%22%3A%22{}%22%2C%22site%22%3A%22INVERSE%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%223e1601b4aeed246b45902b5bc9c26249ddfb5471ce9a8fd118c0d2689c644655%22%7D%7D&_client=Inverse&_version=f488527'.format(quote_plus(split_url.path))
+    if 'bustle' in split_url.netloc:
+        site = 'BUSTLE'
+    elif 'inputmag' in split_url.netloc:
+        site = 'INPUT'
+    elif 'inverse' in split_url.netloc:
+        site = 'INVERSE'
+    elif 'mic.com' in split_url.netloc:
+        site = 'MIC'
+    else:
+        logger.warning('unhandled url for bustle module: ' + url)
+        return None
+
+    graph_url = 'https://graph.bustle.com/?variables=%7B%22includeRelated%22%3Atrue%2C%22path%22%3A%22{}%22%2C%22site%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%223e1601b4aeed246b45902b5bc9c26249ddfb5471ce9a8fd118c0d2689c644655%22%7D%7D&_client=Inverse&_version=f488527'.format(
+        quote_plus(split_url.path), site)
     graph_json = utils.get_url_json(graph_url)
     if graph_json:
         article_json = graph_json['data']['site']['contentByPath']
@@ -258,21 +323,48 @@ def get_content(url, args, save_debug=False):
             item['tags'].append(tag['slug'])
 
     if article_json.get('metaImage'):
-        item['_image'] = article_json['metaImage']
+        item['_image'] = article_json['metaImage']['url']
+    elif article_json.get('header'):
+        if article_json['header']['card'].get('image'):
+            item['_image'] = article_json['header']['card']['image']['url']
+        elif article_json['header']['card'].get('video'):
+            item['_image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
+                article_json['header']['card']['video']['low']['url']))
+    elif article_json.get('teaser'):
+        if article_json['teaser'].get('image'):
+            item['_image'] = article_json['teaser']['image']['url']
+        elif article_json['teaser'].get('video'):
+            item['_image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
+                article_json['teaser']['video']['low']['url']))
 
     item['summary'] = article_json['description']
 
     item['content_html'] = ''
     if article_json.get('header'):
-        item['content_html'] += render_card(article_json['header']['card'])
+        item['content_html'] += render_card(article_json['header']['card'], item['title'])
+
+    if article_json.get('intro'):
+        item['content_html'] += render_body(article_json['intro'], article_json['introZones'])
 
     if article_json.get('body'):
         item['content_html'] += render_body(article_json['body'], article_json['bodyZones'])
 
+    if article_json.get('list'):
+        for i, card in enumerate(article_json['list']):
+            if article_json['listStyle'] == 'number':
+                item['content_html'] += render_card(card['card'], item['title'], i + 1)
+            else:
+                item['content_html'] += render_card(card['card'], item['title'])
+
     if article_json.get('cardZones'):
         for card in article_json['cardZones']:
-            item['content_html'] += render_card(card['card'])
+            item['content_html'] += render_card(card['card'], item['title'])
+
+    if article_json.get('outro'):
+        item['content_html'] += render_body(article_json['outro'])
+
     return item
+
 
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
