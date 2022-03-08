@@ -51,11 +51,14 @@
     "bloomberg": {
         "module": "bloomberg"
     },
+    "brightcove": {
+        "module": "brightcove"
+    },
     "businessinsider": {
         "module": "insider"
     },
-    "brightcove": {
-        "module": "brightcove"
+    "bustle": {
+        "module": "bustle"
     },
     "carbuzz": {
         "module": "carbuzz"
@@ -97,8 +100,16 @@
     "european-rubber-journal": {
         "module": "crains"
     },
+    "fortune": {
+        "module": "fortune",
+        "token": "Zm9ydHVuZTpCcHNyZmtNZCN5SndjWkkhNHFqMndEOTM=",
+        "api_key": "E21aWk5Llm80s3ipS4mV453y8Jt70cWP3mQnpu4k"
+    },
     "ft": {
         "module": "ft"
+    },
+    "gq": {
+        "module": "cne"
     },
     "gfycat": {
         "module": "gfycat"
@@ -128,6 +139,9 @@
     "iheart": {
         "module": "iheart"
     },
+    "inputmag": {
+        "module": "bustle"
+    },
     "insider": {
         "module": "insider"
     },
@@ -135,7 +149,7 @@
         "module": "instagram"
     },
     "inverse": {
-        "module": "inverse"
+        "module": "bustle"
     },
     "jalopnik": {
         "module": "gawker"
@@ -161,6 +175,9 @@
     },
     "megaphone.fm": {
         "module": "megaphonefm"
+    },
+    "mic": {
+        "module": "bustle"
     },
     "motortrend": {
         "module": "motortrend"
@@ -269,6 +286,12 @@
     },
     "vanityfair": {
         "module": "vanityfair"
+    },
+    "vice": {
+        "module": "vice"
+    },
+    "vicetv": {
+        "module": "vice"
     },
     "vidible": {
         "module": "vidible"
