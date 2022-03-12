@@ -81,7 +81,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     headers = {}
     headers['user-agent'] = ua
 
-  if use_proxy:
+  if use_proxy and config.proxies:
     proxies = config.proxies
   else:
     proxies = None
@@ -109,7 +109,10 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
       break
     else:
       # Try again using the proxy
-      proxies = config.proxies
+      if config.proxies:
+        proxies = config.proxies
+      else:
+        break
   return r
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
@@ -301,9 +304,12 @@ def init_jsonfeed(args):
   feed['items'] = []
   return feed
 
-def format_display_date(dt):
-  dt_loc = dt.astimezone(pytz.timezone(config.local_tz))
-  return '{}. {}, {}, {}:{} {} EST'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower())
+def format_display_date(dt_utc, include_time=True):
+  dt_loc = dt_utc.astimezone(pytz.timezone(config.local_tz))
+  if include_time:
+    return '{}. {}, {}, {}:{} {} EST'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower())
+  else:
+    return '{}. {}, {}'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year)
 
 def random_alphanumeric_string(str_len=8):
   letters_digits = string.ascii_letters + string.digits
@@ -395,14 +401,10 @@ def add_blockquote(quote):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
-  #return '<blockquote><table><tr><td style="text-align:right; vertical-align:top;"><span style="font-size:2em;">&#x201C;</span></td><td style="padding-top:0.5em;"><em>'
-  return '<blockquote style="margin:1.5em 10px; padding:0.5em 10px;"><div style="font-size:3em; float:left; margin-right:8px;">“</div><div style="font-size:3em; float:right; margin-left:8px; margin-top:4px;">”</div><div style="overflow:hidden; padding-top:0.5em;"><em>'
+  # svg from https://www.svgrepo.com/svg/12508/quotation-marks
+  return '<blockquote style="margin:1.5em 10px; padding:0.5em 10px;"><div style="float:left; margin-right:8px;"><svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="3em" height="3em" viewBox="0 0 491.202 491.202"><g><path d="M97.714,232.08v37.867c0,5.137-4.164,9.304-9.304,9.304c-18.326,0-28.289,18.79-29.669,55.88H88.41c5.14,0,9.304,4.162,9.304,9.305v79.954c0,5.137-4.164,9.298-9.304,9.298H9.304c-5.14,0-9.304-4.161-9.304-9.298v-79.954c0-17.78,1.791-34.105,5.32-48.516c3.621-14.766,9.176-27.681,16.506-38.385c7.548-10.994,16.991-19.627,28.067-25.638c11.148-6.046,24.107-9.115,38.523-9.115C93.55,222.782,97.714,226.947,97.714,232.08z M217.646,222.782c-14.411,0-27.376,3.068-38.523,9.115c-11.077,6.011-20.52,14.644-28.067,25.638c-7.335,10.71-12.886,23.619-16.512,38.396c-3.529,14.41-5.314,30.724-5.314,48.504v79.954c0,5.137,4.165,9.298,9.298,9.298h79.113c5.133,0,9.297-4.161,9.297-9.298v-79.954c0-5.143-4.164-9.305-9.297-9.305h-29.252c1.362-37.09,11.186-55.88,29.252-55.88c5.133,0,9.297-4.167,9.297-9.304V232.08C226.944,226.947,222.78,222.782,217.646,222.782z M481.904,57.515h-79.109c-5.136,0-9.304,4.164-9.304,9.304v79.949c0,5.139,4.161,9.304,9.304,9.304h29.666c-1.377,37.09-11.343,55.877-29.666,55.877c-5.136,0-9.304,4.164-9.304,9.304v37.867c0,5.137,4.161,9.304,9.304,9.304c14.411,0,27.373-3.074,38.521-9.114c11.071-6.018,20.517-14.639,28.059-25.645c7.329-10.701,12.886-23.61,16.509-38.384c3.528-14.411,5.319-30.73,5.319-48.513V66.818C491.208,61.679,487.035,57.515,481.904,57.515z M352.672,57.515h-79.109c-5.131,0-9.298,4.164-9.298,9.304v79.949c0,5.139,4.167,9.304,9.298,9.304h29.252c-1.365,37.09-11.188,55.877-29.252,55.877c-5.131,0-9.298,4.164-9.298,9.304v37.867c0,5.137,4.167,9.304,9.298,9.304c14.41,0,27.378-3.074,38.526-9.114c11.076-6.018,20.516-14.639,28.058-25.645c7.342-10.701,12.897-23.61,16.521-38.39c3.523-14.405,5.309-30.724,5.309-48.5V66.818C361.976,61.679,357.809,57.515,352.672,57.515z"/></g></svg></div><div style="overflow:hidden; padding-top:0.5em;"><em>'
 
 def close_pullquote(author=''):
-  #end_html = '</em></td><td style="text-align:left; vertical-align:bottom;"><span style="font-size:2em;">&#x201E;</span></td></tr>'
-  #if author:
-    #end_html += '<tr><td>&nbsp;</td><td><small>&mdash;&nbsp;{}</small></td><td></td>&nbsp;</tr>'.format(author)
-  #end_html += '</table></blockquote>'
   end_html = '</em>'
   if author:
     end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
@@ -428,11 +430,11 @@ def get_image_size(img_src):
       p = ImageFile.Parser()
       p.feed(r.content)
       if p.image:
-        return p.image.size
+        return p.image.size[0], p.image.size[1]
     except:
       logger.debug('invalid')
       pass
-  return None
+  return None, None
 
 def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
   begin_html = '<figure style="margin:0; padding:0;'
