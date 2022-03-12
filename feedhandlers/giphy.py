@@ -40,7 +40,14 @@ def get_content(url, args, save_debug=False):
     item['title'] = giphy_json['title']
 
     # not sure about timezone
-    dt = datetime.fromisoformat(giphy_json['import_datetime']).replace(tzinfo=timezone.utc)
+    if giphy_json.get('create_datetime'):
+        dt = datetime.fromisoformat(giphy_json['create_datetime'])
+    elif giphy_json.get('import_datetime'):
+        dt = datetime.fromisoformat(giphy_json['import_datetime'])
+    elif giphy_json.get('update_datetime'):
+        dt = datetime.fromisoformat(giphy_json['update_datetime'])
+    elif giphy_json.get('trending_datetime'):
+        dt = datetime.fromisoformat(giphy_json['trending_datetime'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
