@@ -238,8 +238,7 @@ def get_item(item_info, args, save_debug):
     item['author'] = {}
     item['author']['name'] = '{} (@{})'.format(item_info['author']['nickname'], item_info['author']['uniqueId'])
 
-    avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server,
-                                                             quote_plus(item_info['author']['avatarMedium']))
+    avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(item_info['author']['avatarMedium']))
     author_info = '<a href="https://www.tiktok.com/@{0}"><b>{0}</b></a>&nbsp;'.format(item_info['author']['uniqueId'])
     if item_info['author']['verified']:
         verified_svg = '<svg class="tiktok-shsbhf-StyledVerifyBadge e1aglo370" width="14" height="14" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#20D5EC"></circle><path fill-rule="evenodd" clip-rule="evenodd" d="M37.1213 15.8787C38.2929 17.0503 38.2929 18.9497 37.1213 20.1213L23.6213 33.6213C22.4497 34.7929 20.5503 34.7929 19.3787 33.6213L10.8787 25.1213C9.70711 23.9497 9.70711 22.0503 10.8787 20.8787C12.0503 19.7071 13.9497 19.7071 15.1213 20.8787L21.5 27.2574L32.8787 15.8787C34.0503 14.7071 35.9497 14.7071 37.1213 15.8787Z" fill="white"></path></svg>'
@@ -261,9 +260,7 @@ def get_item(item_info, args, save_debug):
             item_info['music']['title'].replace(' ', '-'), item_info['music']['id'], item_info['music']['title'],
             item_info['music']['authorName'])
 
-    item[
-        'content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}<br/><small>{}</small></div><div style="clear:left;"></div></div>'.format(
-        avatar, author_info, dt.strftime('%Y-%m-%d'))
+    item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}<br/><small>{}</small></div><div style="clear:left;"></div></div>'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
 
     if item.get('summary'):
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
