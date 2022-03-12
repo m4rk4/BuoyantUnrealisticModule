@@ -11,16 +11,24 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(img_src, width=1000):
-    img_src = re.sub(r'(\?|&)(height=\d+)', '', img_src)
-    m = re.search('(\?|&)(width=\d+)', img_src)
+    split_url = urlsplit(img_src)
+    query = split_url.query
+    if not query:
+        query = '&fit=crop&format=pjpg&auto=webp'
+    m = re.search(r'&?height=(\d+)', query)
     if m:
-        img_src = img_src.replace(m.group(2), 'width={}'.format(width))
-    else:
-        if '?' in img_src:
-            img_src += '&width={}'.format(width)
-        else:
-            img_src += '?width={}'.format(width)
-    return img_src
+        h = int(m.group(1))
+        query = query.replace(m.group(0), '')
+    m = re.search(r'&?width=(\d+)', query)
+    if m:
+        w = int(m.group(1))
+        query = query.replace(m.group(0), '')
+    if not (h or w):
+        w, h = utils.get_image_size(img_src)
+    height = math.floor(h*width/w)
+    if not query.startswith('&'):
+        query = '&' + query
+    return '{}://{}{}?width={}&height={}{}'.format(split_url.scheme, split_url.netloc, split_url.path, width, height, query)
 
 
 def get_image(el):
