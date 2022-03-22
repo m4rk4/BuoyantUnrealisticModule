@@ -79,7 +79,7 @@ def add_media(media_card):
     return media_html
 
 
-def render_card(card, article_title='', list_index=0):
+def render_card(card, list_index=0):
     card_html = ''
     if not card:
         return card_html
@@ -92,8 +92,7 @@ def render_card(card, article_title='', list_index=0):
         m = re.search(r'^<[ph]\d?>(.*)</[ph]\d?>$', field_html)
         if m:
             field_html = m.group(1)
-        if not (article_title and field_html in article_title):
-            card_html += '<h2>{}</h2>'.format(field_html)
+            card_html += '<h2 class="headline">{}</h2>'.format(field_html)
         if card['fields'].get('dek'):
             card_html += render_body(card['fields']['dek'])
         if card.get('image'):
@@ -216,7 +215,7 @@ def render_markup_section(section, markups):
     return '<{0}>{1}</{0}>'.format(section[1], render_markers(section[2], markups))
 
 
-def render_body(body, body_zones=None, article_title=''):
+def render_body(body, body_zones=None):
     body_html = ''
     for section in body['sections']:
         if section[0] == 1:
@@ -240,7 +239,7 @@ def render_body(body, body_zones=None, article_title=''):
             if card[0] == 'ZoneCard':
                 zone_card = next((zone for zone in body_zones if zone['id'] == card[1]['id']), None)
                 if zone_card:
-                    body_html += render_card(zone_card['card'], article_title)
+                    body_html += render_card(zone_card['card'])
 
             elif card[0] == 'DividerCard':
                 pass
@@ -341,7 +340,7 @@ def get_content(url, args, save_debug=False):
 
     item['content_html'] = ''
     if article_json.get('header'):
-        item['content_html'] += render_card(article_json['header']['card'], item['title'])
+        item['content_html'] += render_card(article_json['header']['card'])
 
     if article_json.get('intro'):
         item['content_html'] += render_body(article_json['intro'], article_json['introZones'])
@@ -352,13 +351,13 @@ def get_content(url, args, save_debug=False):
     if article_json.get('list'):
         for i, card in enumerate(article_json['list']):
             if article_json['listStyle'] == 'number':
-                item['content_html'] += render_card(card['card'], item['title'], i + 1)
+                item['content_html'] += render_card(card['card'], i + 1)
             else:
-                item['content_html'] += render_card(card['card'], item['title'])
+                item['content_html'] += render_card(card['card'])
 
     if article_json.get('cardZones'):
         for card in article_json['cardZones']:
-            item['content_html'] += render_card(card['card'], item['title'])
+            item['content_html'] += render_card(card['card'])
 
     if article_json.get('outro'):
         item['content_html'] += render_body(article_json['outro'])

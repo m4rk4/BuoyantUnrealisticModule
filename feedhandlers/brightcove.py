@@ -56,19 +56,18 @@ def get_content(url, args, save_debug=False):
     item['_image'] = video_json['poster']
     item['summary'] = video_json['description']
 
-    video = ''
+    sources = []
     for source in video_json['sources']:
-        if source.get('container') and source['container'] == 'MP4':
-            video = source
-            video['type'] = 'video/mp4'
-            break
-    if not video:
+        if source.get('src') and source.get('container') and source['container'] == 'MP4':
+            source['type'] = 'video/mp4'
+            sources.append(source)
+    if not sources:
         for source in video_json['sources']:
-            if source.get('type') and source['type'] == 'application/x-mpegURL':
-                video = source
-                break
-
-    item['content_html'] = utils.add_video(video['src'], video['type'], item['_image'], item['title'])
+            if source.get('src') and source.get('type') and source['type'] == 'application/x-mpegURL':
+                sources.append(source)
+    source = utils.closest_dict(sources, 'height', 480)
+    item['_video'] = source['src']
+    item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], item['title'])
 
     if not 'embed' in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])

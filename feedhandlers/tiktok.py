@@ -239,11 +239,10 @@ def get_item(item_info, args, save_debug):
     item['author']['name'] = '{} (@{})'.format(item_info['author']['nickname'], item_info['author']['uniqueId'])
 
     avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(item_info['author']['avatarMedium']))
-    author_info = '<a href="https://www.tiktok.com/@{0}"><b>{0}</b></a>&nbsp;'.format(item_info['author']['uniqueId'])
+    author_info = '<a href="https://www.tiktok.com/@{0}"><b>{0}</b></a>&nbsp;<small>'.format(item_info['author']['uniqueId'])
     if item_info['author']['verified']:
-        verified_svg = '<svg class="tiktok-shsbhf-StyledVerifyBadge e1aglo370" width="14" height="14" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="24" fill="#20D5EC"></circle><path fill-rule="evenodd" clip-rule="evenodd" d="M37.1213 15.8787C38.2929 17.0503 38.2929 18.9497 37.1213 20.1213L23.6213 33.6213C22.4497 34.7929 20.5503 34.7929 19.3787 33.6213L10.8787 25.1213C9.70711 23.9497 9.70711 22.0503 10.8787 20.8787C12.0503 19.7071 13.9497 19.7071 15.1213 20.8787L21.5 27.2574L32.8787 15.8787C34.0503 14.7071 35.9497 14.7071 37.1213 15.8787Z" fill="white"></path></svg>'
-        author_info += '{}&nbsp;'.format(verified_svg)
-    author_info += '<small>{}</small>'.format(item_info['author']['nickname'])
+        author_info += '&#9989;&nbsp;'
+    author_info += '{}</small>'.format(item_info['author']['nickname'])
 
     if item_info.get('challenges'):
         item['tags'] = []
@@ -266,11 +265,9 @@ def get_item(item_info, args, save_debug):
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
 
     if music_info:
-        music_svg = '<svg width="18" height="18" viewBox="0 0 48 48" fill="currentColor" xmlns="http://www.w3.org/2000/svg" style="transform: translateY(4px);"><path fill-rule="evenodd" clip-rule="evenodd" d="M35.0001 10.7587C35.0001 10.1169 34.4041 9.64129 33.7784 9.78359L17.7902 13.4192C17.335 13.5227 17.0119 13.9275 17.0119 14.3943V37.9972H17.0109C17.0374 40.1644 14.8022 42.4189 11.612 43.2737C8.05093 44.2279 4.64847 43.0769 4.01236 40.7028C3.37624 38.3288 5.74735 35.6308 9.30838 34.6766C10.606 34.3289 11.8826 34.2608 13.0119 34.4294V14.3943C13.0119 12.0601 14.6271 10.0364 16.9033 9.5188L32.8914 5.88317C36.0204 5.17165 39.0001 7.54986 39.0001 10.7587V33.1191C39.084 35.3108 36.8331 37.6109 33.6032 38.4763C30.0421 39.4305 26.6397 38.2795 26.0036 35.9055C25.3675 33.5315 27.7386 30.8334 31.2996 29.8792C32.5961 29.5319 33.8715 29.4635 35.0001 29.6316V10.7587Z"></path></svg>'
-        item['content_html'] += '<p>{}&nbsp;{}</p>'.format(music_svg, music_info)
+        item['content_html'] += '<p>&#127925;&nbsp;{}</p>'.format(music_info)
 
-    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=480,
-                                            fig_style=' margin:0; padding:0;')
+    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=480)
     item['content_html'] += '<br/><a href="{}"><small>Open in TikTok</small></a></div>'.format(item['url'])
     return item
 

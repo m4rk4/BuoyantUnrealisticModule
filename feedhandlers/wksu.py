@@ -156,7 +156,7 @@ def get_content(url, args, save_debug=False):
       item['attachments'] = []
       item['attachments'].append(attachment)
       item['_audio'] = audio_src
-      item['content_html'] += '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9658;</a>&nbsp;<a href="{0}">Listen</a></h4></blockquote>'.format(audio_src)
+      item['content_html'] += '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">Listen</a></h4></blockquote>'.format(audio_src)
 
   article = soup.find(class_='ArticlePage-articleBody')
 

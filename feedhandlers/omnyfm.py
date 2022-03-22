@@ -12,6 +12,7 @@ def get_content(url, args, save_debug=False):
   # https://omny.fm/shows/blindsided/03-paul-bissonnette/embed
   m = re.search(r'\/shows\/([^\/]+)\/([^\/]+)', url)
   if not m:
+    logger.warning('unhandled url ' + url)
     return None
 
   audio_json = utils.get_url_json('https://omny.fm/api/embed/shows/{}/clip/{}'.format(m.group(1), m.group(2)))

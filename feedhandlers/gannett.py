@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(img_src, width=1000):
+    h = None
+    w = None
     split_url = urlsplit(img_src)
     query = split_url.query
     if not query:
@@ -23,7 +25,7 @@ def resize_image(img_src, width=1000):
     if m:
         w = int(m.group(1))
         query = query.replace(m.group(0), '')
-    if not (h or w):
+    if not h or not w:
         w, h = utils.get_image_size(img_src)
     height = math.floor(h*width/w)
     if not query.startswith('&'):
@@ -363,9 +365,12 @@ def get_feed(args, save_debug=False):
     stories = []
     for n in reversed(range(2)):
         dt = datetime.utcnow().date() - timedelta(days=n)
-        url = base_url + '/sitemap/' + dt.strftime('%Y/%B/%d/')
-        html = utils.get_url_html(url)
-        soup = BeautifulSoup(html, 'html.parser')
+        page_url = base_url + '/sitemap/' + dt.strftime('%Y/%B/%d/')
+        page_html = utils.get_url_html(page_url)
+        if not page_html:
+            logger.warning('unable to get ' + page_url)
+            continue
+        soup = BeautifulSoup(page_html, 'html.parser')
         for a in soup.find_all('a'):
             if a.has_attr('href'):
                 if '/story/' in a.get('href') or '/videos/' in a.get('href') or '/picture-gallery/' in a.get('href'):

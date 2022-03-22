@@ -16,8 +16,10 @@ def get_content(url, args, save_debug=False):
     if not m:
         m = re.search(r'player\.megaphone\.fm/(\w+)', url)
         if not m:
-            logger.warning('unable to parse episode id from ' + url)
-            return None
+            m = re.search('(ESP\d+)', url)
+            if not m:
+                logger.warning('unable to parse episode id from ' + url)
+                return None
 
     podcast_json = utils.get_url_json('https://player.megaphone.fm/playlist/episode/{}'.format(m.group(1)))
     if not podcast_json:

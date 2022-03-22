@@ -18,6 +18,9 @@
     "art19": {
         "module": "art19"
     },
+    "audacy": {
+        "module": "audacy"
+    },
     "autonews": {
         "module": "crains"
     },
@@ -100,6 +103,15 @@
     "european-rubber-journal": {
         "module": "crains"
     },
+    "facebook": {
+        "module": "facebook"
+    },
+    "fastcompany": {
+        "module": "fastcompany"
+    },
+    "fivethirtyeight": {
+        "module": "fte"
+    },
     "fortune": {
         "module": "fortune",
         "token": "Zm9ydHVuZTpCcHNyZmtNZCN5SndjWkkhNHFqMndEOTM=",
@@ -131,13 +143,19 @@
     },
     "hackster": {
         "module": "hackster",
-        "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDEtMTlUMTM6MzI6NDQrMDAwMCIsImV4cCI6IjIwMjItMDEtMTlUMTU6MzI6NDQrMDAwMCIsInJuZCI6ImE3NjIxMmI5MzkxYzNlYzhhNmZhNDQ2YTc1YTE5NmNmIn0.l4Sq9uEQmA9GbyLl7NJqd9Tm4PpfHgTV6jBxvyAFaYGEeOGlJUn8FgWx67dTYk0YpB7yzn0hx6e4AZ301v9Y9A"
+        "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDMtMjFUMTM6NTk6MDUrMDAwMCIsImV4cCI6IjIwMjItMDMtMjFUMTU6NTk6MDUrMDAwMCIsInJuZCI6IjFmMmRhMzYzN2EwZDU4NmVmODQyMDRiYjU1NTkwNDE1In0.19HJWh5GM_DfXSPzRCwMqgPxG03sref6DRELrfQcBlRy8jHjimCj6QyQgoUBKT_FU3aJBC-Edha1bNmb8tTn7Q"
     },
     "ign": {
         "module": "ign"
     },
     "iheart": {
         "module": "iheart"
+    },
+    "inc": {
+        "module": "inc"
+    },
+    "infogram": {
+        "module": "infogram"
     },
     "inputmag": {
         "module": "bustle"
@@ -212,8 +230,14 @@
     "plasticsnews": {
         "module": "crains"
     },
+    "protocol": {
+        "module": "rebelmouse"
+    },
     "post-gazette": {
         "module": "pg"
+    },
+    "rawstory": {
+        "module": "rebelmouse"
     },
     "reuters": {
         "module": "reuters"
@@ -277,6 +301,9 @@
     },
     "twitter": {
         "module": "twitter"
+    },
+    "upworthy": {
+        "module": "rebelmouse"
     },
     "usatoday": {
         "module": "gannett"
