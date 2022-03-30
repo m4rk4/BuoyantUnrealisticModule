@@ -796,9 +796,14 @@ def add_embed(url, args={}, save_debug=False):
     embed_url = 'https:' + url
   if 'twitter.com' in url:
     embed_url = clean_url(url)
-  if 'cloudfront.net' in url:
+  elif 'cloudfront.net' in url:
     embed_url = get_redirect_url(embed_url)
-  logger.debug('embed content from ' + url)
+  elif 'embedly.com' in url:
+    split_url = urlsplit(url)
+    params = parse_qs(split_url.query)
+    if params.get('src'):
+      embed_url = params['src'][0]
+  logger.debug('embed content from ' + embed_url)
 
   embed_args = args.copy()
   embed_args['embed'] = True
