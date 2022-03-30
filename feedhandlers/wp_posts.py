@@ -110,6 +110,8 @@ def get_post_content(post, args, save_debug=False):
   else:
     logger.warning('unknown post content in {}' + item['url'])
 
+  content_html = content_html.replace('\u2028', '')
+
   soup = BeautifulSoup(content_html, 'html.parser')
 
   for el in soup.find_all(class_='post-content-image'):
@@ -207,6 +209,11 @@ def get_post_content(post, args, save_debug=False):
   for el in soup.find_all(class_='twitter-tweet'):
     links = el.find_all('a')
     new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
+    el.insert_after(new_el)
+    el.decompose()
+
+  for el in soup.find_all(class_='tiktok-embed'):
+    new_el = BeautifulSoup(utils.add_embed(el['cite']), 'html.parser')
     el.insert_after(new_el)
     el.decompose()
 
