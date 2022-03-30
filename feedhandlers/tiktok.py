@@ -275,10 +275,15 @@ def get_item(item_info, args, save_debug):
 def get_content(url, args, save_debug=False):
     if url.startswith('https'):
         m = re.search(r'/video/(\d+)', url)
-        if not m:
-            logger.warning('unable to determine video id in ' + url)
-            return None
-        video_id = m.group(1)
+        if m:
+            video_id = m.group(1)
+        else:
+            m = re.search(r'embed/v2/(\d+)', url)
+            if m:
+                video_id = m.group(1)
+            else:
+                logger.warning('unable to determine video id in ' + url)
+                return None
     else:
         # url is the video id
         video_id = url
