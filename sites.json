@@ -81,8 +81,8 @@
     "curbed": {
         "module": "nymag"
     },
-    "dwcdn": {
-        "module": "datawrapper"
+    "deadspin": {
+        "module": "gawker"
     },
     "dj": {
         "module": "wsj"
@@ -90,6 +90,9 @@
     "discovermagazine": {
         "module": "discovermag",
         "buildId": "945a192"
+    },
+    "dwcdn": {
+        "module": "datawrapper"
     },
     "empireonline": {
         "module": "empire"
@@ -172,6 +175,9 @@
     "jalopnik": {
         "module": "gawker"
     },
+    "jezebel": {
+        "module": "gawker"
+    },
     "jwplayer": {
         "module": "jwplayer"
     },
@@ -239,6 +245,12 @@
     "rawstory": {
         "module": "rebelmouse"
     },
+    "reddit": {
+        "module": "reddit"
+    },
+    "redditmedia": {
+        "module": "reddit"
+    },
     "reuters": {
         "module": "reuters"
     },
@@ -266,6 +278,9 @@
     "stereogum": {
         "module": "wp_posts"
     },
+    "streamable": {
+        "module": "streamable"
+    },
     "theathletic": {
         "module": "athletic"
     },
@@ -292,6 +307,9 @@
     },
     "theplayerstribune": {
         "module": "playerstribune"
+    },
+    "thetakeout": {
+        "module": "gawker"
     },
     "tiktok": {
         "module": "tiktok"
