@@ -1,4 +1,4 @@
-import json, pytz, re
+import math, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
@@ -11,50 +11,236 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_image_src(id, format, width):
+def get_image_src(id, format, width=1000, height=''):
+    size = ''
+    if width:
+        size = ',w_{}'.format(width)
+    if height:
+        size += ',h_{}'.format(height)
     if format == 'gif':
-        return 'https://i.kinja-img.com/gawker-media/image/upload/c_scale,fl_progressive,q_80,w_{}/{}.gif'.format(width,
-                                                                                                                  id)
-    return 'https://i.kinja-img.com/gawker-media/image/upload/c_fill,f_auto,fl_progressive,g_center,pg_1,q_80,w_1000/{}.{}'.format(
-        id, format)
+        return 'https://i.kinja-img.com/gawker-media/image/upload/c_scale,fl_progressive,q_80{}/{}.gif'.format(size, id)
+    return 'https://i.kinja-img.com/gawker-media/image/upload/c_fill,f_auto,fl_progressive,g_center,pg_1,q_80{}/{}.{}'.format(size, id, format)
 
 
-def get_kinja_video(video_id, url):
-    video_src = ''
-    video_json = utils.get_url_json('https://kinja.com/api/core/video/views/videoById?videoId={}'.format(video_id))
-    if video_json:
-        video_src = video_json['data']['fastlyUrl']
-        width = video_json['data']['poster'].get('width')
-        if not width:
-            width = 640
-        poster = get_image_src(video_json['data']['poster']['id'], video_json['data']['poster']['format'], width)
+def add_image(image):
+    if image['type'] == 'FullBleedWidget':
+        img_src = get_image_src(image['image']['id'], image['image']['format'])
     else:
-        # Try to extract the video src from the page
-        url_html = utils.get_url_html(url)
-        soup = BeautifulSoup(url_html, 'html.parser')
-        el = soup.find('script', attrs={"type": "application/ld+json"})
-        if el:
-            ld_json = json.loads(el.string)
-            if ld_json:
-                for video in ld_json['video']:
-                    if video_id in video['contentUrl']:
-                        video_src = video['contentUrl']
-                        poster = video['thumbnailUrl'][0]
-                        break
+        img_src = get_image_src(image['id'], image['format'])
+    captions = []
+    if image.get('caption'):
+        content = ''
+        for it in image['caption']:
+            content += render_content(it)
+        if content:
+            captions.append(content)
+    if image.get('attribution'):
+        if image['attribution'][0].get('label'):
+            content = image['attribution'][0]['label'] + ': '
+        else:
+            content = ''
+        for it in image['attribution'][0]['credit']:
+            content += render_content(it)
+        if content:
+            captions.append(content)
+    return utils.add_image(img_src, ' | '.join(captions))
 
-    if not video_src:
-        logger.warning('unable to get KinjaVideo source for id {} in {}'.format(video_id, url))
+
+def add_kinja_video(video):
+    video_json = utils.get_url_json('https://kinja.com/api/core/video/views/videoById?videoId={}'.format(video['id']))
+    if not video_json:
+        logger.warning('unable to add Kinja video')
         return ''
+
+    video_src = video_json['data']['fastlyUrl']
 
     if 'm3u8' in video_src:
         video_type = 'application/x-mpegURL'
     elif 'mp4' in video['contentUrl']:
         video_type = 'video/mp4'
     else:
-        logger.warning('unknown video type in for {} in {}'.format(video_src, url))
+        logger.warning('unknown video type in for '.format(video_src))
         video_type = 'application/x-mpegURL'
 
-    return utils.add_video(video_src, video_type, poster)
+    poster = get_image_src(video_json['data']['poster']['id'], video_json['data']['poster']['format'])
+
+    captions = []
+    if video.get('caption'):
+        content = ''
+        for it in video['caption']:
+            content += render_content(it)
+        if content:
+            captions.append(content)
+    if video.get('attribution'):
+        content = ''
+        for it in video['attribution'][0]['credit']:
+            content += render_content(it)
+        if content:
+            captions.append(content)
+    if not captions:
+        captions.append(video_json['data']['title'])
+
+    return utils.add_video(video_src, video_type, poster, ' | '.join(captions))
+
+
+def render_content(content):
+    content_html = ''
+    if content['type'] == 'Text':
+        endtag = ''
+        if 'Bold' in content['styles']:
+            content_html += '<b>'
+            endtag = '</b>' + endtag
+        if 'Italic' in content['styles']:
+            content_html += '<i>'
+            endtag = '</i>' + endtag
+        if 'Underline' in content['styles']:
+            content_html += '<u>'
+            endtag = '</u>' + endtag
+        content_html += content['value'] + endtag
+
+    elif content['type'] == 'Paragraph':
+        value = ''
+        for it in content['value']:
+            value += render_content(it)
+        if content.get('containers'):
+            content_html += value
+        else:
+            content_html += '<p>{}</p>'.format(value)
+
+    elif content['type'] == 'Header':
+        content_html += '<h{}>'.format(content['level'])
+        for it in content['value']:
+            content_html += render_content(it)
+        content_html += '</h{}>'.format(content['level'])
+
+    elif content['type'] == 'LineBreak':
+        content_html += '<br />'
+
+    elif content['type'] == 'PageBreak' or content['type'] == 'HorizontalRule':
+        content_html += '<hr style="width:80%;"/>'
+
+    elif content['type'] == 'Link':
+        content_html += '<a href="{}">'.format(content['reference'])
+        for it in content['value']:
+            content_html += render_content(it)
+        content_html += '</a>'
+
+    elif content['type'] == 'PullQuote':
+        value = ''
+        for it in content['value']:
+            value += render_content(it)
+        content_html += utils.add_pullquote(value)
+
+    elif content['type'] == 'Quotable':
+        quote = ''
+        for it in content['content']:
+            quote += render_content(it)
+        cite = ''
+        for it in content['attribution']:
+            cite += render_content(it)
+        if content.get('image'):
+            img_src = get_image_src(content['image']['id'], content['image']['format'], 80, 80)
+            poster = '{}/image?url={}&mask=circle'.format(config.server, quote_plus(img_src))
+        content_html += '<div style="margin-top:1em; margin-bottom:1em;"><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}<br/>&ndash;&nbsp;{}</div><div style="clear:left;"></div></div>'.format(poster, quote, cite)
+
+    elif content['type'] == 'Image':
+        content_html += add_image(content)
+
+    elif content['type'] == 'FullBleedWidget':
+        if content.get('image'):
+            content_html += add_image(content)
+        else:
+            logger.warning('unhandled FullBleedWidget')
+
+    elif content['type'] == 'KinjaVideo':
+        content_html += add_kinja_video(content)
+
+    elif content['type'] == 'YoutubeVideo':
+        content_html += utils.add_embed('https://www.youtube.com/watch?v={}'.format(content['id']))
+
+    elif content['type'] == 'YoutubePlaylist':
+        content_html += utils.add_embed('https://www.youtube.com/watch?list={}&v={}'.format(content['id'], content['initialVideo']))
+
+    elif content['type'] == 'Twitter':
+        content_html += utils.add_embed(utils.get_twitter_url(content['id']))
+
+    elif content['type'] == 'Instagram':
+        content_html += utils.add_embed('https://www.instagram.com/p/' + content['id'])
+
+    elif content['type'] == 'TikTok':
+        content_html += utils.add_embed('https://www.tiktok.com/embed/v2/{}?lang=en-US'.format(content['id']))
+
+    elif content['type'] == 'Iframe':
+        if content['source'].startswith('https://platform.twitter.com/embed'):
+            m = re.search(r'&id=(\d+)', content['source'])
+            if m:
+                content_html += utils.add_embed(utils.get_twitter_url(m.group(1)))
+            else:
+                content_html += utils.add_embed(content['source'])
+        else:
+            content_html += utils.add_embed(content['source'])
+
+    elif content['type'] == 'ReviewBox':
+        content_html += '<div style="margin: 1.5em 10px; padding: 0.5em 10px;"><center>'
+        if content.get('editorsChoice'):
+            content_html += '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
+        content_html += '<span style="font-size:1.2em;"><b>{}</b></span>'.format(content['title'])
+        if content.get('stars'):
+            content_html += '<br/><span style="font-size:1.5em; color:gold;">'
+            stars = float(content['stars'])
+            for i in range(math.floor(stars)):
+                content_html += '&#9733;'
+            if stars % 1:
+                # The half-star unicde character (&#11240;) doesn't display with standard fonts
+                content_html += '&#x00BD;'
+            #for i in range(5 - math.ceil(stars)):
+            #    content_html += '&#9734;'
+            content_html += '</span>'
+        content_html += '</center>'
+        desc = ''
+        if content.get('description'):
+            desc = content['description'] + '<br/><br/>'
+        if content.get('cta'):
+            desc += '<a href="{}">{}</a><br/><br/>'.format(content['cta']['reference'], content['cta']['value'])
+        if content.get('image'):
+            img_src = get_image_src(content['image']['id'], content['image']['format'], None, 128)
+            content_html += '<div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(img_src, desc)
+        else:
+            content_html += desc
+        for text in content['text']:
+            content_html += '<b>{}</b><br />{}<br/><br/>'.format(text['label'].upper(), text['value'])
+        content_html += '</div>'
+
+    elif content['type'] == 'CommerceLink':
+        content_html += '<p><a href="{}">{}</a></p>'.format(content['url'], content['text'])
+
+    elif content['type'] == 'ContainerBreak':
+        content_html += '<!-- ContainerBreak -->'
+
+    elif re.search('CommerceInset|LinkPreview', content['type']):
+        # Generally redundant
+        pass
+
+    else:
+        logger.warning('unhandled content type ' + content['type'])
+
+    if content.get('containers'):
+        for container in content['containers']:
+            if container['type'] == 'BlockQuote':
+                content_html = utils.add_blockquote(content_html)
+            elif container['type'] == 'List':
+                value = content_html.replace('<p>', '')
+                value = value.replace('</p>', '<br/><br/>')
+                if value.endswith('<br/><br/>'):
+                    value = value[:-10]
+                if container['style'] == 'Bullet':
+                    content_html = '<ul><li>{}</li></ul>'.format(value)
+                else:
+                    content_html = '<ol><li>{}</li></ol>'.format(value)
+            else:
+                logger.warning('unhandled container type ' + container['type'])
+
+    return content_html
 
 
 def get_content(url, args, save_debug=False):
@@ -63,39 +249,37 @@ def get_content(url, args, save_debug=False):
     m = re.search(r'-(\d+)$', split_url.path)
     if not m:
         logger.warning('unable to parse article id in {}'.format(url))
-    article_json_url = 'https://{}/api/core/corepost/getList?id={}'.format(split_url.netloc, m.group(1))
-    article_json = utils.get_url_json(article_json_url)
-    if article_json is None:
+    api_url = 'https://{}/api/core/corepost/getList?id={}'.format(split_url.netloc, m.group(1))
+    api_json = utils.get_url_json(api_url)
+    if not api_json:
         return None
 
+    article_json = api_json['data'][0]
     if save_debug:
-        with open('./debug/debug.json', 'w') as file:
-            json.dump(article_json, file, indent=4)
+        utils.write_file(article_json, './debug/debug.json')
 
-    article_data = article_json['data'][0]
-
-    item['id'] = article_data['id']
-    item['url'] = article_data['permalink']
+    item['id'] = article_json['id']
+    item['url'] = article_json['permalink']
     # Remove html tags
-    item['title'] = BeautifulSoup(article_data['headline'], 'html.parser').get_text()
+    item['title'] = BeautifulSoup(article_json['headline'], 'html.parser').get_text()
 
-    tz = pytz.timezone(article_data['timezone'])
-    dt = datetime.fromtimestamp(article_data['publishTimeMillis'] / 1000)
+    tz = pytz.timezone(article_json['timezone'])
+    dt = datetime.fromtimestamp(article_json['publishTimeMillis'] / 1000)
     dt_utc = tz.localize(dt).astimezone(pytz.utc)
     item['date_published'] = dt_utc.isoformat()
     item['_timestamp'] = dt_utc.timestamp()
     item['_display_date'] = utils.format_display_date(dt_utc)
 
-    dt = datetime.fromtimestamp(article_data['lastUpdateTimeMillis'] / 1000)
+    dt = datetime.fromtimestamp(article_json['lastUpdateTimeMillis'] / 1000)
     dt_utc = tz.localize(dt).astimezone(pytz.utc)
     item['date_modified'] = dt_utc.isoformat()
 
-    if article_data.get('authorIds'):
-        author_json_url = 'https://{}/api/profile/users?'.format(split_url.netloc)
-        for author_id in article_data['authorIds']:
-            author_json_url += 'ids={}&'.format(author_id)
-        author_json_url = author_json_url[:-1]
-        author_json = utils.get_url_json(author_json_url)
+    if article_json.get('authorIds'):
+        api_url = 'https://{}/api/profile/users?'.format(split_url.netloc)
+        for author_id in article_json['authorIds']:
+            api_url += 'ids={}&'.format(author_id)
+        api_url = api_url[:-1]
+        author_json = utils.get_url_json(api_url)
         if author_json:
             authors = []
             for author in author_json['data']:
@@ -104,276 +288,41 @@ def get_content(url, args, save_debug=False):
                 item['author'] = {}
                 item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
-    if article_data.get('tags'):
+    if article_json.get('tags'):
         item['tags'] = []
-        for tag in article_data['tags']:
+        for tag in article_json['tags']:
             item['tags'].append(tag['displayName'])
 
-    if article_data.get('sharingMainImage'):
-        item['_image'] = get_image_src(article_data['sharingMainImage']['id'], article_data['sharingMainImage']['format'], article_data['sharingMainImage']['width'])
+    if article_json.get('sharingMainImage'):
+        item['_image'] = get_image_src(article_json['sharingMainImage']['id'], article_json['sharingMainImage']['format'], article_json['sharingMainImage']['width'])
 
-    item['summary'] = article_data['plaintext']
+    item['summary'] = article_json['plaintext']
 
-    body_html = ''
-    container_break = False
-    is_blockquote = False
-    is_list = False
+    item['content_html'] = ''
+    if article_json.get('subhead'):
+        item['content_html'] += '<p><em>'
+        for content in article_json['subhead']:
+            item['content_html'] += render_content(content)
+        item['content_html'] += '</em></p>'
 
-    def iter_body(body_json):
-        nonlocal url
-        nonlocal body_html
-        nonlocal container_break
-        nonlocal is_blockquote
-        nonlocal is_list
+    if article_json.get('featuredMedia'):
+        item['content_html'] += render_content(article_json['featuredMedia'])
 
-        img_src_root = 'https://i.kinja-img.com/gawker-media/image/upload/c_fill,f_auto,fl_progressive,g_center,pg_1,q_80,'
-        img_size = 'w_800'
+    if article_json.get('body'):
+        for content in article_json['body']:
+            item['content_html'] += render_content(content)
 
-        for it in body_json:
-            if it['type'] == 'Paragraph':
-                if is_blockquote and not next((container for container in it['containers'] if container['type'] == 'List'), None):
-                    body_html += '</{}>'.format(is_list)
-                    is_list = False
-
-                if is_blockquote and not next((container for container in it['containers'] if container['type'] == 'BlockQuote'), None):
-                    body_html += '</blockquote>'
-                    is_blockquote = False
-
-                if not it.get('containers'):
-                    tag = '<p>'
-                    endtag = '</p>'
-                else:
-                    for container in it['containers']:
-                        if container['type'] == 'List':
-                            if container['style'] == 'Bullet':
-                                list_tag = 'ul'
-                            else:
-                                list_tag = 'ol'
-                            if not is_list:
-                                tag = '<{}><li>'.format(list_tag)
-                            else:
-                                tag = '<li>'
-                            endtag = '</li>'
-                            is_list = list_tag
-
-                        elif container['type'] == 'BlockQuote':
-                            if not is_blockquote:
-                                tag = '<blockquote style="border-left: 3px solid #ccc; margin: 1em 1em; padding: 0 0.5em;"><p>'
-                            else:
-                                tag = '<p>'
-                            endtag = '</p>'
-                            is_blockquote = True
-
-                        else:
-                            logger.warning('unhandled container {} in {}'.format(container['type'], article_json_url))
-                body_html += tag
-                iter_body(it['value'])
-                body_html += endtag
-                container_break = False
-
-            elif it['type'] == 'Text':
-                tag = ''
-                endtag = ''
-                if 'Bold' in it['styles']:
-                    tag += '<b>'
-                    endtag = '</b>' + endtag
-                if 'Italic' in it['styles']:
-                    tag += '<i>'
-                    endtag = '</i>' + endtag
-                if 'Underline' in it['styles']:
-                    tag += '<u>'
-                    endtag = '</u>' + endtag
-                body_html += '{}{}{}'.format(tag, it['value'], endtag)
-
-            elif it['type'] == 'Link':
-                body_html += '<a href="{}">'.format(it['reference'])
-                iter_body(it['value'])
-                body_html += '</a>'
-
-            elif it['type'] == 'LinkPreview' and it['style'] != 'CommerceCondensed':
-                link_html = utils.get_url_html(it['url'])
-                if link_html:
-                    soup = BeautifulSoup(link_html, 'html.parser')
-                    title = soup.title.string
-                    meta = soup.find('meta', attrs={"name": "description"})
-                    if meta:
-                        desc = ' &ndash; <i>{}</i>'.format(meta['content'])
-                    else:
-                        desc = ''
-                else:
-                    title = it['url']
-                    desc = ''
-                body_html += '<p style="margin-right: 10%; margin-left: 10%; padding: .5em; font-size: .8em; border: solid 1px; border-radius: 4px;">Related: <a href="{}">{}</a>{}</p>'.format(
-                    it['url'], title, desc)
-
-            elif it['type'] == 'LineBreak':
-                body_html += '<br />'
-
-            elif it['type'] == 'PageBreak' or it['type'] == 'HorizontalRule':
-                body_html += '<hr style="width:80%;"/>'
-
-            elif it['type'] == 'Header':
-                tag = 'h{}'.format(it['level'])
-                body_html += '<{}>'.format(tag)
-                iter_body(it['value'])
-                body_html += '</{}>'.format(tag)
-
-            elif it['type'] == 'PullQuote':
-                body_html += utils.open_pullquote()
-                iter_body(it['value'])
-                if body_html.endswith('\u201d'):
-                    # Remove the quotes
-                    body_html = re.sub(r'\u201c(?![\s\S]*\u201c)', '', body_html)
-                    body_html = re.sub(r'\u201d(?![\s\S]*\u201d)', '', body_html)
-                body_html += utils.close_pullquote()
-
-            elif it['type'] == 'Quotable':
-                body_html += '<table><tr><td width="120px" align="center"><img style="border-radius: 50%;" src="{}w_80,h_80/{}.{}" /></td><td><h4>'.format(
-                    img_src_root, it['image']['id'], it['image']['format'])
-                iter_body(it['header'])
-                body_html += '</h4><p>'
-                iter_body(it['content'])
-                body_html += '</p></td></tr></table>'
-
-            elif it['type'] == 'ReviewBox':
-                body_html += '<div style="background-color: #ccc ; margin: 0 10vh; padding: 0.5em 1em; border: none;">'
-                for text in it['text']:
-                    body_html += '<p><b>{}</b><br />{}</p>'.format(text['label'].upper(), text['value'])
-                body_html += '</div>'
-
-            elif re.search(r'Image|Slideshow|FullBleedWidget', it['type'], flags=re.I):
-                if it['type'] == 'Slideshow':
-                    images = it['slides']
-                    n_images = len(it['slides'])
-                else:
-                    n_images = 1
-
-                n = 1
-                for n in range(n_images):
-                    if it['type'] == 'Image':
-                        image = it
-                    elif it['type'] == 'Slideshow':
-                        image = it['slides'][n]
-                    elif it['type'] == 'FullBleedWidget':
-                        image = it['image']
-
-                    if 'overlay' in it:
-                        img_src = '{}/image?url={}&overlay={}'.format(config.server, quote_plus(get_image_src(image['id'], image['format'], image['width'])), quote_plus(get_image_src(it['overlay']['id'], it['overlay']['format'], it['overlay']['width'])))
-                    else:
-                        img_src = get_image_src(image['id'], image['format'], image['width'])
-                    begin_html, end_html = utils.add_image(img_src, gawker=True)
-                    body_html += begin_html
-
-                    caption = None
-                    attribution = None
-                    begin_caption = '<figcaption><small>'
-                    end_caption = '</small></figcaption>'
-                    has_caption = False
-
-                    if it['type'] == 'Image' or it['type'] == 'Slideshow':
-                        if image.get('caption'):
-                            caption = image['caption']
-                        if image.get('attribution'):
-                            attribution = image['attribution']
-                    else:  # FullBleedWidget
-                        if it.get('caption'):
-                            caption = it['caption']
-                        if it.get('attribution'):
-                            attribution = it['attribution']
-                    if n_images > 1:
-                        has_caption = True
-                        body_html += '{}[{}/{}] '.format(begin_caption, n + 1, n_images)
-                    if caption:
-                        if not has_caption:
-                            has_caption = True
-                            body_html += begin_caption
-                        iter_body(caption)
-                    if attribution:
-                        if has_caption:
-                            body_html += ' | '
-                        else:
-                            has_caption = True
-                            body_html += begin_caption
-                        body_html += '{}: '.format(attribution[0]['label'])
-                        iter_body(attribution[0]['credit'])
-                        if attribution[0].get('source'):
-                            body_html += ' ('
-                            iter_body(attribution[0]['source'])
-                            body_html += ')'
-                    if has_caption:
-                        body_html += end_caption
-                    body_html += end_html
-
-            elif it['type'] == 'YoutubeVideo' or it['type'] == 'YoutubePlaylist':
-                if it['type'] == 'YoutubeVideo':
-                    yt_url = 'https://www.youtube-nocookie.com/embed/' + it['id']
-                else:  # YoutubePlaylist
-                    yt_url = 'https://www.youtube-nocookie.com/embed/' + it['initialVideo']
-                begin_html, end_html = utils.add_video(yt_url, 'youtube', gawker=True)
-                body_html += begin_html
-                if it.get('caption'):
-                    iter_body(it['caption'])
-                    body_html += ' | '
-                if it['type'] == 'YoutubePlaylist':
-                    body_html += '<a href="https://www.youtube-nocookie.com/embed/videoseries?list={}">YouTube Playlist</a> | '.format(
-                        it['id'])
-                body_html += end_html
-
-            elif it['type'] == 'Vimeo':
-                body_html += utils.add_vimeo(it['id'])
-
-            elif it['type'] == 'KinjaVideo':
-                body_html += get_kinja_video(it['id'], url)
-
-            elif it['type'] == 'Twitter':
-                tweet = utils.add_twitter(it['id'])
-                if tweet:
-                    body_html += tweet
-                else:
-                    logger.warning('unable to add tweet {} in {}'.format(it['id'], url))
-
-            elif it['type'] == 'TikTok':
-                body_html += utils.add_embed('https://www.tiktok.com/embed/v2/{}?lang=en-US'.format(it['id']))
-
-            elif it['type'] == 'Instagram':
-                body_html += utils.add_embed('https://www.instagram.com/p/' + it['id'])
-
-            elif it['type'] == 'Iframe':
-                body_html += utils.add_embed(it['source'])
-
-            elif it['type'] == 'ReplyInset':
-                m = re.search(r'\/(\d+)$', it['url'])
-                if m:
-                    body_html += '<iframe width="640" height="628" scrolling="no" style="border:none;" src="https://api.kinja.com/embed/thread/{}"></iframe>'.format(
-                        m.group(1))
-
-            elif it['type'] == 'ContainerBreak':
-                container_break = True
-
-            elif it['type'] == 'CommerceInset' or it['type'] == 'LinkPreview':
-                # Skip
-                pass
-
-            else:
-                logger.warning('unhandled {} in {}'.format(it['type'], article_json_url))
-        return
-
-    if article_data.get('featuredMedia'):
-        featured_media = []
-        featured_media.append(article_data['featuredMedia'])
-        iter_body(featured_media)
-
-    if article_json['data'][0].get('body'):
-        iter_body(article_json['data'][0]['body'])
-    elif article_json['data'][0].get('subhead'):
-        iter_body(article_json['data'][0]['subhead'])
-
-    item['content_html'] = body_html
-
-    if 'removeimage' in args:
-        del item['image']
+    item['content_html'] = re.sub(r'</blockquote><blockquote [^>]+>', '<br/><br/>', item['content_html'])
+    item['content_html'] = re.sub(r'</[ou]l><[ou]l>', '', item['content_html'])
     return item
 
 
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
+
+
+def test_handler():
+    feeds = ['https://gizmodo.com/rss',
+             'https://theinventory.com/rss']
+    for url in feeds:
+        get_feed({"url": url}, True)
