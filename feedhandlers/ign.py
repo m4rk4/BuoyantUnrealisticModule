@@ -208,7 +208,7 @@ def get_content(url, args, save_debug=False):
                 el.decompose()
 
             elif el['data-transform'] == 'divider':
-                el.insert_after(BeautifulSoup('<hr width="80%" />', 'html.parser'))
+                el.insert_after(BeautifulSoup('<hr style="width:80%;"/>', 'html.parser'))
                 el.decompose()
 
             else:
@@ -255,7 +255,7 @@ def get_content(url, args, save_debug=False):
             editors_choice = '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
         else:
             editors_choice = ''
-        item['content_html'] += '<br/><div><center>{}<h1 style="margin:0;">{}</h1>{}</center></p><p><em>{}</em></p><small><ul>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
+        item['content_html'] += '<br/><div><div style="text-align:center">{}<h1 style="margin:0;">{}</h1>{}</div><p><em>{}</em></p><div style="font-size:0.8em;"><ul>'.format(editors_choice, page_json['review']['score'], page_json['review']['scoreText'].upper(), page_json['review']['scoreSummary'])
 
         if page_json['object'].get('objectRegions'):
             object = page_json['object']['objectRegions'][0]
@@ -295,7 +295,7 @@ def get_content(url, args, save_debug=False):
                 if attrs:
                     item['content_html'] += '<li>{}: {}</li>'.format(key.capitalize(), ', '.join(attrs))
 
-        item['content_html'] += '</ul></small></div><hr style="width:80%"/>'
+        item['content_html'] += '</ul></div></div><hr style="width:80%;"/>'
         verdict = '<h2>Verdict</h2><p>{}</p>'.format(page_json['review']['verdict'])
 
     if verdict:
