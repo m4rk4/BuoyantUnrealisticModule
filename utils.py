@@ -438,10 +438,9 @@ def get_image_size(img_src):
 def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
   begin_html = '<figure '
   if fig_style:
-    begin_html += 'style="{}"'.format(fig_style)
+    begin_html += 'style="{}">'.format(fig_style)
   else:
-    begin_html += 'style="margin:0; padding:0;"'
-  begin_html += '">'
+    begin_html += 'style="margin:0; padding:0;">'
 
   if link:
     begin_html += '<a href="{}">'.format(link)
