@@ -82,7 +82,7 @@ def get_content(url, args, save_debug=False):
         if author:
             item['author'] = {"name": author}
 
-        item['tags'] = ld_article['articleSection'].copy()
+        item['tags'] = ld_article['keywords'].copy()
         item['_image'] = ld_article['image']['url']
 
         item['summary'] = ld_article['description']
