@@ -212,9 +212,6 @@
     "nbcnews": {
         "module": "nbcnews"
     },
-    "nbcsports": {
-        "module": "wp_posts"
-    },
     "neilyoungarchives": {
         "module": "nya"
     },
@@ -275,9 +272,6 @@
     "slate": {
         "module": "clay"
     },
-    "stereogum": {
-        "module": "wp_posts"
-    },
     "streamable": {
         "module": "streamable"
     },
@@ -313,6 +307,9 @@
     },
     "tiktok": {
         "module": "tiktok"
+    },
+    "time": {
+        "module": "time"
     },
     "tirebusiness": {
         "module": "crains"
@@ -358,6 +355,20 @@
     },
     "wksu": {
         "module": "wksu"
+    },
+    "wp-posts": {
+        "sites": [
+            "aboutchromebooks",
+            "ghacks",
+            "liliputing",
+            "missingremote",
+            "nbcsports",
+            "stereogum",
+            "techhive",
+            "thurrott",
+            "venturebeat",
+            "zatznotfunny"
+        ]
     },
     "wsj": {
         "module": "wsj"
