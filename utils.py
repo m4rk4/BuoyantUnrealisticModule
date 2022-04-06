@@ -13,10 +13,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_module(url, handler=''):
-  sites_json = read_json_file('./sites.json')
   module = None
   module_name = ''
-  if url:
+  if handler:
+    module_name = '.{}'.format(handler)
+  elif url:
     if 'wp-json' in url:
       module_name = '.wp_posts'
     else:
@@ -31,10 +32,12 @@ def get_module(url, handler=''):
         domain = urlsplit(url).path.split('/')[1]
       else:
         domain = tld.domain
+      sites_json = read_json_file('./sites.json')
       if sites_json.get(domain):
         module_name = '.{}'.format(sites_json[domain]['module'])
-  if handler and not module_name:
-    module_name = '.{}'.format(handler)
+      else:
+        if domain in sites_json['wp-posts']['sites']:
+          module_name = '.wp_posts'
   if module_name:
     try:
       module = importlib.import_module(module_name, 'feedhandlers')
