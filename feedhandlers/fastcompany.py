@@ -90,6 +90,10 @@ def get_content(url, args, save_debug=False):
                 el = BeautifulSoup(it, 'html.parser')
                 el.p.insert_before(el.div)
                 it = str(el)
+            elif it.startswith('<p><iframe'):
+                el = BeautifulSoup(it, 'html.parser')
+                el.p.insert_before(el.iframe)
+                it = str(el)
             content_html += it
 
     soup = BeautifulSoup(content_html, 'html.parser')
@@ -132,6 +136,11 @@ def get_content(url, args, save_debug=False):
     for el in soup.find_all(class_='twitter-tweet'):
         tweet_url = el.find_all('a')[-1]['href']
         new_html = utils.add_embed(tweet_url)
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
+
+    for el in soup.find_all('iframe'):
+        new_html = utils.add_embed(el['src'])
         el.insert_after(BeautifulSoup(new_html, 'html.parser'))
         el.decompose()
 
