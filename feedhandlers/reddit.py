@@ -120,7 +120,8 @@ def get_content(url, args, save_debug=False):
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
 
-def test_feed():
+
+def test_handler():
     # Top subreddits via https://subredditstats.com/
     feeds = ['https://www.reddit.com/r/funny/.rss',
              'https://www.reddit.com/r/AskReddit/.rss',
