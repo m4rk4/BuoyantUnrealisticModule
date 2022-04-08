@@ -1,4 +1,4 @@
-import json, re
+import html, json, re
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, unquote_plus, urlsplit
 
@@ -26,7 +26,60 @@ def render_content(content):
         content_html += content['text']
 
     elif content['type'] == 'tag':
-        if content['name'] == 'hr' or content['name'] == 'br':
+        if content['name'] == 'p':
+            if content.get('attributes') and content['attributes'].get('class'):
+                classes = content['attributes']['class'].split(' ')
+                if 'shortcode-media-rebelmouse-image' in classes:
+                    img_src = ''
+                    img_link = ''
+                    captions = []
+                    for child in content['children']:
+                        if child['name'] == 'rebelmouse-image':
+                            if child['attributes'].get('crop_info'):
+                                crop_info = json.loads(unquote_plus(child['attributes']['crop_info']))
+                                img_src = resize_image(crop_info['thumbnails']['origin'])
+                            else:
+                                img_src = 'https://assets.rbl.ms/{}/origin.jpg'.format(child['attributes']['iden'])
+                        elif child['name'] == 'a':
+                            img_link = child['attributes']['href']
+                            for nino in child['children']:
+                                if nino['name'] == 'rebelmouse-image':
+                                    if nino['attributes'].get('crop_info'):
+                                        crop_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
+                                        img_src = resize_image(crop_info['thumbnails']['origin'])
+                                    else:
+                                        img_src = 'https://assets.rbl.ms/{}/origin.jpg'.format(nino['attributes']['iden'])
+                        elif child.get('attributes') and child['attributes'].get('class'):
+                            child_classes = child['attributes']['class'].split(' ')
+                            caption = ''
+                            if 'media-caption' in child_classes:
+                                for nino in child['children']:
+                                    caption += render_content(nino)
+                                if caption:
+                                    captions.append(caption)
+                            elif 'media-photo-credit' in child_classes:
+                                for nino in child['children']:
+                                    caption += render_content(nino)
+                                if caption:
+                                    captions.append(caption)
+                    return utils.add_image(img_src, ' | '.join(captions), link=img_link)
+
+                elif 'pull-quote' in classes:
+                    quote = ''
+                    author = ''
+                    for child in content['children']:
+                        quote += render_content(child)
+                    m = re.search(r'“([^”]+)” —(.+)$', quote)
+                    if m:
+                        quote = m.group(1)
+                        author = m.group(2)
+                    print(quote)
+                    return utils.add_pullquote(quote, author)
+
+            content_html += '<p>'
+            end_tag = 'p'
+
+        elif content['name'] == 'hr' or content['name'] == 'br':
             content_html += '<{}/>'.format(content['name'])
 
         elif content['name'] == 'a':
@@ -39,27 +92,36 @@ def render_content(content):
         elif content['name'] == 'div':
             skip_div = False
             if content.get('attributes') and content['attributes'].get('class'):
-                if 'newsroomBlockQuoteContainer' in content['attributes']['class']:
+                classes = content['attributes']['class'].split(' ')
+                if 'newsroomBlockQuoteContainer' in classes:
                     quote = ''
                     cite = ''
                     for child in content['children']:
-                        if 'newsroomBlockQuote' in child['attributes']['class']:
+                        child_classes = child['attributes']['class'].split(' ')
+                        if 'newsroomBlockQuote' in child_classes:
                             for nino in child['children']:
                                 quote += render_content(nino)
-                        elif 'newsroomBlockQuoteAuthorContainer' in child['attributes']['class']:
+                        elif 'newsroomBlockQuoteAuthorContainer' in child_classes:
                             for nino in child['children']:
                                 cite += render_content(nino)
-                    content_html += utils.add_pullquote(quote, cite)
-                    return content_html
-                elif content['attributes']['class'] == 'redactor-editor':
+                    return utils.add_pullquote(quote, cite)
+
+                elif 'redactor-editor' in classes:
                     skip_div = True
+
+                elif 'ieee-sidebar-medium' in classes:
+                    sidebar = ''
+                    for child in content['children']:
+                         sidebar += render_content(child)
+                    return utils.add_blockquote(sidebar)
+
             if content.get('children'):
                 for child in content['children']:
                     if child.get('attributes') and child['attributes'].get('data-card') and child['attributes']['data-card'] == 'facebook':
                         for nino in child['children']:
                             if nino.get('attributes') and nino['attributes'].get('data-href'):
-                                content_html += utils.add_embed(nino['attributes']['data-href'])
-                                return content_html
+                                return utils.add_embed(nino['attributes']['data-href'])
+
             if not skip_div:
                 logger.warning('unhandled div')
                 content_html += '<div>'
@@ -118,11 +180,7 @@ def render_content(content):
                             for nino in child['children']:
                                 if nino['name'] == 'rebelmouse-image':
                                     image_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
-                                    for key, val in image_info['thumbnails'].items():
-                                        if key == 'origin':
-                                            continue
-                                        break
-                                    img_src = resize_image(val)
+                                    img_src = resize_image(image_info['thumbnails']['origin'])
                                     img_link = nino['attributes'].get('link_url')
                                 elif re.search(r'embed|facebook|instagram|tiktok|twitter|youtube',nino['name']):
                                     embed_src = nino['attributes']['iden']
