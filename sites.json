@@ -239,6 +239,9 @@
     "post-gazette": {
         "module": "pg"
     },
+    "qz": {
+        "module": "qz"
+    },
     "rawstory": {
         "module": "rebelmouse"
     },
@@ -359,12 +362,16 @@
     "wp-posts": {
         "sites": [
             "aboutchromebooks",
+            "defector",
+            "digitaltrends",
             "ghacks",
             "liliputing",
             "missingremote",
             "nbcsports",
             "stereogum",
             "techhive",
+            "the-gadgeteer",
+            "thestreamingadvisor",
             "thurrott",
             "venturebeat",
             "zatznotfunny"
