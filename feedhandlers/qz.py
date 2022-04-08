@@ -29,37 +29,43 @@ def format_email_table(table):
     content_html = ''
     img_src = ''
     for tr in table.find_all('tr'):
-        if tr.table:
-            content_html += format_email_table(tr.table)
+        if table == tr.find_parent('table'):
+            if tr.table:
+                content_html += format_email_table(tr.table)
 
-        elif tr.get('class') and 'subheadline' in tr['class']:
-            content_html += '<h3>{}</h3>'.format(tr.get_text())
+            elif tr.get('class') and 'subheadline' in tr['class']:
+                content_html += '<h3>{}</h3>'.format(tr.get_text())
 
-        elif tr.div:
-            caption = ''
-            if img_src:
-                if re.search(r'4c4c4c', tr.div['style']):
-                    caption = tr.div.decode_contents()
-                content_html += utils.add_image(img_src, caption)
-                img_src = ''
-            if not caption:
-                start_tag = '<p>'
-                end_tag = '</p>'
-                if re.search(r'text-transform:uppercase;', tr.div['style']):
-                    start_tag = '<p style="text-transform:uppercase;">'
-                if re.search(r'font-weight:bold;', tr.div['style']):
-                    start_tag += '<strong>'
-                    end_tag = '</strong>' + end_tag
-                content_html += '{}{}{}'.format(start_tag, tr.div.decode_contents(), end_tag)
+            elif tr.div:
+                if tr.div.get('style'):
+                    styles = tr.div['style'].split(';')
+                else:
+                    styles = []
+                if 'color:#4c4c4c' in styles and content_html.endswith('</figure>'):
+                    content_html = content_html[:-9] + '<figcaption><small>{}</small></figcaption></figure>'.format(tr.div.decode_contents())
+                else:
+                    content = tr.div.decode_contents()
+                    if 'text-transform:uppercase' in styles:
+                        content = content.upper()
+                    if 'font-size:30px' in styles:
+                        start_tag = '<h2>'
+                        end_tag = '</h2>'
+                    else:
+                        start_tag = '<p>'
+                        end_tag = '</p>'
+                    if 'font-weight:bold' in styles:
+                        start_tag += '<strong>'
+                        end_tag = '</strong>' + end_tag
+                    content_html += '{}{}{}'.format(start_tag, content, end_tag)
 
-        elif tr.p:
-            if re.search(r'border-top:solid', tr.p['style']):
-                content_html += '<hr/>'
-            else:
-                logger.warning('unhandled <p> section')
+            elif tr.p:
+                if re.search(r'border-top:solid', tr.p['style']):
+                    content_html += '<hr/>'
+                else:
+                    logger.warning('unhandled <p> section')
 
-        elif tr.img:
-            img_src = tr.img['src']
+            elif tr.img:
+                content_html += utils.add_image(tr.img['src'])
     return content_html
 
 
@@ -76,71 +82,54 @@ def format_email_content(email_html):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
-    split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path[1:].split('/')))
-    if paths[0] == 'emails':
-        is_email = True
-        email_id = 'email:{}'.format(paths[-1])
-        b64_id = base64.b64encode(email_id.encode('utf-8')).decode()
-        api_url = 'https://content.qz.com/graphql?operationName=EmailById&variables=%7B%22id%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%229cce2423332608c4d4f038009db55f520a7ae9d059065cd5d5b90b05fd870f47%22%7D%7D'.format(b64_id)
-    else:
-        is_email = False
-        api_url = 'https://content.qz.com/graphql?operationName=Article&variables=%7B%22id%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%228701a730ae3da33b54191a893cdfd8e36643ab22de059683d7f74e628ece3575%22%7D%7D'.format(paths[-2])
-    api_json = utils.get_url_json(api_url)
-    if not api_json:
-        return None
+def get_content_item(content_json, args, save_debug=False):
+    if save_debug:
+        utils.write_file(content_json, './debug/debug.json')
 
     item = {}
-
-    if is_email:
-        article_json = api_json['data']['email']
-        item['id'] = article_json['emailId']
+    if content_json['__typename'] == 'Email':
+        item['id'] = content_json['emailId']
     else:
-        article_json = api_json['data']['posts']['nodes'][0]
-        item['id'] = article_json['postId']
+        item['id'] = content_json['postId']
 
-    if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
+    item['url'] = content_json['link']
+    item['title'] = content_json['title']
 
-    item['url'] = article_json['link']
-    item['title'] = article_json['title']
-
-    dt = datetime.fromisoformat(article_json['dateGmt']).replace(tzinfo=timezone.utc)
+    dt = datetime.fromisoformat(content_json['dateGmt']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    if article_json.get('modifiedGmt'):
-        dt = datetime.fromisoformat(article_json['modifiedGmt']).replace(tzinfo=timezone.utc)
+    if content_json.get('modifiedGmt'):
+        dt = datetime.fromisoformat(content_json['modifiedGmt']).replace(tzinfo=timezone.utc)
         item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
-    if article_json.get('authors'):
+    if content_json.get('authors'):
         authors = []
-        for author in article_json['authors']['nodes']:
+        for author in content_json['authors']['nodes']:
             authors.append(author['name'])
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    elif article_json.get('emailLists'):
-        item['author']['name'] = article_json['emailLists']['nodes'][0]['name']
+    elif content_json.get('emailLists'):
+        item['author']['name'] = content_json['emailLists']['nodes'][0]['name']
     else:
         item['author']['name'] = 'Quartz'
 
-    if article_json.get('tags'):
+    if content_json.get('tags'):
         item['tags'] = []
-        for tag in article_json['tags']['nodes']:
+        for tag in content_json['tags']['nodes']:
             item['tags'].append(tag['name'])
 
-    if article_json.get('excerpt'):
-        item['summary'] = article_json['excerpt']
+    if content_json.get('excerpt'):
+        item['summary'] = content_json['excerpt']
 
     item['content_html'] = ''
 
-    if article_json.get('featuredImage'):
-        item['_image'] = article_json['featuredImage']['sourceUrl']
-        item['content_html'] += add_image(article_json['featuredImage'])
+    if content_json.get('featuredImage'):
+        item['_image'] = content_json['featuredImage']['sourceUrl']
+        item['content_html'] += add_image(content_json['featuredImage'])
 
-    if article_json.get('blocks'):
-        for block in article_json['blocks']:
+    if content_json.get('blocks'):
+        for block in content_json['blocks']:
             if block['type'] == 'BLOCKQUOTE':
                 item['content_html'] += utils.add_blockquote(block['innerHtml'])
 
@@ -156,7 +145,7 @@ def get_content(url, args, save_debug=False):
                 if img_src:
                     item['content_html'] += utils.add_image(resize_image(img_src['value']), ' | '.join(captions))
                 else:
-                    logger.warning('unhandled SHORTCODE_CAPTION block in ' + url)
+                    logger.warning('unhandled SHORTCODE_CAPTION block in ' + item['url'])
 
             elif block['type'] == 'IMG':
                 img_src = next((it for it in block['attributes'] if it['name'] == 'src'), None)
@@ -171,17 +160,78 @@ def get_content(url, args, save_debug=False):
                 if embed_url:
                     item['content_html'] += utils.add_embed(embed_url['value'])
                 else:
-                    logger.warning('unhandled block {} in {}'.format(block['type'], url))
+                    logger.warning('unhandled block {} in {}'.format(block['type'], item['url']))
 
             else:
                 print(block['type'])
                 item['content_html'] += '<{0}>{1}</{0}>'.format(block['tagName'], block['innerHtml'])
 
-    if is_email:
-        item['content_html'] += format_email_content(article_json['html'])
+    if content_json['__typename'] == 'Email':
+        item['content_html'] += format_email_content(content_json['html'])
 
     return item
 
 
+def get_content(url, args, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if paths[0] == 'emails':
+        email_id = 'email:{}'.format(paths[-1])
+        b64_id = base64.b64encode(email_id.encode('utf-8')).decode()
+        api_url = 'https://content.qz.com/graphql?operationName=EmailById&variables=%7B%22id%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%229cce2423332608c4d4f038009db55f520a7ae9d059065cd5d5b90b05fd870f47%22%7D%7D'.format(b64_id)
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        content_json = api_json['data']['email']
+    else:
+        api_url = 'https://content.qz.com/graphql?operationName=Article&variables=%7B%22id%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%228701a730ae3da33b54191a893cdfd8e36643ab22de059683d7f74e628ece3575%22%7D%7D'.format(paths[-2])
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        content_json = api_json['data']['posts']['nodes'][0]
+    return get_content_item(content_json, args, save_debug)
+
+
 def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+    split_url = urlsplit(args['url'])
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if paths[0] == 'emails':
+        if len(paths) == 1 or (len(paths) == 2 and paths[1] == 'latest'):
+            api_url = 'https://content.qz.com/graphql?operationName=EmailsByTag&variables=%7B%22after%22%3A%22%22%2C%22perPage%22%3A10%2C%22slug%22%3A%5B%22show-email-in-feeds%22%5D%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2204cbaf74705634bc4dae7fa30efb8b160dbf163e79b2eb315e2295db9a81ba89%22%7D%7D'
+            api_json = utils.get_url_json(api_url)
+            if not api_json:
+                return None
+            email_list = api_json['data']['emails']['nodes']
+            email_name = 'Quartz Emails'
+        else:
+            api_url = 'https://content.qz.com/graphql?operationName=EmailsByList&variables=%7B%22after%22%3A%22%22%2C%22perPage%22%3A10%2C%22slug%22%3A%22{}%22%2C%22tags%22%3A%5B%22daily-brief-americas%22%5D%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%222da62c026df1475fabfe7053f8368af55a372d6d645e6f3bd404360cb1a26a09%22%7D%7D'.format(paths[1])
+            api_json = utils.get_url_json(api_url)
+            if not api_json:
+                return None
+            email_list = api_json['data']['emailLists']['nodes'][0]['emails']['nodes']
+            email_name = api_json['data']['emailLists']['nodes'][0]['name']
+
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+
+        n = 0
+        feed = utils.init_jsonfeed(args)
+        feed['title'] = email_name
+        feed['items'] = []
+        for email in email_list:
+            if save_debug:
+                logger.debug('getting content for ' + email['link'])
+            if email.get('html'):
+                item = get_content_item(email, args, save_debug)
+            else:
+                item = get_content(email['link'], args, save_debug)
+            if item:
+                if utils.filter_item(item, args) == True:
+                    feed['items'].append(item)
+                    n += 1
+                    if 'max' in args:
+                        if n == int(args['max']):
+                            break
+    else:
+        feed = rss.get_feed(args, save_debug, get_content)
+    return feed
