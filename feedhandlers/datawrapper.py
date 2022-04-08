@@ -33,39 +33,46 @@ def get_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(content_json, './debug/debug.json')
 
-    if not content_json.get('chart'):
+    if content_json.get('chart'):
+        chart_json = content_json['chart']
+    elif content_json.get('data') and content_json['data'].get('chartJSON'):
+        chart_json = content_json['data']['chartJSON']
+    else:
         logger.warning('unhandled datawrapper content in ' + url)
         return None
 
     item = {}
-    item['id'] = content_json['chart']['publicId']
+    item['id'] = chart_json['publicId']
     item['url'] = url
-    item['title'] = BeautifulSoup(content_json['chart']['title'], 'html.parser').get_text()
+    item['title'] = BeautifulSoup(chart_json['title'], 'html.parser').get_text()
 
-    dt = datetime.fromisoformat(content_json['chart']['createdAt'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(chart_json['createdAt'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(content_json['chart']['lastModifiedAt'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(chart_json['lastModifiedAt'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
-    item['author']['name'] = content_json['chart']['organizationId']
+    if chart_json.get('authorId'):
+        item['author']['name'] = chart_json['authorId']
+    else:
+        item['author']['name'] = chart_json['organizationId']
 
     item['_image'] = 'https://datawrapper.dwcdn.net/{}/plain-s.png?v=1'.format(item['id'])
     if not utils.url_exists(item['_image']):
         return None
 
     captions = []
-    item['content_html'] = '<h3>{}</h3>'.format(content_json['chart']['title'])
-    if content_json['chart']['metadata'].get('describe'):
-        if content_json['chart']['metadata']['describe'].get('intro'):
-            #item['content_html'] += '<p>{}</p>'.format(content_json['chart']['metadata']['describe']['intro'])
-            captions.append(BeautifulSoup(content_json['chart']['metadata']['describe']['intro'], 'html.parser').get_text())
-        if content_json['chart']['metadata']['describe'].get('byline'):
-            captions.append(content_json['chart']['metadata']['describe']['byline'])
-        if content_json['chart']['metadata']['describe'].get('source-name'):
-            captions.append(content_json['chart']['metadata']['describe']['source-name'])
+    item['content_html'] = '<h3>{}</h3>'.format(chart_json['title'])
+    if chart_json['metadata'].get('describe'):
+        if chart_json['metadata']['describe'].get('intro'):
+            #item['content_html'] += '<p>{}</p>'.format(chart_json['metadata']['describe']['intro'])
+            captions.append(BeautifulSoup(chart_json['metadata']['describe']['intro'], 'html.parser').get_text())
+        if chart_json['metadata']['describe'].get('byline'):
+            captions.append(chart_json['metadata']['describe']['byline'])
+        if chart_json['metadata']['describe'].get('source-name'):
+            captions.append(chart_json['metadata']['describe']['source-name'])
     captions.append('<a href="{}">View chart</a>'.format(item['url']))
     item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions), link=url)
     return item
