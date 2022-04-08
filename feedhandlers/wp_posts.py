@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -57,7 +57,6 @@ def get_post_content(post, args, save_debug=False):
     item['url'] = post['link']
     item['title'] = BeautifulSoup(post['title']['rendered'], 'html.parser').get_text()
 
-    # Dates
     dt = datetime.fromisoformat(post['date_gmt']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
@@ -93,14 +92,17 @@ def get_post_content(post, args, save_debug=False):
                 if link_json:
                     if 'name' in link_json:
                         authors.append(link_json['name'])
+
         if 'wp:term' in post['_links']:
             for link in post['_links']['wp:term']:
-                link_json = utils.get_url_json(link['href'])
-                if link_json:
-                    for it in link_json:
-                        if 'name' in it:
-                            item['tags'].append(it['name'])
-        if 'wp:featuredmedia' in post['_links']:
+                if link.get('taxonomy') and (link['taxonomy'] == 'category' or link['taxonomy'] == 'post_tag'):
+                    link_json = utils.get_url_json(link['href'])
+                    if link_json:
+                        for it in link_json:
+                            if 'name' in it:
+                                item['tags'].append(it['name'])
+
+        if post['_links'].get('wp:featuredmedia'):
             for link in post['_links']['wp:featuredmedia']:
                 link_json = utils.get_url_json(link['href'])
                 if link_json:
@@ -118,27 +120,40 @@ def get_post_content(post, args, save_debug=False):
                             if caption:
                                 captions.append(caption)
                         caption = ' | '.join(captions)
-        elif post.get('jetpack_featured_media_url'):
+
+        if not item.get('_image') and post.get('jetpack_featured_media_url'):
             item['_image'] = post['jetpack_featured_media_url']
-        elif post.get('acf'):
+
+        if not item.get('_image') and post.get('acf'):
             if post['acf'].get('hero') and post['acf']['hero'].get('image'):
                 item['_image'] = post['acf']['hero']['image']
             elif post['acf'].get('post_hero') and post['acf']['post_hero'].get('image'):
                 item['_image'] = post['acf']['post_hero']['image']
+
+    item['author'] = {}
     if authors:
-        item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    else:
+        item['author']['name'] = urlsplit(item['url']).netloc
+
     if not item.get('tags'):
         del item['tags']
+
+    lede = ''
     if item.get('_image'):
-        lede = utils.add_image(item['_image'], caption)
-    else:
-        lede = ''
+        if post.get('content') and post['content'].get('rendered'):
+            if post['content']['rendered'].find(item['_image']) == -1:
+                lede = utils.add_image(item['_image'], caption)
 
     # Article summary
     item['summary'] = BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text()
 
     content_html = ''
+    if post.get('meta') and post['meta'].get('multi_title'):
+        multi_title = json.loads(post['meta']['multi_title'])
+        if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
+            content_html += '<p><em>{}</em></p>'.format(multi_title['titles']['headline']['additional']['headline_subheadline'])
+
     if not 'nolead' in args:
         content_html += lede
 
@@ -307,13 +322,17 @@ def get_post_content(post, args, save_debug=False):
         el_parent.decompose()
 
     for el in soup.find_all('figure', class_='wp-block-embed'):
-        if 'wp-block-embed-twitter' in el['class']:
+        new_el = None
+        if 'wp-block-embed-youtube' in el['class']:
+            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
+        elif 'wp-block-embed-twitter' in el['class']:
             links = el.find_all('a')
             new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
         else:
             logger.warning('unhandled wp-block-embed in ' + item['url'])
+        if new_el:
+            el.insert_after(new_el)
+            el.decompose()
 
     for el in soup.find_all(class_='embed-youtube'):
         if el.iframe:
@@ -330,6 +349,18 @@ def get_post_content(post, args, save_debug=False):
             el.decompose()
         else:
             logger.warning('unhandled video-container in ' + item['url'])
+
+    for el in soup.find_all(class_='dtvideos-container'):
+        if el.get('data-provider') and el['data-provider'] == 'youtube':
+            it = el.find(class_='h-embedded-video')
+            if it:
+                new_el = BeautifulSoup(utils.add_embed(it['data-url']), 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhanlded youtube dtvideo-container in ' + item['url'])
+        else:
+            logger.warning('unhandled dtvideos-container in ' + item['url'])
 
     for el in soup.find_all('iframe'):
         if el.get('src'):
@@ -376,6 +407,12 @@ def get_post_content(post, args, save_debug=False):
         el.insert_after(new_el)
         el.decompose()
 
+    for el in soup.find_all(attrs={"data-initial-classes": "twitter-tweet"}):
+        links = el.find_all('a')
+        new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
     for el in soup.find_all(class_='tiktok-embed'):
         new_el = BeautifulSoup(utils.add_embed(el['cite']), 'html.parser')
         el.insert_after(new_el)
@@ -394,6 +431,11 @@ def get_post_content(post, args, save_debug=False):
     for el in soup.find_all('a', href=re.compile(r'go\.redirectingat\.com/')):
         el['href'] = utils.get_redirect_url(el['href'])
 
+    for el in soup.find_all(class_='product-link'):
+        href = utils.get_redirect_url(el['href'])
+        el.attrs = {}
+        el['href'] = href
+
     for el in soup.find_all(class_='wp-block-product-widget-block'):
         if el.find(id='mentioned-in-this-article'):
             el.decompose()
@@ -405,6 +447,9 @@ def get_post_content(post, args, save_debug=False):
         el.decompose()
 
     for el in soup.find_all(class_=re.compile(r'\bad\b')):
+        el.decompose()
+
+    for el in soup.find_all(['aside', 'ins', 'script', 'style']):
         el.decompose()
 
     item['content_html'] = str(soup)
@@ -468,7 +513,7 @@ def get_feed(args, save_debug=False):
         feed = rss.get_feed(args, save_debug, get_content)
     return feed
 
-def test_handler()
+def test_handler():
     feeds = ['https://www.techhive.com/wp-json/wp/v2/posts?story_types=3']
     for url in feeds:
         get_feed({"url": url}, True)
