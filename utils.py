@@ -174,12 +174,15 @@ def get_redirect_url(url):
     check_query = False
     split_url = urlsplit(redirect_url)
     if split_url.query:
-      for key, val in parse_qs(split_url.query).items():
-        # val[0].startswith('http://') or val[0].startswith('https://')
-        if re.search(r'^https?:\/\/', val[0]):
-          redirect_url = val[0]
-          check_query = True
-          break
+      if redirect_url.startswith('https://www.amazon.com/'):
+        redirect_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
+      else:
+        for key, val in parse_qs(split_url.query).items():
+          # val[0].startswith('http://') or val[0].startswith('https://')
+          if re.search(r'^https?:\/\/', val[0]):
+            redirect_url = val[0]
+            check_query = True
+            break
   return redirect_url
 
 def get_url_title_desc(url):
@@ -399,7 +402,8 @@ def add_blockquote(quote):
     quote = quote.replace('</p>', '<br/><br/>')
     if quote.endswith('<br/><br/>'):
       quote = quote[:-10]
-  if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
+  m = re.search(r'^["“‘]([^"“‘"”’]+)["”’]$', quote)
+  if m:
     return add_pullquote(quote)
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
