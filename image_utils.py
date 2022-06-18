@@ -1,4 +1,4 @@
-import av, requests
+import av, requests, time
 from io import BytesIO
 from PIL import Image, ImageDraw
 
@@ -211,18 +211,23 @@ def get_image(args):
 
     if not im:
         try:
-            if args['url'].endswith('mp4'):
+            clean_url = utils.clean_url(args['url'])
+            if clean_url.endswith('mp4') or clean_url.endswith('mov'):
                 container = av.open(args['url'])
                 for frame in container.decode(video=0):
                     im = frame.to_image()
                     break
                 save = True
             else:
-                r = requests.get(args['url'])
-                if r.status_code == 200:
-                    im_io = BytesIO(r.content)
-                    im = Image.open(im_io)
-                    mimetype = im.get_format_mimetype()
+                for i in range(2):
+                    r = requests.get(args['url'])
+                    if r.status_code == 200:
+                        im_io = BytesIO(r.content)
+                        im = Image.open(im_io)
+                        mimetype = im.get_format_mimetype()
+                        break
+                    else:
+                        time.sleep(5)
         except Exception as e:
             logger.warning('image exception: ' + str(e))
             im = None

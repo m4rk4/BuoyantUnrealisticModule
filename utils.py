@@ -7,6 +7,7 @@ from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
+import utils
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
@@ -38,6 +39,15 @@ def get_module(url, handler=''):
       else:
         if domain in sites_json['wp-posts']['sites']:
           module_name = '.wp_posts'
+  if not module_name:
+    split_url = urlsplit(url)
+    if url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
+      module_name = '.wp_posts'
+    else:
+      dt = datetime.utcnow().date()
+      gannet_url = '{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, dt.strftime('%Y/%B/%d/'))
+      if url_exists(gannet_url.lower()):
+        module_name = '.gannett'
   if module_name:
     try:
       module = importlib.import_module(module_name, 'feedhandlers')
@@ -78,7 +88,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 
   if headers:
-    if not (headers.get('user-agent') or headers.get('User-Agent')):
+    if not (headers.get('user-agent') or headers.get('User-Agent') or headers.get('sec-ch-ua')):
       headers['user-agent'] = ua
   else:
     headers = {}
@@ -274,12 +284,10 @@ def closest_dict(lst, k, target):
 
 def image_from_srcset(srcset, target):
   images = []
-  for src in srcset.split(','):
-    m = re.search(r'^(.+)\s(\d+)', src)
-    if m:
+  for m in re.findall(r'(http\S+) (\d+)w', srcset):
       image = {}
-      image['src'] = m.group(1)
-      image['width'] = int(m.group(2))
+      image['src'] = m[0]
+      image['width'] = int(m[1])
       images.append(image)
   if images:
     image = closest_dict(images, 'width', target)
@@ -435,6 +443,11 @@ def get_image_size(img_src):
     try:
       p = ImageFile.Parser()
       p.feed(r.content)
+      if not p.image:
+        r = requests.get(img_src)
+        if r.status_code == 200 or r.status_code == 206:
+          p = ImageFile.Parser()
+          p.feed(r.content)
       if p.image:
         return p.image.size[0], p.image.size[1]
     except:
@@ -476,31 +489,11 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     return begin_html, end_html
   return begin_html + end_html
 
-def add_audio(audio_src, audio_type, poster='', title='', desc='', link=''):
-  if not poster and not title and not desc:
-    return '<center><audio controls><source type="{0}" src="{1}"></source><a href="{1}">Your browser does not support the audio tag.</audio><small>Play track</small></a></center>'.format(audio_type, audio_src)
-
-  audio_html = ''
-  rows = 1
-  if title:
-    rows += 1
-    if link:
-      audio_html += '<tr><td><a href="{}"><b>{}</b></a></td></tr>'.format(link, title)
-    else:
-      audio_html += '<tr><td><b>{}</b></td></tr>'.format(title)
-
-  if desc:
-    rows += 1
-    audio_html += '<tr><td><small>{}</small></td></tr>'.format(desc)
-
-  audio_html += '<tr><td><audio controls><source type="{0}" src="{1}"></source>Your browser does not support the audio tag.</audio><br /><a href="{1}"><small>Play track</small></a></td></tr>'.format(audio_type, audio_src)
-
-  if poster:
-    audio_html = '<tr><td width="30%" rowspan="{}"><img width="100%" src="{}"></td>'.format(rows, poster) + audio_html[4:]
-
-  audio_html = '<center><table style="width:480px; border:1px solid black; border-radius:10px; border-spacing:0;">' + audio_html
-  audio_html += '</table></center>'
-
+def add_audio(audio_src, title='', poster='', desc='', link=''):
+  if not poster:
+    if not title:
+      title = 'Play'
+    audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
   return audio_html
 
 def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='', fig_style='', gawker=False):
@@ -669,6 +662,14 @@ def add_instagram(igstr):
     return ''
   return ig['content_html']
 
+def add_bar(label, value, max_value, show_percent=True):
+  pct = 100*value/max_value
+  if show_percent:
+    val = '{:.1f}%'.format(pct)
+  else:
+    val = value
+  return '<div style="width:{}%; background-color:lightgrey; margin:10px 0 10px 0;">{}<span style="float:right;">{}</span><span style="clear:right;"></span></div>'.format(round(pct), label, val)
+
 def add_barchart(labels, values, title='', caption='', max_value=0, percent=True, border=True, width="75%"):
   color = 'rgb(196, 207, 214)'
   font = ''
@@ -800,21 +801,30 @@ def add_embed(url, args={}, save_debug=False):
   embed_url = url
   if url.startswith('//'):
     embed_url = 'https:' + url
-  if 'twitter.com' in url:
-    embed_url = clean_url(url)
-  elif 'cloudfront.net' in url:
+
+  if 'twitter.com' in embed_url:
+    embed_url = clean_url(embed_url)
+  elif 'youtube.com/embed' in embed_url:
+    embed_url = clean_url(embed_url)
+  elif 'cloudfront.net' in embed_url:
     embed_url = get_redirect_url(embed_url)
-  elif 'embedly.com' in url:
-    split_url = urlsplit(url)
+  elif 'embedly.com' in embed_url:
+    split_url = urlsplit(embed_url)
     params = parse_qs(split_url.query)
     if params.get('src'):
       embed_url = params['src'][0]
+  elif 'cdn.iframe.ly' in embed_url:
+    embed_html = utils.get_url_html(embed_url)
+    if embed_html:
+      m = re.search(r'"linkUri":"([^"]+)"', embed_html)
+      if m:
+        embed_url = m.group(1)
   logger.debug('embed content from ' + embed_url)
 
   embed_args = args.copy()
   embed_args['embed'] = True
   # limit playlists to 10 items
-  if re.search(r'(apple|bandcamp|soundcloud|spotify)', url):
+  if re.search(r'(apple|bandcamp|soundcloud|spotify)', embed_url):
     embed_args['max'] = 10
 
   module = get_module(embed_url)
@@ -822,7 +832,7 @@ def add_embed(url, args={}, save_debug=False):
     content = module.get_content(embed_url, embed_args, save_debug)
     if content:
       return content['content_html']
-  return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(url)
+  return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
 
 def get_content(url, args, save_debug=False):
   content = None

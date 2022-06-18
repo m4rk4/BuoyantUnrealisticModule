@@ -251,8 +251,8 @@ def get_content(url, args, save_debug=False, d=''):
 
   split_url = urlsplit(url)
   if not d:
-    d = fusion.get_domain_value('{}://{}'.format(split_url.scheme, split_url.netloc))
-    if not d:
+    d = fusion.get_deployment_value('{}://{}'.format(split_url.scheme, split_url.netloc))
+    if d < 0:
       return None
 
   query = '{{"uri":"{0}", "website":"reuters", "published":"true", "website_url":"{0}","arc-site":"reuters"}}'.format(split_url.path)
@@ -299,8 +299,8 @@ def get_feed(args, save_debug=False):
     return get_investigates_feed(args, save_debug)
 
   split_url = urlsplit(args['url'])
-  d = fusion.get_domain_value('{}://{}'.format(split_url.scheme, split_url.netloc))
-  if not d:
+  d = fusion.get_deployment_value('{}://{}'.format(split_url.scheme, split_url.netloc))
+  if d < 0:
     return None
 
   section = split_url.path

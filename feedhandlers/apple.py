@@ -39,7 +39,7 @@ def get_token(url):
 
 
 def get_apple_data(api_url, url, save_debug=False):
-    s = requests.Session()
+    s = requestsSession()
     headers = {
         "accept": "*/*",
         "accept-encoding": "gzip, deflate, br",

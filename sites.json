@@ -5,6 +5,10 @@
     "acast": {
         "module": "acast"
     },
+    "androidauthority": {
+        "module": "androidauth",
+        "buildId": "qR9xU-Ftg7DWRLKtZ3Hmw"
+    },
     "androidpolice": {
         "module": "androidpolice"
     },
@@ -14,6 +18,9 @@
     "apple": {
         "module": "apple",
         "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjQyMDMyNzM0LCJleHAiOjE2NDgyNTM1MzQsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.JP6FzMM2uxxNdjqblsoRzhSsdQRq3j8wZZQlxdd-dw1IwT3cxdRO7CQVRZQ7cRZOPTx0mJ-dkLpz2X2WiRtmEA"
+    },
+    "arstechnica": {
+        "module": "arstech"
     },
     "art19": {
         "module": "art19"
@@ -30,6 +37,29 @@
     "axios": {
         "module": "axios"
     },
+    "baltimoresun": {
+        "api_url": "https://www.baltimoresun.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 35,
+        "arc_site": "baltimore-sun",
+        "content": {
+            "source": "content-api-custom",
+            "query": {
+                "uri": "PATH",
+                "website_url": "PATH",
+                "arc-site": "baltimore-sun"
+            }
+        },
+        "author_feed": {
+            "source": "story-feed-author",
+            "query": {
+                "authorSlug": "AUTHOR",
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10
+            }
+        }
+    },
     "bandcamp": {
         "module": "bandcamp"
     },
@@ -43,7 +73,8 @@
         "module": "wsj"
     },
     "beaconjournal": {
-        "module": "gannett"
+        "module": "gannett",
+        "site_code": "NABJ"
     },
     "billboard": {
         "module": "billboard"
@@ -57,6 +88,10 @@
     "brightcove": {
         "module": "brightcove"
     },
+    "buckeyextra": {
+        "module": "gannett",
+        "site_code": "NBUX"
+    },
     "businessinsider": {
         "module": "insider"
     },
@@ -66,8 +101,119 @@
     "carbuzz": {
         "module": "carbuzz"
     },
+    "chicagotribune": {
+        "api_url": "https://www.chicagotribune.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 35,
+        "arc_site": "chicago-tribune",
+        "content": {
+            "source": "content-api-custom",
+            "query": {
+                "uri": "PATH",
+                "website_url": "PATH",
+                "arc-site": "chicago-tribune"
+            }
+        },
+        "author_feed": {
+            "source": "story-feed-author",
+            "query": {
+                "authorSlug": "AUTHOR",
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10
+            }
+        }
+    },
     "cleveland": {
-        "module": "cleveland"
+        "api_url": "https://www.cleveland.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 809,
+        "arc_site": "cleveland",
+        "content": {
+            "source": "content-api",
+            "query": {
+                "website_url": "PATH"
+            }
+        },
+        "homepage_feed": {
+            "source": "nudge-api",
+            "query": {
+                "arc-site": "cleveland"
+            }
+        },
+        "section_feed": {
+            "source": "section-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "section": "SECTION"
+            }
+        },
+        "author_feed": {
+            "source": "author-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "uri": "/staff/AUTHOR/posts.html",
+                "id": "AUTHOR",
+                "arc-site": "cleveland"
+            }
+        },
+        "tag_feed": {
+            "source": "tag-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "tag": "TAG"
+            }
+        }
+    },
+    "cleveland19": {
+        "api_url": "https://www.cleveland19.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 251,
+        "arc_site": "woio",
+        "content": {
+            "source": "content-api",
+            "query": {
+                "uri": "PATH",
+                "website_url": "PATH",
+                "published": "true",
+                "arc-site": "woio"
+            }
+        },
+        "homepage_feed": {
+            "source": "site-service-collections-feed",
+            "query": {
+                "section": "/homepage",
+                "collectionAlias": "homepage",
+                "feedSize": 10,
+                "arc-site": "woio"
+            }
+        },
+        "section_feed": {
+            "source": "site-service-content-feed",
+            "query": {
+                "uri": "PATH/",
+                "section": "PATH",
+                "feedSize": 10,
+                "includedTypes": "article",
+                "arc-site": "woio"
+            }
+        },
+        "author_feed": {
+            "source": "author-services-author",
+            "query": {
+                "uri": "PATH/",
+                "related_content_size": "1",
+                "id": "AUTHOR",
+                "feedSize": "10",
+                "limitToStationOriginals": "false",
+                "feedOffset": "0",
+                "related_content_offset": "0",
+                "arc-site": "woio"
+            }
+        }
     },
     "cnn": {
         "module": "cnn"
@@ -91,8 +237,15 @@
         "module": "discovermag",
         "buildId": "945a192"
     },
+    "dispatch": {
+        "module": "gannett",
+        "site_code": "NCOD"
+    },
     "dwcdn": {
         "module": "datawrapper"
+    },
+    "economist": {
+        "module": "economist"
     },
     "empireonline": {
         "module": "empire"
@@ -112,6 +265,9 @@
     "fastcompany": {
         "module": "fastcompany"
     },
+    "fiercevideo": {
+        "module": "jsonapi"
+    },
     "fivethirtyeight": {
         "module": "fte"
     },
@@ -119,6 +275,15 @@
         "module": "fortune",
         "token": "Zm9ydHVuZTpCcHNyZmtNZCN5SndjWkkhNHFqMndEOTM=",
         "api_key": "E21aWk5Llm80s3ipS4mV453y8Jt70cWP3mQnpu4k"
+    },
+    "foxbusiness": {
+        "module": "fox"
+    },
+    "foxnews": {
+        "module": "fox"
+    },
+    "foxsports": {
+        "module": "fox"
     },
     "ft": {
         "module": "ft"
@@ -172,6 +337,55 @@
     "inverse": {
         "module": "bustle"
     },
+    "inquirer": {
+        "api_url": "https://www.inquirer.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 272,
+        "arc_site": "philly-media-network",
+        "content": {
+            "source": "content-api",
+            "query": {
+                "canonical_url": "PATH"
+            }
+        },
+        "homepage_feed": {
+            "source": "tag-feed",
+            "query": {
+                "feedOffset": "0",
+                "feedSize": "10",
+                "order": "first_publish_date:desc",
+                "tagSlug": "taxonomy.sites.path:(\"/news\" OR \"/sports\" OR \"/politics\" OR \"/business\" OR \"/health\" OR \"/entertainment\" OR \"/food\" OR \"/real-estate\" OR \"/opinion\") AND NOT taxonomy.tags.text:(\"no-latest\")"
+            }
+        },
+        "section_feed": {
+            "source": "section-feed",
+            "query": {
+                "feedOffset": "0",
+                "feedSize": "10",
+                "firstPromoImgSrcset": [
+                    700,
+                    500,
+                    500
+                ],
+                "includeSections": "PATH",
+                "order": "display_date:desc",
+                "promoImgSrcset": [
+                    350,
+                    300,
+                    250
+                ]
+            }
+        },
+        "author_feed": {
+            "source": "tag-feed",
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "order": "display_date:desc",
+                "tagSlug": "credits.by.id:\"AUTHOR\""
+            }
+        }
+    },
     "jalopnik": {
         "module": "gawker"
     },
@@ -203,17 +417,41 @@
     "mic": {
         "module": "bustle"
     },
+    "mixcloud": {
+        "module": "mixcloud"
+    },
     "motortrend": {
         "module": "motortrend"
     },
     "msnbc": {
         "module": "nbcnews"
     },
+    "nba": {
+        "module": "nba"
+    },
     "nbcnews": {
         "module": "nbcnews"
     },
     "neilyoungarchives": {
         "module": "nya"
+    },
+    "newrepublic": {
+        "module": "tnr"
+    },
+    "newsmemory": {
+        "module": "newsmemory",
+        "hudsonhubtimes-oh": {
+            "pSetup": "hudsonhubtimes",
+            "title": "Hudson Hub Times"
+        },
+        "yorkdailyrecord-pa": {
+            "pSetup": "yorkdailyrecord_live",
+            "title": "York Daily Record"
+        }
+
+    },
+    "newyorker": {
+        "module": "cne"
     },
     "nymag": {
         "module": "nymag"
@@ -252,7 +490,75 @@
         "module": "reddit"
     },
     "reuters": {
-        "module": "reuters"
+        "api_url": "https://www.reuters.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 90,
+        "arc_site": "reuters",
+        "content": {
+            "source": "article-by-id-or-url-v1",
+            "query": {
+                "uri": "PATH",
+                "website": "reuters",
+                "published": "true",
+                "website_url": "PATH"
+            }
+        },
+        "homepage_feed": {
+            "source": "articles-by-section-alias-or-id-v1",
+            "query": {
+                "website": "reuters",
+                "id": "/home",
+                "size": 11,
+                "fetch_type": null,
+                "section_id": "/home",
+                "sophi_page": null,
+                "sophi_widget": null,
+                "arc-site": "reuters"
+            }
+        },
+        "section_feed": {
+            "source": "articles-by-section-alias-or-id-v1",
+            "query": {
+                "called_from_a_component": true,
+                "fetch_type": "section",
+                "section_id": "PATH",
+                "size": 15,
+                "sophi_page": "",
+                "sophi_widget": "",
+                "website": "reuters"
+            }
+        },
+        "author_feed": {
+            "source": "articles-by-topic-v1",
+            "query": {
+                "arc-site": "reuters",
+                "offset": 0,
+                "orderby": "",
+                "size": "10",
+                "topic_url": "/authors/AUTHOR/",
+                "uri": "/authors/AUTHOR/",
+                "website": "reuters"
+            }
+        },
+        "search_feed": {
+            "keyword": "SEARCH",
+            "offset": 0,
+            "orderby": "display_date:desc",
+            "size": 10,
+            "website": "reuters"
+        },
+        "tag_feed": {
+            "source": "articles-by-topic-v1",
+            "query": {
+                "arc-site": "reuters",
+                "offset": 0,
+                "orderby": "",
+                "size": "10",
+                "topic_url": "/tags/TAG/",
+                "uri": "/tags/TAG/",
+                "website": "reuters"
+            }
+        }
     },
     "rollingstone": {
         "module": "rollingstone"
@@ -262,6 +568,9 @@
     },
     "seekingalpha": {
         "module": "seekingalpha"
+    },
+    "sendtonews": {
+        "module": "stnvideo"
     },
     "softpedia": {
         "module": "softpedia"
@@ -308,6 +617,9 @@
     "thetakeout": {
         "module": "gawker"
     },
+    "theweek": {
+        "module": "theweek"
+    },
     "tiktok": {
         "module": "tiktok"
     },
@@ -317,6 +629,9 @@
     "tirebusiness": {
         "module": "crains"
     },
+    "tmz": {
+        "module": "tmz"
+    },
     "twitter": {
         "module": "twitter"
     },
@@ -324,7 +639,8 @@
         "module": "rebelmouse"
     },
     "usatoday": {
-        "module": "gannett"
+        "module": "gannett",
+        "site_code": "USAT"
     },
     "variety": {
         "module": "variety"
@@ -351,7 +667,40 @@
         "module": "nymag"
     },
     "washingtonpost": {
-        "module": "wapo"
+        "module": "fusion",
+        "api_url": "https://www.washingtonpost.com/prism/api/",
+        "deployment": 0,
+        "arc_site": "washpost",
+        "content": {
+            "source": "prism-query",
+            "query": {
+                "query": "PATH"
+            }
+        },
+        "homepage_feed": {
+            "source": "prism-query",
+            "query": {
+                "query": "PATH"
+            }
+        },
+        "section_feed": {
+            "source": "prism-query",
+            "query": {
+                "query": "prism://prism.query/site,SECTION&limit=10"
+            }
+        },
+        "author_feed": {
+            "source": "prism-query",
+            "query": {
+                "query": "prism://prism.query/author,AUTHOR&limit=10"
+            }
+        },
+        "tag_feed": {
+            "source": "prism-query",
+            "query": {
+                "query": "prism://prism.query/tag,TAG&limit=10"
+            }
+        }
     },
     "wired": {
         "module": "wired"
@@ -361,6 +710,9 @@
     },
     "wp-posts": {
         "sites": [
+            "9to5google",
+            "9to5mac",
+            "9to5toys",
             "aboutchromebooks",
             "defector",
             "digitaltrends",
@@ -368,6 +720,7 @@
             "liliputing",
             "missingremote",
             "nbcsports",
+            "snopes",
             "stereogum",
             "techhive",
             "the-gadgeteer",

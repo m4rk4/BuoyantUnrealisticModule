@@ -1,196 +1,155 @@
 import json, re
-from datetime import datetime
-from urllib.parse import urlsplit
+from bs4 import BeautifulSoup
+from datetime import datetime, timezone
+from urllib.parse import quote_plus
 
-import utils
+import config, utils
+from feedhandlers import rss
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-def get_field(field):
-  if field.get('data'):
-    return utils.get_url_json(field['links']['related']['href'])
-  return None
 
-def get_image(field_image):
-  img_src = ''
-  caption = []
-  image_file = None
-  image_json = None
-
-  field_json = get_field(field_image)
-  if field_json:
-    image_json = field_json['data']
-  elif field_image.get('type'):
-    image_json = field_image
-
-  if image_json:
-    if image_json['type'] == 'media--image':
-      if image_json['relationships'].get('image'):
-        field_json = get_field(image_json['relationships']['image'])
-        image_file = field_json['data']
-      if image_json['attributes'].get('field_photo_caption'):
-        caption.append(image_json['attributes']['field_photo_caption']['value'])
-      if image_json['attributes'].get('field_photo_credit'):
-        caption.append(image_json['attributes']['field_photo_credit'])
-    elif image_json['type'] == 'file--file':
-      image_file = image_json
-
-  if image_file:
-    img_src = image_file['attributes']['uri']['url']
-  return img_src, ' | '.join(caption)
-
-def get_paragraphs(field_paragraph):
-  paragraph_body = ''
-  paragraph_json = utils.get_url_json(field_paragraph['links']['related']['href'])
-  if paragraph_json:
-    for paragraph in paragraph_json['data']:
-      if paragraph['type'] == 'paragraph--body':
-        if paragraph['attributes'].get('field_paragraph_body'):
-          body = re.sub(r'^\n?<body>', '', paragraph['attributes']['field_paragraph_body']['value'])
-          paragraph_body += re.sub(r'</body>$', '', body)
+def add_image(image_wrapper):
+    if image_wrapper.img.get('original'):
+        img_src = image_wrapper.img['original']
+    else:
+        img_src = image_wrapper.img['src']
+    captions = []
+    it = image_wrapper.find(class_='article-main-image-caption')
+    if it and it.get_text().strip():
+        if it.p:
+            captions.append(it.p.decode_contents())
         else:
-          logger.warning('empty paragraph--body')
-      elif paragraph['type'] == 'paragraph--photographs':
-        if paragraph['relationships'].get('field_photo'):
-          img_src, caption = get_image(paragraph['relationships']['field_photo'])
-          if img_src:
-            paragraph_body += utils.add_image(img_src, caption)
-          else:
-            logger.warning('unhandled paragraph--photographs')
-      elif paragraph['type'] == 'paragraph--embed':
-        logger.debug('paragraph--embed in {}'.format(paragraph['links']['self']['href']))
-        m = re.search(r'src="([^"]+)"', paragraph['attributes']['field_embed_code'])
-        if m:
-          paragraph_body += '<p><a href="{}">View embedded content</a></p>'.format(m.group(1))
+            captions.append(it.get_text().strip())
+    it = image_wrapper.find(class_='article-main-image-credit')
+    if it and it.get_text().strip():
+        if it.p:
+            captions.append(it.p.decode_contents())
         else:
-          paragraph_body += '<p>Unhandled embedded content</p>'
-      else:
-        logger.warning('unhandled paragraph type {}'.format(paragraph['type']))
-  return paragraph_body
+            captions.append(it.get_text().strip())
+    return utils.add_image(img_src, ' | '.join(captions))
 
-def get_item(article, args, save_debug=False):
-  if save_debug:
-    logger.debug('getting content for ' + article['links']['self']['href'])
-    utils.write_file(article, './debug/debug.json')
-
-  split_url = urlsplit(article['links']['self']['href'])
-
-  item = {}
-  item['id'] = article['id']
-  if article['attributes'].get('field_alternate_url'):
-    item['url'] = article['attributes']['field_alternate_url']
-  else:
-    item['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['attributes']['path']['alias'])
-  item['title'] = article['attributes']['title']
-
-  dt = datetime.fromisoformat(article['attributes']['created'])
-  item['date_published'] = dt.isoformat()
-  item['_timestamp'] = dt.timestamp()
-  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
-  # Check age
-  if args.get('age'):
-    if not utils.check_age(item, args):
-      return None
-
-  dt = datetime.fromisoformat(article['attributes']['changed'])
-  item['date_modified'] = dt.isoformat()
-
-  byline = ''
-  field_json = get_field(article['relationships']['field_byline'])
-  if field_json:
-    authors = []
-    for author in field_json['data']:
-      authors.append(author['attributes']['title'])
-    byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-  elif article['attributes'].get('field_byline_text'):
-    byline = ', '.join(article['attributes']['field_byline_text'])
-  if byline:
-    item['author'] = {}
-    item['author']['name'] = byline.title()
-
-  item['tags'] = []
-  field_json = get_field(article['relationships']['field_category'])
-  if field_json:
-    item['tags'].append(field_json['data']['attributes']['name'].title())
-  field_json = get_field(article['relationships']['field_topics'])
-  if field_json:
-    for it in field_json['data']:
-      item['tags'].append(it['attributes']['name'].title())
-  if item['tags']:
-    # remove dups
-    item['tags'] = list(set(item['tags']))
-  else:
-    del item['tags']
-
-  content_html = ''
-  img_src, caption = get_image(article['relationships']['field_main_image'])
-  if not img_src:
-    img_src, caption = get_image(article['relationships']['field_emphasis_image'])
-  if img_src:
-    item['_image'] = img_src
-    content_html += utils.add_image(img_src, caption)
-
-  if article['attributes'].get('body'):
-    item['summary'] = article['attributes']['body']['value']
-
-  if article['relationships']['field_paragraphs'].get('data'):
-    content_html += get_paragraphs(article['relationships']['field_paragraphs'])
-
-  photo_gallery = get_field(article['relationships']['field_photo_gallery'])
-  if photo_gallery:
-    content_html += '<h3>Gallery</h3>{}'.format(photo_gallery['data']['attributes']['body']['processed'])
-    gallery_images = get_field(photo_gallery['data']['relationships']['field_gallery_images'])
-    if gallery_images:
-      n = len(gallery_images['data'])
-      for i, image in enumerate(gallery_images['data']):
-        img_src, caption = get_image(image)
-        if img_src:
-          caption = '[{}/{}] {}'.format(i+1, n, caption)
-          content_html += utils.add_image(img_src, caption)
-
-  if content_html:
-    item['content_html'] = content_html
-  return item
 
 def get_content(url, args, save_debug=False):
-  item = None
-  split_url = urlsplit(url)
-  if save_debug:
-    logger.debug('getting content from ' + url)
-  article_html = utils.get_url_html(url)
-  if article_html:
+    if '/aaaggregated/' in url:
+        redirect_url = utils.get_redirect_url(url)
+        logger.warning('redirect url ' + redirect_url)
+        item = utils.get_content(redirect_url, args, save_debug)
+        return item
+
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+
+    soup = BeautifulSoup(page_html, 'html.parser')
+    el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
+    if not el:
+        logger.warning('unable to find drupal-settings-json in ' + url)
+        return None
+
+    data_json = json.loads(el.string)
     if save_debug:
-      utils.write_file(article_html, './debug/debug.html')
-    m = re.search(r'\\u0022guid\\u0022:\\u0022([0-9a-f\-]+)\\u0022', article_html)
-    if m:
-      json_url = '{}://{}/jsonapi/node/article/{}'.format(split_url.scheme, split_url.netloc, m.group(1))
-      article_json = utils.get_url_json(json_url)
-      if article_json:
-        item = get_item(article_json['data'], args, save_debug)
-  return item
+        utils.write_file(data_json, './debug/debug.json')
+
+    content_json = data_json['crain_object']['content']
+
+    item = {}
+    item['id'] = content_json['NodeID']
+    item['url'] = url
+    item['title'] = content_json['Title']
+
+    el = soup.find('meta', attrs={"property": "article:published_time"})
+    if el:
+        dt = datetime.fromisoformat(el['content']).astimezone(timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    el = soup.find('meta', attrs={"property": "article:modified_time"})
+    if el:
+        dt = datetime.fromisoformat(el['content']).astimezone(timezone.utc)
+        item['date_modified'] = dt.isoformat()
+
+    authors = []
+    for it in content_json['Author']:
+        authors.append(it['name'])
+    if authors:
+        item['author'] = {}
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+
+    item['tags'] = []
+    for it in content_json['Topics']:
+        item['tags'].append(it['name'])
+    if not item.get('tags'):
+        del item['tags']
+
+    el = soup.find('meta', attrs={"property": "og:image"})
+    if el:
+        item['_image'] = el['content']
+
+    el = soup.find('meta', attrs={"name": "description"})
+    if el:
+        item['summary'] = el['content']
+
+    content_html = ''
+    el = soup.find(class_='article-main-image-wrapper')
+    if el and el.img:
+        content_html += add_image(el)
+
+    for el in soup.find_all(class_=re.compile(r'item--paragraph--type--')):
+        it = el.find(class_='field--name-field-subhead')
+        if it:
+            content_html += '<h3>{}</h3>'.format(it.get_text())
+        if 'item--paragraph--type--body' in el['class']:
+            it = el.find(class_='field--name-field-paragraph-body')
+            content_html += it.body.decode_contents()
+        elif 'item--paragraph--type--photographs' in el['class']:
+            it = el.find(class_='article-images-wrapper')
+            content_html += add_image(it)
+        elif 'item--paragraph--type--video' in el['class']:
+            if el.find(class_='brightcove-player'):
+                it = el.find('video-js')
+                content_html += utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(it['data-account'], it['data-player'], it['data-video-id']))
+            else:
+                logger.warning('unhandled video in ' + item['url'])
+        elif 'item--paragraph--type--embed' in el['class']:
+            it = el.find(class_='field--name-field-embed-code')
+            if it.iframe:
+                content_html += utils.add_embed(it.iframe['src'])
+            else:
+                logger.warning('unhandled embed in ' + item['url'])
+        elif 'item--paragraph--type--factbox' in el['class']:
+            title = el.find(class_='paragraph-inline-title')
+            if el.img:
+                img_src = '{}/image?url={}&width=128'.format(config.server, quote_plus(el.img['src']))
+                content_html += '<table><tr><td><img src="{}"/></td><td style="vertical-align:top;"><h4 style="margin:0;">{}</h4><small>{}</small></td></tr></table>'.format(img_src, title.get_text(), el.p.decode_contents())
+            else:
+                content_html += '<blockquote><strong>{}:</strong>{}</blockquote>'.format(title.get_text(), el.p.decode_contents())
+        elif 'item--paragraph--type--related' in el['class']:
+            pass
+        elif 'item--paragraph--type--newsletter-widget-v1' in el['class']:
+            pass
+        else:
+            logger.warning('unhandled paragraph type {} in {}'.format(el['class'], item['url']))
+
+    content_soup = BeautifulSoup(content_html, 'html.parser')
+    for el in content_soup.find_all('script'):
+        el.decompose()
+
+    item['content_html'] = str(content_soup)
+    return item
+
 
 def get_feed(args, save_debug=False):
-  split_url = urlsplit(args['url'])
-  api_url = '{}://{}/jsonapi/node/article?sort=-created'.format(split_url.scheme, split_url.netloc)
-  articles_json = utils.get_url_json(api_url)
-  if not articles_json:
-    return None
+    return rss.get_feed(args, save_debug, get_content)
 
-  n = 0
-  items = []
-  for article in articles_json['data']:
-    item = get_item(article, args, save_debug)
-    if item:
-      if utils.filter_item(item, args) == True:
-        items.append(item)
-        n += 1
-        if 'max' in args and n == int(args['max']):
-          break
 
-  feed = utils.init_jsonfeed(args)
-  feed['items'] = items.copy()
-  with open('./debug/feed.json', 'w') as file:
-    json.dump(feed, file, indent=4)
-  return feed
+def test_handler():
+    feeds = ['https://www.autonews.com/section/rss',
+             'https://www.plasticsnews.com/section/rss',
+             'https://www.rubbernews.com/section/rss',
+             'https://www.tirebusiness.com/section/rss',
+             'https://www.crainscleveland.com/section/rss']
+    for url in feeds:
+        get_feed({"url": url}, True)

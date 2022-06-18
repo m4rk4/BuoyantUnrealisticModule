@@ -1,12 +1,13 @@
 import glob, importlib, io, os, sys
 import logging, logging.handlers
-from contextlib import redirect_stdout
 from flask import Flask, jsonify, render_template, redirect, request, send_file
+from flask_cors import CORS
 from urllib.parse import quote_plus
 
 import image_utils, utils
 
 app = Flask(__name__)
+CORS(app)
 
 # Setup logger
 LOG_FILENAME = './debug/debug.log'
@@ -25,6 +26,7 @@ logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
+#logging.getLogger('flask_cors').setLevel(logging.DEBUG)
 
 
 @app.template_filter()

@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
@@ -21,16 +21,189 @@ def find_elements(el_name, el_json, el_ret):
     return
 
 
+def get_caption(props):
+    captions = []
+    if props.get('dangerousCaption'):
+        m = re.search(r'^<p>(.*)</p>$', props['dangerousCaption'])
+        if m:
+            captions.append(m.group(1))
+        else:
+            captions.append(props['dangerousCaption'])
+    elif props.get('caption'):
+        captions.append(props['caption'])
+
+    if props.get('dangerousCredit'):
+        captions.append(props['dangerousCredit'])
+    elif props.get('credit'):
+        captions.append(props['credit'])
+
+    return ' | '.join(captions)
+
+
+def add_image(props, width=1000):
+    if props.get('image'):
+        image = props['image']
+    else:
+        image = props
+    sources = []
+    if image.get('sources'):
+        for key, val in image['sources'].items():
+            sources.append(val)
+    elif image.get('segmentedSources'):
+        for key, val in image['segmentedSources'].items():
+            for src in val:
+                sources.append(src)
+    src = utils.closest_dict(sources, 'width', width)
+    caption = get_caption(props)
+    return utils.add_image(src['url'], caption)
+
+
+def add_video(props, width=960):
+    if props.get('image'):
+        image = props['image']
+    else:
+        image = props
+    sources = []
+    for key, val in image['sources'].items():
+        sources.append(val)
+    src = utils.closest_dict(sources, 'width', 640)
+    caption = get_caption(props)
+    if '/clips/' in src['url']:
+        # Gifs are often available for clips with width <=640
+        gif = src['url'].replace('.mp4', '.gif')
+        if utils.url_exists(gif):
+            return utils.add_image(gif, caption)
+    src = utils.closest_dict(sources, 'width', width)
+    poster = '{}/image?url={}&width={}'.format(config.server, quote_plus(src['url']), width)
+    return utils.add_video(src['url'], 'video/mp4', poster, caption)
+
+
+def add_product(props):
+    content_html = '<table style="width:100%"><tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><ul>'.format(props['image']['sources']['sm']['url'], props['dangerousHed'])
+    for offer in props['multipleOffers']:
+        content_html += '<li><a href="{}">'.format(offer['offerUrl'])
+        if offer.get('price'):
+            content_html += '{} at '.format(offer['price'])
+        content_html += offer['sellerName'] + '</a></li>'
+    content_html += '</ul></td></tr></table>'
+    return content_html
+
+
+def format_body(body_json):
+    if body_json[0] == 'ad' or body_json[0] == 'native-ad' or body_json[0] == 'cm-unit' or body_json[0] == 'inline-newsletter':
+        return ''
+
+    start_tag = '<{}>'.format(body_json[0])
+    end_tag = '</{}>'.format(body_json[0])
+
+    if body_json[0] == 'inline-embed':
+        if body_json[1]['type'] == 'image':
+            return add_image(body_json[1]['props'])
+        elif body_json[1]['type'] == 'clip':
+            return add_video(body_json[1]['props'])
+        elif body_json[1]['type'] == 'video':
+            if 'youtube' in body_json[1]['props']['url']:
+                return utils.add_embed(body_json[1]['props']['url'])
+            else:
+                logger.warning('unhandled inline-embed video ' + body_json[1]['props']['url'])
+        elif body_json[1]['type'] == 'cneembed':
+            video_src = ''
+            m = re.search(r'https://player\.cnevids\.com/script/video/(\w+)\.js', body_json[1]['props']['scriptUrl'])
+            if m:
+                video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + m.group(1))
+                if video_json:
+                    # Order of preference
+                    for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
+                        for it in video_json['video']['sources']:
+                            if it['type'] == video_type:
+                                video_src = it['src']
+                                break
+                        if video_src:
+                            break
+            if video_src:
+                return utils.add_video(video_src, video_type, video_json['video']['poster_frame'], video_json['video']['title'])
+        elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'twitter':
+            return utils.add_embed(body_json[1]['props']['url'])
+        elif body_json[1]['type'] == 'product':
+            return add_product(body_json[1]['props'])
+        elif body_json[1]['type'] == 'review':
+            return '<table style="width:100%"><tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="https://www.pitchfork.com{}">{}</a></h4><small>{}</small><br/><br/><a href="https://www.pitchfork.com{}">{}</a></td></tr></table>'.format(body_json[1]['props']['image']['sources']['sm']['url'], body_json[1]['props']['url'], body_json[1]['props']['dangerousHed'], body_json[1]['props']['artistName'], body_json[1]['props']['url'], body_json[1]['props']['buttonTextContent'])
+        elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
+            # skip these but process the children
+            start_tag = ''
+            end_tag = ''
+        elif re.search(r'callout:(anchor|inset-left|inset-right|sidebar)', body_json[1]['type']) or body_json[1]['type'] == 'cneinterlude':
+            # skip these entirely
+            return ''
+        else:
+            logger.warning('unhandled inline-embed type ' + body_json[1]['type'])
+
+    lead_in = False
+    dropcap = False
+    content_html = start_tag
+    for block in body_json[1:]:
+        if isinstance(block, dict) and start_tag:
+            attrs = []
+            for key, val in block.items():
+                if key == 'class':
+                    if 'has-dropcap' in val:
+                        dropcap = True
+                    if 'heading' in val:
+                        m = re.search(r'heading-(h\d)', val)
+                        if m:
+                            n = len(start_tag)
+                            content_html = content_html[:-n] + '<{}>'.format(m.group(1))
+                            end_tag = '</{}>'.format(m.group(1))
+                        else:
+                            if not dropcap:
+                                logger.warning('unknown heading level ' + val)
+                    if 'paywall' in val:
+                        continue
+                    if 'lead-in-text-callout' in val:
+                        lead_in = True
+                        continue
+                attrs.append('{}="{}"'.format(key, val))
+            if attrs:
+                content_html = content_html[:-1] + ' ' + ' '.join(attrs) + '>'
+        elif isinstance(block, list):
+            content_html += format_body(block)
+        elif isinstance(block, str):
+            if lead_in:
+                content_html += block.upper()
+            else:
+                content_html += block
+
+    if dropcap:
+        content_html = re.sub(r'^(<[^>]+>)(\w)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>', content_html) + '<span style="clear:left;">&nbsp;</span>'
+
+    content_html += end_tag
+
+    if body_json[0] == 'inline-embed' and body_json[1]['type'] == 'callout:pullquote':
+        content_html = utils.add_pullquote(content_html)
+
+    return content_html
+
+
 def get_content(url, args, save_debug=False):
     if re.search(r'wired\.com/\d+/\d+/geeks-guide', url):
         return wp_posts.get_content(url, args, save_debug)
 
-    img_size = 'lg'
-    json_url = url + '?format=json'
-    article_json = utils.get_url_json(json_url)
+    article_json = None
+    split_url = urlsplit(url)
+    if not 'www.newyorker.com' in split_url.netloc:
+        json_url = url + '?format=json'
+        article_json = utils.get_url_json(json_url)
     if not article_json:
-        return None
-
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'html.parser')
+        el = soup.find('script', string=re.compile(r'window\.__PRELOADED_STATE__'))
+        if not el:
+            logger.warning('unable to find PRELOADED_STATE in ' + url)
+            return None
+        preload_json = json.loads(el.string[29:-1])
+        article_json = preload_json['transformed']
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -42,325 +215,94 @@ def get_content(url, args, save_debug=False):
     dt = datetime.fromisoformat(article_json['coreDataLayer']['content']['publishDate'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    item['_display_date'] = utils.format_display_date(dt)
     dt = datetime.fromisoformat(article_json['coreDataLayer']['content']['modifiedDate'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
-    # Don't check age here. It should have been checked when parsing the RSS feed.
-
     item['author'] = {}
-    item['author']['name'] = article_json['coreDataLayer']['content']['authorNames']
+    authors = []
+    if article_json.get('article') and article_json['article']['headerProps'].get('contributors'):
+        for key, val in article_json['article']['headerProps']['contributors'].items():
+            for it in val['items']:
+                if key == 'author':
+                    authors.append(it['name'])
+                else:
+                    authors.append('{} ({})'.format(it['name'], key))
+    elif article_json['coreDataLayer']['content'].get('authorNames'):
+        item['author']['name'] = article_json['coreDataLayer']['content']['authorNames']
+    if authors:
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
+    item['tags'] = []
+    omit_tags = []
+    if article_json['coreDataLayer']['content'].get('functionalTags'):
+        omit_tags = article_json['coreDataLayer']['content']['functionalTags'].lower().split('|')
     if article_json['coreDataLayer']['content'].get('tags'):
-        item['tags'] = article_json['coreDataLayer']['content']['tags'].split('|')
+        for tag in article_json['coreDataLayer']['content']['tags'].split('|'):
+            if tag not in omit_tags:
+                item['tags'].append(tag)
+    if not item.get('tags'):
+        del item['tags']
 
     item['_image'] = article_json['head.og.image']
     item['summary'] = article_json['head.description']
+    item['content_html'] = ''
 
-    page_type = article_json['head.pageType']
-    body_json = article_json[page_type]['body']
-    body_html = ''
+    #page_type = article_json['head.pageType']
+    page_type = article_json['head.og.type']
+    body_json = article_json[page_type].get('body')
+
+    if body_json and body_json[1][1] != 'inline-embed':
+        has_lede = True
+    else:
+        has_lede = False
+
+    if not has_lede:
+        if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
+            lede = article_json[page_type]['headerProps']['lede']
+            if lede.get('contentType') == 'photo':
+                item['content_html'] += add_image(lede)
+            elif lede.get('contentType') == 'clip':
+                item['content_html'] += add_video(lede)
+            elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
+                video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
+                if video_json:
+                    for it in video_json['video']['sources']:
+                        if it['type'].find('mp4') > 0:
+                            item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
+        elif item.get('_image'):
+            if '/cartoons/' not in item['url']:
+                item['content_html'] += utils.add_image(item['_image'])
 
     if page_type == 'review':
-        body_html += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><hr/>'.format(
+        item['content_html'] += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><hr/>'.format(
             article_json['review']['rating'], article_json['review']['bestRating'], article_json['review']['pros'],
             article_json['review']['cons'])
 
-    def iter_body(body_json):
-        nonlocal body_html
-        nonlocal json_url
-
-        tag = body_json[0]
-        endtag = '</{}>'.format(tag)
-
-        if tag == 'inline-embed':
-            endtag = ''
-
-            if re.search(
-                    r'\b(article|callout:anchor|callout:blockquote|callout:dropcap|callout:group-\d|callout:feature-large|callout:feature-medium|callout:inset-left|callout:inset-right|callout:sidebar|externallink|sidebar:article)\b',
-                    body_json[1]['type']):
-                # skip
-                pass
-
-            elif body_json[1]['type'] == 'image':
-                caption = ''
-                if body_json[1]['props'].get('dangerousCaption'):
-                    m = re.search(r'<p>(.*)<\/p>', body_json[1]['props']['dangerousCaption'])
-                    if m:
-                        caption = m.group(1)
-                    else:
-                        caption = body_json[1]['props']['dangerousCaption']
-                if body_json[1]['props'].get('dangerousCredit'):
-                    caption += ' ' + body_json[1]['props']['dangerousCredit']
-                img_src = body_json[1]['props']['image']['sources'][img_size]['url']
-                if not 'newsletter.png' in img_src:
-                    body_html += utils.add_image(img_src, caption.strip())
-
-            elif body_json[1]['type'] == 'gallery':
-                for it in body_json[1]['props']['slides']:
-                    caption = ''
-                    if 'dangerousCaption' in it:
-                        m = re.search(r'<p>(.*)<\/p>', it['dangerousCaption'])
-                        if m:
-                            caption = m.group(1)
-                        else:
-                            caption = it['dangerousCaption']
-                    if 'dangerousCredit' in it:
-                        caption += ' ' + it['dangerousCredit']
-                    body_html += utils.add_image(it['image']['sources'][img_size]['url'], caption.strip())
-
-            elif body_json[1]['type'] == 'video':
-                body_html += utils.add_embed(body_json[1]['props']['url'])
-
-            elif body_json[1]['type'] == 'clip':
-                captions = []
-                m = re.search(r'<p>(.*)<\/p>', body_json[1]['props']['dangerousCaption'])
-                if m:
-                    captions.append(m.group(1))
-                elif body_json[1]['props']['dangerousCaption'].strip():
-                    captions.append(body_json[1]['props']['dangerousCaption'].strip())
-                if body_json[1]['props'].get('dangerousCredit') and body_json[1]['props']['dangerousCredit'].strip():
-                    captions.append(body_json[1]['props']['dangerousCredit'].strip())
-                videos = []
-                for k in list(body_json[1]['props']['image']['sources'].keys()):
-                    videos.append(body_json[1]['props']['image']['sources'][k])
-                video = utils.closest_dict(videos, 'height', 480)
-                img_src = video['url'].replace('.mp4', '.gif')
-                if utils.url_exists(img_src):
-                    if body_html.find(quote_plus(img_src)) < 0:
-                        body_html += utils.add_image(img_src, ' | '.join(captions))
-                else:
-                    if body_html.find(quote_plus(video['url'])) < 0:
-                        body_html += utils.add_video(video['url'], 'video/mp4', None, ' | '.join(captions),
-                                                     video['width'], video['height'])
-
-            elif body_json[1]['type'] == 'cneembed':
-                video_id = ''
-                split_url = urlsplit(body_json[1]['props']['scriptUrl'])
-                script_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
-                m = re.search(r'https:\/\/player\.cnevids\.com\/script\/video\/(\w+)\.js',
-                              body_json[1]['props']['scriptUrl'])
-                if m:
-                    video_id = m.group(1)
-                video_src = ''
-                if video_id:
-                    video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + video_id)
-                    if video_json:
-                        for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
-                            for it in video_json['video']['sources']:
-                                if it['type'] == video_type:
-                                    video_src = it['src']
-                                    break
-                            if video_src:
-                                break
-                if video_src:
-                    body_html += utils.add_video(video_src, video_type, video_json['video']['poster_frame'],
-                                                 video_json['video']['title'])
-                else:
-                    logger.warning('error with cneembed video {} in {}'.format(body_json[1]['props']['scriptUrl'], url))
-
-            elif body_json[1]['type'] == 'cneinterlude':
-                # Skip this - mostly seems to be related videos embedded in the middle of the article
-                if False:
-                    for video_id in body_json[1]['props']['embeddedVideos']:
-                        video_src = ''
-                        video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + video_id)
-                        if video_json:
-                            for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
-                                for it in video_json['video']['sources']:
-                                    if it['type'] == video_type:
-                                        video_src = it['src']
-                                        break
-                                if video_src:
-                                    break
-                        if video_src:
-                            body_html += utils.add_video(video_src, video_type, video_json['video']['poster_frame'],
-                                                         video_json['video']['title'])
-                        else:
-                            logger.warning('unable to get video info for videoId {} in {}'.format(video_id, url))
-
-            elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'instagram' or body_json[1][
-                'type'] == 'twitter':
-                body_html += utils.add_embed(body_json[1]['props']['url'])
-
-            elif body_json[1]['type'] == 'product':
-                if not 'subscribe.wired.com' in body_json[1]['props']['offerUrl']:
-                    offer_html = ''
-                    if body_json[1]['props'].get('multipleOffers'):
-                        for offer in body_json[1]['props']['multipleOffers']:
-                            if offer_html:
-                                offer_html += '<br/>'
-                            offer_html += '&bull;&nbsp;<a href="{}">{}'.format(offer['offerUrl'], offer['sellerName'])
-                            if offer.get('price'):
-                                offer_html += ' &ndash; {}'.format(offer['price'])
-                            offer_html += '</a>'
-                    else:
-                        offer_html += '&bull;&nbsp;<a href="{}">{}</a>'.format(offer['offerUrl'],
-                                                                               offer['offerRetailer'])
-                    if body_json[1]['props'].get('image'):
-                        poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(
-                            body_json[1]['props']['image']['sources']['sm']['url']))
-                        body_html += '<div><img style="float:left; margin-right:8px; height:128px;" src="{}"/><div style="overflow:auto; display:block;"><b>{}</b><br/>{}</div><div style="clear:left;"></div>'.format(
-                            poster, body_json[1]['props']['dangerousHed'], offer_html)
-                    else:
-                        body_html += '<h4 style="clear:left; margin-top:0; margin-bottom:0.5em;">{}</h4>{}'.format(
-                            body_json[1]['props']['dangerousHed'], offer_html)
-
-            elif body_json[1]['type'] == 'callout:align-center':
-                body_html += '<div style="text-align: center">'
-                endtag = '</div>'
-
-            elif body_json[1]['type'] == 'callout:pullquote':
-                body_html += '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">'
-                endtag = '</blockquote>'
-
-            else:
-                logger.warning('unhandled inline-embed type {} in {}'.format(body_json[1]['type'], json_url))
-
-        elif tag == 'ad' or tag == 'native-ad' or tag == 'inline-newsletter':
-            # skip
-            return
-
-        else:
-            if tag == 'div':
-                # Change heading tags from div's to h1, h2, h3, etc
-                if 'role' in body_json[1] and body_json[1]['role'] == 'heading':
-                    # Skip the Related Stories heading
-                    try:
-                        if re.search(r'Related Stories', body_json[2], flags=re.I):
-                            return
-                    except:
-                        pass
-                    # Check if there's a newsletter sign up link, etc to skip
-                    try:
-                        if body_json[2][0] == 'a':
-                            if '/newsletter/' in body_json[2][1]['href']:
-                                return
-                    except:
-                        pass
-                    tag = 'h' + body_json[1]['aria-level']
-                    endtag = '</{}>'.format(tag)
-
-            body_html += '<{}>'.format(tag)
-
-        for i in range(1, len(body_json)):
-            # Strings should be text
-            if isinstance(body_json[i], str):
-                body_html += body_json[i]
-
-            # Dicts have props for the current tag
-            elif isinstance(body_json[i], dict):
-                if tag != 'inline-embed':
-                    body_html = body_html.rstrip('>')
-                    for key in body_json[i]:
-                        body_html += ' {}="{}"'.format(key, body_json[1][key])
-                    body_html += '>'
-
-            # Lists are tags we iterate into
-            elif isinstance(body_json[i], list):
-                iter_body(body_json[i])
-
-        body_html += endtag
-        return
-
     if body_json:
-        iter_body(body_json)
+        item['content_html'] += format_body(body_json)
 
     if page_type == 'gallery':
         for it in article_json[page_type]['items']:
-            body_html += '<hr />'
+            item['content_html'] += '<hr />'
             if it.get('image'):
-                caption = []
-                if it['image'].get('caption'):
-                    m = re.search(r'<p>(.*)<\/p>', it['image']['caption'])
-                    if m:
-                        caption.append(m.group(1))
-                    else:
-                        caption.append(it['image']['caption'])
-                if it['image'].get('credit'):
-                    caption.append(it['image']['credit'])
-                if img_size in it['image']['segmentedSources']:
-                    images = it['image']['segmentedSources'][img_size]
-                else:
-                    # Default to sm
-                    images = it['image']['segmentedSources']['sm']
-                image = utils.closest_dict(images, 'width', 1000)
-                body_html += utils.add_image(image['url'], ' | '.join(caption))
+                item['content_html'] += add_image(it['image'])
             if it.get('dangerousHed'):
-                body_html += '<h3>{}</h3>'.format(it['dangerousHed'])
+                item['content_html'] += '<h3>{}</h3>'.format(it['dangerousHed'])
             if it.get('brand') and it.get('name'):
-                body_html += '<h4>{} {}</h4>'.format(it['brand'], it['name'])
+                item['content_html'] += '<h4>{} {}</h4>'.format(it['brand'], it['name'])
+            elif it.get('name'):
+                item['content_html'] += '<h4>{}</h4>'.format(it['name'])
             if it.get('dek'):
-                iter_body(it['dek'])
+                item['content_html'] += format_body(it['dek'])
             if it.get('offers'):
+                item['content_html'] += '<ul>'
                 for offer in it['offers']:
-                    body_html += '<p><a href="{}">{} at {}</a></p>'.format(offer['offerUrl'], offer['price'],
-                                                                           offer['sellerName'])
-
-    def sub_lead_in_text_callout(matchobj):
-        return '{}{}{}'.format(matchobj.group(1), matchobj.group(2).upper(), matchobj.group(3))
-
-    body_html = re.sub(r'(lead-in-text-callout[^>]*>)([^<]*)(<)', sub_lead_in_text_callout, body_html)
-
-    def sub_has_dropcap(matchobj):
-        return '{}<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}{}'.format(matchobj.group(1),
-                                                                                                    matchobj.group(2),
-                                                                                                    matchobj.group(3),
-                                                                                                    matchobj.group(4))
-
-    body_html = re.sub(r'(has-dropcap[^>]*>)(\w)([^<]*)(<)', sub_has_dropcap, body_html)
-
-    # Clean up html
-    body_soup = BeautifulSoup(body_html, 'html.parser')
-    for el in body_soup.find_all('a', attrs={"isaffiliatelink": True}):
-        if el.has_attr('href'):
-            href = utils.get_redirect_url(el['href'])
-            el.attrs = {}
-            el['href'] = href
-
-    for el in body_soup.find_all(re.compile(r'p|h\d|span'), class_=['has-dropcap', 'lead-in-text-callout', 'paywall']):
-        el.attrs = {}
-
-    # Add lede image to article
-    lead_html = ''
-    captions = []
-    img_url = ''
-    if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
-        lede = article_json[page_type]['headerProps']['lede']
-        if lede.get('caption'):
-            m = re.search(r'<p>(.*)<\/p>', lede['caption'])
-            if m:
-                captions.append(m.group(1))
-            else:
-                if lede['caption'].strip():
-                    captions.append(lede['caption'].strip())
-        if lede.get('credit') and lede['credit'].strip():
-            captions.append(lede['credit'].strip())
-        if lede.get('contentType') == 'photo':
-            img_url = lede['sources'][img_size]['url']
-        elif lede.get('contentType') == 'clip':
-            if utils.url_exists(lede['sources']['640w']['url'].replace('.mp4', '.gif')):
-                img_url = lede['sources']['640w']['url'].replace('.mp4', '.gif')
-            else:
-                lead_html = utils.add_video(lede['sources']['640w']['url'], 'video/mp4', caption=' | '.join(captions))
-        elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
-            video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
-            if video_json:
-                for it in video_json['video']['sources']:
-                    if it['type'].find('mp4') > 0:
-                        lead_html = utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'],
-                                                    video_json['video']['title'])
-    elif 'head.og.image' in article_json:
-        img_url = article_json['head.og.image']
-    elif item.get('_image'):
-        img_url = item['_image']
-    if img_url:
-        lead_html = utils.add_image(img_url, ' | '.join(captions))
-
-    item['content_html'] = ''
-    if lead_html:
-        item['content_html'] += lead_html
-    item['content_html'] += str(body_soup)
+                    item['content_html'] += '<li><a href="{}">'.format(offer['offerUrl'])
+                    if offer.get('price'):
+                        item['content_html'] += '{} at '.format(offer['price'])
+                    item['content_html'] += '{}</a></li>'.format(offer['sellerName'])
+                item['content_html'] += '</ul>'
     return item
 
 

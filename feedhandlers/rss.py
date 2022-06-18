@@ -1,5 +1,6 @@
 import feedparser
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 import utils
 
@@ -46,8 +47,10 @@ def get_feed(args, save_debug=False, func_get_content=None):
       entry_link = entry.feedburner_origlink
     else:
       entry_link = entry.link
+
     if not 'youtube' in entry_link:
-      entry_link = utils.clean_url(entry_link)
+      if len(urlsplit(entry_link).path) > 1:
+        entry_link = utils.clean_url(entry_link)
 
     if 'guid' in entry:
       entry_id = entry.guid
