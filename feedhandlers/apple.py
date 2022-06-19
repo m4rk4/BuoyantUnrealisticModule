@@ -39,7 +39,7 @@ def get_token(url):
 
 
 def get_apple_data(api_url, url, save_debug=False):
-    s = requestsSession()
+    s = requests.Session()
     headers = {
         "accept": "*/*",
         "accept-encoding": "gzip, deflate, br",
@@ -102,6 +102,7 @@ def get_apple_data(api_url, url, save_debug=False):
         utils.write_file(sites_json, './sites.json')
     return r.json()
 
+
 def get_album_track(track):
     item = {}
     item['id'] = track['id']
@@ -132,6 +133,7 @@ def get_album_track(track):
     s = math.floor((ms / 1000) % 60)
     item['_duration'] = '{}:{}'.format(m, s)
     return item
+
 
 def get_album(url, args, save_debug=False):
     m = re.search(r'/album/[^/]+/(\d+)', url)
