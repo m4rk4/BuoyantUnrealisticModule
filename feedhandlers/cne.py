@@ -248,31 +248,32 @@ def get_content(url, args, save_debug=False):
     item['summary'] = article_json['head.description']
     item['content_html'] = ''
 
-    #page_type = article_json['head.pageType']
-    page_type = article_json['head.og.type']
+    if article_json['head.pageType'] == article_json['head.og.type']:
+        page_type = article_json['head.og.type']
+    else:
+        if article_json['head.pageType'] in item['url']:
+            page_type = article_json['head.pageType']
+        elif article_json['head.og.type'] in item['url']:
+            page_type = article_json['head.og.type']
+        else:
+            logger.warning('unknown page type for ' + item['url'])
     body_json = article_json[page_type].get('body')
 
-    if body_json and body_json[1][1] != 'inline-embed':
-        has_lede = True
-    else:
-        has_lede = False
-
-    if not has_lede:
-        if 'headerProps' in article_json[page_type] and 'lede' in article_json[page_type]['headerProps']:
-            lede = article_json[page_type]['headerProps']['lede']
-            if lede.get('contentType') == 'photo':
-                item['content_html'] += add_image(lede)
-            elif lede.get('contentType') == 'clip':
-                item['content_html'] += add_video(lede)
-            elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
-                video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
-                if video_json:
-                    for it in video_json['video']['sources']:
-                        if it['type'].find('mp4') > 0:
-                            item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
-        elif item.get('_image'):
-            if '/cartoons/' not in item['url']:
-                item['content_html'] += utils.add_image(item['_image'])
+    if article_json[page_type].get('headerProps') and article_json[page_type]['headerProps'].get('lede'):
+        lede = article_json[page_type]['headerProps']['lede']
+        if lede.get('contentType') == 'photo':
+            item['content_html'] += add_image(lede)
+        elif lede.get('contentType') == 'clip':
+            item['content_html'] += add_video(lede)
+        elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
+            video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
+            if video_json:
+                for it in video_json['video']['sources']:
+                    if it['type'].find('mp4') > 0:
+                        item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
+    elif item.get('_image'):
+        if '/cartoons/' not in item['url']:
+            item['content_html'] += utils.add_image(item['_image'])
 
     if page_type == 'review':
         item['content_html'] += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><hr/>'.format(

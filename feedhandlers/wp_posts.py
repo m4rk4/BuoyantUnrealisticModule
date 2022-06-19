@@ -505,6 +505,22 @@ def format_content(content_html, item):
         else:
             logger.warning('unhandled wp-block-audio in ' + item['url'])
 
+    for el in soup.find_all(class_='podcast'):
+        # https://www.wired.com/author/geeks-guide-to-the-galaxy/
+        poster = '{}/image?&width=256&overlay=audio'.format(config.server)
+        it = el.find('img')
+        if it:
+            poster += '&url=' + quote_plus(it['src'])
+        it = el.find('audio')
+        if it:
+            audio_src = it.source['src']
+        else:
+            audio_src = ''
+        new_html = '<div><a href="{}"><img src="{}"/></a></div>'.format(audio_src, poster)
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
     for el in soup.find_all('figure', class_='wp-block-embed'):
         new_html = None
         if 'wp-block-embed-youtube' in el['class']:
@@ -663,7 +679,7 @@ def format_content(content_html, item):
     for el in soup.find_all(class_=re.compile(r'wp-block-bigbite-multi-title|wp-block-product-widget-block')):
         el.decompose()
 
-    for el in soup.find_all(id=re.compile(r'^ad_|\bad\b')):
+    for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
         el.decompose()
 
     for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b')):
