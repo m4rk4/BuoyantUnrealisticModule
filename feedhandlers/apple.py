@@ -55,7 +55,7 @@ def get_apple_data(api_url, url, save_debug=False):
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
         "sec-gpc": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.124 Safari/537.36 Edg/102.0.1245.44"
     }
     preflight = s.options(api_url, headers=headers)
     if preflight.status_code != 204:
@@ -71,13 +71,13 @@ def get_apple_data(api_url, url, save_debug=False):
         "origin": "https://embed.podcasts.apple.com",
         "pragma": "no-cache",
         "referer": "https://embed.podcasts.apple.com/",
-        "sec-ch-ua": "\"Chromium\";v=\"92\", \" Not A;Brand\";v=\"99\", \"Google Chrome\";v=\"92\"",
+        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"102\", \"Microsoft Edge\";v=\"102\"",
         "sec-ch-ua-mobile": "?0",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
         "sec-gpc": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.124 Safari/537.36 Edg/102.0.1245.44"
     }
 
     sites_json = utils.read_json_file('./sites.json')
@@ -140,8 +140,10 @@ def get_album(url, args, save_debug=False):
     if not m:
         logger.warning('unable to get album id from ' + url)
         return None
-    api_json = get_apple_data('https://api.music.apple.com/v1/catalog/us/albums/{}?include=artists'.format(m.group(1)), url, save_debug)
+    api_url = 'https://api.music.apple.com/v1/catalog/us/albums/{}?include=artists'.format(m.group(1))
+    api_json = get_apple_data(api_url, url, save_debug)
     if not api_json:
+
         return None
     if save_debug:
         utils.write_file(api_json, './debug/album.json')
