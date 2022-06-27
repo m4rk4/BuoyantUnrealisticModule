@@ -63,6 +63,9 @@ def get_content(url, args, save_debug=False):
     item['url'] = url
 
     if ld_article:
+        if save_debug:
+            utils.write_file(ld_article, './debug/debug.json')
+
         item['title'] = html.unescape(ld_article['headline'])
 
         dt = datetime.fromisoformat(ld_article['datePublished'].replace('Z', '+00:00'))
@@ -74,7 +77,13 @@ def get_content(url, args, save_debug=False):
 
         author = ''
         if ld_article.get('author'):
-            author = ld_article['author']['name']
+            if isinstance(ld_article['author'], dict):
+                author = ld_article['author']['name']
+            elif isinstance(ld_article['author'], list):
+                authors = []
+                for author in ld_article['author']:
+                    authors.append(author['name'])
+                author = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
         else:
             el = soup.find('a', class_='author')
             if el:
