@@ -21,7 +21,7 @@ def resize_image(img_src, width=1000):
     return '{}://{}{}?{}'.format(split_url.scheme, split_url.netloc, split_url.path, query)
 
 
-def add_image(el_figure):
+def add_figure(el_figure):
     it = el_figure.find('source')
     if it:
         img_src = it.get('srcset')
@@ -33,6 +33,14 @@ def add_image(el_figure):
         caption = el_figure.figcaption.get_text()
     else:
         caption = ''
+    return add_image(img_src, caption)
+
+
+def add_image(img_src, caption):
+    w,h = utils.get_image_size(img_src)
+    if h > w:
+        print(w)
+        return utils.add_image(resize_image(img_src, width=w), caption, width="70%")
     return utils.add_image(resize_image(img_src), caption)
 
 
@@ -138,7 +146,7 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = ''
     el = soup.find(class_='heading_image')
     if el:
-        item['content_html'] += add_image(el.figure)
+        item['content_html'] += add_figure(el.figure)
 
     article_body = soup.find(class_='article-body')
     if article_body:
@@ -172,7 +180,7 @@ def get_content(url, args, save_debug=False):
             if it:
                 for img in it.find_all(class_='review-item-gallery-thumbnail'):
                     src = img.find('source')
-                    new_html = utils.add_image(resize_image(src['data-srcset']), '&nbsp;')
+                    new_html = add_image(resize_image(src['data-srcset']), '&nbsp;')
                     it.insert_before(BeautifulSoup(new_html, 'html.parser'))
                 it.decompose()
             it = el.find(class_='item-buy')
@@ -189,12 +197,12 @@ def get_content(url, args, save_debug=False):
             el.decompose()
 
         for el in article_body.find_all(class_='body-img'):
-            new_html = add_image(el.figure)
+            new_html = add_figure(el.figure)
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
         for el in article_body.find_all(class_='img-article-item'):
-            new_html = add_image(el.figure)
+            new_html = add_figure(el.figure)
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
@@ -208,7 +216,7 @@ def get_content(url, args, save_debug=False):
                     caption = it.figcaption.get_text()
                 else:
                     caption = '&nbsp;'
-                new_html += utils.add_image(resize_image(it['data-img-url']), caption)
+                new_html += add_image(resize_image(it['data-img-url']), caption)
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
@@ -216,9 +224,9 @@ def get_content(url, args, save_debug=False):
             if el.parent.name != 'figure':
                 new_html = ''
                 if el.get('src'):
-                    new_html = utils.add_image(resize_image(el['src']))
+                    new_html = add_image(resize_image(el['src']))
                 elif el.get('data-img-url'):
-                    new_html = utils.add_image(resize_image(el['data-img-url']))
+                    new_html = add_image(resize_image(el['data-img-url']))
                 if new_html:
                     el.insert_after(BeautifulSoup(new_html, 'html.parser'))
                     el.decompose()

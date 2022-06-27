@@ -465,11 +465,11 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   if link:
     begin_html += '<a href="{}">'.format(link)
 
-  begin_html += '<img src="{}" loading="lazy" style="'.format(img_src)
+  begin_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
   if width:
-    begin_html += 'width:{};'.format(width)
+    begin_html += ' width:{};'.format(width)
   else:
-    begin_html += 'width:100%;'
+    begin_html += ' width:100%;'
   if height:
     begin_html += ' height:{};'.format(height)
   if img_style:
