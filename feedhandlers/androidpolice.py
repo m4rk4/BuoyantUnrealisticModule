@@ -39,7 +39,6 @@ def add_figure(el_figure):
 def add_image(img_src, caption):
     w,h = utils.get_image_size(img_src)
     if h > w:
-        print(w)
         return utils.add_image(resize_image(img_src, width=w), caption, width="70%")
     return utils.add_image(resize_image(img_src), caption)
 
