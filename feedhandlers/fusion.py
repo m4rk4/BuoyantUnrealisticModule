@@ -591,6 +591,7 @@ def get_feed(args, save_debug=False):
     if save_debug:
         utils.write_file(feed_content, './debug/feed.json')
 
+    feed_title = ''
     if isinstance(feed_content, dict):
         if feed_content.get('content_elements'):
             content_elements = feed_content['content_elements']
@@ -598,6 +599,8 @@ def get_feed(args, save_debug=False):
             content_elements = feed_content['stories']
         elif feed_content.get('result'):
             content_elements = feed_content['result']['articles']
+            if feed_content['result'].get('section'):
+                feed_title = 'Reuters > ' + feed_content['result']['section']['name']
         elif feed_content.get('latest'):
             content_elements = feed_content['latest']
         elif feed_content.get('items'):
@@ -636,7 +639,7 @@ def get_feed(args, save_debug=False):
             logger.debug('getting content from ' + url)
         if content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
             item = get_item(content, url, args, save_debug)
-        elif content['type'] == 'video' and content.get('streams'):
+        elif content.get('type') and content['type'] == 'video' and content.get('streams'):
             item = get_item(content, url, args, save_debug)
         else:
             item = get_content(url, args, save_debug)
@@ -648,12 +651,16 @@ def get_feed(args, save_debug=False):
                     if n == int(args['max']):
                         break
     feed = utils.init_jsonfeed(args)
+    if feed_title:
+        feed['title'] = feed_title
     feed['items'] = items.copy()
     return feed
+
 
 def test_handler():
     feeds = ['https://feeds.washingtonpost.com/rss/homepage',
              'https://www.washingtonpost.com/business/technology/',
-             'https://www.washingtonpost.com/opinions/']
+             'https://www.washingtonpost.com/opinions/',
+             'https://www.reuters.com/technology']
     for url in feeds:
         get_feed({"url": url}, True)

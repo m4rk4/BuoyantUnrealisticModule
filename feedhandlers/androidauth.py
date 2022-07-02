@@ -59,6 +59,7 @@ def add_image(image):
 
 
 def format_block(block):
+    print(block)
     content_html = ''
     if block['resource'] == 'nc-string':
         content_html += block['html']
@@ -199,14 +200,22 @@ def get_content(url, args, save_debug=False):
         dt = datetime.fromisoformat(meta['content'])
         item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in page_json['authors']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if page_json.get('authors'):
+        authors = []
+        for it in page_json['authors']:
+            authors.append(it['name'])
+        if authors:
+            item['author'] = {}
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    elif page_json.get('meta') and page_json['meta'].get('dataLayer') and page_json['meta']['dataLayer'].get('author'):
+        item['author'] = {"name": page_json['meta']['dataLayer']['author']}
+    else:
+        item['author'] = {"name": "Android Authority"}
 
-    item['tags'] = list(set(page_json['meta']['subscribeTags']))
+    if page_json['meta'].get('subscribeTags'):
+        item['tags'] = list(set(page_json['meta']['subscribeTags']))
+    elif page_json['meta'].get('tags'):
+        item['tags'] = list(set(page_json['meta']['tage']))
 
     meta = next((it for it in page_json['head']['metaTags'] if it.get('property') == 'og:image'), None)
     if meta:
@@ -219,11 +228,14 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = ''
     if page_json.get('subtitle'):
         item['content_html'] += '<p><em>{}</em></p>'.format(page_json['subtitle'])
+    elif page_json.get('remarkHtml'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(page_json['remarkHtml'])
 
     if page_json.get('image'):
         item['content_html'] += add_image(page_json['image'])
-    elif item.get('_image') and not (page_json['blocks'][0].get('image') or page_json['blocks'][0].get('video')):
-        item['content_html'] += utils.add_image(item['_image'])
+    elif item.get('_image'):
+        if page_json.get('blocks') and not (page_json['blocks'][0].get('image') or page_json['blocks'][0].get('video')):
+            item['content_html'] += utils.add_image(item['_image'])
 
     if page_json.get('review'):
         badge = ''
@@ -253,8 +265,27 @@ def get_content(url, args, save_debug=False):
             item['content_html'] += '<li><a href="{}">{}</a>'.format(utils.get_redirect_url(it['url']), it['buttonLabel'])
         item['content_html'] += '</ul>'
 
-    for block in page_json['blocks']:
-        item['content_html'] += format_block(block)
+    if page_json.get('stories'):
+        for story in page_json['stories']:
+            item['content_html'] += '<h2>{}</h2>'.format(story['title'])
+            for block in story['blocks']:
+                item['content_html'] += format_block(block)
+
+    if page_json.get('roundup'):
+        for story in page_json['roundup']:
+            item['content_html'] += '<h2>{}</h2>'.format(story['title'])
+            for block in story['blocks']:
+                item['content_html'] += format_block(block)
+
+    if page_json.get('fun'):
+        for story in page_json['fun']:
+            item['content_html'] += '<h2>{}</h2>'.format(story['title'])
+            for block in story['blocks']:
+                item['content_html'] += format_block(block)
+
+    if page_json.get('blocks'):
+        for block in page_json['blocks']:
+            item['content_html'] += format_block(block)
     return item
 
 

@@ -7,7 +7,7 @@
     },
     "androidauthority": {
         "module": "androidauth",
-        "buildId": "qR9xU-Ftg7DWRLKtZ3Hmw"
+        "buildId": "UjuoivvJjybyyZeE7sUjE"
     },
     "androidpolice": {
         "module": "androidpolice"
@@ -519,7 +519,7 @@
     "reuters": {
         "api_url": "https://www.reuters.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 90,
+        "deployment": 100,
         "arc_site": "reuters",
         "content": {
             "source": "article-by-id-or-url-v1",
