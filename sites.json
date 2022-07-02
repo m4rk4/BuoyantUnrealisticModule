@@ -101,6 +101,10 @@
     "carbuzz": {
         "module": "carbuzz"
     },
+    "cfobrew": {
+        "module": "morningbrew",
+        "buildId": "VqvC4s6lx9O6jLFpvu-av"
+    },
     "chicagotribune": {
         "api_url": "https://www.chicagotribune.com/pf/api/v3/content/fetch/",
         "module": "fusion",
@@ -247,6 +251,10 @@
     "economist": {
         "module": "economist"
     },
+    "emergingtechbrew": {
+        "module": "morningbrew",
+        "buildId": "IxhNLVXfz70VFxUVFIAjP"
+    },
     "empireonline": {
         "module": "empire"
     },
@@ -312,6 +320,10 @@
     "hackster": {
         "module": "hackster",
         "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDMtMjFUMTM6NTk6MDUrMDAwMCIsImV4cCI6IjIwMjItMDMtMjFUMTU6NTk6MDUrMDAwMCIsInJuZCI6IjFmMmRhMzYzN2EwZDU4NmVmODQyMDRiYjU1NTkwNDE1In0.19HJWh5GM_DfXSPzRCwMqgPxG03sref6DRELrfQcBlRy8jHjimCj6QyQgoUBKT_FU3aJBC-Edha1bNmb8tTn7Q"
+    },
+    "hr-brew": {
+        "module": "morningbrew",
+        "buildId": "VqvC4s6lx9O6jLFpvu-av"
     },
     "ign": {
         "module": "ign"
@@ -386,6 +398,10 @@
             }
         }
     },
+    "itbrew": {
+        "module": "morningbrew",
+        "buildId": "VqvC4s6lx9O6jLFpvu-av"
+    },
     "jalopnik": {
         "module": "gawker"
     },
@@ -405,6 +421,10 @@
     "lifehacker": {
         "module": "gawker"
     },
+    "marketingbrew": {
+        "module": "morningbrew",
+        "buildId": "85o1uNt2Ql4KY_LrXnGBi"
+    },
     "mashable": {
         "module": "mashable"
     },
@@ -419,6 +439,10 @@
     },
     "mixcloud": {
         "module": "mixcloud"
+    },
+    "morningbrew": {
+        "module": "morningbrew",
+        "buildId": "j0DIsY1PLCjmSQl_b8fne"
     },
     "motortrend": {
         "module": "motortrend"
@@ -448,7 +472,6 @@
             "pSetup": "yorkdailyrecord_live",
             "title": "York Daily Record"
         }
-
     },
     "newyorker": {
         "module": "cne"
@@ -488,6 +511,10 @@
     },
     "redditmedia": {
         "module": "reddit"
+    },
+    "retailbrew": {
+        "module": "morningbrew",
+        "buildId": "VqvC4s6lx9O6jLFpvu-av"
     },
     "reuters": {
         "api_url": "https://www.reuters.com/pf/api/v3/content/fetch/",
