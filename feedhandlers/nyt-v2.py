@@ -83,7 +83,7 @@ def render_block(block, arg1=None, arg2=None):
             block_html += render_block(blk)
         block_html += '</li>'
 
-    elif block['__typename'] == 'HeaderBasicBlock' or block['__typename'] == 'HeaderFullBleedHorizontalBlock' or block['__typename'] == 'HeaderMultimediaBlock':
+    elif block['__typename'] == 'HeaderBasicBlock' or block['__typename'] == 'HeaderFullBleedHorizontalBlock'  or block['__typename'] == 'HeaderFullBleedVerticalBlock' or block['__typename'] == 'HeaderMultimediaBlock':
         if full_header:
             if block.get('headline'):
                 block_html += render_block(block['headline'])
@@ -374,7 +374,7 @@ def get_content(url, args, save_debug=False):
         for block in article_json['sprinkledBody']['content']:
             item['content_html'] += render_block(block)
 
-    item['content_html'] = item['content_html'].replace('</figure><figure', '</figure><br/><figure')
+    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
     return item
 
 
