@@ -1,9 +1,9 @@
-import hashlib, hmac, json, re
+import base64, hashlib, hmac, json, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -11,462 +11,529 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def image_resize(img_src, width=1092):
-    # https://www.zdnet.com/a/img/resize/8442e1cabace25833c896450c97727d73ee7477c/2021/10/25/83cabc85-3a18-484e-8d42-af9224d68e79/google-pixel-6-01.jpg?auto=webp&width=1200
-    if img_src.startswith('https://www.zdnet.com/a/img/resize/'):
-        m = re.search('/resize/[0-9a-f]+(/[^\?]+)', img_src)
-        if not m:
-            logger.debug('unable to resize ' + img_src)
-            return img_src
-        path = m.group(1)
-    elif img_src.startswith('https://image-resizer.prod.zdnet.com/i/'):
-        path = urlsplit(img_src).path[2:]
-    elif img_src.startswith('https://www.zdnet.com/a/hub/i/'):
-        path = urlsplit(img_src).path[8:]
-    else:
-        logger.warning('unhandled zdnet image source ' + img_src)
-        return img_src
-    path += '?auto=webp&width={}'.format(width)
-    # secret key from https://www.zdnet.com/a/neutron/953a029.modern.js
-    key = 'nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI='
-    digest = hmac.new(bytes(key, 'UTF-8'), bytes(path, 'UTF-8'), hashlib.sha1)
-    return 'https://www.zdnet.com/a/img/resize/{}{}'.format(digest.hexdigest(), path)
-
-
-def get_gallery_content(url, args, save_debug=False):
-    # https://www.zdnet.com/pictures/first-look-16-inch-m1-pro-macbook-pro/
-    m = re.search(r'\/pictures\/([^\/]+)', url)
+def resize_image(img_src, secret_key, width=1092):
+    split_url = urlsplit(img_src)
+    m = re.search('/\d{4}/\d\d/\d\d/.*', split_url.path)
     if not m:
-        return None
-    api_url = 'https://cmg-prod.apigee.net/v1/xapi/galleries/zdnet/{}/web?apiKey=hzY568JORMZcDzoFQ1ey5LBJuBS7DncX&componentName=gallery&componentDisplayName=Gallery&componentType=Gallery'.format(
-        m.group(1))
-    gallery_json = utils.get_url_json(api_url)
-    if not gallery_json:
-        return None
-    if save_debug:
-        utils.write_file(gallery_json, './debug/debug.json')
-
-    item = {}
-    item['id'] = gallery_json['data']['item']['id']
-    item['url'] = url
-    item['title'] = gallery_json['data']['item']['headline']
-
-    dt = datetime.fromisoformat(gallery_json['data']['item']['datePublished']['date']).replace(tzinfo=timezone.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
-    authors = []
-    authors.append('{} {}'.format(gallery_json['data']['item']['author']['firstName'],
-                                  gallery_json['data']['item']['author']['lastName']))
-    if gallery_json['data']['item'].get('moreAuthors'):
-        for author in gallery_json['data']['item']['moreAuthors']:
-            authors.append('{} {}'.format(author['firstName'], author['lastName']))
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
-    item['tags'] = []
-    for tag in gallery_json['data']['item']['topics']:
-        item['tags'].append(tag['name'])
-
-    item['_image'] = gallery_json['data']['item']['promoImage']['path']
-
-    item['content_html'] = ''
-    if gallery_json['data']['item'].get('dek'):
-        item['summary'] = gallery_json['data']['item']['dek']
-        item['content_html'] += '<p><em>{}</em></p>'.format(gallery_json['data']['item']['dek'])
-
-    n = len(gallery_json['data']['item']['items'])
-    for i, gallery_item in enumerate(gallery_json['data']['item']['items']):
-        caption = '{} of {} | '.format(i + 1, n)
-        if gallery_item.get('photoCredit'):
-            caption += gallery_item['photoCredit']
-        else:
-            caption += '{}/ZDNet'.format(item['author']['name'])
-        item['content_html'] += utils.add_image(image_resize(gallery_item['image']['path']), caption)
-        if gallery_item.get('title'):
-            item['content_html'] += '<h3>{}</h3>'.format(gallery_item['title'])
-        if gallery_item.get('description'):
-            item['content_html'] += gallery_item['description']
-        item['content_html'] += '<hr style="width:80%" />'
-    return item
-
-
-def get_video_content(url, args, save_debug=False):
-    video_html = utils.get_url_html(url)
-    if not video_html:
-        return None
-    if save_debug:
-        utils.write_file(video_html, './debug/debug.html')
-
-    soup = BeautifulSoup(video_html, 'html.parser')
-
-    for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
-        ld_json = json.loads(el.string)
-        if ld_json['@type'] == 'VideoObject':
-            break
-
-    el = soup.find(attrs={"data-component": "videoPlaylistConnector"})
-    video_playlist = json.loads(el['data-video-playlist-connector-options'])
-    playlist = json.loads(video_playlist['playlist'])
-    if save_debug:
-        utils.write_file(playlist, './debug/playlist.json')
-    video_json = playlist[0]
-
-    item = {}
-    item['id'] = video_json['id']
-    item['url'] = url
-    item['title'] = video_json['title']
-
-    dt = datetime.fromisoformat(ld_json['uploadDate'].replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
-    item['author'] = {}
-    item['author']['name'] = '{} {}'.format(video_json['author']['firstName'], video_json['author']['lastName'])
-
-    item['summary'] = video_json['description']
-
-    el = soup.find(class_='videoPlayer')
-    video_options = json.loads(el['data-zdnet-video-options'])
-    if save_debug:
-        utils.write_file(video_options, './debug/video.json')
-    video = video_options['videos'][0]
-    item['_image'] = image_resize(video['previewImg'])
-    if 'embed' in args:
-        caption = item['summary']
+        logger.warning('unhandled image source ' + img_src)
+        return img_src
+    if 'tvguide' in split_url.netloc:
+        img_path = '/hub' + m.group(0) + '?auto=webp&width={}'.format(width)
     else:
-        caption = ''
-    if 'mp4' in video:
-        item['_video'] = video['mp4']
-        item['content_html'] = utils.add_video(video['mp4'], 'video/mp4', item['_image'], caption)
-    elif 'm3u8' in video:
-        item['_video'] = video['m3u8']
-        item['content_html'] = utils.add_video(video['m3u8'], 'application/x-mpegURL', item['_image'], caption)
-    if not 'embed' in args:
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
-    return item
+        img_path = m.group(0) + '?auto=webp&width={}'.format(width)
+    img_path = re.sub(r'/watermark/[a-f0-9]+', '', img_path, flags=re.I)
+    digest = hmac.new(bytes(secret_key, 'UTF-8'), bytes(img_path, 'UTF-8'), hashlib.sha1)
+    return 'https://{}/a/img/resize/{}{}'.format(split_url.netloc, digest.hexdigest(), img_path)
 
 
-def get_product_content(url, args, save_debug=False):
+def get_article_soup(url):
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
-
     soup = BeautifulSoup(article_html, 'html.parser')
-    for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
-        ld_json = json.loads(el.string)
-        if ld_json.get('@type') == 'Product':
-            break
-
-    if save_debug:
-        utils.write_file(ld_json, './debug/debug.json')
-
-    item = {}
-    m = re.search(r'"articleId":"([^"]+)"', article_html)
-    if m:
-        item['id'] = m.group(1)
-    else:
-        item['id'] = ld_json['review']['headline']
-    item['url'] = url
-    item['title'] = ld_json['review']['headline']
-
-    dt = datetime.fromisoformat(ld_json['review']['datePublished']).replace(tzinfo=timezone.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-    dt = datetime.fromisoformat(ld_json['review']['dateModified']).replace(tzinfo=timezone.utc)
-    item['date_modified'] = dt.isoformat()
-
-    authors = []
-    for author in ld_json['review']['author']:
-        authors.append(author['name'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
-    item['tags'] = [ld_json['category']]
-
-    item['_image'] = ld_json['image']['url']
-    item['summary'] = ld_json['review']['description']
-
-    item['content_html'] = get_content_html(soup, item)
-
-    if ld_json.get('additionalProperty'):
-        item['content_html'] += '<h3>Specs</h3>'
-        heading = ''
-        for prop in ld_json['additionalProperty']:
-            head, name = prop['name'].split(' - ')
-            if head != heading:
-                if item['content_html'][-5:] == '</li>':
-                    item['content_html'] += '</ul>'
-                heading = head
-                item['content_html'] += '<h4>{}</h4><ul>'.format(heading)
-            item['content_html'] += '<li>{}: {}</li>'.format(name, ', '.join(prop['value']))
-    return item
-
-
-def get_content_html(soup, item):
-    article_body = soup.find(class_='storyBody')
-    if not article_body:
-        return ''
-
-    for el in article_body.find_all(['script', 'hr']):
-        el.decompose()
-
-    for el in article_body.find_all(
-            class_=re.compile(r'listicle-precap|relatedContent|relatedReviews|sharethrough', flags=re.I)):
-        el.decompose()
-
-    for el in article_body.find_all('figure', class_='image'):
-        img = el.find('img')
-        if 'lazy' in img['class']:
-            img_src = img['data-original']
-        else:
-            img_src = img['src']
-        img_src = image_resize(img_src)
-        caption = []
-        it = el.find(class_='caption')
-        if it:
-            txt = it.get_text().strip()
-            if txt:
-                caption.append(txt)
-        it = el.find(class_='credit')
-        if it:
-            txt = it.get_text().strip()
-            if txt:
-                caption.append(txt)
-        new_el = BeautifulSoup(utils.add_image(img_src, ' | '.join(caption)), 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
-
-    for el in article_body.find_all(class_='shortcodeGalleryWrapper'):
-        split_url = urlsplit(item['url'])
-        it = el.find('a', class_='full-gallery')
-        gallery_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, it['href'])
-        gallery_item = get_gallery_content(gallery_url, {"embed": True})
-        if gallery_item:
-            new_el = BeautifulSoup(
-                '<hr/><h3><a href="{}">Gallery: {}</a></h3>{}'.format(gallery_url, gallery_item['title'],
-                                                                      gallery_item['content_html']), 'html.parser')
-            # Move galleries to end
-            article_body.append(new_el)
-            el.decompose()
-
-    for el in article_body.find_all(class_='video'):
-        player = el.find(class_='videoPlayer')
-        if player:
-            new_el = None
-            video_options = json.loads(player['data-zdnet-video-options'])
-            video = video_options['videos'][0]
-            if 'mp4' in video:
-                new_el = BeautifulSoup(utils.add_video(video['mp4'], 'video/mp4', video['previewImg'], video['title']),
-                                       'html.parser')
-            elif 'm3u8' in video:
-                new_el = BeautifulSoup(
-                    utils.add_video(video['m3u8'], 'application/x-mpegURL', video['previewImg'], video['title']),
-                    'html.parser')
-            if new_el:
-                # Insert as lead if there's none
-                has_lead = False
-                for i in range(2):
-                    if article_body.contents[i].name and article_body.contents[i].name == 'figure':
-                        has_lead = True
-                if not has_lead:
-                    article_body.insert(0, new_el)
-                else:
-                    el.insert_after(new_el)
-                el.decompose()
-
-    for el in article_body.find_all(class_='shortcode'):
-        if 'media-source' in el['class']:
-            it = el.find('iframe')
-            if it:
-                new_el = BeautifulSoup(utils.add_embed(it['data-src']), 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
-        elif not 'listicle' in el['class']:
-            logger.warning('unhandled shortcode class {} in {}'.format(el['class'], item['url']))
-
-    for el in article_body.find_all(class_='embed'):
-        if 'embed--type-instagram' in el['class']:
-            new_el = BeautifulSoup(utils.add_embed(el.blockquote['data-instgrm-permalink']), 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-        else:
-            logger.warning('unhandled embed type {} in {}'.format(el['class'], item['url']))
-
-    # Review rating + pros/cons
-    for el in article_body.find_all(class_='row'):
-        new_html = ''
-        it = soup.find('span', class_='score')
-        if it:
-            new_html += '<div style="font-size:4em; margin:0; padding:0; float:left;">{}</div>'.format(it.get_text())
-            it = soup.find('span', class_='ratingText')
-            if it:
-                new_html += '<div style="padding-top:2.5em; padding-left:1em;"><em>{}</em></div>'.format(it.get_text())
-            new_html += '<div style="clear:left;"></div>'
-        it = el.find('ul', class_='pros')
-        if it:
-            new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">Pros</h4><ul style="margin-top:0;">'
-            for li in it.find_all('li'):
-                if li.span:
-                    li.span.decompose()
-                new_html += '<li>{}</li>'.format(li.get_text())
-            new_html += '</ul>'
-        it = el.find('ul', class_='cons')
-        if it:
-            new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">Cons</h4><ul style="margin-top:0;">'
-            for li in it.find_all('li'):
-                if li.span:
-                    li.span.decompose()
-                new_html += '<li>{}</li>'.format(li.get_text())
-            new_html += '</ul>'
-        if new_html:
-            new_html += '<hr style="width:80%;" />'
-            el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-            el.decompose()
-
-    # Review card
-    for el in article_body.find_all(class_='review-card'):
-        new_html = ''
-        it = el.find(class_='rating-number')
-        if it:
-            new_html += '<div style="font-size:4em; margin:0; padding:0; float:left;">{}</div>'.format(it.get_text())
-            it = el.find(class_='product-score')
-            if it:
-                new_html += '<div style="padding-top:2.5em; padding-left:1em;"><em>{}</em></div>'.format(it.get_text())
-            new_html += '<div style="clear:left;"></div>'
-        it = el.find('ul', class_='review-card-likes')
-        if it:
-            new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">{}</h4><ul style="margin-top:0;">'.format(
-                el.find(class_='review-card-likes-heading').get_text())
-            for li in it.find_all(class_='review-card-list-text'):
-                new_html += '<li>{}</li>'.format(li.get_text())
-            new_html += '</ul>'
-        it = el.find('ul', class_='review-card-dislikes')
-        if it:
-            new_html += '<h4 style="margin-top:0.5; margin-bottom:0.5em;">{}</h4><ul style="margin-top:0;">'.format(
-                el.find(class_='review-card-dislikes-heading').get_text())
-            for li in it.find_all(class_='review-card-list-text'):
-                new_html += '<li>{}</li>'.format(li.get_text())
-            new_html += '</ul>'
-        it = el.find(class_='review-card-buttons')
-        for link in it.find_all('a'):
-            new_html += '<a href="{}">{}</a>'.format(utils.get_redirect_url(link['href']), link.get_text())
-        new_html += '<hr style="width:80%;" />'
-        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-        el.decompose()
-
-    for el in article_body.find_all(class_='listicle'):
-        new_listicle = ''
-        for it in el.find_all(True, recursive=False):
-            if it.name == 'h2' or it.name == 'h3':
-                new_listicle += '<{0}>{1}</{0}>'.format(it.name, it.get_text().strip())
-            elif it.name == 'a' or (it.get('class') and 'imageContainer' in it.get('class')):
-                img = it.find('img')
-                if img:
-                    if 'lazy' in img['class']:
-                        img_src = img['data-original']
-                    else:
-                        img_src = img['src']
-                    new_listicle += utils.add_image(img_src)
-                else:
-                    new_listicle += '<a href="{}">{}</a><br />'.format(utils.get_redirect_url(it['href']),
-                                                                       it.get_text().strip())
-            else:
-                new_listicle += str(it)
-        el.insert_after(BeautifulSoup(new_listicle, 'html.parser'))
-        el.decompose()
-
-    for el in article_body.find_all(class_='lead-link'):
-        new_link = '<a href="{}">{}</a>'.format(utils.get_redirect_url(el['href']), el.get_text().strip())
-        if el.parent.has_attr('class') and 'listicle-links' in el.parent['class']:
-            el.parent.attrs.clear()
-        el.insert_after(BeautifulSoup(new_link, 'html.parser'))
-        el.decompose()
-
-    for el in article_body.find_all(attrs={"data-shortcode": True}):
-        el.decompose()
-
-    for el in article_body.find_all(['p', 'h3']):
-        try:
-            if el.strong and re.search(r'^(Also:|Must read:|SEE:|See also:)', el.strong.get_text()):
-                el.decompose()
-            elif el.strong and re.search(r'^(RECENT (AND|&) RELATED CONTENT)', el.strong.string):
-                while ((el.next_sibling.a and el.next_sibling.a.strong) or (
-                        el.next_sibling.strong and el.next_sibling.strong.a)):
-                    el.next_sibling.decompose()
-                el.decompose()
-            elif re.search(r'^(Related Stories|Related Coverage|Read more reviews)', el.get_text(), flags=re.I):
-                if el.next_sibling.name == 'ul':
-                    el.next_sibling.decompose()
-                    el.decompose()
-        except Exception as e:
-            logger.warning('zdnet exception: ' + str(e))
-            pass
-
-    # Add a lead image if one is not present
-    has_lead = False
-    for i in range(2):
-        if article_body.contents[i].name and article_body.contents[i].name == 'figure':
-            has_lead = True
-    if not has_lead:
-        if item.get('_image'):
-            article_body.insert(0, BeautifulSoup(utils.add_image(item['_image']), 'html.parser'))
-
-    return article_body.decode_contents().replace('\n', '')
+    return soup.find('article')
 
 
 def get_content(url, args, save_debug=False):
-    clean_url = utils.clean_url(url)
-    if '/product/' in clean_url:
-        return get_product_content(url, args, save_debug)
-    elif '/pictures/' in clean_url:
-        return get_gallery_content(url, args, save_debug)
-    elif '/video/' in clean_url:
-        return get_video_content(url, args, save_debug)
-
-    if not clean_url.endswith('/'):
-        clean_url += '/'
-    article_xhr = utils.get_url_json(clean_url + 'xhr/')
-    if not article_xhr:
+    url = re.sub(r'#ftag=\w+', '', url)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    slug = paths[-1]
+    tld = tldextract.extract(url)
+    sites_json = utils.read_json_file('./sites.json')
+    api_key = sites_json[tld.domain]['apiKey']
+    secret_key = sites_json[tld.domain]['secretKey']
+    if '/pictures/' in split_url.path:
+        api_url = 'https://cmg-prod.apigee.net/v1/xapi/galleries/{}/{}/web?apiKey={}&componentName=gallery&componentDisplayName=Gallery&componentType=Gallery'.format(tld.domain, slug, api_key)
+    elif re.search(r'/videos?/', split_url.path):
+        api_url = 'https://cmg-prod.apigee.net/v1/xapi/videos/{}/{}/web?apiKey={}&componentName=video&componentDisplayName=Video&componentType=Video'.format(tld.domain, slug, api_key)
+    elif tld.domain == 'cnet' and re.search(r'-(preview|review)/?$', split_url.path):
+        slug = re.sub(r'-(preview|review)/?$', '', slug)
+        api_url = 'https://cmg-prod.apigee.net/v1/xapi/reviews/{}/{}/web?apiKey={}&componentName=review&componentDisplayName=Review&componentType=Review'.format(tld.domain, slug, api_key)
+    else:
+        api_url = 'https://cmg-prod.apigee.net/v1/xapi/articles/{}/{}/web?apiKey={}&componentName=article&componentDisplayName=Article&componentType=Article'.format(tld.domain, slug, api_key)
+    api_json = utils.get_url_json(api_url)
+    if not api_json:
         return None
     if save_debug:
-        utils.write_file(article_xhr, './debug/debug.json')
+        utils.write_file(api_json, './debug/debug.json')
 
-    soup = BeautifulSoup(article_xhr['template'], 'html.parser')
-
+    article_soup = None
+    article_json = api_json['data']['item']
     item = {}
-    item['id'] = article_xhr['trackingData']['articleId']
-    item['url'] = clean_url
-    item['title'] = article_xhr['trackingData']['articleTitle'].title()
+    item['id'] = article_json['id']
+    item['url'] = utils.clean_url(url)
+    item['title'] = article_json['headline']
 
-    dt = datetime.fromisoformat(article_xhr['trackingData']['articlePubDate']).replace(tzinfo=timezone.utc)
+    dt = datetime.fromisoformat(article_json['datePublished']['date']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    item['_display_date'] = utils.format_display_date(dt)
+    if article_json.get('dateUpdated'):
+        dt = datetime.fromisoformat(article_json['dateUpdated']['date']).replace(tzinfo=timezone.utc)
+        item['date_modified'] = dt.isoformat()
 
     authors = []
-    for author in article_xhr['trackingData']['articleAuthorName']:
-        authors.append(author.title())
+    if article_json.get('author') and article_json['author'].get('lastName'):
+        if article_json['author'].get('firstName'):
+            authors.append('{} {}'.format(article_json['author']['firstName'], article_json['author']['lastName']))
+        else:
+            authors.append(article_json['author']['lastName'])
+    if article_json.get('moreAuthors'):
+        more_authors = []
+        if isinstance(article_json['moreAuthors'], dict):
+            if article_json['moreAuthors'].get('data'):
+                more_authors = article_json['moreAuthors']['data']
+        else:
+            more_authors = article_json['moreAuthors']
+        for it in more_authors:
+            if it.get('firstName'):
+                authors.append('{} {}'.format(it['firstName'], it['lastName']))
+            else:
+                authors.append(it['lastName'])
     if authors:
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    else:
+        item['author'] = {"name": tld.domain}
 
-    item['tags'] = article_xhr['trackingData']['topicName'].copy()
+    item['tags'] = []
+    for it in article_json['topics']:
+        item['tags'].append(it['name'])
 
-    el = soup.find('meta', attrs={"property": "og:image"})
-    if el:
-        item['_image'] = el['content']
+    if article_json.get('promoImage'):
+        item['_image'] = article_json['promoImage']['path']
 
-    el = soup.find('meta', attrs={"property": "og:description"})
-    if el:
-        item['summary'] = el['content']
+    item['content_html'] = ''
+    if article_json.get('dek'):
+        item['summary'] = article_json['dek']
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
+    elif article_json.get('description'):
+        item['summary'] = article_json['description']
 
-    item['content_html'] = get_content_html(soup, item)
+    if api_json['meta']['componentName'] == 'video':
+        item['_image'] = resize_image(article_json['image']['path'], secret_key)
+        if article_json.get('mp4Url'):
+            item['_video'] = article_json['mp4Url']
+        elif article_json.get('files'):
+            videos = []
+            for it in article_json['files']:
+                if it.get('streamingUrl') and it['streamingUrl'].endswith('mp4'):
+                    videos.append(it)
+            it = utils.closest_dict(videos, 'height', 480)
+            item['_video'] = it['streamingUrl']
+        if 'embed' in args:
+            caption = item['title']
+        else:
+            caption = ''
+        item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], caption)
+        if article_json.get('description') and 'embed' not in args:
+            item['content_html'] += '<p>{}</p>'.format(re.sub(r'(https://\S+)', r'<a href="\1">\1</a>', article_json['description']))
+        soup = None
+
+    elif api_json['meta']['componentName'] == 'gallery':
+        gallery_html = ''
+        n = len(article_json['items'])
+        for i, it in enumerate(article_json['items']):
+            caption = '{} of {}: '.format(i + 1, n)
+            if it.get('photoCredit'):
+                caption += it['photoCredit']
+            else:
+                caption += 'Credit: ' + item['author']['name']
+            gallery_html += utils.add_image(resize_image(it['image']['path'], secret_key), caption)
+            if it.get('title'):
+                gallery_html += '<h3>{}</h3>'.format(it['title'])
+            if it.get('description'):
+                gallery_html += it['description']
+            if i < n - 1:
+                gallery_html += '<hr />'
+            soup = BeautifulSoup(gallery_html, 'html.parser')
+
+    elif api_json['meta']['componentName'] == 'review':
+        if article_json.get('videos'):
+            video_url = '{}://{}/videos/{}'.format(split_url.scheme, split_url.netloc, article_json['videos'][0]['slug'])
+            if save_debug:
+                logger.debug('getting content from ' + video_url)
+            video_item = get_content(video_url, {"embed": True}, False)
+            if video_item:
+                item['_image'] = video_item['_image']
+                item['content_html'] += video_item['content_html']
+        elif article_json.get('image'):
+            captions = []
+            if article_json['image'].get('caption'):
+                m = re.search(r'^<p>(.*)</p>', article_json['caption'])
+                if m and m.group(1):
+                    captions.append(m.group(1))
+                else:
+                    captions.append(article_json['caption'])
+            if article_json['image'].get('credit'):
+                captions.append(article_json['image']['credit'])
+            item['_image'] = resize_image(article_json['image']['path'], secret_key)
+            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        item['content_html'] += '<div style="text-align:center;"><h3>{}</h3>'.format(article_json['preferredProductName'])
+        if article_json.get('rating'):
+            item['content_html'] += '<span style="font-size:2em; font-weight:bold;">{}</span>/10'.format(article_json['rating'])
+        if article_json.get('editorsChoice'):
+            item['content_html'] += '<br/><span style="margin-top:4em; background-color:red; color:white;">Editors Choice</span>'
+        item['content_html'] += '</div>'
+        if article_json.get('bottomLine'):
+            item['content_html'] += '<h4 style="padding:2px; margin-bottom:0;">Bottom line</h4><p style="margin-top:0;">{}</p>'.format(article_json['bottomLine'])
+        if article_json.get('good'):
+            item['content_html'] += '<h4 style="margin-bottom:0;">&#128077;&nbsp;Pros</h4><ul style="margin-top:0;">'
+            for it in list(filter(None, article_json['good'].split('~'))):
+                item['content_html'] += '<li>{}</li>'.format(it.strip())
+            item['content_html'] += '</ul>'
+        if article_json.get('good'):
+            item['content_html'] += '<h4 style="margin-bottom:0;">&#128078;&nbsp;Cons</h4><ul style="margin-top:0;">'
+            for it in list(filter(None, article_json['bad'].split('~'))):
+                item['content_html'] += '<li>{}</li>'.format(it.strip())
+            item['content_html'] += '</ul>'
+        if article_json.get('subRatings'):
+            item['content_html'] += '<h4 style="margin-bottom:0;">Score breakdown</h4><table>'
+            for it in article_json['subRatings']:
+                if it.get('rating'):
+                    item['content_html'] += '<tr><td>{}</td><td>{}</td></tr>'.format(it['name'], it['rating'])
+            item['content_html'] += '</table><br/>'
+        item['content_html'] += '<hr/>'
+        soup = BeautifulSoup(article_json['body'], 'html.parser')
+
+    else:
+        #if article_json.get('layoutName') and (article_json['layoutName'] == 'bighero' or article_json['layoutName'] == 'text-over-hero') and article_json.get('promoImage'):
+        if not article_json['body'].startswith('<shortcode') and article_json.get('promoImage'):
+            # Add the lede image
+            img_src = resize_image(article_json['promoImage']['path'], secret_key)
+            captions = []
+            if article_json['promoImage'].get('caption'):
+                m = re.search(r'^<p>(.*)</p>', article_json['promoImage']['caption'])
+                if m:
+                    if len(m.group(1)) > 0:
+                        captions.append(m.group(1))
+                else:
+                    captions.append(article_json['promoImage']['caption'])
+            if article_json['promoImage'].get('credits'):
+                captions.append(article_json['promoImage']['credits'])
+            item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
+        soup = BeautifulSoup(article_json['body'], 'html.parser')
+
+    if soup:
+        for el in soup.find_all('shortcode'):
+            new_html = ''
+            if el['shortcode'] == 'image':
+                img_src = ''
+                if re.search(r'\d{4}/\d{2}/\d{2}', el['image-date-created']):
+                    img_src = 'https://{}/a/img/{}/{}/{}'.format(split_url.netloc, el['image-date-created'], el['uuid'], el['image-filename'])
+                else:
+                    m = re.search(r'(\d{4})-(\d{2})-(\d{2})', el['image-date-created'])
+                    if m:
+                        img_src = 'https://{}/a/img/{}/{}/{}/{}/{}'.format(split_url.netloc, m.group(1), m.group(2), m.group(3), el['uuid'], el['image-filename'])
+                    else:
+                        logger.warning('unknown image src format in ' + item['url'])
+                if img_src:
+                    if el.get('image-do-not-resize') and el['image-do-not-resize'] != 'true':
+                        img_src = resize_image(img_src, secret_key)
+                    captions = []
+                    if el.get('image-caption'):
+                        m = re.search(r'^<p>(.*)</p>', el['image-caption'])
+                        if m:
+                            if len(m.group(1)) > 0:
+                                captions.append(m.group(1))
+                        else:
+                            captions.append(el['image-caption'])
+                    if el.get('image-credit'):
+                        captions.append(el['image-credit'])
+                    new_html = utils.add_image(img_src, ' | '.join(captions))
+
+            elif el['shortcode'] == 'video':
+                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                if shortcode_json.get('mp4Url'):
+                    new_html += utils.add_video(shortcode_json['mp4Url'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
+                elif shortcode_json.get('files'):
+                    it = utils.closest_dict(shortcode_json['files']['data'], 'height', 480)
+                    new_html += utils.add_video(it['streamingUrl'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
+
+            elif el['shortcode'] == 'twitter_tweet' or el['shortcode'] == 'youtube_video':
+                new_html += utils.add_embed(el['url'])
+
+            elif el['shortcode'] == 'link':
+                if el.get('inner-text'):
+                    new_html += '<a href="{}">{}</a>'.format(el['href'], el['inner-text'])
+                elif el.get('link-text'):
+                    new_html += '<a href="{}">{}</a>'.format(el['href'], el['link-text'])
+                else:
+                    logger.warning('unknown link text in ' + item['url'])
+
+            elif el['shortcode'] == 'cmganchorsatellitelink':
+                # Is there an api call to get the link?
+                link = ''
+                if not article_soup:
+                    article_soup = get_article_soup(item['url'])
+                if article_soup:
+                    for it in article_soup.find_all('a', string=el['link-text']):
+                        if it.get('data-link-tracker-options') and 'link_anchor' in it['data-link-tracker-options']:
+                            link = it['href']
+                            break
+                if link:
+                    new_html += '<a href="{}">{}</a>'.format(link, el['link-text'])
+                else:
+                    logger.debug('unable to determine link for cmganchorsatellitelink {} in {}'.format(el['id'], item['url']))
+                    new_html += '<span>{}</span>'.format(el['link-text'])
+
+            elif el['shortcode'] == 'annotation':
+                # Is there an api call to get the link?
+                link = ''
+                if not article_soup:
+                    article_soup = get_article_soup(item['url'])
+                if article_soup:
+                    it = article_soup.find('a', attrs={"data-link-tracker-options": re.compile(r'{}\|{}'.format(el['type'], el['score']))})
+                    if it:
+                        link = '{}://{}{}'.format(split_url.scheme, split_url.netloc, it['href'])
+                if link:
+                    new_html += '<a href="{}">{}</a>'.format(link, el['text'])
+                else:
+                    logger.debug('unable to determine link for annotation {} in {}'.format(el['id'], item['url']))
+                    new_html += '<span>{}</span>'.format(el['text'])
+
+            elif el['shortcode'] == 'pullquote':
+                new_html += utils.add_pullquote(el['quote'])
+
+            elif el['shortcode'] == 'commercelinkshortcode':
+                new_html = '<a href="{}">{}</a>'.format(el['raw-url'], el['link-shortcode-text'])
+
+            elif el['shortcode'] == 'chart':
+                chart_json = json.loads(el['chart'].replace('&quot;', '"'))
+                new_html = '<h2>{}</h2><table>'.format(chart_json['chartName'])
+                for row in chart_json['chart']:
+                    new_html += '<tr>'
+                    for it in row:
+                        new_html += '<td>{}</td>'.format(it)
+                    new_html += '</tr>'
+                new_html += '</table>'
+
+            elif el['shortcode'] == 'cnetlisticle' or el['shortcode'] == 'cross_content_listicle':
+                if el.get('imagegroup'):
+                    shortcode_json = json.loads(el['imagegroup'].replace('&quot;', '"'))
+                    #utils.write_file(shortcode_json, './debug/shortcode.json')
+                    if shortcode_json.get('imageData'):
+                        img_src = resize_image(shortcode_json['imageData']['path'], secret_key)
+                        captions = []
+                        if shortcode_json.get('imageCaption'):
+                            m = re.search(r'^<p>(.+)</p>', shortcode_json['imageCaption'])
+                            if m:
+                                captions.append(m.group(1))
+                        if shortcode_json.get('imageCredit'):
+                            captions.append(shortcode_json['imageCredit'])
+                        new_html += utils.add_image(img_src, ' | '.join(captions))
+                if el.get('hed'):
+                    new_html += '<h3 style="margin-bottom:0;">{}</h3>'.format(el['hed'])
+                if el.get('superlative'):
+                    new_html += '<h5 style="margin-top:0; margin-bottom:0;">{}</h5>'.format(el['superlative'])
+                if el.get('description'):
+                    new_html += el['description']
+                if el.get('merchantoffers'):
+                    shortcode_json = json.loads(el['merchantoffers'].replace('&quot;', '"'))
+                    for it in shortcode_json:
+                        if it.get('offerPrice'):
+                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(it['rawUrl'], float(it['offerPrice']), it['offerMerchant'])
+                        else:
+                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(it['rawUrl'], it['offerMerchant'])
+                new_html += '<hr/>'
+
+            elif el['shortcode'] == 'reviewcard':
+                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
+                captions = []
+                if shortcode_json['imageGroup'].get('caption'):
+                    m = re.search(r'^<p>(.*)</p>', shortcode_json['imageGroup']['caption'])
+                    if m and m.group(1):
+                        captions.append(m.group(1))
+                    else:
+                        captions.append(shortcode_json['imageGroup']['caption'])
+                if shortcode_json['imageGroup'].get('credit'):
+                    captions.append(shortcode_json['imageGroup']['credit'])
+                new_html = utils.add_image(img_src, ' | '.join(captions))
+                new_html += '<div style="text-align:center;"><h3>{}</h3>'.format(shortcode_json['productName'])
+                if shortcode_json.get('rating'):
+                    new_html += '<span style="font-size:2em; font-weight:bold;">{}</span>/10'.format(shortcode_json['rating'])
+                new_html += '</div>'
+                new_html += '<h4 style="margin-bottom:0;">&#128077;&nbsp;Pros</h4><ul>'
+                for it in list(filter(None, shortcode_json['like'].split('~'))):
+                    new_html += '<li>{}</li>'.format(it.strip())
+                new_html += '</ul><h4 style="margin-bottom:0;">&#128078;&nbsp;Cons</h4><ul>'
+                for it in list(filter(None, shortcode_json['dislike'].split('~'))):
+                    new_html += '<li>{}</li>'.format(it.strip())
+                new_html += '</ul>'
+                if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
+                    for it in shortcode_json['techProd']['resellers']:
+                        new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(utils.get_redirect_url(it['url']), int(it['price'])/100, it['name'])
+                else:
+                    for it in shortcode_json['merchantOffers']:
+                        if it.get('offerPrice'):
+                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(it['rawUrl'], float(it['offerPrice']), it['offerMerchant'])
+                        else:
+                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(it['rawUrl'], it['offerMerchant'])
+
+            elif el['shortcode'] == 'newscard':
+                new_html += utils.add_blockquote('<h3 style="margin-bottom:0;">What\'s happening</h3><p>{}</p><h3 style="margin-bottom:0;">Why it matters</h3><p>{}</p>'.format(el['whathappening'], el['whymatters']))
+
+            elif el['shortcode'] == 'buybutton':
+                new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;">{}</a></div>'.format(el['button-url'], el['button-text'])
+
+            elif el['shortcode'] == 'commercebutton':
+                new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;">{}</a></div>'.format(el['raw-url'], el['button-text'])
+
+            elif el['shortcode'] == 'commercepromo':
+                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                new_html += '<table><tr><td><img src="{}" width="200px"/></td><td><strong>{}</strong><br/>'.format(resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key, 200), shortcode_json['hed'])
+                if shortcode_json.get('offerPrice'):
+                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(shortcode_json['offerUrl'], float(shortcode_json['offerPrice']), shortcode_json['offerMerchant'])
+                elif shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
+                    promo_url = utils.get_redirect_url(shortcode_json['techProd']['resellers'][0]['url'])
+                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(promo_url, int(shortcode_json['techProd']['resellers'][0]['price'])/100, shortcode_json['techProd']['resellers'][0]['name'])
+                else:
+                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(shortcode_json['offerUrl'], shortcode_json['offerMerchant'])
+                new_html += '</td></tr></table>'
+
+            elif el['shortcode'] == 'pinbox':
+                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                new_html = '<h3>{}</h3><ul>'.format(shortcode_json['title'])
+                for it in shortcode_json['content']:
+                    new_html += '<li><a href="https://{}/article/{}">{}</a></li>'.format(split_url.netloc, it['slug'], it['title'])
+                new_html += '</ul>'
+
+            elif el['shortcode'] == 'codesnippet':
+                if el['encoding'] == 'base64':
+                    code = base64.b64decode(el['code']).decode('utf-8')
+                    if re.search(r'https://joinsubtext\.com/|myFinance-widget', code):
+                        el.decompose()
+                        continue
+                    elif re.search(r'^<(h\d|br)\b', code):
+                        new_html += code
+                    elif re.search(r'^<iframe', code):
+                        m = re.search(r'src="([^"]+)"', code)
+                        if m:
+                            new_html += utils.add_embed(m.group(1))
+                    if not new_html:
+                        logger.warning('unhandled codesnippet {} in {}'.format(code, item['url']))
+                        el.decompose()
+                else:
+                    logger.warning('unhandled codesnippet encoding {} in {}'.format(el['encoding'], item['url']))
+                    el.decompose()
+
+            elif el['shortcode'] == 'gallery':
+                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                gallery_url = '{}://{}/pictures/{}'.format(split_url.scheme, split_url.netloc, shortcode_json['slug'])
+                link = '{}/content?read&url={}'.format(config.server, quote_plus(gallery_url))
+                caption = 'Gallery: <a href="{}">{}</a>'.format(link, shortcode_json['headline'])
+                new_html += utils.add_image(resize_image(shortcode_json['promoImage']['path'], secret_key), caption, link=link)
+
+            elif el['shortcode'] == 'newsletter' or el['shortcode'] == 'relatedlinks':
+                el.decompose()
+
+            else:
+                logger.warning('unhandled shortcode {} in {}'.format(el['shortcode'], item['url']))
+
+            if new_html:
+                el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+                el.decompose()
+
+        item['content_html'] += str(soup)
+        if item['content_html'].endswith('<hr/>'):
+            item['content_html'] = item['content_html'][:-5]
     return item
 
 
 def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+    if '/rss' in args['url'] or '/feed' in args['url']:
+        return rss.get_feed(args, save_debug, get_content)
+
+    # TODO: CNET tag feeds
+    # TODO: CNET author feeds
+
+    feed = None
+    urls = []
+    if args['url'].startswith('https://www.cnet.com/profiles/'):
+        split_url = urlsplit(args['url'])
+        paths = list(filter(None, split_url.path[1:].split('/')))
+        api_url = 'https://www.cnet.com/profiles/user/profile/ugc/?username={}&type=recent&limit=10&offset=0&_={}'.format(paths[1], int(datetime.timestamp(datetime.now())*1000))
+        headers = {
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            "accept-language": "en-US,en;q=0.9,de;q=0.8",
+            "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"103\", \"Chromium\";v=\"103\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "x-requested-with": "XMLHttpRequest"
+        }
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
+            return None
+        soup = BeautifulSoup(api_json['html'], 'html.parser')
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+            utils.write_file(str(soup), './debug/debug.html')
+        feed_title = 'CNET | ' + paths[1]
+        for el in soup.find_all('h3'):
+            if el.parent and el.parent.name == 'a':
+                urls.append('https://www.cnet.com' + el.parent['href'])
+
+    elif args['url'] == 'https://www.zdnet.com/pictures/':
+        feed_title = 'ZDNet | Photo Galleries'
+        page_html = utils.get_url_html(args['url'])
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'html.parser')
+        for el in soup.find_all('article'):
+            it = el.find('h3')
+            if it.a:
+                urls.append('https://www.zdnet.com' + it.a['href'])
+
+    elif args['url'] == 'https://www.tvguide.com/news/':
+        feed_title = 'TV Guide | Latest News'
+        api_url = 'https://cmg-prod.apigee.net/v1/xapi/composer/tvguide/pages/door/news-door-global/web?contentOnly=true&apiKey=MKjirHWTcEGBEOp2z7fNqTOe670TbHSz'
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+        for it in api_json['components'][1]['data']['items']:
+            urls.append(args['url'] + it['slug'])
+
+    if urls:
+        n = 0
+        feed = utils.init_jsonfeed(args)
+        feed['title'] = feed_title
+        feed_items = []
+        for url in urls:
+            if save_debug:
+                logger.debug('getting content for ' + url)
+            item = get_content(url, args, save_debug)
+            if item:
+                if utils.filter_item(item, args) == True:
+                    feed_items.append(item)
+                    n += 1
+                    if 'max' in args:
+                        if n == int(args['max']):
+                            break
+        feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+    return feed
+
+
+def test_handler():
+    feeds = ['https://www.zdnet.com/news/rss.xml',
+             'https://www.zdnet.com/topic/reviews/rss.xml',
+             'https://www.zdnet.com/videos/rss.xml',
+             'https://www.zdnet.com/meet-the-team/palmsolo+%28aka+matthew+miller%29/rss.xml',
+             'https://www.zdnet.com/pictures/',
+             'https://www.cnet.com/rss/all/',
+             'https://www.cnet.com/rss/reviews/',
+             'https://feed.cnet.com/feed/roadshow/all',
+             'https://www.tvguide.com/news/']
+    for url in feeds:
+        get_feed({"url": url}, True)

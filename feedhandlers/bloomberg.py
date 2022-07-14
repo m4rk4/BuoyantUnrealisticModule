@@ -16,38 +16,29 @@ def resize_image(img_src):
 
 
 def get_bb_url(url, get_json=False):
+    #print(url)
     headers = {
         "accept-encoding": "gzip, deflate, br",
-        "accept-language": "en-US,en;q=0.9",
-        "cache-control": "no-cache",
-        "dnt": "1",
-        "pragma": "no-cache",
-        "sec-ch-ua": "\"Google Chrome\";v=\"95\", \"Chromium\";v=\"95\", \";Not A Brand\";v=\"99\"",
+        "accept-language": "en-US,en;q=0.9,de;q=0.8",
+        "cache-control": "max-age=0",
+        "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"103\", \"Chromium\";v=\"103\"",
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "Windows",
+        "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "document",
         "sec-fetch-mode": "navigate",
         "sec-fetch-site": "none",
         "sec-fetch-user": "?1",
         "sec-gpc": "1",
         "upgrade-insecure-requests": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.49"
     }
 
     if get_json:
         headers['accept'] = 'application/json'
         r = utils.get_url_json(url, headers=headers, allow_redirects=False)
     else:
-        headers[
-            'accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
+        headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
         r = utils.get_url_html(url, headers=headers, allow_redirects=False)
-
-    if not r:
-        # retry with proxy
-        if get_json:
-            r = utils.get_url_json(url, headers=headers, allow_redirects=False, use_proxy=True)
-        else:
-            r = utils.get_url_html(url, headers=headers, allow_redirects=False, use_proxy=True)
     return r
 
 
@@ -150,6 +141,7 @@ def get_content(url, args, save_debug):
             api_url = 'https://www.bloomberg.com/javelin/api/foundation_feature_transporter/' + m.group(2)
     if not api_url:
         logger.warning('unsupported url ' + url)
+        return None
 
     # bb_json = utils.read_json_file('./debug/debug.json')
     # if not bb_json:
@@ -252,18 +244,7 @@ def get_content(url, args, save_debug):
     for el in body.find_all('figure'):
         new_html = ''
         if el.get('data-image-type') == 'chart':
-            chart = next((it for it in article_json['story']['charts'] if it['id'] == el['data-id']), None)
-            if chart:
-                img_src = resize_image(chart['responsiveImages']['mobile']['url'])
-                captions = []
-                if chart.get('subtitle'):
-                    captions.append(chart['subtitle'])
-                if chart.get('source'):
-                    captions.append(chart['source'])
-                if chart.get('footnote'):
-                    captions.append(chart['footnote'])
-                new_html = utils.add_image(img_src, ' | '.join(captions))
-            elif article_json['story']['imageAttachments'].get(el['data-id']):
+            if article_json['story']['imageAttachments'].get(el['data-id']):
                 image = article_json['story']['imageAttachments'][el['data-id']]
                 img_src = resize_image(image['baseUrl'])
                 if image.get('themes'):
@@ -278,6 +259,21 @@ def get_content(url, args, save_debug):
                 if it and it.get_text().strip():
                     captions.append(it.get_text().strip())
                 new_html = utils.add_image(img_src, ' | '.join(captions))
+            else:
+                chart = next((it for it in article_json['story']['charts'] if it['id'] == el['data-id']), None)
+                if chart:
+                    if chart.get('responsiveImages') and chart['responsiveImages'].get('mobile'):
+                        img_src = resize_image(chart['responsiveImages']['mobile']['url'])
+                        captions = []
+                        if chart.get('subtitle'):
+                            captions.append(chart['subtitle'])
+                        if chart.get('source'):
+                            captions.append(chart['source'])
+                        if chart.get('footnote'):
+                            captions.append(chart['footnote'])
+                        new_html = utils.add_image(img_src, ' | '.join(captions))
+            if not new_html:
+                logger.warning('unhandled chart {} in {}'.format(el['data-id'], item['url']))
 
         elif el.get('data-image-type') == 'audio':
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(el.img['src']))
@@ -359,14 +355,13 @@ def get_feed(args, save_debug=False):
         return None
 
     if paths[0] in ['markets', 'technology', 'politics', 'wealth', 'pursuits']:
-        page = paths[0] + 'vp'
+        page = paths[0] + '-vp'
     elif paths[0] == 'businessweek':
         page = 'businessweek-v2'
     else:
         page = paths[0]
     api_url = 'https://www.bloomberg.com/lineup/api/lazy_load_paginated_module?id=pagination_story_list&page={}&offset=0&zone=righty'.format(
         page)
-    print(api_url)
     bb_json = get_bb_url(api_url, True)
     if save_debug:
         utils.write_file(bb_json, './debug/feed.json')
@@ -391,3 +386,11 @@ def get_feed(args, save_debug=False):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
+
+
+def test_handler():
+    feeds = ['https://www.bloomberg.com/businessweek'
+             'https://www.bloomberg.com/technology',
+             'https://www.bloomberg.com/authors/AS7Hj1mBMGM/mark-gurman.rss']
+    for url in feeds:
+        get_feed({"url": url}, True)

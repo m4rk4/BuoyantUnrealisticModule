@@ -522,8 +522,7 @@ def format_block(block_id, initial_state, arg1=None, arg2=None):
         if embed_html:
             block_html += embed_html
         else:
-            embed_html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>{}</body></html>'.format(
-                block['html'])
+            embed_html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>{}</body></html>'.format(block['html'])
             embed_b64 = base64.b64encode(embed_html.encode('utf-8'))
             block_html += '<h4><a href="data:text/html;base64,{}">Embedded content</a></h4>'.format(
                 embed_b64.decode('utf-8'))
@@ -856,7 +855,7 @@ def get_content(url, args, save_debug=False):
     initial_state = json_data['initialState']
 
     split_url = urlsplit(url)
-    article_id = ''
+    root_id = ''
     if 'ROOT_QUERY' in initial_state:
         for key, val in initial_state['ROOT_QUERY'].items():
             if split_url.path in key:

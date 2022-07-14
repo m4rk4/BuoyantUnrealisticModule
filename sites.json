@@ -223,7 +223,9 @@
         "module": "cnn"
     },
     "cnet": {
-        "module": "cnet"
+        "module": "zdnet",
+        "apiKey": "KPWzSlwqMiNaiAWDdO88Fp0uTSTHPBtq",
+        "secretKey": "nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI="
     },
     "crainscleveland": {
         "module": "crains"
@@ -480,7 +482,7 @@
         "module": "nymag"
     },
     "nytimes": {
-        "module": "nyt"
+        "module": "nyt-v2"
     },
     "omny": {
         "module": "omnyfm"
@@ -659,6 +661,11 @@
     "tmz": {
         "module": "tmz"
     },
+    "tvguide": {
+        "module": "zdnet",
+        "apiKey": "MKjirHWTcEGBEOp2z7fNqTOe670TbHSz",
+        "secretKey": "nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI="
+    },
     "twitter": {
         "module": "twitter"
     },
@@ -773,6 +780,8 @@
         "module": "youtube"
     },
     "zdnet": {
-        "module": "zdnet"
+        "module": "zdnet",
+        "apiKey": "hzY568JORMZcDzoFQ1ey5LBJuBS7DncX",
+        "secretKey": "nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI="
     }
 }
