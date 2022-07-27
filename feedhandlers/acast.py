@@ -8,11 +8,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_content(url, args, save_debug=False):
-  m = re.search(r'embed\.acast\.com\/([^\/]+)\/([^\/]+)', url)
+  m = re.search(r'embed\.acast\.com/([^/]+)/([^/]+)', url)
   if not m:
-    m = re.search(r'play\.acast\.com\/s\/([^\/]+)\/([^\/]+)', url)
+    m = re.search(r'play\.acast\.com/s/([^/]+)/([^/]+)', url)
     if not m:
-      return None
+      m = re.search(r'shows\.acast\.com/([^/]+)/episodes/([^/]+)', url)
+      if not m:
+        logger.warning('unhandled acast url ' + url)
+        return None
 
   audio_json = utils.get_url_json('https://feeder.acast.com/api/v1/shows/{}/episodes/{}?showInfo=true'.format(m.group(1), m.group(2)))
   if save_debug:

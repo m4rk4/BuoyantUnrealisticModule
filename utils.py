@@ -832,6 +832,20 @@ def add_embed(url, args={}, save_debug=False):
     content = module.get_content(embed_url, embed_args, save_debug)
     if content:
       return content['content_html']
+
+  page_html = get_url_html(embed_url)
+  if page_html:
+    soup = BeautifulSoup(page_html, 'html.parser')
+    el = soup.find('meta', attrs={"property": "og:image"})
+    if el:
+      img_src = el['content']
+      el = soup.find('meta', attrs={"property": "og:title"})
+      if el:
+        caption = el['content']
+      else:
+        caption = ''
+      return add_image(img_src, caption, link=embed_url)
+
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
 
 def get_content(url, args, save_debug=False):

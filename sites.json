@@ -219,13 +219,16 @@
             }
         }
     },
-    "cnn": {
-        "module": "cnn"
+    "cnbc": {
+        "module": "cnbc"
     },
     "cnet": {
         "module": "zdnet",
         "apiKey": "KPWzSlwqMiNaiAWDdO88Fp0uTSTHPBtq",
         "secretKey": "nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI="
+    },
+    "cnn": {
+        "module": "cnn"
     },
     "crainscleveland": {
         "module": "crains"
@@ -423,6 +426,12 @@
     "lifehacker": {
         "module": "gawker"
     },
+    "linkedin": {
+        "module": "linkedin"
+    },
+    "loudwire": {
+        "module": "townsquare"
+    },
     "marketingbrew": {
         "module": "morningbrew",
         "buildId": "85o1uNt2Ql4KY_LrXnGBi"
@@ -495,6 +504,9 @@
     },
     "plasticsnews": {
         "module": "crains"
+    },
+    "popcrush": {
+        "module": "townsquare"
     },
     "protocol": {
         "module": "rebelmouse"
@@ -595,6 +607,9 @@
     "rubbernews": {
         "module": "crains"
     },
+    "screencrush": {
+        "module": "townsquare"
+    },
     "seekingalpha": {
         "module": "seekingalpha"
     },
@@ -616,6 +631,9 @@
     "streamable": {
         "module": "streamable"
     },
+    "tasteofcountry": {
+        "module": "townsquare"
+    },
     "theathletic": {
         "module": "athletic"
     },
@@ -634,6 +652,9 @@
     "TheHackersNews": {
         "module": "extractor"
     },
+    "theintercept": {
+        "module": "theintercept"
+    },
     "theinventory": {
         "module": "gawker"
     },
@@ -642,6 +663,10 @@
     },
     "theplayerstribune": {
         "module": "playerstribune"
+    },
+    "theskimm": {
+        "module": "theskimm",
+        "buildId": "U9Id-BZEWbcLLWCtHGTsN"
     },
     "thetakeout": {
         "module": "gawker"
@@ -668,6 +693,9 @@
     },
     "twitter": {
         "module": "twitter"
+    },
+    "ultimateclassicrock": {
+        "module": "townsquare"
     },
     "upworthy": {
         "module": "rebelmouse"
@@ -766,6 +794,9 @@
     },
     "wsj": {
         "module": "wsj"
+    },
+    "xxlmag": {
+        "module": "townsquare"
     },
     "yahoo": {
         "module": "yahoo"

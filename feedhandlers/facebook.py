@@ -101,7 +101,13 @@ def format_post_message(post_message):
 
 
 def get_content(url, args, save_debug=False):
-    embed_html = get_fb_html(url, True)
+    split_url = urlsplit(url)
+    query = parse_qs(split_url.query)
+    if query.get('href'):
+        fb_url = query['href'][0]
+    else:
+        fb_url = url
+    embed_html = get_fb_html(fb_url, True)
     if not embed_html:
         return None
 
@@ -149,7 +155,7 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = '<table style="width:500px; border:1px solid black; border-collapse:collapse;"><tr><td style="width:48px;"><img src="{}"/></td><td style="vertical-align:middle;"><a href="{}"><strong style="font-size:1.2em;">{}</strong></a><br/><small>{}</small></td></tr>'.format(avatar, item['author']['url'], item['author']['name'], item['_display_date'])
 
     media_html = ''
-    for el in soup.body.find_all('a', href=re.compile(r'facebook\.com/photo\.php')):
+    for el in soup.body.find_all('a', href=re.compile(r'facebook\.com/photo\.php|/photos/')):
         it = el.find('img')
         if it:
             media_html += utils.add_image(it['src'], link=el['href']) + '<br/>'
