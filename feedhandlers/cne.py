@@ -99,6 +99,8 @@ def format_body(body_json):
     if body_json[0] == 'inline-embed':
         if body_json[1]['type'] == 'image':
             return add_image(body_json[1]['props'])
+        elif body_json[1]['type'] == 'instagram':
+            return utils.add_embed(body_json[1]['props']['url'])
         elif body_json[1]['type'] == 'clip':
             return add_video(body_json[1]['props'])
         elif body_json[1]['type'] == 'video':
@@ -309,3 +311,15 @@ def get_content(url, args, save_debug=False):
 
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
+
+
+def test_handler():
+    feeds = ['https://www.wired.com/feed/rss',
+             'https://www.wired.co.uk/feed/rss',
+             'https://www.gq.com/feed/rss',
+             'https://www.gq-magazine.co.uk/feed/rss',
+             'https://www.newyorker.com/feed/rss',
+             'https://www.pitchfork.com/feed/rss',
+             'https://www.vogue.com/feed/rss']
+    for url in feeds:
+        get_feed({"url": url}, True)

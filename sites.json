@@ -304,6 +304,9 @@
     "gq": {
         "module": "cne"
     },
+    "gq-magazine": {
+        "module": "cne"
+    },
     "gfycat": {
         "module": "gfycat"
     },
@@ -533,7 +536,7 @@
     "reuters": {
         "api_url": "https://www.reuters.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 100,
+        "deployment": 105,
         "arc_site": "reuters",
         "content": {
             "source": "article-by-id-or-url-v1",
@@ -666,7 +669,7 @@
     },
     "theskimm": {
         "module": "theskimm",
-        "buildId": "U9Id-BZEWbcLLWCtHGTsN"
+        "buildId": "CgHmyHT_ZEp5KMOXctEFz"
     },
     "thetakeout": {
         "module": "gawker"
@@ -703,9 +706,6 @@
     "usatoday": {
         "module": "gannett",
         "site_code": "USAT"
-    },
-    "variety": {
-        "module": "variety"
     },
     "vanityfair": {
         "module": "vanityfair"
@@ -777,17 +777,21 @@
             "9to5toys",
             "aboutchromebooks",
             "defector",
-            "digitaltrends",
             "ghacks",
             "liliputing",
             "missingremote",
             "nbcsports",
+            "robbreport",
             "snopes",
+            "sportico",
+            "spy",
             "stereogum",
             "techhive",
             "the-gadgeteer",
             "thestreamingadvisor",
             "thurrott",
+            "tvline",
+            "variety",
             "venturebeat",
             "zatznotfunny"
         ]
