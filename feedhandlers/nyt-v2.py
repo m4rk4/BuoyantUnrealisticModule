@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss
+from feedhandlers import rss, wirecutter
 
 import logging
 
@@ -333,6 +333,8 @@ def get_content(url, args, save_debug=False):
     if re.search('/(live|interactive)/', url):
         logger.warning('unsupported url ' + url)
         return None
+    elif '/wirecutter/' in url:
+        return wirecutter.get_content(url, args, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if not article_html:

@@ -40,7 +40,7 @@
     "baltimoresun": {
         "api_url": "https://www.baltimoresun.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 35,
+        "deployment": 73,
         "arc_site": "baltimore-sun",
         "content": {
             "source": "content-api-custom",
@@ -98,8 +98,17 @@
     "bustle": {
         "module": "bustle"
     },
+    "buzzfeed": {
+        "module": "buzzfeed"
+    },
+    "buzzfeednews": {
+        "module": "buzzfeed"
+    },
     "carbuzz": {
         "module": "carbuzz"
+    },
+    "cbssports": {
+        "module": "cbssports"
     },
     "cfobrew": {
         "module": "morningbrew",
@@ -108,7 +117,7 @@
     "chicagotribune": {
         "api_url": "https://www.chicagotribune.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 35,
+        "deployment": 73,
         "arc_site": "chicago-tribune",
         "content": {
             "source": "content-api-custom",
@@ -131,7 +140,7 @@
     "cleveland": {
         "api_url": "https://www.cleveland.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 809,
+        "deployment": 876,
         "arc_site": "cleveland",
         "content": {
             "source": "content-api",
@@ -175,7 +184,7 @@
     "cleveland19": {
         "api_url": "https://www.cleveland19.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 251,
+        "deployment": 277,
         "arc_site": "woio",
         "content": {
             "source": "content-api",
@@ -230,6 +239,9 @@
     "cnn": {
         "module": "cnn"
     },
+    "complex": {
+        "module": "complex"
+    },
     "crainscleveland": {
         "module": "crains"
     },
@@ -249,6 +261,9 @@
     "dispatch": {
         "module": "gannett",
         "site_code": "NCOD"
+    },
+    "documentcloud": {
+        "module": "documentcloud"
     },
     "dwcdn": {
         "module": "datawrapper"
@@ -464,6 +479,9 @@
     "msnbc": {
         "module": "nbcnews"
     },
+    "nationalgeographic": {
+        "module": "natgeo"
+    },
     "nba": {
         "module": "nba"
     },
@@ -507,6 +525,9 @@
     },
     "plasticsnews": {
         "module": "crains"
+    },
+    "podbean": {
+        "module": "podbean"
     },
     "popcrush": {
         "module": "townsquare"
@@ -633,6 +654,9 @@
     },
     "streamable": {
         "module": "streamable"
+    },
+    "sustainableplastics": {
+        "module": "crains"
     },
     "tasteofcountry": {
         "module": "townsquare"

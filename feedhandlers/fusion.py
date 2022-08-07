@@ -19,8 +19,10 @@ def get_deployment_value(url):
     return -1
 
 
-def resize_image(image_item, width_target=916):
+def resize_image(image_item, width_target=1024):
     if image_item.get('url') and 'washpost' in image_item['url']:
+        if width_target == 1024:
+            width_target = 916
         return 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(image_item['url'], width_target)
 
     img_src = ''
@@ -76,7 +78,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
                 elif raw_soup.iframe.get('data-url'):
                     data_content = utils.get_content(raw_soup.iframe['data-url'], {}, save_debug)
                     if data_content and data_content.get('_image'):
-                        print(data_content['url'])
+                        #print(data_content['url'])
                         caption = '<a href="{}/content?read&url={}">{}</a>'.format(config.server, quote_plus(data_content['url']), data_content['title'])
                         element_html += utils.add_image(data_content['_image'], caption, link=data_content['url'])
                     else:
@@ -197,8 +199,18 @@ def process_content_element(element, url, func_resize_image, save_debug):
                 else:
                     captions.append(element['credits']['by'][0]['byline'])
         caption = ' | '.join(captions)
+        #if element.get('subtitle') and element['subtitle'].strip():
+        #    caption = '<strong>{}.</strong> '.format(element['subtitle'].strip()) + caption
         if img_src:
             element_html += utils.add_image(img_src, caption)
+
+    elif element['type'] == 'gallery':
+        img_src = func_resize_image(element['content_elements'][0])
+        link = '{}://{}{}'.format(split_url.scheme, split_url.netloc, element['canonical_url'])
+        caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
+        link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
+        if img_src:
+            element_html += utils.add_image(img_src, caption, link=link)
 
     elif element['type'] == 'graphic':
         if element['graphic_type'] == 'image':
@@ -312,6 +324,9 @@ def get_content_html(content, func_resize_image, url, save_debug):
             logger.warning('no handled streams found for video content in ' + url)
         return content_html
 
+    if content.get('subheadlines'):
+        content_html += '<p><em>{}</em></p>'.format(content['subheadlines']['basic'])
+
     if content.get('summary'):
         content_html += '<ul>'
         for it in content['summary']:
@@ -321,51 +336,42 @@ def get_content_html(content, func_resize_image, url, save_debug):
                 content_html += '<li>{}</li>'.format(it['description'])
         content_html += '</ul>'
 
-    # Add a lead image if it's not in the article (except galleries because those are moved to the end)
-    if content['type'] != 'video':
-        if content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube':
-            if content.get('multimedia_main'):
-                if content['multimedia_main']['type'] == 'gallery':
-                    content_html += process_content_element(content['multimedia_main']['content_elements'][0], url, func_resize_image, save_debug)
-                else:
-                    content_html += process_content_element(content['multimedia_main'], url, func_resize_image, save_debug)
-            else:
-                if content.get('promo_items'):
-                    lead_image = None
-                    if content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
-                        lead_image = content['promo_items']['basic']
-                    elif content['promo_items'].get('images'):
-                        lead_image = content['promo_items']['images'][0]
-                    if lead_image:
-                        content_html += process_content_element(lead_image, url, func_resize_image, save_debug)
-
-    gallery_elements = []
-    for element in content['content_elements']:
-        # Add galleries to the end of the content
-        if element['type'] == 'gallery':
-            gallery_elements.append(element)
-        else:
-            content_html += process_content_element(element, url, func_resize_image, save_debug)
-
+    lead_image = None
     if content.get('multimedia_main'):
-        if content['multimedia_main']['type'] == 'gallery':
-            gallery_elements.append(content['multimedia_main'])
-    elif content.get('related_content') and content['related_content'].get('galleries'):
-        for gallery in content['related_content']['galleries']:
-            gallery_elements.append(gallery)
+        lead_image = content['multimedia_main']
+    elif content.get('promo_items'):
+        if content['promo_items'].get('lead_art'):
+            lead_image = content['promo_items']['lead_art']
+        elif content['promo_items'].get('basic'):
+            lead_image = content['promo_items']['basic']
+        elif content['promo_items'].get('images'):
+            lead_image = content['promo_items']['images'][0]
+    if lead_image:
+        if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
+            content_html += process_content_element(lead_image, url, func_resize_image, save_debug)
 
-    if len(gallery_elements) > 0:
-        for gallery in gallery_elements:
-            content_html += '<h3>Photo Gallery ({} photos)</h3>'.format(len(gallery['content_elements']))
-            for element in gallery['content_elements']:
-                content_html += process_content_element(element, url, func_resize_image, save_debug) + '<br/>'
+    for element in content['content_elements']:
+        content_html += process_content_element(element, url, func_resize_image, save_debug)
+
+    if content.get('related_content') and content['related_content'].get('galleries'):
+        for gallery in content['related_content']['galleries']:
+            if gallery.get('canonical_url'):
+                content_html += process_content_element(gallery, url, func_resize_image, save_debug)
+            else:
+                content_html += '<h3>Photo Gallery</h3>'
+                for element in gallery['content_elements']:
+                    if lead_image and lead_image['id'] == element['id']:
+                        continue
+                    content_html += process_content_element(element, url, func_resize_image, save_debug)
 
     # Reuters specific
     if content.get('related_content') and content['related_content'].get('videos'):
         content_html += '<h3>Related Videos</h3>'
         for video in content['related_content']['videos']:
             caption = '<b>{}</b> &mdash; {}'.format(video['title'], video['description'])
-            content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption) + '<br/>'
+            content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption)
+
+    content_html = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', content_html)
     return content_html
 
 
