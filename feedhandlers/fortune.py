@@ -129,9 +129,9 @@ def add_image(image, width=1000):
 def render_content(content):
     content_html = ''
     for child in content['children']:
-        print(child['name'])
+        #print(child['name'])
 
-        if re.search(r'\b(advertising|byline|pagination|sidebar|social)\b', child['name']):
+        if re.search(r'\b(advertising|byline|pagination|sidebar|social)\b', child['name']) or (child['name'] == 'dianomi' and child['config']['type'] == 'sidebar'):
             continue
 
         if 'hero' in child['name']:

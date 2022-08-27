@@ -319,6 +319,7 @@ def test_handler():
              'https://www.gq.com/feed/rss',
              'https://www.gq-magazine.co.uk/feed/rss',
              'https://www.newyorker.com/feed/rss',
+             'https://www.newyorker.com/feed/contributors/andy-borowitz/rss',
              'https://www.pitchfork.com/feed/rss',
              'https://www.vogue.com/feed/rss']
     for url in feeds:

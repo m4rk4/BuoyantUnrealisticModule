@@ -41,31 +41,26 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
                         text_html = text_html.replace(url['url'], '')
                     else:
                         # If not a card, format the link
-                        text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'],
-                                                                                               url['display_url']))
+                        text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'], url['display_url']))
                 else:
                     # Twitter links are often quoted tweets
                     if tweet_json.get('quoted_tweet') and (tweet_json['quoted_tweet']['id_str'] in url['expanded_url']):
                         text_html = text_html.replace(url['url'], '')
                     else:
                         # If not a quoted tweet, format the link
-                        text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'],
-                                                                                               url['display_url']))
+                        text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'], url['display_url']))
             else:
-                text_html = text_html.replace(url['url'],
-                                              '<a href="{}">{}</a>'.format(url['expanded_url'], url['display_url']))
+                text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'], url['display_url']))
 
     if tweet_json.get('photos'):
         for photo in tweet_json['photos']:
-            media_html += '<div><a href="{0}"><img width="100%" style="border-radius:10px" src="{0}" /></a></div>'.format(
-                photo['url'])
+            media_html += '<div><a href="{0}"><img width="100%" style="border-radius:10px" src="{0}" /></a></div>'.format(photo['url'])
 
     if tweet_json.get('video'):
         if tweet_json['video'].get('variants'):
             for video in tweet_json['video']['variants']:
                 if 'mp4' in video['type']:
-                    media_html += '<video style="width:100%; border-radius:10px;" controls poster="{0}"><source src="{1}" type="video/mp4"></video><a href="{1}"><small>Open video</small></a>'.format(
-                        tweet_json['video']['poster'], video['src'])
+                    media_html += '<video style="width:100%; border-radius:10px;" controls poster="{0}"><source src="{1}" type="video/mp4"></video><a href="{1}"><small>Open video</small></a>'.format(tweet_json['video']['poster'], video['src'])
                     break
         else:
             video_url = tweet_json['entities']['media'][0]['expanded_url']
@@ -150,7 +145,11 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
         elif tweet_json['card']['name'] == 'unified_card':
             card_values = json.loads(card['unified_card']['string_value'])
             card_type = 2
-            link = utils.get_redirect_url(card_values['destination_objects']['browser_1']['data']['url_data']['url'])
+            link = ''
+            for key, val in card_values['destination_objects'].items():
+                if key.startswith('browser_'):
+                    link = utils.get_redirect_url(val['data']['url_data']['url'])
+                    break
             title = card_values['component_objects']['details_1']['data']['title']['content']
             desc = ''
             img = ''

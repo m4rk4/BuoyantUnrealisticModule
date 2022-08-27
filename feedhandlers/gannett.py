@@ -244,6 +244,8 @@ def get_content(url, args, save_debug=False, article_json=None):
                     new_html = utils.add_embed(el['data-v-src'])
                 elif el['data-gl-method'] == 'loadAnc':
                     pass
+                elif el['data-gl-method'] == 'loadHb64' and el.get('aria-label') and re.search(r'subscribe', el['aria-label'], flags=re.I):
+                    pass
                 else:
                     logger.warning('unhandled aside data-gl-method {} in {}'.format(el['data-gl-method'], item['url']))
                 if new_html:
@@ -315,6 +317,8 @@ def get_feed(args, save_debug):
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
+    if save_debug:
+        utils.write_file(api_json, './debug/feed.json')
 
     n = 0
     items = []
@@ -336,3 +340,5 @@ def get_feed(args, save_debug):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
+
+#http://localhost:8080/feed?debug&read&url=https%3A%2F%2Fwww.beaconjournal.com%2F?tagIds=2a456b3f-53a1-4a9a-965d-d59445f34794,89c8ea3a-1755-44c7-82e2-b70f7b7ea5fb,2b88a3a1-66b8-4949-b039-db1646545181

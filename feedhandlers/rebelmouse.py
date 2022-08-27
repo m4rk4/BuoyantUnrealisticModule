@@ -29,7 +29,7 @@ def render_content(content):
         if content['name'] == 'p':
             if content.get('attributes') and content['attributes'].get('class'):
                 classes = content['attributes']['class'].split(' ')
-                if 'shortcode-media-rebelmouse-image' in classes:
+                if re.search(r'shortcode-media-rebelmouse-image', content['attributes']['class']):
                     img_src = ''
                     img_link = ''
                     captions = []
@@ -64,27 +64,31 @@ def render_content(content):
                                     captions.append(caption)
                     return utils.add_image(img_src, ' | '.join(captions), link=img_link)
 
-                elif 'pull-quote' in classes:
+                elif re.search(r'pull-quote', content['attributes']['class']):
                     quote = ''
                     author = ''
                     for child in content['children']:
                         quote += render_content(child)
-                    m = re.search(r'“([^”]+)” —(.+)$', quote)
+                    m = re.search(r'“([^”]+)”\s?—(.+)$', quote)
                     if m:
                         quote = m.group(1)
                         author = m.group(2)
-                    print(quote)
                     return utils.add_pullquote(quote, author)
 
             content_html += '<p>'
             end_tag = 'p'
 
+        elif content['name'] == 'span':
+            if content.get('children'):
+                logger.warning('unhandled span tag')
+
         elif content['name'] == 'hr' or content['name'] == 'br':
             content_html += '<{}/>'.format(content['name'])
 
         elif content['name'] == 'a':
-            content_html += '<a href="{}">'.format(content['attributes']['href'])
-            end_tag = 'a'
+            if content['attributes'].get('href'):
+                content_html += '<a href="{}">'.format(content['attributes']['href'])
+                end_tag = 'a'
 
         elif content['name'] == 'img':
             content_html += '<img src="{}" style="width:100%;"/>'.format(content['attributes']['src'])
@@ -92,28 +96,42 @@ def render_content(content):
         elif content['name'] == 'div':
             skip_div = False
             if content.get('attributes') and content['attributes'].get('class'):
-                classes = content['attributes']['class'].split(' ')
-                if 'newsroomBlockQuoteContainer' in classes:
+                if re.search(r'newsroomBlockQuoteContainer', content['attributes']['class']):
                     quote = ''
                     cite = ''
                     for child in content['children']:
-                        child_classes = child['attributes']['class'].split(' ')
-                        if 'newsroomBlockQuote' in child_classes:
+                        if re.search(r'newsroomBlockQuote', child['attributes']['class']):
                             for nino in child['children']:
                                 quote += render_content(nino)
-                        elif 'newsroomBlockQuoteAuthorContainer' in child_classes:
+                        elif re.search(r'newsroomBlockQuoteAuthorContainer', child['attributes']['class']):
                             for nino in child['children']:
                                 cite += render_content(nino)
                     return utils.add_pullquote(quote, cite)
 
-                elif 'redactor-editor' in classes:
+                elif re.search(r'horizontal-rule', content['attributes']['class']):
+                    content_html += '<hr/>'
                     skip_div = True
 
-                elif 'ieee-sidebar-medium' in classes:
+                elif re.search(r'embed-media|redactor-editor', content['attributes']['class']):
+                    skip_div = True
+
+                elif re.search(r'ieee-editors-note', content['attributes']['class']):
+                    content_html += '<h4><em>Editor\'s note</em></h4>'
+                    skip_div = True
+
+                elif re.search(r'ieee-(factbox|sidebar)-', content['attributes']['class']):
                     sidebar = ''
                     for child in content['children']:
                          sidebar += render_content(child)
                     return utils.add_blockquote(sidebar)
+
+                elif re.search(r'flourish-embed', content['attributes']['class']):
+                    embed_src = utils.clean_url('https://flo.uri.sh/' + content['attributes']['data-src']) + '/embed?auto=1'
+                    content_html += utils.add_embed(embed_src)
+                    skip_div = True
+
+            elif content.get('attributes') and content['attributes'].get('style') and re.search(r'page-break-after', content['attributes']['style']):
+                skip_div = True
 
             if content.get('children'):
                 for child in content['children']:
@@ -178,6 +196,8 @@ def render_content(content):
                     elif child['name'] == 'particle-media':
                         if child.get('children'):
                             for nino in child['children']:
+                                if nino.get('text') and re.search(r'shortcode-Ad', nino['text'], flags=re.I):
+                                    continue
                                 if nino['name'] == 'rebelmouse-image':
                                     image_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
                                     img_src = resize_image(image_info['thumbnails']['origin'])
@@ -197,6 +217,8 @@ def render_content(content):
                                             logger.warning('unhandled particle-media blockquote class ' + nino['attributes']['class'])
                                 elif nino['name'] == 'iframe':
                                     embed_src = nino['attributes']['src']
+                                elif nino['name'] == 'div' and nino['attributes'].get('class') and re.search(r'flourish-embed', nino['attributes']['class']):
+                                    embed_src = utils.clean_url('https://flo.uri.sh/' + nino['attributes']['data-src']) + '/embed?auto=1'
                                 elif nino['name'] == 'script' or nino['name'] == 'p':
                                     pass
                                 else:
@@ -219,30 +241,50 @@ def render_content(content):
                                 credit = m.group(1)
 
                     elif child['name'] == 'assembler':
+                        if child['attributes']['use_pagination']:
+                            content_html += '<hr/>'
                         if child.get('children'):
                             for nino in child['children']:
                                 content_html += render_content(nino)
+                                if child['attributes']['use_pagination']:
+                                    content_html += '<hr/>'
 
                     else:
                         logger.warning('unhandled particle child ' + child['name'])
 
+                particle_html = ''
                 if headline:
-                    content_html += '<hr/><h3>{}</h3>'.format(headline)
+                    particle_html += '<h3>{}</h3>'.format(headline)
                 if img_src:
                     if caption and credit:
                         caption += ' | ' + credit
                     elif credit and not caption:
                         caption = credit
-                    content_html += utils.add_image(img_src, caption, link=img_link)
+                    particle_html += utils.add_image(img_src, caption, link=img_link)
                     if is_slideshow:
-                        content_html += '<br/>'
+                        particle_html += '<br/>'
                 if embed_src:
-                    content_html += utils.add_embed(embed_src)
+                    particle_html += utils.add_embed(embed_src)
                 if body:
-                    content_html += body
+                    particle_html += body
+                if content.get('attributes') and content['attributes'].get('class_name') and re.search(r'ieee-(factbox|sidebar)-', content['attributes']['class_name']):
+                    content_html += utils.add_blockquote(particle_html)
+                elif content.get('attributes') and content['attributes'].get('class_name') and re.search(r'ieee-pullquote-', content['attributes']['class_name']):
+                    content_html += utils.add_pullquote(particle_html)
+                else:
+                    content_html += particle_html
                 return content_html
 
-        elif content['name'] == 'assembler' or content['name'] == 'script':
+        elif content['name'] == 'assembler':
+            if content['attributes']['use_pagination']:
+                content_html += '<hr/>'
+            for child in content['children']:
+                content_html += render_content(child)
+                if content['attributes']['use_pagination']:
+                    content_html += '<hr/>'
+            return content_html
+
+        elif content['name'] == 'script':
             pass
 
         else:
@@ -309,8 +351,13 @@ def get_content(url, args, save_debug=False):
     if post_json.get('subheadline'):
         item['content_html'] += post_json['subheadline']
 
+    image_info = None
     if post_json.get('image_info'):
-        for key, val in post_json['image_info'].items():
+        image_info = post_json['image_info']
+    elif post_json.get('teaser_image_info'):
+        image_info = post_json['teaser_image_info']
+    if image_info:
+        for key, val in image_info.items():
             if key == 'origin':
                 continue
             break
@@ -330,7 +377,7 @@ def get_content(url, args, save_debug=False):
         else:
             captions.append(post_json['photo_credit'])
 
-    if item.get('_image'):
+    if post_json.get('image_info'):
         item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
 
     for child in content_json['children']:
@@ -341,5 +388,14 @@ def get_content(url, args, save_debug=False):
     #item['content_html'] = post_json['body']
     return item
 
+
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
+
+
+def test_handler():
+    feeds = ['https://spectrum.ieee.org/feeds/feed.rss',
+             'https://spectrum.ieee.org/feeds/type/opinion.rss',
+             'https://spectrum.ieee.org/feeds/topic/consumer-electronics.rss']
+    for url in feeds:
+        get_feed({"url": url}, True)

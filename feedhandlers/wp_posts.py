@@ -1,4 +1,4 @@
-import json, re
+import av, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
@@ -37,7 +37,7 @@ def render_content(content, url):
                     if 'time.com' in url and block['attributes'].get('videoid'):
                         content_html += utils.add_embed('https://cdn.jwplayer.com/previews/{}'.format(block['attributes']['videoid']))
                 else:
-                    print(block['tag'])
+                    #print(block['tag'])
                     content_html += '<{0}>{1}</{0}>'.format(block['tag'],render_content(block['content'], url))
             else:
                 logger.warning('unhandled dict block without tag')
@@ -99,12 +99,18 @@ def get_post_content(post, args, save_debug=False):
         if post.get('authors'):
             for author in post['authors']:
                 authors.append(author['display_name'])
+        elif post['_links'].get('ns:byline'):
+            for link in post['_links']['ns:byline']:
+                link_json = utils.get_url_json(link['href'])
+                if link_json:
+                    if link_json.get('title'):
+                        authors.append(link_json['title']['rendered'])
         elif post['_links'].get('author'):
-                for link in post['_links']['author']:
-                    link_json = utils.get_url_json(link['href'])
-                    if link_json:
-                        if 'name' in link_json:
-                            authors.append(link_json['name'])
+            for link in post['_links']['author']:
+                link_json = utils.get_url_json(link['href'])
+                if link_json:
+                    if link_json.get('name'):
+                        authors.append(link_json['name'])
 
     if not item.get('tags'):
         if 'wp:term' in post['_links']:
@@ -164,7 +170,10 @@ def get_post_content(post, args, save_debug=False):
     if post.get('excerpt'):
         item['summary'] = BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text()
     elif post.get('yoast_head_json'):
-        item['summary'] = post['yoast_head_json']['description']
+        if post['yoast_head_json'].get('description'):
+            item['summary'] = post['yoast_head_json']['description']
+        elif post['yoast_head_json'].get('og_description'):
+            item['summary'] = post['yoast_head_json']['og_description']
 
     content_html = ''
     if post.get('subtitle'):
@@ -177,7 +186,7 @@ def get_post_content(post, args, save_debug=False):
             if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
                 content_html += '<p><em>{}</em></p>'.format(multi_title['titles']['headline']['additional']['headline_subheadline'])
 
-    if not 'nolead' in args:
+    if 'nolead' not in args and 'nolede' not in args:
         content_html += lede
 
     if post.get('content') and post['content'].get('structured'):
@@ -475,7 +484,14 @@ def format_content(content_html, item):
                 video_type = 'application/x-mpegURL'
             else:
                 logger.warning('unhandled video type for {} in {}'.format(video_src, item['url']))
-                video_type = 'application/x-mpegURL'
+                video_container = av.open(video_src)
+                if 'mp4' in video_container.format.extensions:
+                    video_type = 'video/mp4'
+                elif 'webm' in video_container.format.extensions:
+                    video_type = 'video/webm'
+                else:
+                    video_type = 'application/x-mpegURL'
+                video_container.close()
             if not poster:
                 if video_type == 'video/mp4':
                     poster = '{}/image?url={}&width=1000'.format(config.server, quote_plus(video_src))
@@ -528,6 +544,10 @@ def format_content(content_html, item):
         elif 'wp-block-embed-twitter' in el['class']:
             links = el.find_all('a')
             new_html = utils.add_embed(links[-1]['href'])
+        elif 'wp-block-embed-instagram' in el['class']:
+            it = el.find('blockquote')
+            if it:
+                new_html = utils.add_embed(it['data-instgrm-permalink'])
         elif 'wp-block-embed-facebook' in el['class']:
             links = el.find_all('a')
             new_html = utils.add_embed(links[-1]['href'])
@@ -682,7 +702,7 @@ def format_content(content_html, item):
     for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
         el.decompose()
 
-    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b')):
+    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|sharedaddy')):
         el.decompose()
 
     for el in soup.find_all(['aside', 'ins', 'script', 'style']):
@@ -707,7 +727,7 @@ def get_content(url, args, save_debug=False):
         post_url = ''
         soup = BeautifulSoup(article_html, 'html.parser')
         for link in soup.find_all('link', attrs={"type":"application/json"}):
-            print(link['href'])
+            #print(link['href'])
             if re.search(r'/wp-json/wp/v2/', link['href']):
                 post_url = link['href']
                 break

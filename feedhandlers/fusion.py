@@ -665,6 +665,8 @@ def get_feed(args, save_debug=False):
 
 def test_handler():
     feeds = ['https://feeds.washingtonpost.com/rss/homepage',
+             'https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml',
+             'https://www.al.com/arc/outboundfeeds/rss/?outputType=xml',
              'https://www.washingtonpost.com/business/technology/',
              'https://www.washingtonpost.com/opinions/',
              'https://www.reuters.com/technology']
