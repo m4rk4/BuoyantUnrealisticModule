@@ -4,72 +4,18 @@
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>{{ title }}</title>
-        <!-- Collapsible styles from https://codepen.io/jason-knight/pen/ZEWPPVZ -->
-        <style>
-.toggle_collapse {
-  /* make it show to work across all ua's */
-  display:block;
-}
-
-.toggle_collapse, /* hide off screen */
-.toggle_collapse + *  .collapseAfter ~ * {
-	position:absolute;
-	top:-999em;
-	left:-999em;
-}
-
-.toggle_collapse:checked + *  .collapseAfter ~ * {
-  position:static;
-}
-
-.toggle_collapse + * + label {
-  display:inline-block; /* make visible for screen media */
-  color:blue;
-}
-
-.toggle_collapse + * + label:before {
-	content:"Read";
-}
-
-.toggle_collapse:checked + * + label:before {
-	content:"Hide";
-}
-
-.toggle_collapse + * + label:after {
-	content:"\25BC";
-	display:inline-block;
-	padding:0.4em 0 0 0.3em;
-	vertical-align:top;
-	font-size:0.625em;
-}
-
-.toggle_collapse:checked + * + label:after {
-	content:"\25B2";
-}
-
-.title {
-    font-size:1.2em;
-    font-weight:bold;
-    color:black;
-}
-
-.item_image {
-    float:left;
-    margin-right:8px;
-}
-        </style>
 	</head>
 	<body style="max-width:800px;">
         <h2><a href="{{ link }}">{{ title }}</a></h2>
         {% for item in items %}
-            <input type="checkbox" id="toggle_section{{ loop.index }}" class="toggle_collapse" hidden aria-hidden="true">
-            <div>
-                <div class="collapseAfter">
-                    {% if item._image %}
-                        <img class="item_image" src="{{ item._image | make_thumbnail }}"/>
-                    {% endif %}
-                    <a class="title" href="{{ item.url }}">{{ item.title }}</a>
-                </div>
+            {% if item._image %}
+                <img src="{{ item._image | make_thumbnail }}" style="float:right;" />
+            {% endif %}
+            <details>
+                <summary style="height:108px;">
+                    <a href="{{ item.url }}" style="font-size:1.2em; font-weight:bold; color:black;">{{ item.title }}</a>
+                </summary>
+                <div style="clear:right;"></div>
                 <div class="content">
                     <p>
                         {% if item.author %} By {{ item.author.name }} {% endif %}
@@ -82,9 +28,7 @@
                         <p>Tags: {{ ', '.join(item.tags) | safe }}</p>
                         {% endif %}
                 </div>
-            </div>
-            <label for="toggle_section{{ loop.index }}" hidden aria-hidden="true"></label>
-            <div style="clear:left; margin-bottom: 1em;"></div>
+            </details>
         {% endfor %}
 	</body>
 </html>

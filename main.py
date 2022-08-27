@@ -215,6 +215,44 @@ def videojs():
     return render_template('videojs.html', args=video_args)
 
 
+@app.route('/openplayer')
+def openplayer():
+    args = request.args
+    player_args = args.copy()
+    if player_args.get('url'):
+        item = utils.get_content(player_args['url'], {}, False)
+        if not item:
+            return 'Unable to get url content'
+        if player_args.get('content_type'):
+            if player_args['content_type'] == 'video':
+                player_args['src'] = item['_video']
+            elif player_args['content_type'] == 'audio':
+                player_args['src'] = item['_audio']
+        else:
+            if item.get('_video'):
+                player_args['src'] = item['_video']
+            elif item.get('_audio'):
+                player_args['src'] = item['_audio']
+
+    if not player_args.get('src'):
+        return 'No player source was found'
+
+    if not player_args.get('poster'):
+        player_args['poster'] = '/static/video_poster-640x360.webp'
+
+    if not player_args.get('src_type'):
+        if '.mp4' in player_args['src'].lower():
+            player_args['src_type'] = 'video/mp4'
+        elif '.webm' in player_args['src'].lower():
+            player_args['src_type'] = 'video/webm'
+        elif '.m3u8' in player_args['src'].lower():
+            player_args['src_type'] = 'application/x-mpegURL'
+        else:
+            player_args['src_type'] = 'video/mp4'
+
+    return render_template('openplayer.html', args=player_args)
+
+
 @app.route('/debug')
 def debug():
     args = request.args

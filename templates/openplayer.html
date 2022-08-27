@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.css" />
+</head>
+<body>
+    <video class="op-player__media" id="player" controls playsinline poster="{{ args.poster }}">
+        <source src="{{ args.src }}" type="{{ args.src_type }}" />
+    </video>
+    <script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
+    <script>
+        // Check the `API and events` link below for more options
+           const player = new OpenPlayerJS('player');
+           player.init();
+    </script>
+</body>
+</html>
