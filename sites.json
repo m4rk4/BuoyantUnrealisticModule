@@ -5,6 +5,56 @@
     "acast": {
         "module": "acast"
     },
+    "al": {
+        "api_url": "https://www.al.com/pf/api/v3/content/fetch/",
+        "module": "fusion",
+        "deployment": 890,
+        "arc_site": "al",
+        "content": {
+            "source": "article-beta-content-api",
+            "query": {
+                "uri": "PATH",
+                "website_url": "PATH",
+                "type": "elements",
+                "limit": 6,
+                "arc-site": "al"
+            }
+        },
+        "homepage_feed": {
+            "source": "nudge-api",
+            "query": {
+                "arc-site": "cleveland"
+            }
+        },
+        "section_feed": {
+            "source": "section-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "section": "SECTION",
+                "arc-site": "al"
+            }
+        },
+        "author_feed": {
+            "source": "author-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "uri": "/staff/AUTHOR/posts.html",
+                "id": "AUTHOR",
+                "arc-site": "al"
+            }
+        },
+        "tag_feed": {
+            "source": "tag-feed-api",
+            "query": {
+                "limit": 10,
+                "offset": 0,
+                "tag": "TAG",
+                "arc-site": "al"
+            }
+        }
+    },
     "androidauthority": {
         "module": "androidauth",
         "buildId": "UjuoivvJjybyyZeE7sUjE"
@@ -140,7 +190,7 @@
     "cleveland": {
         "api_url": "https://www.cleveland.com/pf/api/v3/content/fetch/",
         "module": "fusion",
-        "deployment": 876,
+        "deployment": 889,
         "arc_site": "cleveland",
         "content": {
             "source": "content-api",
@@ -348,6 +398,9 @@
         "module": "morningbrew",
         "buildId": "VqvC4s6lx9O6jLFpvu-av"
     },
+    "ieee": {
+        "module": "rebelmouse"
+    },
     "ign": {
         "module": "ign"
     },
@@ -363,11 +416,18 @@
     "inputmag": {
         "module": "bustle"
     },
+    "insidehook": {
+        "module": "wp_article"
+    },
     "insider": {
         "module": "insider"
     },
     "instagram": {
         "module": "instagram"
+    },
+    "interestingengineering": {
+        "module": "intengineering",
+        "buildId": "9fB1cQfIAfbCv3KJMZIn2"
     },
     "inverse": {
         "module": "bustle"
@@ -438,11 +498,17 @@
         "module": "kerrang",
         "buildId": "LnDSbSxopOym9D-E5OtEf"
     },
+    "knowablemagazine": {
+        "module": "knowable"
+    },
     "kotaku": {
         "module": "gawker"
     },
     "lifehacker": {
         "module": "gawker"
+    },
+    "linkdhome": {
+        "module": "sqs"
     },
     "linkedin": {
         "module": "linkedin"
@@ -491,6 +557,9 @@
     "neilyoungarchives": {
         "module": "nya"
     },
+    "nerdist": {
+        "module": "wp_article"
+    },
     "newrepublic": {
         "module": "tnr"
     },
@@ -519,6 +588,9 @@
     },
     "pcmag": {
         "module": "pcmag"
+    },
+    "pewresearch": {
+        "module": "prc"
     },
     "pitchfork": {
         "module": "pitchfork"
@@ -640,14 +712,31 @@
     "sendtonews": {
         "module": "stnvideo"
     },
+    "seattlepi": {
+        "module": "hearst"
+    },
+    "seattletimes": {
+        "module": "seattletimes"
+    },
+    "sfchronicle": {
+        "module": "hearst"
+    },
+    "sfgate": {
+        "module": "hearst"
+    },
     "softpedia": {
         "module": "softpedia"
     },
     "soundcloud": {
-        "module": "soundcloud"
+        "module": "soundcloud",
+        "client_id": "LBCcHmRB8XSStWL6wKH2HPACspQlXg2P",
+        "app_version": "1661164069"
     },
     "spotify": {
         "module": "spotify"
+    },
+    "slacker-labs": {
+        "module": "sqs"
     },
     "slate": {
         "module": "clay"
@@ -717,6 +806,9 @@
         "module": "zdnet",
         "apiKey": "MKjirHWTcEGBEOp2z7fNqTOe670TbHSz",
         "secretKey": "nD869n2hThqkD9okFqNIfsMu2Zvrfp8OD/n7fJuVixI="
+    },
+    "tvrev": {
+        "module": "sqs"
     },
     "twitter": {
         "module": "twitter"
@@ -800,20 +892,42 @@
             "9to5mac",
             "9to5toys",
             "aboutchromebooks",
+            "bleedingcool",
+            "chromeunboxed",
+            "deadline",
             "defector",
+            "denofgeek",
+            "dotemu",
+            "factcheck",
+            "filmschoolrejects",
+            "geekwire",
             "ghacks",
+            "heroichollywood",
+            "hollywoodreporter",
+            "indiewire",
             "liliputing",
             "missingremote",
+            "mobilesyrup",
             "nbcsports",
+            "onmsft",
+            "popsci",
+            "poynter",
             "robbreport",
+            "singularityhub",
             "snopes",
             "sportico",
             "spy",
             "stereogum",
+            "techadvisor",
+            "techcrunch",
             "techhive",
+            "thathashtagshow",
             "the-gadgeteer",
+            "thehill",
             "thestreamingadvisor",
+            "thewrap",
             "thurrott",
+            "truthorfiction",
             "tvline",
             "variety",
             "venturebeat",
