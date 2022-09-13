@@ -170,7 +170,7 @@ def get_content(url, args, save_debug=False):
             else:
                 item['content_html'] += render_content(content)
     else:
-        gallery_html = '<hr/>'
+        gallery_html = ''
         for content in content_json['body']:
             if content['type'] == 'gallery':
                 gallery_html += render_content(content)
@@ -184,7 +184,7 @@ def get_content(url, args, save_debug=False):
             else:
                 item['content_html'] += render_content(content)
         if gallery_html:
-            item['content_html'] += gallery_html
+            item['content_html'] += '<hr/>' + gallery_html
 
     item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
     return item

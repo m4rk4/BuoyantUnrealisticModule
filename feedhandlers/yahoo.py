@@ -125,7 +125,7 @@ def get_content(url, args, save_debug=False):
   dt = datetime.fromisoformat(article_json['datePublished'].replace('Z', '+00:00'))
   item['date_published'] = dt.isoformat()
   item['_timestamp'] = dt.timestamp()
-  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  item['_display_date'] = utils.format_display_date(dt)
   dt = datetime.fromisoformat(article_json['dateModified'].replace('Z', '+00:00'))
   item['date_modified'] = dt.isoformat()
 

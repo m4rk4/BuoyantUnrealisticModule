@@ -1,4 +1,4 @@
-import json, pytz, re, tldextract
+import base64, hashlib, hmac, json, pytz, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit, quote_plus
@@ -19,7 +19,25 @@ def get_deployment_value(url):
     return -1
 
 
-def resize_image(image_item, width_target=1024):
+def resize_image(image_item, resizer_url, resizer_secret, width=1280):
+    if image_item.get('url') and 'washpost' in image_item['url']:
+        if width == 1280:
+            width = 916
+        img_src = 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(quote_plus(image_item['url']), width)
+    else:
+        split_url = urlsplit(image_item['url'])
+        image_path = '{}{}'.format(split_url.netloc, split_url.path)
+        operation_path = '{}x0/smart/'.format(width)
+        # THUMBOR_SECURITY_KEY (from tampabay.com)
+        #security_key = 'Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7'
+        hashed = hmac.new(bytes(resizer_secret, 'ascii'), bytes(operation_path+image_path, 'ascii'), hashlib.sha1)
+        #resizer_hash = base64.b64encode(hashed.digest()).decode().replace('+', '-').replace('/', '_')
+        resizer_hash = base64.urlsafe_b64encode(hashed.digest()).decode()
+        img_src = '{}{}/{}{}'.format(resizer_url, resizer_hash, operation_path, image_path)
+    return img_src
+
+
+def old_resize_image(image_item, width_target=1024):
     if image_item.get('url') and 'washpost' in image_item['url']:
         if width_target == 1024:
             width_target = 916
@@ -58,7 +76,7 @@ def resize_image(image_item, width_target=1024):
     return img_src
 
 
-def process_content_element(element, url, func_resize_image, save_debug):
+def process_content_element(element, url, resizer_url, resizer_secret, save_debug):
     split_url = urlsplit(url)
 
     element_html = ''
@@ -70,7 +88,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
 
     elif element['type'] == 'raw_html':
         # Filter out ad content
-        if not re.search(r'adsrv|amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|nflshop\.com', element['content'], flags=re.I):
+        if not re.search(r'adsrv|amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|link\.nj\.com/s/Newsletter|nflshop\.com|\boffer\b', element['content'], flags=re.I):
             raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
             if raw_soup.iframe:
                 if raw_soup.iframe.get('data-fallback-image-url'):
@@ -105,6 +123,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
             elif element.get('subtype') and element['subtype'] == 'subs_form':
                 pass
             else:
+                element_html += '<p>{}</p>'.format(element['content'])
                 logger.warning('unhandled raw_html ' + element['content'])
 
     elif element['type'] == 'custom_embed':
@@ -113,7 +132,14 @@ def process_content_element(element, url, func_resize_image, save_debug):
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
             element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"></div><blockquote><small>{}</small></blockquote></div>'.format(
                 episode['audio'], poster, episode['title'], episode['summary'])
-        elif element['subtype'] == 'magnet':
+        elif re.search(r'iframe', element['subtype'], flags=re.I):
+            embed_html = base64.b64decode(element['embed']['config']['base64HTML']).decode('utf-8')
+            m = re.search(r'src="([^"]+)"', embed_html)
+            if m:
+                element_html += utils.add_embed(m.group(1))
+            else:
+                logger.warning('unhandled custom_embed iframe')
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
             pass
         else:
             logger.warning('unhandled custom_embed')
@@ -127,7 +153,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
     elif element['type'] == 'quote':
         text = ''
         for el in element['content_elements']:
-            text += process_content_element(el, url, func_resize_image, save_debug)
+            text += process_content_element(el, url, resizer_url, resizer_secret, save_debug)
         if element['subtype'] == 'blockquote':
             element_html += utils.add_blockquote(text)
         elif element['subtype'] == 'pullquote':
@@ -139,9 +165,9 @@ def process_content_element(element, url, func_resize_image, save_debug):
         element_html += '<h{0}>{1}</h{0}>'.format(element['level'], element['content'])
 
     elif element['type'] == 'oembed_response':
-        if element['raw_oembed'].get('_id'):
+        if element['raw_oembed'].get('_id') and element['raw_oembed']['_id'].startswith('http'):
             element_html += utils.add_embed(element['raw_oembed']['_id'])
-        elif element['raw_oembed'].get('url'):
+        elif element['raw_oembed'].get('url') and element['raw_oembed']['url'].startswith('http'):
             element_html += utils.add_embed(element['raw_oembed']['url'])
         else:
             logger.warning('unknown raw_oembed url')
@@ -185,7 +211,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
         element_html += '</table>'
 
     elif element['type'] == 'image':
-        img_src = func_resize_image(element)
+        img_src = resize_image(element, resizer_url, resizer_secret)
         captions = []
         if element.get('credits_caption_display'):
             captions.append(element['credits_caption_display'])
@@ -205,7 +231,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
             element_html += utils.add_image(img_src, caption)
 
     elif element['type'] == 'gallery':
-        img_src = func_resize_image(element['content_elements'][0])
+        img_src = resize_image(element['content_elements'][0], resizer_url, resizer_secret)
         link = '{}://{}{}'.format(split_url.scheme, split_url.netloc, element['canonical_url'])
         caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
         link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
@@ -242,16 +268,22 @@ def process_content_element(element, url, func_resize_image, save_debug):
                 streams_ts.append(stream)
         stream = None
         if streams_mp4:
-            stream = utils.closest_dict(streams_mp4, 'height', 720)
+            if streams_mp4[0].get('height'):
+                stream = utils.closest_dict(streams_mp4, 'height', 720)
+            else:
+                stream = streams_mp4[0]
             stream_type = 'video/mp4'
         elif streams_ts:
-            stream = utils.closest_dict(streams_ts, 'height', 720)
+            if streams_ts[0].get('height'):
+                stream = utils.closest_dict(streams_ts, 'height', 720)
+            else:
+                stream = streams_ts[0]
             stream_type = 'application/x-mpegURL'
         if stream:
             if element.get('imageResizerUrls'):
                 poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
             elif element.get('promo_image'):
-                poster = func_resize_image(element['promo_image'])
+                poster = resize_image(element['promo_image'], resize_image)
             else:
                 poster = ''
             element_html += utils.add_video(stream['url'], stream_type, poster, element['headlines']['basic'])
@@ -281,7 +313,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
             element_html += '<p>by {} (updated {})</p>'.format(byline, date)
         else:
             element_html += '<p>updated {}</p>'.format(date)
-        element_html += get_content_html(element, func_resize_image, url, save_debug)
+        element_html += get_content_html(element, resizer_url, resizer_secret, url, save_debug)
 
     elif element['type'] == 'interstitial_link':
         pass
@@ -291,7 +323,7 @@ def process_content_element(element, url, func_resize_image, save_debug):
     return element_html
 
 
-def get_content_html(content, func_resize_image, url, save_debug):
+def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
     content_html = ''
     if content['type'] == 'video':
         streams_mp4 = []
@@ -312,7 +344,7 @@ def get_content_html(content, func_resize_image, url, save_debug):
             if content.get('imageResizerUrls'):
                 poster = utils.closest_dict(content['imageResizerUrls'], 'width', 1000)
             elif content.get('promo_image'):
-                poster = func_resize_image(content['promo_image'])
+                poster = resize_image(content['promo_image'], resizer_url, resizer_secret)
             else:
                 poster = ''
             if content.get('description'):
@@ -348,21 +380,21 @@ def get_content_html(content, func_resize_image, url, save_debug):
             lead_image = content['promo_items']['images'][0]
     if lead_image:
         if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
-            content_html += process_content_element(lead_image, url, func_resize_image, save_debug)
+            content_html += process_content_element(lead_image, url, resizer_url, resizer_secret, save_debug)
 
     for element in content['content_elements']:
-        content_html += process_content_element(element, url, func_resize_image, save_debug)
+        content_html += process_content_element(element, url, resizer_url, resizer_secret, save_debug)
 
     if content.get('related_content') and content['related_content'].get('galleries'):
         for gallery in content['related_content']['galleries']:
             if gallery.get('canonical_url'):
-                content_html += process_content_element(gallery, url, func_resize_image, save_debug)
+                content_html += process_content_element(gallery, url, resizer_url, resizer_secret, save_debug)
             else:
                 content_html += '<h3>Photo Gallery</h3>'
                 for element in gallery['content_elements']:
                     if lead_image and lead_image['id'] == element['id']:
                         continue
-                    content_html += process_content_element(element, url, func_resize_image, save_debug)
+                    content_html += process_content_element(element, url, resizer_url, resizer_secret, save_debug)
 
     # Reuters specific
     if content.get('related_content') and content['related_content'].get('videos'):
@@ -375,7 +407,7 @@ def get_content_html(content, func_resize_image, url, save_debug):
     return content_html
 
 
-def get_item(content, url, args, save_debug):
+def get_item(content, url, resizer_url, resizer_secret, args, save_debug):
     item = {}
     if content.get('_id'):
         item['id'] = content['_id']
@@ -390,23 +422,31 @@ def get_item(content, url, args, save_debug):
     elif content.get('title'):
         item['title'] = content['title']
 
+    date = ''
     if content.get('first_publish_date'):
-        dt = datetime.fromisoformat(content['first_publish_date'].replace('Z', '+00:00'))
+        date = content['first_publish_date']
     elif content.get('published_time'):
-        dt = datetime.fromisoformat(content['published_time'].replace('Z', '+00:00'))
+        date = content['published_time']
     elif content.get('display_date'):
-        dt = datetime.fromisoformat(content['display_date'].replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
+        date = content['display_date']
+    if date:
+        dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+    else:
+        logger.warning('no publish date found in ' + item['url'])
 
-    dt = None
+    date = ''
     if content.get('last_updated_date'):
-        dt = datetime.fromisoformat(content['last_updated_date'].replace('Z', '+00:00'))
+        date = content['last_updated_date']
     elif content.get('updated_time'):
-        dt = datetime.fromisoformat(content['updated_time'].replace('Z', '+00:00'))
-    if dt:
+        date = content['updated_time']
+    if date:
+        dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
         item['date_modified'] = dt.isoformat()
+    else:
+        logger.warning('no updated date found in ' + item['url'])
 
     # Check age
     if 'age' in args:
@@ -422,7 +462,10 @@ def get_item(content, url, args, save_debug):
             authors.append(author['name'])
     if authors:
         item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        if len(authors) == 1:
+            item['author']['name'] = authors[0]
+        else:
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     tags = []
     if content.get('taxonomy'):
@@ -437,14 +480,19 @@ def get_item(content, url, args, save_debug):
                             tags.append(it['name'])
     if content.get('websites'):
         for key, val in content['websites'].items():
-            if val.get('website_section'):
-                tags.append(val['website_section']['name'])
+            if val.get('website_section') and val['website_section'].get('name'):
+                if val['website_section']['name'] not in tags:
+                    tags.append(val['website_section']['name'])
     if tags:
         item['tags'] = list(set(tags))
 
     if content.get('promo_items'):
         if content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
             item['_image'] = content['promo_items']['basic']['url']
+        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'gallery':
+            item['_image'] = content['promo_items']['basic']['promo_items']['basic']['url']
+        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'video':
+            item['_image'] = content['promo_items']['basic']['promo_items']['basic']['url']
         elif content['promo_items'].get('images'):
             item['_image'] = content['promo_items']['images'][0]['url']
     elif content.get('content_elements'):
@@ -462,7 +510,7 @@ def get_item(content, url, args, save_debug):
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
 
-    item['content_html'] = get_content_html(content, resize_image, url, save_debug)
+    item['content_html'] = get_content_html(content, url, resizer_url, resizer_secret, save_debug)
     return item
 
 
@@ -470,12 +518,17 @@ def get_content(url, args, save_debug=False):
     if not url.startswith('http'):
         return None
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
     tld = tldextract.extract(url)
     sites_json = utils.read_json_file('./sites.json')
     d = sites_json[tld.domain]['deployment']
+    resizer_url = sites_json[tld.domain]['resizer_url']
+    resizer_secret = sites_json[tld.domain]['resizer_secret']
 
     for n in range(2):
         query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['content']['query'])).replace('PATH', split_url.path)
+        if 'ajc.com' in split_url.netloc:
+            query = query.replace('ID', paths[-1])
         api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], sites_json[tld.domain]['content']['source'], quote_plus(query), d, sites_json[tld.domain]['arc_site'])
         if save_debug:
             logger.debug('getting content from ' + api_url)
@@ -504,8 +557,8 @@ def get_content(url, args, save_debug=False):
         utils.write_file(content, './debug/debug.json')
 
     if content.get('result'):
-        return get_item(content['result'], url, args, save_debug)
-    return get_item(content, url, args, save_debug)
+        return get_item(content['result'], url, resizer_url, resizer_secret, args, save_debug)
+    return get_item(content, url, resizer_url, resizer_secret, args, save_debug)
 
 
 def get_feed(args, save_debug=False):
@@ -519,6 +572,8 @@ def get_feed(args, save_debug=False):
     tld = tldextract.extract(args['url'])
     sites_json = utils.read_json_file('./sites.json')
     d = sites_json[tld.domain]['deployment']
+    resizer_url = sites_json[tld.domain]['resizer_url']
+    resizer_secret = sites_json[tld.domain]['resizer_secret']
 
     split_url = urlsplit(args['url'])
     if split_url.path.endswith('/'):
@@ -543,16 +598,12 @@ def get_feed(args, save_debug=False):
                     logger.warning('unhandled author url ' + args['url'])
                     return None
             source = sites_json[tld.domain]['author_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['author_feed']['query'])).replace('AUTHOR', author)
-        elif paths[0] == 'tags' or paths[0] == 'topic':
+            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path)
+        elif paths[0] == 'tags' or paths[0] == 'topics' or (paths[0] == 'topic' and 'thebaltimorebanner' not in split_url.netloc):
             tag = paths[1]
             source = sites_json[tld.domain]['tag_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['tag_feed']['query'])).replace('TAG', tag)
+            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path)
         else:
-            if split_url.path.endswith('/'):
-                path = split_url.path[:-1]
-            else:
-                path = split_url.path
             source = sites_json[tld.domain]['section_feed']['source']
             if 'washingtonpost' in split_url.netloc:
                 page_html = utils.get_url_html(args['url'])
@@ -573,7 +624,7 @@ def get_feed(args, save_debug=False):
                     return None
             else:
                 section = paths[-1]
-                query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['section_feed']['query'])).replace('PATH', path).replace('SECTION', section)
+                query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['section_feed']['query'])).replace('PATH', path).replace('SECTION', section).replace('PATH', path)
 
         api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], source, quote_plus(query), d, sites_json[tld.domain]['arc_site'])
         if save_debug:
@@ -643,12 +694,16 @@ def get_feed(args, save_debug=False):
                 continue
         if save_debug:
             logger.debug('getting content from ' + url)
-        if content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
-            item = get_item(content, url, args, save_debug)
+
+        if not content.get('type'):
+            item = get_content(url, args, save_debug)
+        elif content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
+            item = get_item(content, url, resizer_url, resizer_secret, args, save_debug)
         elif content.get('type') and content['type'] == 'video' and content.get('streams'):
-            item = get_item(content, url, args, save_debug)
+            item = get_item(content, url, resizer_url, resizer_secret, args, save_debug)
         else:
             item = get_content(url, args, save_debug)
+
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

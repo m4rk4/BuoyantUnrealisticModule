@@ -1,4 +1,4 @@
-import av, json, re
+import av, json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
@@ -467,6 +467,24 @@ def format_content(content_html, item):
             el.insert_after(new_el)
             el.decompose()
 
+    for el in soup.find_all('img', class_='post-image'):
+        img_src = el['src']
+        if el.parent and el.parent.name == 'a':
+            link = el.parent['href']
+            if el.parent.parent and el.parent.parent.name == 'p':
+                el_parent = el.parent.parent
+            else:
+                el_parent = el.parent
+        else:
+            link = ''
+            if el.parent and el.parent.name == 'p':
+                el_parent = el.parent
+            else:
+                el_parent = el
+        new_el = BeautifulSoup(utils.add_image(img_src, link=link), 'html.parser')
+        el_parent.insert_after(new_el)
+        el_parent.decompose()
+
     for el in soup.find_all(class_='wp-block-video'):
         video_src = ''
         if el.video:
@@ -567,8 +585,14 @@ def format_content(content_html, item):
             logger.warning('unhandled wp-block-embed in ' + item['url'])
 
     for el in soup.find_all(class_='embed-youtube'):
+        new_html = ''
         if el.iframe:
-            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
+            if el.iframe.get('src'):
+                new_html = utils.add_embed(el.iframe['src'])
+            elif el.iframe.get('data-src'):
+                new_html = utils.add_embed(el.iframe['data-src'])
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
         else:
@@ -593,6 +617,28 @@ def format_content(content_html, item):
                 logger.warning('unhanlded youtube dtvideo-container in ' + item['url'])
         else:
             logger.warning('unhandled dtvideos-container in ' + item['url'])
+
+    for el in soup.find_all(attrs={"data-embed-type": "Brightcove"}):
+        it = el.find('video')
+        if it:
+            new_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(it['data-account'], it['data-player'], it['data-video-id']))
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled Brightcove embed in ' + item['url'])
+
+    for el in soup.find_all('video', class_='video-js'):
+        if el.get('data-player'):
+            new_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el['data-account'], el['data-player'], el['data-video-id']))
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el_parent = el
+            while el_parent.parent.parent:
+                el_parent = el_parent.parent
+            el_parent.insert_after(new_el)
+            el_parent.decompose()
+        else:
+            logger.warning('unhandled video-js embed in ' + item['url'])
 
     for el in soup.find_all('iframe'):
         if el.get('src'):
@@ -645,6 +691,11 @@ def format_content(content_html, item):
         el.insert_after(new_el)
         el.decompose()
 
+    for el in soup.find_all('blockquote', class_='instagram-media'):
+        new_el = BeautifulSoup(utils.add_embed(el['data-instgrm-permalink']), 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
     for el in soup.find_all(class_='tiktok-embed'):
         new_el = BeautifulSoup(utils.add_embed(el['cite']), 'html.parser')
         el.insert_after(new_el)
@@ -660,6 +711,17 @@ def format_content(content_html, item):
             new_el = BeautifulSoup(utils.add_blockquote(el.decode_contents()), 'html.parser')
         el.insert_after(new_el)
         el.decompose()
+
+    for el in soup.find_all('blockquote'):
+        it = el.find(class_='quote-author')
+        if it:
+            author = it.get_text().strip()
+            if author == 'by':
+                author = ''
+            it.decompose()
+            new_el = BeautifulSoup(utils.add_pullquote(el.decode_contents(), author), 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
 
     for el in soup.find_all(class_='article-pull-quote'):
         quote = el.find(class_='text')
@@ -709,6 +771,7 @@ def format_content(content_html, item):
         el.decompose()
 
     return str(soup)
+
 
 def get_content(url, args, save_debug=False):
     split_url = urlsplit(url)

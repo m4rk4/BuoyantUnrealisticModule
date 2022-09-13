@@ -184,7 +184,7 @@ def render_block(block, full_header=False, headline_url=''):
 
     elif block['__typename'] == 'Video':
         for it in block['renditions']:
-            if it['type'] == 'video_480p_mp4':
+            if re.search(r'video_480p_mp4', it['type']):
                 video = it
                 break
         for it in block['promotionalMedia']['crops']:

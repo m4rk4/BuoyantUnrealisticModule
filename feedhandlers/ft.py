@@ -33,6 +33,7 @@ def add_image(image_el):
         caption = ''
     return utils.add_image(img_src, caption)
 
+
 def get_content(url, args, save_debug=False):
     if url.startswith('://'):
         url = url.replace('://', 'https://www.ft.com')

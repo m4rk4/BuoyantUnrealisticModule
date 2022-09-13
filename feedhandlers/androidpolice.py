@@ -38,8 +38,9 @@ def add_figure(el_figure):
 
 def add_image(img_src, caption):
     w,h = utils.get_image_size(img_src)
-    if h > w:
-        return utils.add_image(resize_image(img_src, width=w), caption, width="70%")
+    #print(w,h)
+    if w and h and h > w:
+        return utils.add_image(resize_image(img_src, width=w), caption, fig_style="width:50%; margin-left:auto; margin-right:auto;")
     return utils.add_image(resize_image(img_src), caption)
 
 
@@ -143,6 +144,9 @@ def get_content(url, args, save_debug=False):
             item['summary'] = el['content']
 
     item['content_html'] = ''
+    if item.get('summary'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+
     el = soup.find(class_='heading_image')
     if el:
         item['content_html'] += add_figure(el.figure)
@@ -214,7 +218,7 @@ def get_content(url, args, save_debug=False):
                 if it.figcaption:
                     caption = it.figcaption.get_text()
                 else:
-                    caption = '&nbsp;'
+                    caption = ''
                 new_html += add_image(resize_image(it['data-img-url']), caption)
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
@@ -254,6 +258,15 @@ def get_content(url, args, save_debug=False):
             new_html = utils.add_embed('https://www.youtube.com/watch?v=' + el['id'])
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
+
+        for el in article_body.find_all('iframe'):
+            new_html = utils.add_embed(el['src'])
+            if el.parent and el.parent.name == 'div':
+                el.parent.insert_after(BeautifulSoup(new_html, 'html.parser'))
+                el.parent.decompose()
+            else:
+                el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+                el.decompose()
 
         for el in article_body.find_all(class_='w-play_store_app'):
             m = re.search(r'window\.arrayOfEmbeds\["{}"\] = {{\'play_store_app\' : \'(.+?)\'}};\n'.format(el['id']), article_html)
@@ -327,8 +340,8 @@ def get_content(url, args, save_debug=False):
                             poster = '{}/image?url={}&width=128&height=128'.format(config.server, quote_plus(m.group(1)))
             if not poster:
                 poster = '{}/image?width=128&height=128'.format(config.server)
-            new_html = '<div><a href="{}"><img style="height:128px; float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"></div>'.format(
-                link, poster, desc)
+            #new_html = '<div><a href="{}"><img style="height:128px; float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"></div>'.format(
+            new_html = '<table><tr><td style="width:128px;"><a href="{}"><img style="height:128px;" src="{}"/></a></td><td style="vertical-align:top;">{}</td></tr></table>'.format(link, poster, desc)
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
@@ -390,7 +403,7 @@ def get_content(url, args, save_debug=False):
         for el in article_body.find_all(text=lambda text: isinstance(text, Comment)):
             el.extract()
 
-        item['content_html'] += str(article_body)
+        item['content_html'] += re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', article_body.decode_contents())
     return item
 
 

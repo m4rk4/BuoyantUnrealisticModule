@@ -1,7 +1,6 @@
 import re
-from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit, quote_plus
+from urllib.parse import urlsplit
 
 import utils
 from feedhandlers import rss
@@ -127,12 +126,21 @@ def get_content(url, args, save_debug=False):
     if not item.get('tags'):
         del item['tags']
 
+    item['content_html'] = ''
+    if article_json.get('excerpt'):
+        item['summary'] = article_json['excerpt']
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+
     if article_json.get('promo_image'):
         item['_image'] = resize_image('https://theintercept.com/' + article_json['promo_image']['sizes']['original']['path'])
+        if article_json.get('content-parsed') and article_json['content-parsed'][0]['type'] != 'image':
+            captions = []
+            if article_json['promo_image'].get('excerpt'):
+                captions.append(article_json['promo_image']['excerpt'])
+            if article_json['promo_image'].get('credit'):
+                captions.append(article_json['promo_image']['credit'])
+            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
 
-    item['summary'] = article_json['excerpt']
-
-    item['content_html'] = ''
     for content in article_json['content-parsed']:
         item['content_html'] += render_content(content)
 

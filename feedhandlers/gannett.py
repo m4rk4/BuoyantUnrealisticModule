@@ -109,6 +109,16 @@ def get_content(url, args, save_debug=False, article_json=None):
     if save_debug:
         utils.write_file(article_html, './debug/debug.html')
 
+    ld_article_json = None
+    if article_html:
+        soup = BeautifulSoup(article_html, 'html.parser')
+        el = soup.find('script', attrs={"type": "application/ld+json"})
+        if el:
+            ld_json = json.loads(el.string)
+            if save_debug:
+                utils.write_file(ld_json, './debug/ld.json')
+            ld_article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
+
     if not article_json:
         split_url = urlsplit(url)
         paths = list(filter(None, split_url.path.split('/')))
@@ -141,6 +151,11 @@ def get_content(url, args, save_debug=False, article_json=None):
     item['author'] = {}
     if article_json.get('byline'):
         item['author']['name'] = article_json['byline']
+    elif ld_article_json and ld_article_json.get('author'):
+        authors = []
+        for it in ld_article_json['author']:
+            authors.append(it['name'])
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     else:
         item['author']['name'] = article_json['publication']
 

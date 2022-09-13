@@ -80,7 +80,7 @@ def get_content(url, args, save_debug=False):
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-        item['author'] = {"name": audio_json['Porgram']['Name']}
+        item['author'] = {"name": audio_json['Program']['Name']}
         item['_image'] = audio_json['Images']['Small']
         item['_audio'] = utils.get_redirect_url(audio_json['AudioUrl'])
         item['summary'] = audio_json['DescriptionHtml']
@@ -94,11 +94,10 @@ def get_content(url, args, save_debug=False):
             duration.append('{} min.'.format(t))
 
         poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="{}">{}</a><br/>{}</small>'.format(item['url'], item['title'], audio_json['Program']['ShowPageUrl'], item['author']['name'], ', '.join(duration))
-        item['content_html'] = '<table style="width:100%"><tr><td><a href="{}"><img width="128px" src="{}"/></a></td><td>{}</td></table>'.format(item['_audio'], poster, desc)
+        desc = '<a href="{}"><b>{}</b></a><br/><small>by <a href="{}">{}</a><br/>{}</small>'.format(item['url'], item['title'], audio_json['Program']['ShowPageUrl'], item['author']['name'], ', '.join(duration))
+        item['content_html'] = '<table style="width:100%"><tr><td style="width:128px;"><a href="{}"><img width="128px" src="{}"/></a></td><td style="vertical-align:top;">{}</td></table>'.format(item['_audio'], poster, desc)
         if not 'embed' in args:
-            item['content_html'] += '<blockquote><small>{}</small></blockquote>'.format(item['summary'])
-        item['content_html'] += '</div>'
+            item['content_html'] += '<p>{}</p>'.format(item['summary'])
     return item
 
 

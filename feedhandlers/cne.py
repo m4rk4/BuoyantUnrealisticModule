@@ -24,7 +24,7 @@ def find_elements(el_name, el_json, el_ret):
 def get_caption(props):
     captions = []
     if props.get('dangerousCaption'):
-        m = re.search(r'^<p>(.*)</p>$', props['dangerousCaption'])
+        m = re.search(r'^<p>(.*)</p>\s*$', props['dangerousCaption'], flags=re.S)
         if m:
             captions.append(m.group(1))
         else:
@@ -110,18 +110,22 @@ def format_body(body_json):
                 logger.warning('unhandled inline-embed video ' + body_json[1]['props']['url'])
         elif body_json[1]['type'] == 'cneembed':
             video_src = ''
-            m = re.search(r'https://player\.cnevids\.com/script/video/(\w+)\.js', body_json[1]['props']['scriptUrl'])
+            m = re.search(r'https://player\.cnevids\.com/script/(video|playlist)/(\w+)\.js', body_json[1]['props']['scriptUrl'])
             if m:
-                video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + m.group(1))
-                if video_json:
-                    # Order of preference
-                    for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
-                        for it in video_json['video']['sources']:
-                            if it['type'] == video_type:
-                                video_src = it['src']
+                if m.group(1) == 'video':
+                    video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + m.group(2))
+                    if video_json:
+                        # Order of preference
+                        for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
+                            for it in video_json['video']['sources']:
+                                if it['type'] == video_type:
+                                    video_src = it['src']
+                                    break
+                            if video_src:
                                 break
-                        if video_src:
-                            break
+                elif m.group(1) == 'playlist':
+                    logger.debug('skipping cne video playlist https://player.cnevids.com/embed-api.json?playlistId=' + m.group(2))
+                    return ''
             if video_src:
                 return utils.add_video(video_src, video_type, video_json['video']['poster_frame'], video_json['video']['title'])
         elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'twitter':

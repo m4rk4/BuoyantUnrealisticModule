@@ -29,7 +29,7 @@ def get_content(url, args, save_debug=False):
   dt = datetime.fromisoformat(audio_json['publishDate'].replace('Z', '+00:00'))
   item['date_published'] = dt.isoformat()
   item['_timestamp'] = dt.timestamp()
-  item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+  item['_display_date'] = utils.format_display_date(dt, False)
 
   item['author'] = {}
   item['author']['name'] = audio_json['show']['title']

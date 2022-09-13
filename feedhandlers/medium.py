@@ -137,8 +137,7 @@ def get_content(url, args, save_debug=False):
                 paragraphs = post[key]['bodyModel']['paragraphs']
                 break
 
-    is_list = ''
-    content_html = ''
+    item['content_html'] = ''
     for p in paragraphs:
         if p.get('__ref'):
             paragraph = article_json[p['__ref']]
@@ -148,15 +147,13 @@ def get_content(url, args, save_debug=False):
         paragraph_type = paragraph['type'].lower()
 
         # Skip the first paragraph if since it's usually the title
-        if paragraph['id'].endswith('_0') and paragraph_type == 'h3':
-            continue
+        if paragraph['id'].endswith('_0') or paragraph['id'].endswith('_1'):
+            if paragraph_type == 'h4':
+                continue
+            elif paragraph_type == 'h3' and re.sub(r'\W', '', paragraph['text']) == re.sub(r'\W', '', item['title']):
+                continue
 
-        if is_list and not (paragraph_type == 'oli' or paragraph_type == 'uli'):
-            start_tag = '</{}>'.format(is_list)
-            is_list = ''
-        else:
-            start_tag = ''
-
+        start_tag = ''
         if paragraph_type == 'p' or paragraph_type == 'h1' or paragraph_type == 'h2' or paragraph_type == 'h3' or paragraph_type == 'h4':
             start_tag += '<{}>'.format(paragraph_type)
             end_tag = '</{}>'.format(paragraph_type)
@@ -187,16 +184,8 @@ def get_content(url, args, save_debug=False):
             paragraph_text = paragraph['text']
 
         elif paragraph_type == 'oli' or paragraph_type == 'uli':
-            if is_list:
-                start_tag += '<li>'
-                end_tag = '</li>'
-            else:
-                if paragraph_type == 'oli':
-                    is_list = 'ol'
-                else:
-                    is_list = 'ul'
-                start_tag += '<{}><li>'.format(is_list)
-                end_tag = '</li>'
+            start_tag = '<{}l><li>'.format(paragraph_type[0])
+            end_tag = '</li></{}l>'.format(paragraph_type[0])
             paragraph_text = paragraph['text']
 
         elif paragraph_type == 'iframe':
@@ -285,16 +274,9 @@ def get_content(url, args, save_debug=False):
             markup_text = paragraph_text
         markup_text = markup_text.replace('\n', '<br />')
 
-        content_html += start_tag + markup_text + end_tag
+        item['content_html'] += start_tag + markup_text + end_tag
 
-    # Close an open list tag if it was the last element
-    if is_list:
-        content_html += '</{}>'.format(is_list)
-
-    # Remove the title
-    # content_html = re.sub(r'<h3.*>{}<.*\/h3>'.format(item['title']), '', content_html)
-
-    item['content_html'] = content_html
+    item['content_html'] = item['content_html'].replace('</ol><ol>', '').replace('</ul><ul>', '')
     return item
 
 

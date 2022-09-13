@@ -114,16 +114,24 @@ def get_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(embed_html, './debug/facebook.html')
 
-    soup = BeautifulSoup(embed_html, 'html.parser')
-
     item = {}
 
+    soup = BeautifulSoup(embed_html, 'html.parser')
+    el = soup.find('div', attrs={"role": "feed"})
+    if el and el.p:
+        if re.search(r'no longer available', el.p.get_text()):
+            item['content_html'] = '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b><br/>{1}</blockquote>'.format(url, el.p.get_text())
+            return item
+
     el = soup.find('a', href=re.compile(r'/sharer/sharer\.php'))
-    if el:
-        split_url = urlsplit('https://www.facebook.com' + el['href'].replace('&amp;', '&'))
-        query = parse_qs(split_url.query)
-        item['url'] = query['u'][0]
-        item['id'] = item['url']
+    if not el:
+        logger.warning('unable to get content from ' + url)
+        return None
+    split_url = urlsplit('https://www.facebook.com' + el['href'].replace('&amp;', '&'))
+    query = parse_qs(split_url.query)
+
+    item['url'] = query['u'][0]
+    item['id'] = item['url']
 
     el = soup.find(class_='timestamp')
     if el:
@@ -136,6 +144,7 @@ def get_content(url, args, save_debug=False):
         item['_display_date'] = 'Date unknown'
 
     item['author'] = {}
+    avatar = ''
     el = soup.find('img', attrs={"aria-label":True})
     if el:
         item['author']['name'] = el['aria-label']
@@ -144,12 +153,13 @@ def get_content(url, args, save_debug=False):
         it = el.find_previous('a')
         if it:
             item['author']['url'] = utils.clean_url(it['href'])
-    else:
-        if '.php' not in item['url']:
-            split_url = urlsplit(item['url'])
-            paths = list(filter(None, split_url.path.split('/')))
+    if not item['author'].get('url') and '.php' not in item['url']:
+        split_url = urlsplit(item['url'])
+        paths = list(filter(None, split_url.path.split('/')))
+        if not item['author'].get('name'):
             item['author']['name'] = re.sub(r'([a-z])([A-Z])', r'\1 \2', paths[0])
-            item['author']['url'] = 'https://www.facebook.com/' + paths[0]
+        item['author']['url'] = 'https://www.facebook.com/' + paths[0]
+    if not avatar:
         avatar = '{}/image?height=48&mask=ellipse'.format(config.server)
 
     item['content_html'] = '<table style="width:500px; border:1px solid black; border-collapse:collapse;"><tr><td style="width:48px;"><img src="{}"/></td><td style="vertical-align:middle;"><a href="{}"><strong style="font-size:1.2em;">{}</strong></a><br/><small>{}</small></td></tr>'.format(avatar, item['author']['url'], item['author']['name'], item['_display_date'])

@@ -416,13 +416,13 @@ def add_blockquote(quote):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
-  return '<blockquote style="margin:1.5em 10px; padding:0.5em 10px;"><div style="float:left; margin-right:8px; font-size:3em;">&#8220;</div><div style="overflow:hidden; padding-top:0.5em;"><em>'
+  return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
 
 def close_pullquote(author=''):
   end_html = '</em>'
   if author:
     end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
-  end_html += '</div><div style="clear:both;"></div></blockquote>'
+  end_html += '</td></tr></table>'
   return end_html
 
 def add_pullquote(quote, author=''):
@@ -432,6 +432,7 @@ def add_pullquote(quote, author=''):
     if quote.endswith('<br/><br/>'):
       quote = quote[:-10]
   # Strip quotes
+  quote = quote.strip()
   if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
     quote = quote[1:-1]
   pullquote = open_pullquote() + quote + close_pullquote(author)
