@@ -11,30 +11,17 @@ logger = logging.getLogger(__name__)
 # Apple Music API documentation
 # https://developer.apple.com/documentation/applemusicapi/
 
-def get_token(url):
-    js = utils.get_url_html(
-        'https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/musickit-components.esm.js')
+def get_token():
+    js = utils.get_url_html('https://embed.podcasts.apple.com/build/web-embed.esm.js')
     if not js:
         return ''
-
-    m = re.search(r'JSON\.parse\(\'\[\["([^"]+)"', js)
-    if not m:
-        return ''
-
-    js = utils.get_url_html(
-        'https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/{}.entry.js'.format(m.group(1)))
-    if not js:
-        return ''
-
-    jsfiles = re.findall(r'(from|import)"\.\/(p-[0-9a-f]+\.js)"', js)
-    for jsfile in jsfiles:
-        js = utils.get_url_html(
-            'https://js-cdn.music.apple.com/musickit/v2/components/musickit-components/{}'.format(jsfile[1]))
-        if not js:
-            continue
-        m = re.search('podcasts:\{prod:"([^"]+)"', js)
-        if m:
-            return m.group(1)
+    for it in re.findall(r'\bp-[0-9a-f]+', js):
+        js = utils.get_url_html('https://embed.podcasts.apple.com/build/{}.entry.js'.format(it))
+        if js:
+            m = re.search(r'="(ey[^"]+)"', js)
+            if m:
+                return m.group(1)
+    logger.warning('Apple podcast token not found')
     return ''
 
 
@@ -87,7 +74,7 @@ def get_apple_data(api_url, url, save_debug=False):
     r = s.get(api_url, headers=headers)
     if r.status_code != 200:
         # The token might be expired, try to get a new one
-        new_token = get_token(url)
+        new_token = get_token()
         if new_token:
             logger.debug('trying new Apple token to ' + new_token)
             headers['authorization'] = 'Bearer ' + new_token
