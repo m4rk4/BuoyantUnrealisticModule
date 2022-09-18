@@ -124,7 +124,7 @@
     },
     "apple": {
         "module": "apple",
-        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjQyMDMyNzM0LCJleHAiOjE2NDgyNTM1MzQsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.JP6FzMM2uxxNdjqblsoRzhSsdQRq3j8wZZQlxdd-dw1IwT3cxdRO7CQVRZQ7cRZOPTx0mJ-dkLpz2X2WiRtmEA"
+        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjYyMzc5NzM3LCJleHAiOjE2Njg2MDA1MzcsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.0reVCzOD0ZYygyV_42zR1w_LPj1fWbi206h7ccakvdx7lwCLzavFgL6pXokDP71e8DJlro5CF4tRDZzHMCmYoA"
     },
     "arstechnica": {
         "module": "arstech"
@@ -812,6 +812,9 @@
             }
         }
     },
+    "npr": {
+        "module": "npr"
+    },
     "nydailynews": {
         "api_url": "https://www.nydailynews.com/pf/api/v3/content/fetch/",
         "resizer_url": "https://www.nydailynews.com/resizer/",
@@ -1285,6 +1288,10 @@
     "thetakeout": {
         "module": "gawker"
     },
+    "theverge": {
+        "buildId": "RhjdcRF-as1FcU_Ybo0rO",
+        "module": "theverge"
+    },
     "theweek": {
         "module": "theweek"
     },
@@ -1388,6 +1395,7 @@
     },
     "wp-posts": {
         "sites": [
+            "512pixels",
             "9to5google",
             "9to5mac",
             "9to5toys",
@@ -1397,6 +1405,8 @@
             "bookriot",
             "carscoops",
             "chromeunboxed",
+            "damemagazine",
+            "datanami",
             "deadline",
             "defector",
             "denofgeek",
@@ -1410,9 +1420,11 @@
             "hard-drive",
             "heroichollywood",
             "hollywoodreporter",
+            "hotpodnews",
             "indiewire",
             "interviewmagazine",
             "liliputing",
+            "macstories",
             "macworld",
             "mediaite",
             "missingremote",
@@ -1420,29 +1432,38 @@
             "nbcsports",
             "onmsft",
             "petapixel",
+            "playstationlifestyle",
             "popsci",
             "poynter",
             "publicola",
             "robbreport",
+            "scriptype",
             "singularityhub",
             "snopes",
             "sportico",
+            "sportsvideo",
             "spy",
             "statnews",
             "stereogum",
             "techadvisor",
             "techcrunch",
+            "techdirt",
             "techhive",
             "technabob",
             "thathashtagshow",
             "the-gadgeteer",
+            "theautopian",
+            "thedesk",
             "thehill",
             "thestreamingadvisor",
             "thesun",
             "thewrap",
             "thurrott",
+            "torrentfreak",
             "truthorfiction",
+            "tubefilter",
             "tvline",
+            "usmagazine",
             "variety",
             "venturebeat",
             "zatznotfunny"
