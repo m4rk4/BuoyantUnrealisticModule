@@ -146,6 +146,20 @@ def get_content(url, args, save_debug=False):
             logger.warning('unhandled image in ' + item['url'])
 
     item['content_html'] += str(soup)
+
+    if article_json.get('scenes'):
+        for scene in article_json['scenes']:
+            if len(scene['sceneType']['config']) > 1:
+                logger.warning('unhandled scene with multiple types in ' + item['url'])
+            if scene['sceneType']['config'][0][0]['type'] == 'richtext':
+                for it in scene['richtexts']:
+                    item['content_html'] += it
+            elif scene['sceneType']['config'][0][0]['type'] == 'image':
+                for it in scene['leadCarousel']:
+                    img_src = 'https://images.complex.com/complex/images/c_scale,f_auto,q_auto,w_1080/fl_lossy,pg_1/{}/{}'.format(it['transformation']['asset']['cloudinaryId'], it['transformation']['asset']['seoFilename'])
+                    item['content_html'] += utils.add_image(img_src, it['transformation']['asset']['caption'])
+            else:
+                logger.warning('unhandled scene type {} in {}'.format(scene['sceneType']['config'][0][0]['type'], item['url']))
     return item
 
 

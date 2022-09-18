@@ -224,6 +224,7 @@ def get_post_content(post, args, save_debug=False):
 
     content_html = content_html.replace('\u2028', '')
     item['content_html'] = format_content(content_html, item)
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 
@@ -391,6 +392,14 @@ def format_content(content_html, item):
         if not img:
             img = el.find('amp-img')
         if img:
+            if img.get('srcset'):
+                img_src = utils.image_from_srcset(img['srcset'], 1000)
+            elif img.get('data-srcset'):
+                img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+            elif img.get('data-src'):
+                img_src = img['data-src']
+            elif img.get('src'):
+                img_src = img['src']
             captions = []
             it = el.find(class_=re.compile(r'caption-text'))
             if it:
@@ -398,7 +407,7 @@ def format_content(content_html, item):
             it = el.find(class_=re.compile(r'image-credit|credits-text'))
             if it:
                 captions.append(it.get_text())
-            new_el = BeautifulSoup(utils.add_image(img['src'], ' | '.join(captions)), 'html.parser')
+            new_el = BeautifulSoup(utils.add_image(img_src, ' | '.join(captions)), 'html.parser')
             el.insert_after(new_el)
             el.decompose()
         else:
@@ -484,6 +493,28 @@ def format_content(content_html, item):
         new_el = BeautifulSoup(utils.add_image(img_src, link=link), 'html.parser')
         el_parent.insert_after(new_el)
         el_parent.decompose()
+
+    for el in soup.find_all(class_='media-wrapper'):
+        print(el['class'])
+        if el.find(class_='image-caption'):
+            it = el.find(class_='image-caption')
+            if it:
+                caption = it.get_text().strip()
+            else:
+                caption = ''
+            new_el = BeautifulSoup(utils.add_image(el.img['src'], caption), 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        elif el.find('iframe', class_='youtube-player'):
+            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        elif el.find('iframe', attrs={"src": re.compile(r'podcasts\.apple\.com')}):
+            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled media-wrapper')
 
     for el in soup.find_all(class_='wp-block-video'):
         video_src = ''
@@ -758,13 +789,10 @@ def format_content(content_html, item):
         if el.find(id='mentioned-in-this-article'):
             el.decompose()
 
-    for el in soup.find_all(class_=re.compile(r'wp-block-bigbite-multi-title|wp-block-product-widget-block')):
+    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|link-related|sharedaddy|wp-block-bigbite-multi-title|wp-block-product-widget-block')):
         el.decompose()
 
     for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
-        el.decompose()
-
-    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|sharedaddy')):
         el.decompose()
 
     for el in soup.find_all(['aside', 'ins', 'script', 'style']):

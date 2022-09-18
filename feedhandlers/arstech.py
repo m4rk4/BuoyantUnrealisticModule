@@ -120,6 +120,16 @@ def get_content(url, args, save_debug=False):
     for el in article_body.find_all(text=lambda text: isinstance(text, Comment)):
         el.extract()
 
+    for el in article_body.find_all('table'):
+        el.attrs = {}
+        el['border'] = ''
+        el['style'] = 'width:100%; border-collapse:collapse;'
+        if el.get('class') and 'specifications' in el['class']:
+            it = el.find('tr')
+            if it.th and re.search(r'Specs at a glance', it.th.get_text(), flags=re.I):
+                el.insert_before(BeautifulSoup('<h3 style="margin-bottom:0.5em;">{}</h3>'.format(it.th.get_text()), 'html.parser'))
+                it.decompose()
+
     for el in article_body.find_all('blockquote'):
         if el.get('class'):
             if 'twitter-tweet' in el['class']:
@@ -192,16 +202,6 @@ def get_content(url, args, save_debug=False):
         el.insert_after(new_el)
         el.decompose()
 
-    for el in article_body.find_all('table'):
-        el.attrs = {}
-        el['border'] = ''
-        el['style'] = 'width:100%; border-collapse:collapse;'
-        if el.get('class') and 'specifications' in el['class']:
-            it = el.find('tr')
-            if it.th and re.search(r'Specs at a glance', it.th.get_text(), flags=re.I):
-                el.insert_before(BeautifulSoup('<h3 style="margin-bottom:0.5em;">{}</h3>'.format(it.th.get_text()), 'html.parser'))
-                it.decompose()
-
     for el in article_body.find_all(class_='ars-component-buy-box'):
         el_html = '<h3 style="margin-bottom:0;">Buy:</h3><ul style="margin-top:0.5em;">'
         for it in el.find_all('a', class_='ars-buy-box-button'):
@@ -221,7 +221,10 @@ def get_content(url, args, save_debug=False):
         el['src'] = 'https://cdn.arstechnica.net/wp-content/themes/ars/assets/img/ars-approved-271f606d5e.png'
         el['style'] = 'float:right; width:128px;'
 
-    item['content_html'] = article_body.decode_contents()
+    item['content_html'] = ''
+    if item.get('summary'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+    item['content_html'] += article_body.decode_contents()
     return item
 
 
