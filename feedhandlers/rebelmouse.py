@@ -313,6 +313,7 @@ def get_content(url, args, save_debug=False):
     bootstrap_path = m.group(1).replace('\\u0026', '&')
     split_url = urlsplit(url)
     bootstrap_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, bootstrap_path)
+    print(bootstrap_url)
     bootstrap_json = utils.get_url_json(bootstrap_url)
 
     post_json = bootstrap_json['post']
@@ -336,7 +337,10 @@ def get_content(url, args, save_debug=False):
         authors.append(author['title'])
     if authors:
         item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        if len(authors) == 1:
+            item['author']['name'] = authors[0]
+        else:
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     item['tags'] = post_json['public_tags'].copy()
 
@@ -349,7 +353,7 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = ''
 
     if post_json.get('subheadline'):
-        item['content_html'] += post_json['subheadline']
+        item['content_html'] += '<p><em>{}</em></p>'.format(post_json['subheadline'])
 
     image_info = None
     if post_json.get('image_info'):

@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import quote, quote_plus, urlsplit
 
 import utils
 from feedhandlers import rss
@@ -27,138 +27,141 @@ def resize_image(img_src, width=1000):
 
 def get_content(url, args, save_debug=False):
     query = '''
-query ($id: ID, $nid: ID) {
-  Article(id: $id, nid: $nid) {
-    ...ArticlePageFields
-  }
-}
 
-fragment ArticlePageFields on Article {
-  id
-  nid
-  slug
-  title
-  cleanTitle
-  badge
-  frontPage {
+  query ($id: ID, $nid: ID) {
+    Article(id: $id, nid: $nid) {
+      ...ArticlePageFields
+      feed{...ArticlePageFields}
+    }
+  }
+
+  fragment ArticlePageFields on Article {
     id
+    nid
     slug
     title
-  }
-  LinkedSeriesId
-  series {
-    id
-    slug
-    seriesStream {
-      nids
-    }
-    linkedArticle {
+    cleanTitle
+    badge
+    frontPage {
       id
+      slug
       title
-      url
     }
-  }
-  authors {
-    id
-    name
-    slug
-    blurb
-    meta {
-      twitter
-    }
-  }
-  body
-  publishedAt
-  displayAt
-  publicPublishedDate
-  status
-  ledeImage {
-    id
-    src
-    format
-    width
-    height
-    alt
-  }
-  ledeAltImage {
-    id
-    src
-    format
-    width
-    height
-    alt
-  }
-  url
-  urlFull
-  meta {
-    wordCount
-    template
-    navigationTheme
-    bigLede
-    hideLede
-    cropModeFronts
-    ledeOverrideSource
-    disableAds
-    social {
-      google {
-        title
-        description
+    LinkedSeriesId
+    series {
+      id
+      slug
+      seriesStream {
+        nids
       }
-      facebook {
-        title
-        description
-        image {
-          id
-          src
-          format
-          width
-          height
-        }
-      }
-      twitter {
-        title
-        description
-        image {
-          id
-          src
-          format
-          width
-          height
-        }
-      }
-    }
-  }
-  ledeImageCredit
-  ledeImageCreditBottom
-  ledeImageRealCaption
-  bylines
-  deck
-  type
-  galleries {
-    id
-    galleryData {
-      captionText
-      creditText
-      image {
+      linkedArticle {
         id
-        src
-        width
-        height
+        title
+        url
       }
     }
+    authors {
+      id
+      name
+      slug
+      blurb
+      meta {
+        twitter
+        podcast
+      }
+    }
+    body
+    publishedAt
+    displayAt
+    publicPublishedDate
+    status
+    ledeImage {
+      id
+      src
+      format
+      width
+      height
+      alt
+    }
+    ledeAltImage {
+      id
+      src
+      format
+      width
+      height
+      alt
+    }
+    url
+    urlFull
+    meta {
+      wordCount
+      template
+      navigationTheme
+      bigLede
+      hideLede
+      cropModeFronts
+      ledeOverrideSource
+      disableAds
+      social {
+        google {
+          title
+          description
+        }
+        facebook {
+          title
+          description
+          image {
+            id
+            src
+            format
+            width
+            height
+          }
+        }
+        twitter {
+          title
+          description
+          image {
+            id
+            src
+            format
+            width
+            height
+          }
+        }
+      }
+    }
+    ledeImageCredit
+    ledeImageCreditBottom
+    ledeImageRealCaption
+    bylines
+    deck
+    type
+    galleries {
+      id
+      galleryData {
+        captionText
+        creditText
+        image {
+          id
+          src
+          width
+          height
+        }
+      }
+    }
+    tags {
+      id
+      slug
+      label
+    }
+    suppressBadges
   }
-  ampEnabled
-  tags {
-    id
-    slug
-    label
-  }
-}
     '''
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     variables = {"nid": str(paths[1])}
-    gql_url = 'https://newrepublic.com/graphql?query={}&variables={}'.format(quote_plus(query), quote_plus(json.dumps(variables)))
+    gql_url = 'https://newrepublic.com/graphql?query={}&variables={}'.format(quote(query), quote(json.dumps(variables)))
     gql_json = utils.get_url_json(gql_url)
     if not gql_json:
         return None

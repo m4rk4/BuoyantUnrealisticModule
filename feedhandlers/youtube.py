@@ -37,13 +37,12 @@ def get_content(url, args, save_debug=False):
   if save_debug:
     utils.write_file(yt_html, './debug/youtube.html')
 
-  m = re.search(r'ytInitialPlayerResponse = (.+?);(<\/script>|var)', yt_html)
+  m = re.search(r'ytInitialPlayerResponse = (.+?);(</script>|var)', yt_html)
   if not m:
-    logger.warning('unable to extract yt info from ' + url)
+    logger.warning('unable to extract ytInitialPlayerResponse from ' + yt_watch_url)
     return None
 
-  if False:
-    utils.write_file(m.group(1), './debug/debug.txt')
+  #utils.write_file(m.group(1), './debug/debug.txt')
 
   yt_json = json.loads(m.group(1))
   if save_debug:

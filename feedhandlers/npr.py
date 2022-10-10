@@ -1,14 +1,28 @@
-import json, re
+import json, math, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def get_program_details(program):
+    img_src = ''
+    link = ''
+    page_html = utils.get_url_html('https://www.npr.org/podcasts-and-shows/')
+    soup = BeautifulSoup(page_html, 'html.parser')
+    el = soup.find('img', attrs={"alt": program})
+    if el:
+        img_src = el['src']
+        it = el.find_parent('a')
+        if it:
+            link = it['href']
+    return img_src, link
 
 
 def get_content(url, args, save_debug=False):
@@ -150,7 +164,6 @@ def get_content(url, args, save_debug=False):
             elif it.name == 'p':
                 txt = it.get_text().strip()[-50:]
                 for it in paragraphs.find_all('p'):
-                    print
                     if it.get_text().strip().endswith(txt):
                         it.insert_after(new_el)
                         new_html = ''
@@ -160,11 +173,44 @@ def get_content(url, args, save_debug=False):
 
     el = page_soup.find(class_='audio-module-controls-wrap')
     if el:
-        audio_data = json.loads(el['data-audio'])
-        new_html = '<blockquote><a href="{}">&#9654;&nbsp;Listen on {}</a></blockquote>'.format(audio_data['audioUrl'], audio_data['program'])
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        it = paragraphs.find('p')
-        it.insert_before(new_el)
+        if el.get('data-audio'):
+            audio_data = json.loads(el['data-audio'])
+            attachment = {}
+            attachment['url'] = audio_data['audioUrl']
+            attachment['mime_type'] = 'audio/mpeg'
+            item['attachments'] = []
+            item['attachments'].append(attachment)
+            item['_audio'] = audio_data['audioUrl']
+
+            program_poster, program_link = get_program_details(audio_data['program'])
+            if program_poster:
+                poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(program_poster))
+            else:
+                poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
+
+            duration = []
+            t = math.floor(float(audio_data['duration']) / 3600)
+            if t >= 1:
+                duration.append('{} hr'.format(t))
+            t = math.ceil((float(audio_data['duration']) - 3600 * t) / 60)
+            if t > 0:
+                duration.append('{} min.'.format(t))
+
+            new_html = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/><a href="{}"><small>{}</small></a><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(audio_data['audioUrl'], poster, audio_data['storyUrl'], audio_data['title'], program_link, audio_data['program'], item['_display_date'], ', '.join(duration))
+
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            it = paragraphs.find('p')
+            it.insert_before(new_el)
+        else:
+            it = el.find(class_='audio-availability-message')
+            if it:
+                new_html = '<blockquote><b>{}</b></blockquote>'.format(it.get_text())
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                it = paragraphs.find('p')
+                it.insert_before(new_el)
+
+    for el in paragraphs.find_all('a', href=re.compile('^/')):
+        el['href'] = 'https://www.npr.com' + el['href']
 
     item['content_html'] = re.sub(r'<hr/>\s+Related Story: <a [^>]+>[^<]+</a>\s?<hr/>', '', paragraphs.decode_contents())
     return item

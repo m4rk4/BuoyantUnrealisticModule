@@ -1,7 +1,7 @@
 import base64, hashlib, hmac, json, pytz, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit, quote_plus
+from urllib.parse import urlsplit, quote, quote_plus
 
 import config, utils
 from feedhandlers import rss
@@ -24,9 +24,16 @@ def resize_image(image_item, resizer_url, resizer_secret, width=1280):
         if width == 1280:
             width = 916
         img_src = 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(quote_plus(image_item['url']), width)
-    else:
+    elif resizer_secret:
         split_url = urlsplit(image_item['url'])
-        image_path = '{}{}'.format(split_url.netloc, split_url.path)
+        if split_url.path.startswith('/resizer'):
+            m = re.search(r'/([^/]+(advancelocal|arcpublishing).*)', split_url.path)
+            if not m:
+                logger.warning('unable to determine image path in ' + image_item['url'])
+                return image_item['url']
+            image_path = m.group(1)
+        else:
+            image_path = '{}{}'.format(split_url.netloc, split_url.path)
         operation_path = '{}x0/smart/'.format(width)
         # THUMBOR_SECURITY_KEY (from tampabay.com)
         #security_key = 'Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7'
@@ -34,6 +41,18 @@ def resize_image(image_item, resizer_url, resizer_secret, width=1280):
         #resizer_hash = base64.b64encode(hashed.digest()).decode().replace('+', '-').replace('/', '_')
         resizer_hash = base64.urlsafe_b64encode(hashed.digest()).decode()
         img_src = '{}{}/{}{}'.format(resizer_url, resizer_hash, operation_path, image_path)
+    elif image_item.get('renditions'):
+        images = []
+        for key, val in image_item['renditions']['original'].items():
+            image = {
+                "width": int(key[:-1]),
+                "url": val
+            }
+            images.append(image)
+        image = utils.closest_dict(images, 'width', width)
+        img_src = image['url']
+    else:
+        img_src = image_item['url']
     return img_src
 
 
@@ -88,7 +107,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
 
     elif element['type'] == 'raw_html':
         # Filter out ad content
-        if not re.search(r'adsrv|amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|link\.nj\.com/s/Newsletter|nflshop\.com|\boffer\b', element['content'], flags=re.I):
+        if not re.search(r'adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
             raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
             if raw_soup.iframe:
                 if raw_soup.iframe.get('data-fallback-image-url'):
@@ -109,6 +128,9 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             elif raw_soup.script and raw_soup.script.get('src'):
                 if 'sendtonews.com' in raw_soup.script['src']:
                     element_html += utils.add_embed(raw_soup.script['src'])
+            elif raw_soup.find('aside', class_='refer'):
+                it = raw_soup.find('aside', class_='refer')
+                element_html += utils.add_blockquote(it.decode_contents())
             elif raw_soup.contents[0].name == 'img':
                 element_html += utils.add_image(raw_soup.img['src'])
             elif raw_soup.contents[0].name == 'table':
@@ -123,11 +145,20 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             elif element.get('subtype') and element['subtype'] == 'subs_form':
                 pass
             else:
-                element_html += '<p>{}</p>'.format(element['content'])
-                logger.warning('unhandled raw_html ' + element['content'])
+                #element_html += '<p>{}</p>'.format(element['content'])
+                logger.warning('unhandled raw_html ')
+                print(element['content'])
 
     elif element['type'] == 'custom_embed':
-        if element['subtype'] == 'custom-audio':
+        if element['subtype'] == 'custom-image':
+            captions = []
+            if element['embed']['config'].get('image_caption'):
+                captions.append(element['embed']['config']['image_caption'])
+            if element['embed']['config'].get('image_credit'):
+                captions.append(element['embed']['config']['image_credit'])
+            img_src = resize_image({"url": element['embed']['config']['image_src']}, resizer_url, resizer_secret)
+            element_html += utils.add_image(img_src, ' | '.join(captions))
+        elif element['subtype'] == 'custom-audio':
             episode = element['embed']['config']['episode']
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
             element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"></div><blockquote><small>{}</small></blockquote></div>'.format(
@@ -154,12 +185,19 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
         text = ''
         for el in element['content_elements']:
             text += process_content_element(el, url, resizer_url, resizer_secret, save_debug)
-        if element['subtype'] == 'blockquote':
-            element_html += utils.add_blockquote(text)
-        elif element['subtype'] == 'pullquote':
-            element_html += utils.add_pullquote(text)
+        if element.get('citation'):
+            cite = element['citation']['content']
         else:
-            logger.warning('unhandled quote item type {}'.format(element['subtype']))
+            cite = ''
+        if element.get('subtype'):
+            if element['subtype'] == 'blockquote':
+                element_html += utils.add_blockquote(text)
+            elif element['subtype'] == 'pullquote':
+                element_html += utils.add_pullquote(text, cite)
+            else:
+                logger.warning('unhandled quote item type {}'.format(element['subtype']))
+        else:
+            element_html += utils.add_pullquote(text, cite)
 
     elif element['type'] == 'header':
         element_html += '<h{0}>{1}</h{0}>'.format(element['level'], element['content'])
@@ -189,15 +227,17 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             element_html += '</ol>'
 
     elif element['type'] == 'table':
-        element_html += '<table><tr>'
-        for it in element['header']:
-            if isinstance(it, str):
-                element_html += '<th>{}</th>'.format(it)
-            elif isinstance(it, dict) and it.get('type') and it['type'] == 'text':
-                element_html += '<th>{}</th>'.format(it['content'])
-            else:
-                logger.warning('unhandled table header item type {}'.format(element['type']))
-        element_html += '</tr>'
+        element_html += '<table>'
+        if element.get('header'):
+            element_html += '<tr>'
+            for it in element['header']:
+                if isinstance(it, str):
+                    element_html += '<th>{}</th>'.format(it)
+                elif isinstance(it, dict) and it.get('type') and it['type'] == 'text':
+                    element_html += '<th>{}</th>'.format(it['content'])
+                else:
+                    logger.warning('unhandled table header item type {}'.format(element['type']))
+            element_html += '</tr>'
         for row in element['rows']:
             element_html += '<tr>'
             for it in row:
@@ -283,7 +323,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             if element.get('imageResizerUrls'):
                 poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
             elif element.get('promo_image'):
-                poster = resize_image(element['promo_image'], resize_image)
+                poster = resize_image(element['promo_image'], resizer_url, resizer_secret)
             else:
                 poster = ''
             element_html += utils.add_video(stream['url'], stream_type, poster, element['headlines']['basic'])
@@ -292,7 +332,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
 
     elif element['type'] == 'social_media' and element['sub_type'] == 'twitter':
         links = BeautifulSoup(element['html'], 'html.parser').find_all('a')
-        element_html += utils.add_embed(links[-1])
+        element_html += utils.add_embed(links[-1]['href'])
 
     elif element['type'] == 'story':
         # This may be Wapo specific
@@ -320,6 +360,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
 
     else:
         logger.warning('unhandled element type {}'.format(element['type']))
+        #print(element)
     return element_html
 
 
@@ -586,8 +627,12 @@ def get_feed(args, save_debug=False):
         if len(paths) == 0:
             source = sites_json[tld.domain]['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['homepage_feed']['query']))
-        elif re.search(r'author|people|staff', paths[0]):
-            if len(paths) > 1:
+        elif re.search(r'about|author|people|staff', paths[0]):
+            if paths[0] == 'about':
+                # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
+                author = paths[-1]
+            elif len(paths) > 1:
+                # https://www.cleveland.com/staff/tpluto/posts.html
                 author = paths[1]
             else:
                 # https://www.baltimoresun.com/bal-nathan-ruiz-20190328-staff.html
@@ -598,11 +643,15 @@ def get_feed(args, save_debug=False):
                     logger.warning('unhandled author url ' + args['url'])
                     return None
             source = sites_json[tld.domain]['author_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path)
+            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
         elif paths[0] == 'tags' or paths[0] == 'topics' or (paths[0] == 'topic' and 'thebaltimorebanner' not in split_url.netloc):
             tag = paths[1]
             source = sites_json[tld.domain]['tag_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path)
+            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path).replace('%20', ' ')
+        elif split_url.netloc == 'www.reuters.com' and split_url.path.startswith('/markets/companies/'):
+            tag = paths[-1]
+            source = sites_json[tld.domain]['stock_symbol_feed']['source']
+            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['stock_symbol_feed']['query'])).replace('SYMBOL', tag).replace('PATH', path).replace('%20', ' ')
         else:
             source = sites_json[tld.domain]['section_feed']['source']
             if 'washingtonpost' in split_url.netloc:
@@ -624,9 +673,9 @@ def get_feed(args, save_debug=False):
                     return None
             else:
                 section = paths[-1]
-                query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['section_feed']['query'])).replace('PATH', path).replace('SECTION', section).replace('PATH', path)
+                query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['section_feed']['query'])).replace('PATH', path).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
 
-        api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], source, quote_plus(query), d, sites_json[tld.domain]['arc_site'])
+        api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], source, quote(query), d, sites_json[tld.domain]['arc_site'])
         if save_debug:
             logger.debug('getting feed from ' + api_url)
 
@@ -720,7 +769,9 @@ def get_feed(args, save_debug=False):
 
 def test_handler():
     feeds = ['https://feeds.washingtonpost.com/rss/homepage',
+             'https://www.bostonglobe.com/arc/outboundfeeds/rss/?outputType=xml',
              'https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml',
+             'https://www.masslive.com/arc/outboundfeeds/rss/?outputType=xml',
              'https://www.al.com/arc/outboundfeeds/rss/?outputType=xml',
              'https://www.washingtonpost.com/business/technology/',
              'https://www.washingtonpost.com/opinions/',

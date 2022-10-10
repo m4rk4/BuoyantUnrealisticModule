@@ -2,12 +2,13 @@ import glob, importlib, io, os, sys
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from flask_cors import CORS
-from urllib.parse import quote_plus
+from urllib.parse import quote
 
 import image_utils, utils
 
 app = Flask(__name__)
 CORS(app)
+
 
 # Setup logger
 LOG_FILENAME = './debug/debug.log'
@@ -20,18 +21,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Turn off debuging in some modules
+logging.getLogger('asyncio').setLevel(logging.WARNING)
 logging.getLogger('chardet').setLevel(logging.WARNING)
 logging.getLogger('filelock').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
+logging.getLogger('pyppeteer').setLevel(logging.WARNING)
 logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('websockets').setLevel(logging.WARNING)
 #logging.getLogger('flask_cors').setLevel(logging.DEBUG)
 
 
 @app.template_filter()
 def make_thumbnail(img_src):
-    return '/image?url={}&height=100&crop=120,100'.format(quote_plus(img_src))
+    return '/image?url={}&height=100&crop=120,100'.format(quote(img_src))
 
 
 @app.route('/')

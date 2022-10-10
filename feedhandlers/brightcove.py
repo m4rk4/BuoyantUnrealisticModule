@@ -9,13 +9,18 @@ logger = logging.getLogger(__name__)
 
 def get_content(url, args, save_debug=False):
     s = requests.Session()
-    r = s.get(url)
-    if not r:
-        return None
-    m = re.search(r'policyKey:"([^"]+)"', r.text)
-    if not m:
-        logger.warning('unable to find policyKey in ' + url)
-        return None
+
+    if 'data-key' in args:
+        pk = args['data-key']
+    else:
+        r = s.get(url)
+        if not r:
+            return None
+        m = re.search(r'policyKey:"([^"]+)"', r.text)
+        if not m:
+            logger.warning('unable to find policyKey in ' + url)
+            return None
+        pk = m.group(1)
     headers = {
         "accept-language": "en-US,en;q=0.9,de;q=0.8",
         "sec-ch-ua": "\"Chromium\";v=\"104\", \" Not A;Brand\";v=\"99\", \"Microsoft Edge\";v=\"104\"",
@@ -25,18 +30,25 @@ def get_content(url, args, save_debug=False):
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "cross-site"
     }
-    headers['accept'] = 'application/json;pk={}'.format(m.group(1))
+    headers['accept'] = 'application/json;pk={}'.format(pk)
 
-    # https://players.brightcove.net/1105443290001/19b4b681-5e7c-4b03-b1ff-050f00d0be3e_default/index.html?videoId=6294188220001
-    m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*videoId=(\d+)', url)
-    if not m:
-        logger.warning('unsupported brightcove url ' + url)
-        return None
-    api_url = 'https://edge.api.brightcove.com/playback/v1/accounts/{}/videos/{}'.format(m.group(1), m.group(2), headers=headers)
+    if 'data-account' in args and 'data-video-id' in args:
+        account = args['data-account']
+        video_id = args['data-video-id']
+    else:
+        # https://players.brightcove.net/1105443290001/19b4b681-5e7c-4b03-b1ff-050f00d0be3e_default/index.html?videoId=6294188220001
+        m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*videoId=(\d+)', url)
+        if not m:
+            logger.warning('unsupported brightcove url ' + url)
+            return None
+        account = m.group(1)
+        video_id = m.group(2)
+
+    api_url = 'https://edge.api.brightcove.com/playback/v1/accounts/{}/videos/{}'.format(account, video_id)
     r = s.get(api_url, headers=headers)
 
     item = {}
-    item['id'] = m.group(2)
+    item['id'] = video_id
     item['url'] = url
 
     if r.status_code == 403:

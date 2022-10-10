@@ -139,15 +139,6 @@ def get_content(url, args, save_debug=False):
                 item['content_html'] += el.decode_contents()
 
     elif ld_json.get('articleBody'):
-        item['content_html'] = ''
-        el = soup.find(class_='o-topper__visual')
-        if not el:
-            el = soup.find(class_='main-image')
-        if el and len(el.contents) > 0:
-            item['content_html'] += add_image(el)
-        elif item.get('_image'):
-            item['content_html'] += utils.add_image(resize_image(item['_image']))
-
         article_body = soup.find('div', attrs={"data-attribute": "article-content-body"})
         for el in article_body.find_all('div', class_='o-ads'):
             el.decompose()
@@ -156,7 +147,7 @@ def get_content(url, args, save_debug=False):
             el.decompose()
 
         for el in article_body.find_all(class_='n-content-layout'):
-            print(el.get('data-layout-name'))
+            #print(el.get('data-layout-name'))
             if el.get('data-layout-name') == 'card':
                 # Skip newsletter signups
                 if not el.find('a', href=re.compile('https://ep\.ft\.com/newsletters/subscribe')):
@@ -239,6 +230,16 @@ def get_content(url, args, save_debug=False):
 
         for el in article_body.find_all('experimental'):
             el.unwrap()
+
+        item['content_html'] = ''
+        if article_body.find().name != 'figure':
+            el = soup.find(class_='o-topper__visual')
+            if not el:
+                el = soup.find(class_='main-image')
+            if el and len(el.contents) > 0:
+                item['content_html'] += add_image(el)
+            elif item.get('_image'):
+                item['content_html'] += utils.add_image(resize_image(item['_image']))
 
         item['content_html'] += re.sub(r'</figure>\s*<figure', '</figure><br/><figure', article_body.decode_contents())
     return item

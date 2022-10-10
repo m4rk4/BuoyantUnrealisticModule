@@ -185,8 +185,7 @@ def get_feed(args, save_debug):
     for article in next_json['pageProps']['content']['articles']:
         if not article.get('slug'):
             continue
-        article_url = 'https://www.discovermagazine.com/{}/{}'.format(article['refs']['category']['slug'],
-                                                                      article['slug'])
+        article_url = 'https://www.discovermagazine.com/{}/{}'.format(article['refs']['category']['slug'], article['slug'])
         if save_debug:
             logger.debug('getting content for ' + article_url)
         item = get_content(article_url, args, save_debug)

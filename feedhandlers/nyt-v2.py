@@ -120,16 +120,16 @@ def render_block(block, full_header=False, headline_url=''):
                 block_html += render_block(blk)
             block_html += '</strong>'
             if block.get('role'):
-                block_html += '<br/><em>About the author: '
+                block_html += '<br/><em><small>About the author: '
                 for blk in block['role']:
                     block_html += render_block(blk)
-            block_html += '</em></p>'
+            block_html += '</small></em></p>'
         else:
             if block.get('role'):
-                block_html += '<p><em>About the author: '
+                block_html += '<p><em><small>About the author: '
                 for blk in block['role']:
                     block_html += render_block(blk)
-                block_html += '</em></p>'
+                block_html += '</small></em></p>'
 
     elif block['__typename'] == 'Byline':
         block_html += block['prefix'] + ' '

@@ -40,11 +40,7 @@ def get_caption(props):
     return ' | '.join(captions)
 
 
-def add_image(props, width=1000):
-    if props.get('image'):
-        image = props['image']
-    else:
-        image = props
+def get_image_src(image, width=1000):
     sources = []
     if image.get('sources'):
         for key, val in image['sources'].items():
@@ -54,8 +50,18 @@ def add_image(props, width=1000):
             for src in val:
                 sources.append(src)
     src = utils.closest_dict(sources, 'width', width)
-    caption = get_caption(props)
-    return utils.add_image(src['url'], caption)
+    return src['url']
+
+
+def add_image(props, width=1000, caption=''):
+    if props.get('image'):
+        image = props['image']
+    else:
+        image = props
+    img_src = get_image_src(image, width)
+    if not caption:
+        caption = get_caption(props)
+    return utils.add_image(img_src, caption)
 
 
 def add_video(props, width=960):
@@ -99,6 +105,9 @@ def format_body(body_json):
     if body_json[0] == 'inline-embed':
         if body_json[1]['type'] == 'image':
             return add_image(body_json[1]['props'])
+        elif body_json[1]['type'] == 'gallery':
+            caption = '<a href="{}"><b>View Gallery</b></a>: {}'.format(body_json[1]['props']['url'], body_json[1]['props']['dangerousHed'])
+            return add_image(body_json[1]['props']['tout'], caption=caption)
         elif body_json[1]['type'] == 'instagram':
             return utils.add_embed(body_json[1]['props']['url'])
         elif body_json[1]['type'] == 'clip':
@@ -265,18 +274,21 @@ def get_content(url, args, save_debug=False):
             logger.warning('unknown page type for ' + item['url'])
     body_json = article_json[page_type].get('body')
 
-    if article_json[page_type].get('headerProps') and article_json[page_type]['headerProps'].get('lede'):
-        lede = article_json[page_type]['headerProps']['lede']
-        if lede.get('contentType') == 'photo':
-            item['content_html'] += add_image(lede)
-        elif lede.get('contentType') == 'clip':
-            item['content_html'] += add_video(lede)
-        elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
-            video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
-            if video_json:
-                for it in video_json['video']['sources']:
-                    if it['type'].find('mp4') > 0:
-                        item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
+    if article_json[page_type].get('headerProps'):
+        if article_json[page_type]['headerProps'].get('dangerousDek'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(article_json[page_type]['headerProps']['dangerousDek'])
+        if article_json[page_type]['headerProps'].get('lede'):
+            lede = article_json[page_type]['headerProps']['lede']
+            if lede.get('contentType') == 'photo':
+                item['content_html'] += add_image(lede)
+            elif lede.get('contentType') == 'clip':
+                item['content_html'] += add_video(lede)
+            elif lede.get('metadata') and lede['metadata'].get('contentType') == 'cnevideo':
+                video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + lede['cneId'])
+                if video_json:
+                    for it in video_json['video']['sources']:
+                        if it['type'].find('mp4') > 0:
+                            item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
     elif item.get('_image'):
         if '/cartoons/' not in item['url']:
             item['content_html'] += utils.add_image(item['_image'])
@@ -310,21 +322,11 @@ def get_content(url, args, save_debug=False):
                         item['content_html'] += '{} at '.format(offer['price'])
                     item['content_html'] += '{}</a></li>'.format(offer['sellerName'])
                 item['content_html'] += '</ul>'
+
+    item['content_html'] = item['content_html'].replace('<a href="/', '<a href="{}://{}/'.format(split_url.scheme, split_url.netloc))
+    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://www.wired.com/feed/rss',
-             'https://www.wired.co.uk/feed/rss',
-             'https://www.gq.com/feed/rss',
-             'https://www.gq-magazine.co.uk/feed/rss',
-             'https://www.newyorker.com/feed/rss',
-             'https://www.newyorker.com/feed/contributors/andy-borowitz/rss',
-             'https://www.pitchfork.com/feed/rss',
-             'https://www.vogue.com/feed/rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

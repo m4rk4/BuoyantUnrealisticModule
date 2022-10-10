@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(img_src, width=1080):
-    return utils.clean_url() + '?format={}w'.format(width)
+    return utils.clean_url(img_src) + '?format={}w'.format(width)
 
 
 def get_content(url, args, save_debug=False):
@@ -72,6 +72,8 @@ def get_content(url, args, save_debug=False):
             item['content_html'] += el.decode_contents()
 
         elif 'sqs-block-image' in block['class']:
+            if block.find(class_='sqs-empty'):
+                continue
             caption = ''
             el = block.find(class_='image-caption')
             if el:
@@ -101,18 +103,33 @@ def get_content(url, args, save_debug=False):
                             card_html += '<a href="{}">{}</a>'.format(utils.get_redirect_url(it.a['href']), it.get_text().strip())
                     item['content_html'] += utils.add_blockquote(card_html)
             else:
+                #print(block)
                 logger.warning('unhandled sqs-block-image in ' + item['url'])
+
+        elif 'sqs-block-gallery' in block['class']:
+            # TODO: captions. Need and example.
+            el = block.find(class_='sqs-gallery')
+            for it in el.find_all('noscript'):
+                item['content_html'] += utils.add_image(resize_image(it.img['src']))
 
         elif 'sqs-block-video' in block['class']:
             if block.get('data-block-json'):
-                video_json = json.loads(block['data-block-json'])
-                utils.write_file(video_json, './debug/video.json')
-                if video_json['providerName'] == 'YouTube':
-                    item['content_html'] += utils.add_embed(video_json['url'])
+                data_json = json.loads(block['data-block-json'])
+                if save_debug:
+                    utils.write_file(data_json, './debug/video.json')
+                if data_json['providerName'] == 'YouTube' or data_json['providerName'] == 'Vimeo':
+                    item['content_html'] += utils.add_embed(data_json['url'])
                 else:
-                    logger.warning('unhandled video provider {} in {}'.format(video_json['providerName'], item['url']))
+                    logger.warning('unhandled video provider {} in {}'.format(data_json['providerName'], item['url']))
             else:
                 logger.warning('unhandled sqs-block-video in ' + item['url'])
+
+        elif 'sqs-block-embed' in block['class']:
+            if block.get('data-block-json'):
+                data_json = json.loads(block['data-block-json'])
+                if data_json['html'] and re.search(r'disqus', data_json['html'], flags=re.I):
+                    continue
+            logger.warning('unhandled sqs-block-video in ' + item['url'])
 
         elif 'sqs-block-horizontalrule' in block['class']:
             item['content_html'] += '<hr/>'
@@ -154,12 +171,31 @@ def get_content(url, args, save_debug=False):
             else:
                 logger.warning('unhandled sqs-block-summary-v2 block in ' + item['url'])
 
+        elif 'sqs-block-button' in block['class']:
+            el = block.find(class_='sqs-block-button-container')
+            if el:
+                style = 'width:80%; margin-right:auto; margin-left:auto; padding:8px; border-style:solid; background-color:grey; font-size:1.2em; weight:bold;'
+                if el['data-alignment'] == 'center':
+                    style += ' text-align:center;'
+                el.attrs = {}
+                el['style'] = style
+                if el.a:
+                    href = el.a['href']
+                    el.a.attrs = {}
+                    el.a['href'] = href
+                    el.a['style'] = 'text-decoration:none; color:white;'
+                    el['onclick'] = "location.href='{}'".format(href)
+                item['content_html'] += str(el)
+            else:
+                logger.warning('unhandled sqs-block-button in ' + item['url'])
+
         elif 'sqs-block-spacer' in block['class']:
             pass
 
         else:
             logger.warning('unhandled sqs-block class {} in {}'.format(block['class'], item['url']))
 
+    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 

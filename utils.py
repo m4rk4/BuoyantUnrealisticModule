@@ -1,7 +1,8 @@
-import importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import asyncio, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
+from pyppeteer import launch
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -130,7 +131,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
   r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
-  if r != None and (r.status_code == 200 or r.status_code == 402):
+  if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404):
     try:
       return r.json()
     except:
@@ -248,6 +249,26 @@ def post_url(url, data=None, json_data=None, headers=None):
 def url_exists(url):
   r = requests.head(url)
   return r.status_code == requests.codes.ok
+
+def get_or_create_event_loop():
+  try:
+    return asyncio.get_event_loop()
+  except RuntimeError as ex:
+    if "There is no current event loop in thread" in str(ex):
+      loop = asyncio.new_event_loop()
+      asyncio.set_event_loop(loop)
+      return asyncio.get_event_loop()
+
+async def browser_launch():
+  return await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
+
+async def browser_get_url_html(browser, url):
+  page = await browser.newPage()
+  await page.goto(url)
+  return await page.content()
+
+async def browser_close(browser):
+  await browser.close()
 
 def write_file(data, filename):
   if filename.endswith('.json'):
@@ -497,7 +518,7 @@ def add_audio(audio_src, title='', poster='', desc='', link=''):
     audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='', fig_style='', gawker=False):
+def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', gawker=False):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -531,25 +552,19 @@ def add_video(video_url, video_type, poster='', caption='', width='', height='',
     return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
 
   if poster:
-    poster = '{}/image?url={}'.format(config.server, quote_plus(poster))
-    if width:
-      poster += '&width={}'.format(width)
+    poster = '{}/image?url={}&width={}'.format(config.server, quote_plus(poster), width)
     if height:
       poster += '&height={}'.format(height)
     poster += '&overlay=video'
   else:
-    poster = '{}/image?'.format(config.server)
-    if width:
-      poster += 'width={}'.format(width)
-    else:
-      poster += 'width=1280'
+    poster = '{}/image?width={}'.format(config.server, width)
     if height:
       poster += '&height={}'.format(height)
     else:
       poster += '&height=720'
     poster += '&overlay=video'
 
-  return add_image(poster, caption, width, height, video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
+  return add_image(poster, caption, '', '', video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -577,7 +592,7 @@ def get_youtube_id(ytstr):
     m = re.search(r'\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
   elif 'youtu.be' in ytstr:
     m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
-  if m:
+  if m and m.group(1) != 'videoseries':
     yt_video_id = m.group(1)
   else:
     # id only
@@ -806,7 +821,8 @@ def add_embed(url, args={}, save_debug=False):
   if 'twitter.com' in embed_url:
     embed_url = clean_url(embed_url)
   elif 'youtube.com/embed' in embed_url:
-    embed_url = clean_url(embed_url)
+    if 'list=' not in embed_url:
+      embed_url = clean_url(embed_url)
   elif 'cloudfront.net' in embed_url:
     embed_url = get_redirect_url(embed_url)
   elif 'embedly.com' in embed_url:

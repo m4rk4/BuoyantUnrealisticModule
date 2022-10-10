@@ -112,14 +112,16 @@ def add_mask(im, type):
 def add_overlay(im, overlay, args):
     im_overlay = None
     if overlay == 'video':
-        overlays = [{"width": 512, "height": 360, "url": "./static/video_play_button-512x360.png"},
-                    {"width": 384, "height": 270, "url": "./static/video_play_button-384x270.png"},
-                    {"width": 256, "height": 180, "url": "./static/video_play_button-256x180.png"},
-                    {"width": 192, "height": 135, "url": "./static/video_play_button-192x135.png"},
-                    {"width": 128, "height": 90, "url": "./static/video_play_button-128x90.png"},
-                    {"width": 97, "height": 68, "url": "./static/video_play_button-97x68.png"},
-                    {"width": 64, "height": 45, "url": "./static/video_play_button-64x45.png"},
-                    {"width": 48, "height": 34, "url": "./static/video_play_button-48x34.png"}]
+        overlays = [
+            {"width": 512, "height": 360, "url": "./static/video_play_button-512x360.png"},
+            {"width": 384, "height": 270, "url": "./static/video_play_button-384x270.png"},
+            {"width": 256, "height": 180, "url": "./static/video_play_button-256x180.png"},
+            {"width": 192, "height": 135, "url": "./static/video_play_button-192x135.png"},
+            {"width": 128, "height": 90, "url": "./static/video_play_button-128x90.png"},
+            {"width": 97, "height": 68, "url": "./static/video_play_button-97x68.png"},
+            {"width": 64, "height": 45, "url": "./static/video_play_button-64x45.png"},
+            {"width": 48, "height": 34, "url": "./static/video_play_button-48x34.png"}
+        ]
         if im.height < im.width:
             overlay = utils.closest_dict(overlays, 'height', im.height // 5)
         else:
@@ -127,15 +129,17 @@ def add_overlay(im, overlay, args):
         im_overlay = Image.open(overlay['url'])
 
     elif overlay == 'audio':
-        overlays = [{"width": 512, "height": 512, "url": "./static/play_button-512x512.png"},
-                    {"width": 384, "height": 384, "url": "./static/play_button-384x384.png"},
-                    {"width": 256, "height": 256, "url": "./static/play_button-256x256.png"},
-                    {"width": 192, "height": 192, "url": "./static/play_button-192x192.png"},
-                    {"width": 128, "height": 128, "url": "./static/play_button-128x128.png"},
-                    {"width": 96, "height": 96, "url": "./static/play_button-96x96.png"},
-                    {"width": 64, "height": 64, "url": "./static/play_button-64x64.png"},
-                    {"width": 48, "height": 48, "url": "./static/play_button-48x48.png"},
-                    {"width": 32, "height": 32, "url": "./static/play_button-32x32.png"}]
+        overlays = [
+            {"width": 512, "height": 512, "url": "./static/play_button-512x512.png"},
+            {"width": 384, "height": 384, "url": "./static/play_button-384x384.png"},
+            {"width": 256, "height": 256, "url": "./static/play_button-256x256.png"},
+            {"width": 192, "height": 192, "url": "./static/play_button-192x192.png"},
+            {"width": 128, "height": 128, "url": "./static/play_button-128x128.png"},
+            {"width": 96, "height": 96, "url": "./static/play_button-96x96.png"},
+            {"width": 64, "height": 64, "url": "./static/play_button-64x64.png"},
+            {"width": 48, "height": 48, "url": "./static/play_button-48x48.png"},
+            {"width": 32, "height": 32, "url": "./static/play_button-32x32.png"}
+        ]
         if im.height < im.width:
             overlay = utils.closest_dict(overlays, 'height', im.height // 5)
         else:
@@ -174,12 +178,24 @@ def add_overlay(im, overlay, args):
         return False
     return True
 
+def read_image(img_src):
+    im = None
+    for i in range(2):
+        r = requests.get(img_src)
+        if r.status_code == 200:
+            im_io = BytesIO(r.content)
+            im = Image.open(im_io)
+            break
+        else:
+            time.sleep(5)
+    return im
 
 def get_image(args):
     im = None
     im_io = None
     save = False
     resized = False
+    mimetype = ''
 
     if not 'url' in args:
         w = -1
@@ -209,27 +225,32 @@ def get_image(args):
         else:
             return None, 'No url given'
 
+    container = None
     if not im:
         try:
-            clean_url = utils.clean_url(args['url'])
+            #clean_url = utils.clean_url(args['url'])
             container = av.open(args['url'])
-            #print(container.format.name)
             if re.search(r'mp4|mpeg|webm', container.format.name):
                 for frame in container.decode(video=0):
                     im = frame.to_image()
                     break
                 save = True
             elif re.search(r'image|jpeg|png|webp', container.format.name):
-                for i in range(2):
-                    r = requests.get(args['url'])
-                    if r.status_code == 200:
-                        im_io = BytesIO(r.content)
-                        im = Image.open(im_io)
-                        mimetype = im.get_format_mimetype()
-                        break
-                    else:
-                        time.sleep(5)
-            container.close()
+                im = read_image(args['url'])
+                if im:
+                    mimetype = im.get_format_mimetype()
+        except Exception as e:
+            logger.warning('image exception: ' + str(e))
+            im = None
+
+    if container:
+        container.close()
+
+    if not im:
+        try:
+            im = read_image(args['url'])
+            if im:
+                mimetype = im.get_format_mimetype()
         except Exception as e:
             logger.warning('image exception: ' + str(e))
             im = None

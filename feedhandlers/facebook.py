@@ -106,7 +106,7 @@ def get_content(url, args, save_debug=False):
     if query.get('href'):
         fb_url = query['href'][0]
     else:
-        fb_url = url
+        fb_url = url.replace('graph.facebook.com', 'www.facebook.com')
     embed_html = get_fb_html(fb_url, True)
     if not embed_html:
         return None
@@ -168,7 +168,10 @@ def get_content(url, args, save_debug=False):
     for el in soup.body.find_all('a', href=re.compile(r'facebook\.com/photo\.php|/photos/')):
         it = el.find('img')
         if it:
-            media_html += utils.add_image(it['src'], link=el['href']) + '<br/>'
+            if it.get('alt') and it['alt'] == 'app-facebook':
+                pass
+            else:
+                media_html += utils.add_image(it['src'], link=el['href']) + '<br/>'
     if media_html:
         item['content_html'] += '<tr><td colspan="2" style="padding:0.3em;">' + media_html[:-5] + '</td></tr>'
 

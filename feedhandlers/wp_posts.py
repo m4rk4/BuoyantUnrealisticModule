@@ -1,4 +1,4 @@
-import av, json, re, requests
+import av, json, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
@@ -9,6 +9,7 @@ from feedhandlers import rss
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def render_content(content, url):
     content_html = ''
@@ -98,7 +99,12 @@ def get_post_content(post, args, save_debug=False):
     if not authors:
         if post.get('authors'):
             for author in post['authors']:
-                authors.append(author['display_name'])
+                if author.get('display_name'):
+                    authors.append(author['display_name'])
+                elif author.get('name'):
+                    authors.append(author['name'])
+                else:
+                    logger.warning('unknown author name in ' + item['url'])
         elif post['_links'].get('ns:byline'):
             for link in post['_links']['ns:byline']:
                 link_json = utils.get_url_json(link['href'])
@@ -165,6 +171,8 @@ def get_post_content(post, args, save_debug=False):
         if post.get('content') and post['content'].get('rendered'):
             if post['content']['rendered'].find(item['_image']) == -1:
                 lede = utils.add_image(item['_image'], caption)
+    if post.get('meta') and post['meta'].get('_pmc_featured_video_override_data'):
+        lede = utils.add_embed(post['meta']['_pmc_featured_video_override_data'])
 
     # Article summary
     if post.get('excerpt'):
@@ -186,6 +194,7 @@ def get_post_content(post, args, save_debug=False):
             if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
                 content_html += '<p><em>{}</em></p>'.format(multi_title['titles']['headline']['additional']['headline_subheadline'])
 
+    #print(args['nolede'])
     if 'nolead' not in args and 'nolede' not in args:
         content_html += lede
 
@@ -495,26 +504,31 @@ def format_content(content_html, item):
         el_parent.decompose()
 
     for el in soup.find_all(class_='media-wrapper'):
-        print(el['class'])
-        if el.find(class_='image-caption'):
+        # Used on macstories.net
+        new_html = ''
+        if 'subscribe-podcast-cta' in el['class']:
+            el.decompose()
+        elif 'audio-player' in el['class']:
+            it = el.find('source')
+            if it:
+                new_html = '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Play</a></span></div>'.format(it['src'], config.server)
+        elif el.find(class_='image-caption'):
             it = el.find(class_='image-caption')
             if it:
                 caption = it.get_text().strip()
             else:
                 caption = ''
-            new_el = BeautifulSoup(utils.add_image(el.img['src'], caption), 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            new_html = utils.add_image(el.img['src'], caption)
         elif el.find('iframe', class_='youtube-player'):
-            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            new_html = utils.add_embed(el.iframe['src'])
         elif el.find('iframe', attrs={"src": re.compile(r'podcasts\.apple\.com')}):
-            new_el = BeautifulSoup(utils.add_embed(el.iframe['src']), 'html.parser')
+            new_html = utils.add_embed(el.iframe['src'])
+        else:
+            logger.warning('unhandled media-wrapper class {}'.format(el['class']))
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
-        else:
-            logger.warning('unhandled media-wrapper')
 
     for el in soup.find_all(class_='wp-block-video'):
         video_src = ''
@@ -660,8 +674,18 @@ def format_content(content_html, item):
             logger.warning('unhandled Brightcove embed in ' + item['url'])
 
     for el in soup.find_all('video', class_='video-js'):
+        new_html = ''
         if el.get('data-player'):
             new_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el['data-account'], el['data-player'], el['data-video-id']))
+        elif el.get('data-opts'):
+            data_opts = json.loads(el['data-opts'])
+            source = utils.closest_dict(data_opts['plugins']['sources']['renditions'], 'frameHeight', 480)
+            if source['videoContainer'] == 'MP4':
+                video_type = 'video/mp4'
+            else:
+                video_type = 'application/x-mpegURL'
+            new_html = utils.add_video(source['url'], video_type, data_opts['poster'], data_opts['title'])
+        if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
             el_parent = el
             while el_parent.parent.parent:
@@ -743,6 +767,11 @@ def format_content(content_html, item):
         el.insert_after(new_el)
         el.decompose()
 
+    for el in soup.find_all('blockquote', id=re.compile(r'blockquote\d')):
+        new_el = BeautifulSoup(utils.add_blockquote(el.decode_contents()), 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
     for el in soup.find_all('blockquote'):
         it = el.find(class_='quote-author')
         if it:
@@ -768,6 +797,28 @@ def format_content(content_html, item):
         else:
             logger.warning('unhandled article-pull-quote')
 
+    for el in soup.find_all(class_='media-element'):
+        it = el.find('img', class_='media-element-image')
+        if it:
+            new_html = '<table><tr><td style="width:128px;"><img src="{}" style="width:100%;"></td><td>'.format(it['src'])
+            desc = el.find(class_='media-element-description')
+            if desc:
+                it = desc.find(class_='title')
+                if it:
+                    it.name = 'h4'
+                    it.attrs = {}
+                    it['style'] = 'margin-top:0; margin-bottom:0.5em;'
+                desc = desc.decode_contents()
+                desc = re.sub(r'</p>\s*<p>', '<br/><br/>', desc)
+                desc = re.sub(r'<p>|</p>', '', desc)
+                new_html += desc
+            new_html += '</td></tr></table>'
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled media-element')
+
     for el in soup.find_all(class_='bottom-line-module'):
         it = el.find(class_='module-title')
         if it:
@@ -789,7 +840,7 @@ def format_content(content_html, item):
         if el.find(id='mentioned-in-this-article'):
             el.decompose()
 
-    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|link-related|sharedaddy|wp-block-bigbite-multi-title|wp-block-product-widget-block')):
+    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|injected-related-story|link-related|sharedaddy|wp-block-bigbite-multi-title|wp-block-product-widget-block')):
         el.decompose()
 
     for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
@@ -802,41 +853,55 @@ def format_content(content_html, item):
 
 
 def get_content(url, args, save_debug=False):
+    args_copy = args.copy()
+    tld = tldextract.extract(url)
+    sites_json = utils.read_json_file('./sites.json')
+    if sites_json.get(tld.domain) and sites_json[tld.domain].get('wpjson_path'):
+        wpjson_path = sites_json[tld.domain]['wpjson_path']
+        posts_path = sites_json[tld.domain]['posts_path']
+        if sites_json[tld.domain].get('args'):
+            args_copy.update(sites_json[tld.domain]['args'])
+    else:
+        wpjson_path = '/wp-json'
+        posts_path = '/wp/v2/posts'
+
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1].split('.')[0]
-    post_url = '{}://{}/wp-json/wp/v2/posts?slug={}'.format(split_url.scheme, split_url.netloc, slug)
+
+    post_url = '{}://{}{}{}?slug={}'.format(split_url.scheme, split_url.netloc, wpjson_path, posts_path, slug)
     post = utils.get_url_json(post_url)
     if post:
-        return get_post_content(post[0], args, save_debug)
+        return get_post_content(post[0], args_copy, save_debug)
 
-    url_root = '{}://{}'.format(split_url.scheme, split_url.netloc)
+    post_url = ''
     article_html = utils.get_url_html(url)
     if article_html:
         if save_debug:
             utils.write_file(article_html, './debug/debug.html')
-        post_url = ''
         soup = BeautifulSoup(article_html, 'html.parser')
-        for link in soup.find_all('link', attrs={"type":"application/json"}):
-            #print(link['href'])
-            if re.search(r'/wp-json/wp/v2/', link['href']):
+        for link in soup.find_all('link', attrs={"type": "application/json"}):
+            if re.search(r'{}{}'.format(wpjson_path, posts_path), link['href']):
                 post_url = link['href']
                 break
         if not post_url:
-            # Search for the post id and assume the wp-json path
-            m = re.search(r'{}://{}/\?p=(\d+)'.format(split_url.scheme, split_url.netloc), article_html)
+            m = re.search(r'{}://{}/[^\?]*\?p=(\d+)'.format(split_url.scheme, split_url.netloc), article_html)
             if m:
-                post_url = m.group(0)
+                post_url = '{}://{}{}{}/{}'.format(split_url.scheme, split_url.netloc, wpjson_path, posts_path, m.group(1))
             else:
                 m = re.search(r'data-content_cms_id="(\d+)"', article_html)
                 if m:
-                    post_url = '{}://{}/wp-json/wp/v2/posts/{}'.format(split_url.scheme, split_url.netloc, m.group(1))
-                else:
-                    logger.warning('unable to find wp-json post url in ' + url)
-                    return None
-    post = utils.get_url_json(post_url)
-    if post:
-        return get_post_content(post, args, save_debug)
+                    post_url = '{}://{}{}{}/{}'.format(split_url.scheme, split_url.netloc, wpjson_path, posts_path, m.group(1))
+
+    if post_url:
+        post = utils.get_url_json(post_url)
+        if post:
+            return get_post_content(post, args_copy, save_debug)
+    else:
+        logger.warning('unable to find wp-json post url in ' + url)
+        return None
+
+    logger.warning('unable to get post content from ' + url)
     return None
 
 

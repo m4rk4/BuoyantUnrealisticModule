@@ -127,6 +127,7 @@ def render_content(content, netloc, inc_gallery=False):
         logger.warning('unhandled content type ' + content['type'])
     return content_html
 
+
 def get_content(url, args, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://{}/rest/carbon/filter/main{}'.format(split_url.netloc, split_url.path)

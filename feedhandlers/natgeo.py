@@ -1,9 +1,9 @@
-import base64, json, re
+import json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit, unquote_plus
+from urllib.parse import quote_plus, urlsplit, unquote_plus
 
-import utils
+import config, utils
 from feedhandlers import natgeo_uk
 
 import logging
@@ -20,6 +20,9 @@ def render_body(body):
     body_html = ''
     if body['type'] == 'p':
         body_html += '<p>' + body['cntnt']['mrkup'] + '</p>'
+
+    elif re.search(r'^h\d$', body['type']):
+        body_html += '<{0}>{1}</{0}>'.format(body['type'], body['cntnt']['mrkup'])
 
     elif body['type'] == 'inline':
         if body['cntnt']['cmsType'] == 'editorsNote':
@@ -68,26 +71,49 @@ def render_body(body):
             # apikey from
             # https://assets-cdn.nationalgeographic.com/natgeo/2ffe781f47e0-release-07-28-2022.7/client/natgeo.js
             # n.SHIELD_API_KEY = "uiqlbgzdwuru14v627vdusswb"
-            video_json = utils.get_url_json('https://watch.auth.api.dtci.technology/video/auth/media/{}/asset?apikey=uiqlbgzdwuru14v627vdusswb'.format(body['cntnt']['pId']))
-            captions = []
-            if body['cntnt'].get('caption'):
-                captions.append(re.sub(r'^<p>|</p>$', '', body['cntnt']['caption']))
-            elif body['cntnt'].get('description'):
-                captions.append(body['cntnt']['description'])
-            elif body['cntnt'].get('slideTitle'):
-                captions.append(body['cntnt']['slideTitle'])
-            if body['cntnt'].get('credit'):
-                captions.append(body['cntnt']['credit'])
-            elif body['cntnt']['image'].get('crdt'):
-                captions.append(body['cntnt']['image']['crdt'])
-            body_html += utils.add_video(video_json['stream'], 'application/x-mpegURL', body['cntnt']['image']['src'], ' | '.join(captions))
+            video_url = 'https://watch.auth.api.dtci.technology/video/auth/media/{}/asset?apikey=uiqlbgzdwuru14v627vdusswb'.format(body['cntnt']['pId'])
+            # Use requests directly because a 404 error returns an error message
+            r = requests.get(video_url)
+            if r.text:
+                video_json = r.json()
+                captions = []
+                if body['cntnt'].get('caption'):
+                    captions.append(re.sub(r'^<p>|</p>$', '', body['cntnt']['caption']))
+                elif body['cntnt'].get('description'):
+                    captions.append(body['cntnt']['description'])
+                elif body['cntnt'].get('slideTitle'):
+                    captions.append(body['cntnt']['slideTitle'])
+                if body['cntnt'].get('credit'):
+                    captions.append(body['cntnt']['credit'])
+                elif body['cntnt']['image'].get('crdt'):
+                    captions.append(body['cntnt']['image']['crdt'])
+                if video_json.get('stream'):
+                    body_html += utils.add_video(video_json['stream'], 'application/x-mpegURL', body['cntnt']['image']['src'], ' | '.join(captions))
+                elif video_json.get('error'):
+                    captions.insert(0, '<strong>Error: {}</strong>'.format(video_json['error']))
+                    poster = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(body['cntnt']['image']['src']))
+                    body_html += utils.add_image(poster, ' | '.join(captions))
+                else:
+                    logger.warning('unhandled video json response from ' + video_url)
+            else:
+                logger.warning('unhandled video json response from ' + video_url)
+
+        elif body['cntnt']['cmsType'] == 'listicle':
+            body_html += '<h3>{}</h3>'.format(body['cntnt']['title'])
+            if body['cntnt']['text'].startswith('<p>'):
+                # convert paragraphs to list items
+                text = body['cntnt']['text'].replace('<p>&nbsp;</p>', '')
+                text = re.sub(r'<(/)?p>', r'<\1li>', text)
+            else:
+                text = '<li>' + body['cntnt']['text'].replace('<br><br>', '</li><li>') + '</li>'
+            body_html += '<ul>{}</ul>'.format(text)
 
         elif body['cntnt']['cmsType'] == 'markup':
-            code = base64.b64decode(body['cntnt']['mrkup']).decode('utf-8')
-            soup = BeautifulSoup(unquote_plus(code), 'html.parser')
-            logger.warning('unhandled markup code ' + list(soup.div.attrs.keys())[0])
-            if True:
-                utils.write_file(unquote_plus(code), './debug/markup.html')
+            logger.warning('unhandled inline markup code')
+            body_html +=  '<blockquote><b>Embedded content unable to be displayed</b></blockquote>'
+            #code = base64.b64decode(body['cntnt']['mrkup']).decode('utf-8')
+            #utils.write_file(unquote_plus(code), './debug/markup.html')
+            #soup = BeautifulSoup(unquote_plus(code), 'html.parser')
 
         else:
             logger.warning('unhandled inline cmsType ' + body['cntnt']['cmsType'])
@@ -169,6 +195,8 @@ def get_content(url, args, save_debug=False):
             for module in frame['mods']:
                 for edge in module['edgs']:
                     if edge['cmsType'] == 'ArticleBodyTile':
+                        if edge.get('dscrptn'):
+                            item['content_html'] += '<p><em>{}</em></p>'.format(edge['dscrptn'])
                         if edge.get('ldMda'):
                             if edge['ldMda']['type'] == 'videoLead':
                                 body = {"type": "inline", "cntnt": edge['ldMda']['video']}
@@ -178,14 +206,18 @@ def get_content(url, args, save_debug=False):
                         for body in edge['bdy']:
                             item['content_html'] += render_body(body)
                     elif edge['cmsType'] == 'ImmersiveLeadTile':
-                        if edge['mdiaKy'] == 'video':
+                        if edge.get('description'):
+                            item['content_html'] += '<p><em>{}</em></p>'.format(edge['description'])
+                        #if edge['mdiaKy'] == 'video':
+                        if edge.get('video'):
                             body = {"type": "inline", "cntnt": edge['video']}
                         else:
                             body = {"type": "inline", "cntnt": edge['cmsImage']}
                         item['content_html'] += render_body(body)
                     else:
                         logger.warning('unhandled ArticleBody edge cmsType ' + edge['cmsType'])
-    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
+
+    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 

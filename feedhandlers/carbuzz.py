@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, save_debug=False):
     if 'carbuzz.com/cars/' in url:
         page_html = utils.get_url_html(url)
-        m = re.search(r'src="https:\/\/api\.carbuzz\.com\/v3\.0\/tracking\/post-view\/([^"]+)"', page_html)
+        m = re.search(r'src="https://api\.carbuzz\.com/v\d\.0/tracking/post-view/([^"]+)"', page_html)
         if not m:
             logger.warning('unable to determine proper url for ' + url)
             return None
@@ -106,6 +106,10 @@ def get_content(url, args, save_debug=False):
             else:
                 logger.warning('unhandled content block type {} in {}'.format(content_block['blockType'], api_url))
 
+        elif content_block['blockType'] == 52 and content_block.get('blockKey') and content_block['blockKey'] == 'primis-block':
+            # ads
+            pass
+
         else:
             logger.warning('unhandled content block type {} in {}'.format(content_block['blockType'], api_url))
 
@@ -120,7 +124,7 @@ def get_content(url, args, save_debug=False):
                 content_html += '<li>{}</li>'.format(credit['name'])
         content_html += '</ul><p>'
 
-    item['content_html'] = content_html
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', content_html)
     return item
 
 

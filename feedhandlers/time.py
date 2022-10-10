@@ -82,6 +82,8 @@ def get_content(url, args, save_debug):
             item['content_html'] += utils.add_video(post_json['primary_media']['data']['url'], post_json['primary_media']['data']['video_type'], post_json['primary_media']['data']['poster_url'], post_json['primary_media']['data']['name'])
         else:
             logger.warning('unhandled primary media type {} in {}'.format(post_json['primary_media']['type'], url))
+    elif post_json.get('primary_image'):
+        item['content_html'] += add_image(post_json['primary_image'])
 
     for block in post_json['body']:
         if block['type'] == 'paragraph' or block['type'] == 'heading' :

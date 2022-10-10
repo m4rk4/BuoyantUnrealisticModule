@@ -1,9 +1,10 @@
-import json, math, re
+import json, math, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
+from feedhandlers import usatoday_sportswire
 
 import logging
 
@@ -98,12 +99,15 @@ def get_gallery_content(gallery_id, site_code):
 
 
 def get_content(url, args, save_debug=False, article_json=None):
-    if '/storytelling/' in url:
-        logger.warning('unhandled storytelling content ' + url)
-        return None
-
     split_url = urlsplit(url)
     base_url = split_url.scheme + '://' + split_url.netloc
+    tld = tldextract.extract(url)
+
+    if '/storytelling/' in split_url.path:
+        logger.warning('unhandled storytelling content ' + url)
+        return None
+    elif tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
+        return usatoday_sportswire.get_content(url, args, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if save_debug:
@@ -117,7 +121,11 @@ def get_content(url, args, save_debug=False, article_json=None):
             ld_json = json.loads(el.string)
             if save_debug:
                 utils.write_file(ld_json, './debug/ld.json')
-            ld_article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
+            if isinstance(ld_json, list):
+                ld_article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
+            else:
+                if ld_json['@type'] == 'NewsArticle':
+                    ld_article_json = ld_json
 
     if not article_json:
         split_url = urlsplit(url)
@@ -152,10 +160,13 @@ def get_content(url, args, save_debug=False, article_json=None):
     if article_json.get('byline'):
         item['author']['name'] = article_json['byline']
     elif ld_article_json and ld_article_json.get('author'):
-        authors = []
-        for it in ld_article_json['author']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        if isinstance(ld_article_json['author'], list):
+            authors = []
+            for it in ld_article_json['author']:
+                authors.append(it['name'])
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        else:
+            item['author']['name'] = ld_article_json['author']['name']
     else:
         item['author']['name'] = article_json['publication']
 
@@ -283,7 +294,7 @@ def get_content(url, args, save_debug=False, article_json=None):
         for el in article.find_all(re.compile(r'\b(h\d|li|ol|p|span|ul)\b'), class_=True):
             el.attrs = {}
 
-        item['content_html'] = str(article)
+        item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', str(article))
 
     if not item.get('_image'):
         el = soup.find('meta', attrs={"property": "og:image"})
@@ -297,6 +308,12 @@ def get_content(url, args, save_debug=False, article_json=None):
 
 
 def get_feed(args, save_debug):
+    split_url = urlsplit(url)
+    base_url = split_url.scheme + '://' + split_url.netloc
+    tld = tldextract.extract(url)
+    if tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
+        return wp_posts.get_feed(args, save_debug)
+
     page_html = utils.get_url_html(args['url'])
     m = re.search(r'"siteCode[":\\]+(\w{4})', page_html)
     if not m:

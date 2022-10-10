@@ -251,8 +251,10 @@ def get_content(url, args, save_debug=False):
         hero = add_image(article_json['main_image'])
 
     item['content_html'] = ''
+    if article_json.get('dek'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
     if hero:
-        item['content_html'] = hero
+        item['content_html'] += hero
 
     if article_json.get('body'):
         cards = article_json['body']['cards']

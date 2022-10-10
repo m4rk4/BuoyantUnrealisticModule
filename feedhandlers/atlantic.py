@@ -198,7 +198,7 @@ def get_content(url, args, save_debug=False):
 
     content_html = ''
     if article_json.get('dek'):
-        content_html += '<p>{}</p>'.format(article_json['dek'])
+        content_html += '<p><em>{}</em></p>'.format(article_json['dek'])
 
     if article_json.get('leadArt'):
         if re.search(r'LeadArtImage', article_json['leadArt']['__typename']):
