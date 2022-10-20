@@ -128,13 +128,14 @@ def get_content(url, args, save_debug=False):
     path_prefix = ''
     page_type = ''
     node_id = ''
+    drupal_settings_json = None
     soup = BeautifulSoup(page_html, 'html.parser')
     el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
     if el:
-        settings = json.loads(el.string)
-        if settings['path'].get('pathPrefix'):
-            path_prefix = settings['path']['pathPrefix']
-        node_id = settings['path']['currentPath'].split('/')[-1]
+        drupal_settings_json = json.loads(el.string)
+        if drupal_settings_json['path'].get('pathPrefix'):
+            path_prefix = drupal_settings_json['path']['pathPrefix']
+        node_id = drupal_settings_json['path']['currentPath'].split('/')[-1]
 
     el = soup.find('body')
     if el and el.get('class'):
@@ -145,8 +146,10 @@ def get_content(url, args, save_debug=False):
             m = re.search(r'-node-(\d+)', ' '.join(el['class']))
             if m:
                 node_id = m.group(1)
+    if not page_type and '/article/' in url:
+        page_type = 'node--article'
 
-    if not node_id and not page_type:
+    if not node_id or not page_type:
         logger.warning('unable to determine node id and page type for ' + url)
         return None
 
@@ -189,6 +192,17 @@ def get_content(url, args, save_debug=False):
             api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
+    elif page_json['relationships'].get('field_article_author') and page_json['relationships']['field_article_author'].get('data'):
+        if isinstance(page_json['relationships']['field_article_author']['data'], list):
+            for data in page_json['relationships']['field_article_author']['data']:
+                api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+                if api_json:
+                    authors.append(api_json['data']['attributes']['title'])
+        else:
+            data = page_json['relationships']['field_article_author']['data']
+            api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+            if api_json:
+                authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('field_authors') and page_json['relationships']['field_authors'].get('data'):
         for data in page_json['relationships']['field_authors']['data']:
             api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
@@ -227,6 +241,10 @@ def get_content(url, args, save_debug=False):
         data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
+    elif page_json['relationships'].get('field_article_hero_image') and page_json['relationships']['field_article_hero_image'].get('data'):
+        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html = data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
         item['_image'], caption = get_img_src(data_html)
@@ -238,6 +256,32 @@ def get_content(url, args, save_debug=False):
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
         item['_image'], caption = get_img_src(data_html)
+
+    if page_json['attributes'].get('field_video_pid'):
+        # Note: this may be specific to nbcsportsedge.com
+        video_src = ''
+        video_type = ''
+        poster = ''
+        caption = ''
+        if drupal_settings_json and drupal_settings_json.get('svod'):
+            svod_html = utils.get_url_html(drupal_settings_json['svod']['iframe_url'])
+            if svod_html:
+                svod_soup = BeautifulSoup(svod_html, 'html.parser')
+                el = svod_soup.find('link', attrs={"type": "application/smil+xml"})
+                if el:
+                    video_src = utils.get_redirect_url(el['href'])
+                    if '.mp4' in video_src:
+                        video_type = 'video/mp4'
+                    else:
+                        video_type = 'application/x-mpegURL'
+                el = svod_soup.find('meta', attrs={"property": "og:image"})
+                if el:
+                    poster = el['content']
+                el = svod_soup.find('meta', attrs={"property": "og:description"})
+                if el:
+                    caption = el['content']
+        if video_src:
+            lede_html = utils.add_video(video_src, video_type, poster, caption)
 
     item['content_html'] = ''
     if page_json['type'] == 'node--gallery':
@@ -263,71 +307,84 @@ def get_content(url, args, save_debug=False):
         if lede_html:
             item['content_html'] += lede_html
 
-        body_soup = BeautifulSoup(page_json['attributes']['body']['processed'], 'html.parser')
-        for el in body_soup.find_all('div', attrs={"data-embed-button": True}):
-            new_html = ''
-            if el['data-embed-button'] == 'media_entity_embed' or el['data-embed-button'] == 'social_media':
-                it = el.find(class_=re.compile(r'media--type-'))
-                if it:
-                    if 'media--type-image' in it['class']:
-                        new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
-                    elif 'media--type-twitter' in it['class']:
-                        new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
-                    elif 'media--type-instagram' in it['class']:
-                        new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
-            elif el['data-embed-button'] == 'mpx_video_embed':
-                new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
-            elif el['data-embed-button'] == 'teaser_embed':
-                el.decompose()
-                continue
-            elif el['data-embed-button'] == 'node' and el.get('data-entity-embed-display') and 'related_content' in \
-                    el['data-entity-embed-display']:
-                el.decompose()
-                continue
-            if new_html:
+        if page_json['attributes'].get('body'):
+            body_soup = BeautifulSoup(page_json['attributes']['body']['processed'], 'html.parser')
+        elif page_json['attributes'].get('field_article_body'):
+            body_soup = BeautifulSoup(page_json['attributes']['field_article_body'][0]['processed'], 'html.parser')
+        else:
+            logger.warning('unknown body content in ' + item['url'])
+            body_soup = None
+        if body_soup:
+            for el in body_soup.find_all('div', attrs={"data-embed-button": True}):
+                new_html = ''
+                if el['data-embed-button'] == 'media_entity_embed' or el['data-embed-button'] == 'social_media':
+                    it = el.find(class_=re.compile(r'media--type-'))
+                    if it:
+                        if 'media--type-image' in it['class']:
+                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                        elif 'media--type-twitter' in it['class']:
+                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                        elif 'media--type-instagram' in it['class']:
+                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                elif el['data-embed-button'] == 'mpx_video_embed':
+                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                elif el['data-embed-button'] == 'teaser_embed':
+                    el.decompose()
+                    continue
+                elif el['data-embed-button'] == 'media' and el.find(class_='editor_note__editor-note-text'):
+                    it = el.find(class_='editor_note__editor-note-text')
+                    new_html = it.decode_contents()
+                elif el['data-embed-button'] == 'node' and el.get('data-entity-embed-display') and 'related_content' in \
+                        el['data-entity-embed-display']:
+                    el.decompose()
+                    continue
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    logger.warning('unhandled data-embed-button {} in {}'.format(el['data-embed-button'], item['url']))
+
+            for el in body_soup.find_all('img', class_='figure-img'):
+                # TODO: caption?
+                new_html = utils.add_image(el['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                parents = el.find_parents()
+                it = parents[-2]
+                it.insert_after(new_el)
+                it.decompose()
+
+            for el in body_soup.find_all('blockquote', class_='twitter-tweet'):
+                links = el.find_all('a')
+                new_html = utils.add_embed(links[-1]['href'])
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
-            else:
-                logger.warning('unhandled data-embed-button {} in {}'.format(el['data-embed-button'], item['url']))
 
-        for el in body_soup.find_all('img', class_='figure-img'):
-            # TODO: caption?
-            new_html = utils.add_image(el['src'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            parents = el.find_parents()
-            it = parents[-2]
-            it.insert_after(new_el)
-            it.decompose()
-
-        for el in body_soup.find_all('blockquote', class_='twitter-tweet'):
-            links = el.find_all('a')
-            new_html = utils.add_embed(links[-1]['href'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-
-        for el in body_soup.find_all('blockquote', class_='instagram-media'):
-            new_html = utils.add_embed(el['data-instgrm-permalink'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-
-        for el in body_soup.find_all('iframe'):
-            new_html = utils.add_embed(el['src'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            if el.parent and el.parent.name == 'p':
-                el.parent.insert_after(new_el)
-                el.parent.decompose()
-            else:
+            for el in body_soup.find_all('blockquote', class_='instagram-media'):
+                new_html = utils.add_embed(el['data-instgrm-permalink'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
 
-        for el in body_soup.find_all('script'):
-            el.decompose()
+            for el in body_soup.find_all('iframe'):
+                new_html = utils.add_embed(el['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                if el.parent and el.parent.name == 'p':
+                    el.parent.insert_after(new_el)
+                    el.parent.decompose()
+                else:
+                    el.insert_after(new_el)
+                    el.decompose()
 
-        item['content_html'] += str(body_soup)
-        item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
+            for el in body_soup.find_all('script'):
+                el.decompose()
+
+            for el in body_soup.find_all(id=re.compile(r'taboola')):
+                el.decompose()
+
+            item['content_html'] += str(body_soup)
+            item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
 
     if browser:
         loop.run_until_complete(utils.browser_close(browser))

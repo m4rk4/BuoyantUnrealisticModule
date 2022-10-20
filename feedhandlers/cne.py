@@ -143,6 +143,8 @@ def format_body(body_json):
             return add_product(body_json[1]['props'])
         elif body_json[1]['type'] == 'review':
             return '<table style="width:100%"><tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="https://www.pitchfork.com{}">{}</a></h4><small>{}</small><br/><br/><a href="https://www.pitchfork.com{}">{}</a></td></tr></table>'.format(body_json[1]['props']['image']['sources']['sm']['url'], body_json[1]['props']['url'], body_json[1]['props']['dangerousHed'], body_json[1]['props']['artistName'], body_json[1]['props']['url'], body_json[1]['props']['buttonTextContent'])
+        elif body_json[1]['type'] == 'justwatch':
+            return utils.add_embed(body_json[1]['props']['url'])
         elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
             # skip these but process the children
             start_tag = ''

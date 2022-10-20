@@ -243,6 +243,9 @@ def format_content(content_html, item):
     for el in soup.find_all(id='piano-meter-offer'):
         el.unwrap()
 
+    for el in soup.find_all('div', class_=re.compile(r'GutenbergParagraph_gutenbergParagraph_')):
+        el.unwrap()
+
     for el in soup.find_all(id='review-body'):
         # This is probably specific to techhive.com
         review_html = '<br/><div><div style="text-align:center">'

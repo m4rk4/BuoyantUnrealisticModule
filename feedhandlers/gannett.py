@@ -165,8 +165,10 @@ def get_content(url, args, save_debug=False, article_json=None):
             for it in ld_article_json['author']:
                 authors.append(it['name'])
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-        else:
+        elif isinstance(ld_article_json['author'], dict):
             item['author']['name'] = ld_article_json['author']['name']
+        elif isinstance(ld_article_json['author'], str):
+            item['author']['name'] = ld_article_json['author']
     else:
         item['author']['name'] = article_json['publication']
 
@@ -308,9 +310,9 @@ def get_content(url, args, save_debug=False, article_json=None):
 
 
 def get_feed(args, save_debug):
-    split_url = urlsplit(url)
+    split_url = urlsplit(args['url'])
     base_url = split_url.scheme + '://' + split_url.netloc
-    tld = tldextract.extract(url)
+    tld = tldextract.extract(args['url'])
     if tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
         return wp_posts.get_feed(args, save_debug)
 

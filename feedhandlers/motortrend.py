@@ -74,14 +74,18 @@ def get_content(url, args, save_debug=False):
 
     item = {}
     item['id'] = article_json['articleId']
-    item['url'] = article_json['seo']['carbonCanonicalUrl']
+    item['url'] = article_json['seo']['canonicalUrl']
     item['title'] = article_json['title']
 
-    dt = datetime.fromisoformat(article_json['publishedDate'].replace('Z', '+00:00'))
+    def format_date(matchobj):
+        return '.{}+00:00'.format(matchobj.group(1).zfill(3))
+    date = re.sub(r'\.(\d+)Z', format_date, article_json['publishedDate'])
+    dt = datetime.fromisoformat(date)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['lastModifiedDate'].replace('Z', '+00:00'))
+    date = re.sub(r'\.(\d+)Z', format_date, article_json['lastModifiedDate'])
+    dt = datetime.fromisoformat(date)
     item['date_modified'] = dt.isoformat()
 
     authors = []
@@ -136,6 +140,9 @@ def get_content(url, args, save_debug=False):
             videos = article_json['assets']['videoPlaylist']
 
     item['content_html'] = ''
+    if article_json.get('subTitle'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['subTitle'])
+
     if article_json.get('heroMedia'):
         if article_json['heroMedia']['type'] == 'image':
             item['_image'] = article_json['heroMedia']['image']['url']
@@ -180,27 +187,25 @@ def get_feed(args, save_debug=False):
 
     items = []
     for package in api_json['data']['resource']['packages']:
-        if package['packageType'] == 'videoplaylist':
+        if package['packageType'] == 'videoplaylist' or not package.get('items'):
             continue
         for it in package['items']:
-            if not it.get('published'):
-                continue
-            item = it.copy()
-            dt = datetime.strptime(item['published'], '%a %b %d %Y %H:%M:%S GMT+0000 (Coordinated Universal Time)').replace(tzinfo=timezone.utc)
-            item['_timestamp'] = dt.timestamp()
-            if 'age' in args:
-                if not utils.check_age(item, args):
-                    continue
-            if next((i for i in items if i['id'] == item['id']), None):
-                continue
-            items.append(item)
+            if it.get('published'):
+                item = it.copy()
+                dt = datetime.strptime(item['published'], '%a %b %d %Y %H:%M:%S GMT+0000 (Coordinated Universal Time)').replace(tzinfo=timezone.utc)
+                item['_timestamp'] = dt.timestamp()
+                if 'age' in args:
+                    if not utils.check_age(item, args):
+                        continue
+                if not next((i for i in items if i['_id'] == item['_id']), None):
+                    items.append(item)
 
     items = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
 
     n = 0
     feed_items = []
     for it in items:
-        url = it['source']['seo']['carbonCanonicalUrl']
+        url = it['source']['seo']['canonicalUrl']
         if save_debug:
             logger.debug('getting content for ' + url)
         item = get_content(url, args, save_debug)

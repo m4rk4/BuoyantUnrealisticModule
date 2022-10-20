@@ -31,7 +31,7 @@ def get_module(url, handler=''):
       elif tld.domain == 'go':
         domain = tld.subdomain
       elif tld.domain == 'feedburner':
-        domain = urlsplit(url).path.split('/')[1]
+        domain = urlsplit(url).path.split('/')[1].lower()
       else:
         domain = tld.domain
       sites_json = read_json_file('./sites.json')

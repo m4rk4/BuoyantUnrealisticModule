@@ -167,7 +167,8 @@ def get_item(article_json, args, save_debug):
     for asset in re.findall(r'(<!--[^>]*%asset:(\d+);?%?[^>]*-->)', item['content_html']):
         embeds = None
         asset_html = ''
-        asset_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/content/{}'.format(asset[1]))
+        asset_url = 'https://publicapi.misitemgr.com/webapi-public/v2/content/{}'.format(asset[1])
+        asset_json = utils.get_url_json(asset_url)
         if not asset_json:
             logger.warning('skipping asset {} in {}'.format(asset[1], item['url']))
             continue
@@ -214,7 +215,11 @@ def get_item(article_json, args, save_debug):
             if embeds:
                 if embeds[n].iframe:
                     asset_html = utils.add_embed(embeds[n].iframe['src'])
+                elif embeds[n].blockquote and 'tiktok-embed' in embeds[n].blockquote['class']:
+                    asset_html = utils.add_embed(embeds[n].blockquote['cite'])
             n = n + 1
+            if 'NL sign-up' in asset_json['title']:
+                continue
 
         elif asset_json['asset_type'] == 'story':
             # These are usually just related stories
@@ -223,7 +228,7 @@ def get_item(article_json, args, save_debug):
         if asset_html:
             item['content_html'] = item['content_html'].replace(asset[0], asset_html)
         else:
-            logger.warning('unhandled asset type {} in {}'.format(asset_json['asset_type'], item['url']))
+            logger.warning('unhandled asset type {} in {}'.format(asset_json['asset_type'], asset_url))
 
     return item
 
