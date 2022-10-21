@@ -1,7 +1,9 @@
 {
     "500ish": {
         "module": "medium",
-        "test_feed": ["https://500ish.com/rss"]
+        "test_feed": [
+            "https://500ish.com/rss"
+        ]
     },
     "abcnews": {
         "module": "abcnews"
@@ -211,7 +213,15 @@
     },
     "betterhumans": {
         "module": "medium",
-        "test_feed": ["https://betterhumans.pub/rss"]
+        "test_feed": [
+            "https://betterhumans.pub/rss"
+        ]
+    },
+    "bigthink": {
+        "module": "bigthink",
+        "test_feed": [
+            "https://bigthink.com/feed/all"
+        ]
     },
     "billboard": {
         "module": "billboard"
@@ -303,7 +313,9 @@
     },
     "centredaily": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/centredaily/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/centredaily/stories"
+        ]
     },
     "cfobrew": {
         "module": "morningbrew",
@@ -311,7 +323,9 @@
     },
     "charlotteobserver": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/charlotteobserver/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/charlotteobserver/stories"
+        ]
     },
     "chicagotribune": {
         "api_url": "https://www.chicagotribune.com/pf/api/v3/content/fetch/",
@@ -595,7 +609,7 @@
     },
     "discovermagazine": {
         "module": "discovermag",
-        "buildId": "945a192"
+        "buildId": "my-build-id"
     },
     "dispatch": {
         "module": "gannett",
@@ -749,7 +763,12 @@
         "module": "hearst"
     },
     "ieee": {
-        "module": "rebelmouse"
+        "module": "rebelmouse",
+        "test_feed": [
+            "https://spectrum.ieee.org/feeds/feed.rss",
+            "https://spectrum.ieee.org/feeds/type/opinion.rss",
+            "https://spectrum.ieee.org/feeds/topic/consumer-electronics.rss"
+        ]
     },
     "ign": {
         "module": "ign"
@@ -866,6 +885,12 @@
             "https://www.ktnv.com/index.rss"
         ]
     },
+    "kqed": {
+        "module": "kqed",
+        "test_feed": [
+            "https://ww2.kqed.org/news/feed/"
+        ]
+    },
     "lifehacker": {
         "module": "gawker"
     },
@@ -967,7 +992,9 @@
     },
     "miamiherald": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/miamiherald/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/miamiherald/stories"
+        ]
     },
     "mic": {
         "module": "bustle"
@@ -1044,6 +1071,9 @@
     "msnbc": {
         "module": "nbcnews"
     },
+    "nasa": {
+        "module": "nasa"
+    },
     "nationalgeographic": {
         "module": "natgeo"
     },
@@ -1063,7 +1093,7 @@
         "module": "nya"
     },
     "nerdist": {
-        "module": "wp_article"
+        "module": "nerdist"
     },
     "newrepublic": {
         "module": "tnr"
@@ -1087,7 +1117,9 @@
     },
     "newsobserver": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/newsobserver/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/newsobserver/stories"
+        ]
     },
     "newyorker": {
         "module": "cne",
@@ -1471,7 +1503,9 @@
     },
     "sacbee": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/sacbee/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/sacbee/stories"
+        ]
     },
     "screencrush": {
         "module": "townsquare"
@@ -1620,7 +1654,9 @@
     },
     "sunherald": {
         "module": "mcclatchy",
-        "test_feed": ["https://feeds.mcclatchy.com/sunherald/stories"]
+        "test_feed": [
+            "https://feeds.mcclatchy.com/sunherald/stories"
+        ]
     },
     "sustainableplastics": {
         "module": "crains"
@@ -1818,7 +1854,9 @@
     },
     "towardsdatascience": {
         "module": "medium",
-        "test_feed": ["https://towardsdatascience.com/rss"]
+        "test_feed": [
+            "https://towardsdatascience.com/rss"
+        ]
     },
     "tvguide": {
         "module": "zdnet",
@@ -1984,7 +2022,7 @@
     },
     "aboutchromebooks": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.aboutchromebooks.com/feed"
@@ -1992,7 +2030,7 @@
     },
     "artnews": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.artnews.com/feed"
@@ -2000,7 +2038,7 @@
     },
     "beebom": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://beebom.com/feed"
@@ -2008,7 +2046,7 @@
     },
     "bleedingcool": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://bleedingcool.com/feed"
@@ -2016,7 +2054,7 @@
     },
     "bookriot": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://bookriot.com/feed"
@@ -2262,6 +2300,14 @@
             "https://www.ghacks.net/feed"
         ]
     },
+    "grist": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://grist.org/feed"
+        ]
+    },
     "hard-drive": {
         "module": "wp_posts",
         "wpjson_path": "/wp-json",
@@ -2494,6 +2540,30 @@
             "https://www.nakedcapitalism.com/feed"
         ]
     },
+    "narratively": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://narratively.com/feed"
+        ]
+    },
+    "nautil": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://nautil.us/feed"
+        ]
+    },
+    "nature": {
+        "module": "wp_posts",
+        "wpjson_path": "/science/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://blog.nature.org/science/feed/"
+        ]
+    },
     "nbcsports": {
         "module": "wp_posts",
         "wpjson_path": "/wp-json",
@@ -2549,6 +2619,14 @@
             "https://sdtimes.com/feed"
         ]
     },
+    "singularityhub": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://singularityhub.com/feed"
+        ]
+    },
     "sonoff": {
         "module": "wp_posts",
         "wpjson_path": "/wp-json",
@@ -2587,6 +2665,14 @@
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.usmagazine.com/feed"
+        ]
+    },
+    "wwd": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://wwd.com/feed"
         ]
     },
     "wp-posts": {
