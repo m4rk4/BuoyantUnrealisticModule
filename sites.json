@@ -2078,7 +2078,7 @@
     },
     "carscoops": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.carscoops.com/feed"
@@ -2094,7 +2094,7 @@
     },
     "cgmagonline": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.cgmagonline.com/feed"
@@ -2102,7 +2102,7 @@
     },
     "chromeunboxed": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://chromeunboxed.com/feed"
@@ -2110,10 +2110,18 @@
     },
     "commercialobserver": {
         "module": "wp_posts",
-        "wpjson_path": "/blog/wp-json",
+        "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://commercialobserver.com/feed"
+        ]
+    },
+    "dailyinfographic": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://www.dailyinfographic.com/feed"
         ]
     },
     "damemagazine": {
