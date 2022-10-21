@@ -19,22 +19,23 @@ def get_next_json(url):
     sites_json = utils.read_json_file('./sites.json')
     next_url = 'https://www.discovermagazine.com/_next/data/' + sites_json['discovermagazine']['buildId']
 
-    split_url = urlsplit(url)
-    if split_url.path:
-        next_url += split_url.path + '.json'
-    else:
-        next_url += '/index.json'
+    path = urlsplit(url).path
+    if path.endswith('/'):
+        path = path[:-1]
+    if not path:
+        path = '/index'
+    path += '.json'
 
-    next_json = utils.get_url_json(next_url, retries=1)
+    next_json = utils.get_url_json(next_url + path, retries=1)
     if not next_json:
         logger.debug('updating discovermagazine.com buildId')
         article_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([a-f0-9]+)"', article_html)
+        m = re.search(r'"buildId":"([^"]+)"', article_html)
         if m:
             sites_json['discovermagazine']['buildId'] = m.group(1)
             utils.write_file(sites_json, './sites.json')
-            next_json = utils.get_url_json(
-                'https://www.discovermagazine.com/_next/data/{}{}.json'.format(m.group(1), split_url.path))
+            next_url = 'https://www.discovermagazine.com/_next/data/' + m.group(1)
+            next_json = utils.get_url_json(next_url + path)
             if not next_json:
                 return None
     return next_json

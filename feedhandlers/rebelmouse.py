@@ -23,7 +23,10 @@ def render_content(content):
     content_html = ''
     end_tag = ''
     if content['type'] == 'text':
-        content_html += content['text']
+        def rebelmouse_proxy_image(matchobj):
+            return utils.add_image(matchobj.group(1))
+        text = re.sub('\[rebelmouse-proxy-image (https://[^\s]+) [^\]]+]', rebelmouse_proxy_image, content['text'])
+        content_html += text
 
     elif content['type'] == 'tag':
         if content['name'] == 'p':
@@ -395,11 +398,3 @@ def get_content(url, args, save_debug=False):
 
 def get_feed(args, save_debug=False):
     return rss.get_feed(args, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://spectrum.ieee.org/feeds/feed.rss',
-             'https://spectrum.ieee.org/feeds/type/opinion.rss',
-             'https://spectrum.ieee.org/feeds/topic/consumer-electronics.rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

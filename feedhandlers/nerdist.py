@@ -16,7 +16,7 @@ def get_content(url, args, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1].split('.')[0]
     lede = ''
-    if re.search(r'nerdist\.com/watch/video/', url):
+    if '/watch/video/' in url:
         page_html = utils.get_url_html(url)
         if page_html:
             soup = BeautifulSoup(page_html, 'html.parser')
