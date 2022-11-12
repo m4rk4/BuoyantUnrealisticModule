@@ -16,7 +16,7 @@ def get_feed(args, save_debug=False, func_get_content=None):
     rss_url = args['url']
 
   rss_feed = utils.get_url_html(rss_url)
-  if not rss_url:
+  if not rss_feed:
     return None
   
   try:

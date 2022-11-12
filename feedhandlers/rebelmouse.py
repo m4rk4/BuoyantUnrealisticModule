@@ -370,22 +370,29 @@ def get_content(url, args, save_debug=False):
             break
         item['_image'] = resize_image(val)
 
-    captions = []
-    if post_json.get('photo_caption'):
-        m = re.search('^<p>(.+?)</p>$', post_json['photo_caption'])
-        if m:
-            captions.append(m.group(1))
+    if post_json.get('video'):
+        query = parse_qs(urlsplit(post_json['video']).query)
+        if query.get('jwplayer_video_url'):
+            item['content_html'] += utils.add_embed(query['jwplayer_video_url'][0])
         else:
-            captions.append(post_json['photo_caption'])
-    if post_json.get('photo_credit'):
-        m = re.search('^<p>(.+?)</p>$', post_json['photo_credit'])
-        if m:
-            captions.append(m.group(1))
-        else:
-            captions.append(post_json['photo_credit'])
+            logger.warning('unhandled video {} in {}'.format(post_json['video'], item['url']))
+    else:
+        captions = []
+        if post_json.get('photo_caption'):
+            m = re.search('^<p>(.+?)</p>$', post_json['photo_caption'])
+            if m:
+                captions.append(m.group(1))
+            else:
+                captions.append(post_json['photo_caption'])
+        if post_json.get('photo_credit'):
+            m = re.search('^<p>(.+?)</p>$', post_json['photo_credit'])
+            if m:
+                captions.append(m.group(1))
+            else:
+                captions.append(post_json['photo_credit'])
 
-    if post_json.get('image_info'):
-        item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        if item.get('_image'):
+            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
 
     for child in content_json['children']:
         item['content_html'] += render_content(child)

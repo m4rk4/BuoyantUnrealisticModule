@@ -12,10 +12,11 @@ logger = logging.getLogger(__name__)
 
 
 def add_image(image_wrapper):
-    if image_wrapper.img.get('original'):
-        img_src = image_wrapper.img['original']
+    it = image_wrapper.find('img')
+    if it.get('original'):
+        img_src = it['original']
     else:
-        img_src = image_wrapper.img['src']
+        img_src = it['src']
     captions = []
     it = image_wrapper.find(class_='article-main-image-caption')
     if it and it.get_text().strip():
@@ -94,7 +95,7 @@ def get_content(url, args, save_debug=False):
 
     content_html = ''
     el = soup.find(class_='article-main-image-wrapper')
-    if el and el.img:
+    if el and el.find('img'):
         content_html += add_image(el)
 
     for el in soup.find_all(class_=re.compile(r'item--paragraph--type--')):

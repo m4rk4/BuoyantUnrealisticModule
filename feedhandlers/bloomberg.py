@@ -1,15 +1,14 @@
-import json, re
+import feedparser, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss
 
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 def resize_image(img_src):
     return re.sub(r'[\d-]+x[\d-]+.(jpg|png)', '1024x-1.\\1', img_src)
@@ -21,7 +20,7 @@ def get_bb_url(url, get_json=False):
         "accept-encoding": "gzip, deflate, br",
         "accept-language": "en-US,en;q=0.9,de;q=0.8",
         "cache-control": "max-age=0",
-        "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"103\", \"Chromium\";v=\"103\"",
+        "sec-ch-ua": "\"Chromium\";v=\"106\", \"Microsoft Edge\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "document",
@@ -30,20 +29,38 @@ def get_bb_url(url, get_json=False):
         "sec-fetch-user": "?1",
         "sec-gpc": "1",
         "upgrade-insecure-requests": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.49"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edg/106.0.1370.47"
     }
-
     if get_json:
         headers['accept'] = 'application/json'
-        r = utils.get_url_json(url, headers=headers, allow_redirects=False)
+        content = utils.get_url_json(url, headers=headers, allow_redirects=False)
     else:
         headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
-        r = utils.get_url_html(url, headers=headers, allow_redirects=False)
-    return r
+        content = utils.get_url_html(url, headers=headers, allow_redirects=False)
+    if not content:
+        with sync_playwright() as playwright:
+            webkit = playwright.webkit
+            browser = webkit.launch()
+            context = browser.new_context()
+            page = context.new_page()
+            try:
+                page.goto(url)
+                if get_json:
+                    content = json.loads(page.content())
+                else:
+                    content = page.content()
+                # page.screenshot(path="./debug/screenshot.png")
+            except PlaywrightTimeoutError:
+                logger.warning('timeout error getting ' + url)
+                content = ''
+            browser.close()
+    return content
 
 
 def add_video(video_id):
-    video_json = get_bb_url('https://www.bloomberg.com/multimedia/api/embed?id=' + video_id, True)
+    #api_url = 'https://www.bloomberg.com/multimedia/api/embed?id=' + video_id
+    api_url = 'https://www.bloomberg.com/media-manifest/embed?id=' + video_id
+    video_json = get_bb_url(api_url, True)
     if video_json:
         if video_json.get('description'):
             caption = video_json['description']
@@ -51,6 +68,9 @@ def add_video(video_id):
             caption = video_json['title']
         poster = resize_image('https:' + video_json['thumbnail']['baseUrl'])
         return utils.add_video(video_json['downloadURLs']['600'], 'video/mp4', poster, caption)
+    else:
+        logger.warning('error getting video json ' + api_url)
+        return ''
 
 
 def get_video_content(url, args, save_debug):
@@ -126,9 +146,27 @@ def get_video_content(url, args, save_debug):
     return item
 
 
+def get_newsletter_content(url, args, save_debug):
+    bb_html = get_bb_url(url)
+    if save_debug:
+        utils.write_file(bb_html, './debug/debug.html')
+    if not bb_html:
+        return None
+
+    soup = BeautifulSoup(bb_html, 'html.parser')
+    el = soup.find('script', attrs={"type": "application/json", "data-component-props": "OverlayAd"})
+    if not el:
+        logger.warning('unable to find newsletter props in ' + url)
+        return None
+    article_json = json.loads(el.string)
+    return get_item(article_json, args, save_debug)
+
+
 def get_content(url, args, save_debug):
     if '/videos/' in url:
-        return get_video_content(url, '', args, save_debug)
+        return get_video_content(url, args, save_debug)
+    elif '/newsletters/' in url:
+        return get_newsletter_content(url, args, save_debug)
 
     api_url = ''
     split_url = urlsplit(url)
@@ -143,10 +181,7 @@ def get_content(url, args, save_debug):
         logger.warning('unsupported url ' + url)
         return None
 
-    # bb_json = utils.read_json_file('./debug/debug.json')
-    # if not bb_json:
     bb_json = get_bb_url(api_url, True)
-    # bb_json = utils.get_url_json(api_url, headers={"Accept": "application/json"})
     if not bb_json:
         return None
     if save_debug:
@@ -158,6 +193,10 @@ def get_content(url, args, save_debug):
         logger.warning('unable to find ArticleBody in ' + url)
         return None
     article_json = json.loads(el.string)
+    return get_item(article_json, args, save_debug)
+
+
+def get_item(article_json, args, save_debug):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -204,6 +243,9 @@ def get_content(url, args, save_debug):
             item['content_html'] += '<li>{}</li>'.format(it)
         item['content_html'] += '</ul>'
 
+    body = BeautifulSoup(article_json['story']['body'], 'html.parser')
+
+    lede = ''
     if article_json['story'].get('ledeMediaKind'):
         item['_image'] = article_json['story']['ledeImageUrl']
         captions = []
@@ -215,16 +257,17 @@ def get_content(url, args, save_debug):
             captions.append(article_json['story']['ledeCredit'])
         caption = re.sub(r'<p>|<\/p>', '', ' | '.join(captions))
         if article_json['story']['ledeMediaKind'] == 'image':
-            item['content_html'] += utils.add_image(resize_image(article_json['story']['ledeImageUrl']), caption)
+            lede += utils.add_image(resize_image(article_json['story']['ledeImageUrl']), caption)
         elif article_json['story']['ledeMediaKind'] == 'video':
-            item['content_html'] += add_video(article_json['story']['ledeAttachment']['bmmrId'])
+            lede += add_video(article_json['story']['ledeAttachment']['bmmrId'])
     elif article_json['story'].get('imageAttachments'):
         img_id = [*article_json['story']['imageAttachments']][0]
         image = article_json['story']['imageAttachments'][img_id]
         item['_image'] = image['baseUrl']
-        item['content_html'] += utils.add_image(resize_image(image['baseUrl']), image['caption'])
-
-    body = BeautifulSoup(article_json['story']['body'], 'html.parser')
+        if not body.find('figure', attrs={"data-id": img_id}):
+            lede += utils.add_image(resize_image(image['baseUrl']), image['caption'])
+    if lede:
+        item['content_html'] += lede
 
     for el in body.find_all(attrs={"data-ad-placeholder": "Advertisement"}):
         el.decompose()
@@ -327,14 +370,18 @@ def get_content(url, args, save_debug):
             el.decompose()
 
     for el in body.find_all(class_='thirdparty-embed'):
+        new_html = ''
         it = el.find(class_='instagram-media')
         if it:
             new_html = utils.add_embed(it['data-instgrm-permalink'])
+        elif el.iframe:
+            new_html = utils.add_embed(el.iframe['src'])
+        if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
         else:
-            logger.warning('unhandled embed in ' + url)
+            logger.warning('unhandled embed in ' + item['url'])
 
     for el in body.find_all(class_='paywall'):
         el.attrs = {}
@@ -345,34 +392,56 @@ def get_content(url, args, save_debug):
 
 
 def get_feed(args, save_debug=False):
-    if args['url'].endswith('.rss'):
-        return rss.get_feed(args, save_debug, get_content)
-
+    urls = []
     split_url = urlsplit(args['url'])
     paths = split_url.path[1:].split('/')
-    if len(paths) > 1:
-        logger.warning('unsupported feed ' + args['url'])
-        return None
 
-    if paths[0] in ['markets', 'technology', 'politics', 'wealth', 'pursuits']:
-        page = paths[0] + '-vp'
-    elif paths[0] == 'businessweek':
-        page = 'businessweek-v2'
+    if args['url'].endswith('.rss'):
+        rss_feed = utils.get_url_html(args['url'])
+        if rss_feed:
+            d = feedparser.parse(rss_feed)
+            for entry in d.entries:
+                urls.append(entry.link)
+    elif 'newsletters' in paths:
+        if paths[-1] == 'latest':
+            # https://www.bloomberg.com/newsletters/five-things/latest
+            urls.append(utils.get_redirect_url(args['url']))
+        else:
+            # https://www.bloomberg.com/account/newsletters
+            bb_json = utils.get_url_json('https://login.bloomberg.com/api/newsletters/list?email=&hash=')
+            if bb_json:
+                for key in ['daily', 'weekly']:
+                    for val in bb_json[key]:
+                        if val.get('sampleUrl'):
+                            urls.append(val['sampleUrl'])
+                        elif val.get('variants'):
+                            for v in val['variants']:
+                                if v.get('sampleUrl'):
+                                    urls.append(v['sampleUrl'])
     else:
-        page = paths[0]
-    api_url = 'https://www.bloomberg.com/lineup/api/lazy_load_paginated_module?id=pagination_story_list&page={}&offset=0&zone=righty'.format(
-        page)
-    bb_json = get_bb_url(api_url, True)
-    if save_debug:
-        utils.write_file(bb_json, './debug/feed.json')
-    if not bb_json:
-        return None
-    soup = BeautifulSoup(bb_json['html'], 'html.parser')
+        if len(paths) > 1:
+            logger.warning('unsupported feed ' + args['url'])
+            return None
+
+        if paths[0] in ['markets', 'technology', 'politics', 'wealth', 'pursuits']:
+            page = paths[0] + '-vp'
+        elif paths[0] == 'businessweek':
+            page = 'businessweek-v2'
+        else:
+            page = paths[0]
+        api_url = 'https://www.bloomberg.com/lineup/api/lazy_load_paginated_module?id=pagination_story_list&page={}&offset=0&zone=righty'.format(page)
+        bb_json = get_bb_url(api_url, True)
+        if save_debug:
+            utils.write_file(bb_json, './debug/feed.json')
+        if not bb_json:
+            return None
+        soup = BeautifulSoup(bb_json['html'], 'html.parser')
+        for el in soup.find_all('a', class_='story-list-story__info__headline-link'):
+            urls.append('https://www.bloomberg.com' + el['href'])
 
     n = 0
     items = []
-    for el in soup.find_all('a', class_='story-list-story__info__headline-link'):
-        url = 'https://www.bloomberg.com' + el['href']
+    for url in urls:
         if save_debug:
             logger.debug('getting content for ' + url)
         item = get_content(url, args, save_debug)
@@ -386,11 +455,3 @@ def get_feed(args, save_debug=False):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
-
-
-def test_handler():
-    feeds = ['https://www.bloomberg.com/businessweek'
-             'https://www.bloomberg.com/technology',
-             'https://www.bloomberg.com/authors/AS7Hj1mBMGM/mark-gurman.rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

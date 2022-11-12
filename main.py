@@ -1,7 +1,9 @@
-import glob, importlib, io, os, sys
+import glob, importlib, io, os, requests, sys
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from flask_cors import CORS
+from io import BytesIO
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from urllib.parse import quote
 
 import image_utils, utils
@@ -284,6 +286,41 @@ def image():
     if im_io:
         return send_file(im_io, mimetype=mimetype)
     return mimetype
+
+
+@app.route('/screenshot')
+def screenshot():
+    args = request.args
+    if not args.get('url'):
+        return 'No url specified'
+    with sync_playwright() as playwright:
+        webkit = playwright.webkit
+        browser = webkit.launch()
+        context = browser.new_context(viewport={"width": 800, "height": 1200})
+        page = context.new_page()
+        page.goto(args['url'])
+        if args.get('locator'):
+            ss = page.locator(args['locator']).screenshot()
+        else:
+            ss = page.screenshot()
+    if not ss:
+        return 'Something went wrong'
+    im_io = BytesIO()
+    im_io.write(ss)
+    im_io.seek(0)
+    return send_file(im_io, mimetype='image/png')
+
+
+@app.route('/send_src')
+def send_src():
+    args = request.args
+    if 'src' not in args:
+        return None
+    r = requests.get(args['src'])
+    if r.status_code != 200:
+        return 'Something went wrong'
+    f_io = BytesIO(r.content)
+    return send_file(f_io, mimetype='text/html')
 
 
 if __name__ == '__main__':

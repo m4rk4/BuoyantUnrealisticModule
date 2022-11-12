@@ -106,7 +106,7 @@ def get_content(url, args, save_debug=False, article_json=None):
     if '/storytelling/' in split_url.path:
         logger.warning('unhandled storytelling content ' + url)
         return None
-    elif tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
+    elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
         return usatoday_sportswire.get_content(url, args, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')

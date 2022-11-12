@@ -80,12 +80,14 @@ def format_block(block):
             img_b = utils.image_from_srcset(block['b']['image']['srcSet'], 1000)
         else:
             img_b = block['b']['image']['src']
-        content_html += '<table style="width:100%;"><tr><td style="width:50%"><img src="{}"/><br/><small>{}</small></td><td style="width:50%"><img src="{}"/><br/><small>{}</small></td></tr></table>'.format(img_a, block['a']['title'], img_b, block['b']['title'])
+        content_html += '<table style="width:100%;"><tr><td style="width:50%"><img src="{}"/><br/><small>{}</small></td><td style="width:50%"><img src="{}"/><br/><small>{}</small></td></tr></table>'.format(
+            img_a, block['a']['title'], img_b, block['b']['title'])
 
     elif block['resource'] == 'nc-embed':
         if block.get('video'):
             if block['video'].get('youtubeId'):
-                content_html += utils.add_embed('https://www.youtube.com/watch?v={}'.format(block['video']['youtubeId']))
+                content_html += utils.add_embed(
+                    'https://www.youtube.com/watch?v={}'.format(block['video']['youtubeId']))
             else:
                 logger.warning('unhandled nc-embed video')
         else:
@@ -137,19 +139,26 @@ def format_block(block):
 
     elif block['resource'] == 'nc-linked-buttons':
         for it in block['buttons']:
-            content_html += '<p style="text-align:{};"><a href="{}"><strong>{}</strong></a></p>'.format(it['align'], utils.get_redirect_url(it['pLink']['href']), it['label'])
+            content_html += '<p style="text-align:{};"><a href="{}"><strong>{}</strong></a></p>'.format(it['align'],
+                                                                                                        utils.get_redirect_url(
+                                                                                                            it['pLink'][
+                                                                                                                'href']),
+                                                                                                        it['label'])
 
     elif block['resource'] == 'nc-deals-simple':
-        content_html += '<p style="text-align:center;"><strong>{}</strong> — <a href="{}">{}</a></p>'.format(block['title'], utils.get_redirect_url(block['link']['pLink']['href']), block['link']['label'])
+        content_html += '<p style="text-align:center;"><strong>{}</strong> — <a href="{}">{}</a></p>'.format(
+            block['title'], utils.get_redirect_url(block['link']['pLink']['href']), block['link']['label'])
 
     elif block['resource'] == 'nc-deals-detailed':
         content_html += '<div style="margin-left:20px;"><strong>{}</strong>'.format(block['title'])
         if block.get('tags'):
             content_html += '<br/>{}'.format('•'.join(block['tags']))
         if block.get('refLink'):
-            content_html += '<br/>&#10148;&nbsp;<a href="{}">{}</a>'.format(block['refLink']['pLink']['href'], block['refLink']['label'])
+            content_html += '<br/>&#10148;&nbsp;<a href="{}">{}</a>'.format(block['refLink']['pLink']['href'],
+                                                                            block['refLink']['label'])
         if block.get('link'):
-            content_html += '<br/>&#10148;&nbsp;<a href="{}">{}</a>'.format(utils.get_redirect_url(block['link']['pLink']['href']), block['link']['label'])
+            content_html += '<br/>&#10148;&nbsp;<a href="{}">{}</a>'.format(
+                utils.get_redirect_url(block['link']['pLink']['href']), block['link']['label'])
         content_html += '</div>'
 
     elif block['resource'] == 'nc-deals-large':
@@ -158,9 +167,11 @@ def format_block(block):
         else:
             img_src = block['image']['src']
         img_src = '{}/image?url={}&height=128'.format(config.server, quote_plus(img_src))
-        content_html += '<table><tr><td><img src="{}"/></td><td style="vertical-align:top;"><h4 style="margin:0;">{}</h4><small>{}</small></td></tr></table><ul>'.format(img_src, block['title'], block['text'])
+        content_html += '<table><tr><td><img src="{}"/></td><td style="vertical-align:top;"><h4 style="margin:0;">{}</h4><small>{}</small></td></tr></table><ul>'.format(
+            img_src, block['title'], block['text'])
         for item in block['buttons']:
-            content_html += '<li><a href="{}">{}</a></li>'.format(utils.get_redirect_url(item['link']['pLink']['href']), item['link']['label'])
+            content_html += '<li><a href="{}">{}</a></li>'.format(utils.get_redirect_url(item['link']['pLink']['href']),
+                                                                  item['link']['label'])
         content_html += '</ul>'
 
     elif block['resource'] == 'nc-multi':
@@ -174,6 +185,7 @@ def format_block(block):
         logger.warning('unhandled block ' + block['resource'])
 
     return content_html
+
 
 def get_content(url, args, save_debug=False):
     next_json = get_next_json(url)
@@ -245,7 +257,10 @@ def get_content(url, args, save_debug=False):
                     badge = 'Recommended'
                 elif re.search(r'editors_choice', it['src']):
                     badge = 'Editor\'s Choice'
-        item['content_html'] += '<div style="text-align:center"><strong>{}</strong><h1 style="margin:0;">{}</h1>{}</div><p><em>{}</em></p>'.format(page_json['review']['device']['name'], page_json['review']['device']['score'], badge, page_json['review']['bottomLine'])
+        item[
+            'content_html'] += '<div style="text-align:center"><strong>{}</strong><h1 style="margin:0;">{}</h1>{}</div><p><em>{}</em></p>'.format(
+            page_json['review']['device']['name'], page_json['review']['device']['score'], badge,
+            page_json['review']['bottomLine'])
         if page_json['review'].get('scores'):
             item['content_html'] += '<h3 style="margin-bottom:0;">Our scores</h3>'
             for it in page_json['review']['scores']:
@@ -254,15 +269,18 @@ def get_content(url, args, save_debug=False):
     if page_json.get('table'):
         item['content_html'] += '<h3 style="margin-bottom:0;">{}</h3>'.format(page_json['table']['positive']['title'])
         for it in page_json['table']['positive']['list']:
-            item['content_html'] += '<div>&nbsp;&nbsp;<span style="color:green;">&#10003;</span>&nbsp;{}</div>'.format(it)
+            item['content_html'] += '<div>&nbsp;&nbsp;<span style="color:green;">&#10003;</span>&nbsp;{}</div>'.format(
+                it)
         item['content_html'] += '<h3 style="margin-bottom:0;">{}</h3>'.format(page_json['table']['negative']['title'])
         for it in page_json['table']['negative']['list']:
             item['content_html'] += '<div>&nbsp;&nbsp;<span style="color:red;">&#10007;</span>&nbsp;{}</div>'.format(it)
 
     if page_json.get('offers'):
-        item['content_html'] += '<h3 style="margin-bottom:0;">{}</h3><ul style="margin-top:4px;">'.format(page_json['title'])
+        item['content_html'] += '<h3 style="margin-bottom:0;">{}</h3><ul style="margin-top:4px;">'.format(
+            page_json['title'])
         for it in page_json['offers']['items']:
-            item['content_html'] += '<li><a href="{}">{}</a>'.format(utils.get_redirect_url(it['url']), it['buttonLabel'])
+            item['content_html'] += '<li><a href="{}">{}</a>'.format(utils.get_redirect_url(it['url']),
+                                                                     it['buttonLabel'])
         item['content_html'] += '</ul>'
 
     if page_json.get('stories'):
