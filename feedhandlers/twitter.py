@@ -282,7 +282,8 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
 
 
 def get_tweet_json(tweet_id, save_debug=False):
-    tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
+    # tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
+    tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en'.format(tweet_id))
     if save_debug:
         with open('./debug/tweet.json', 'w') as fd:
             json.dump(tweet_json, fd, indent=2)

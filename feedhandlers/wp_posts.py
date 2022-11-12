@@ -240,6 +240,9 @@ def get_post_content(post, args, save_debug=False):
 def format_content(content_html, item):
     soup = BeautifulSoup(content_html, 'html.parser')
 
+    for el in soup.find_all(class_='ad-aligncenter'):
+        el.decompose()
+
     for el in soup.find_all(id='piano-meter-offer'):
         el.unwrap()
 
@@ -349,8 +352,12 @@ def format_content(content_html, item):
 
     for el in soup.find_all(class_=['wp-block-gallery', 'wp-block-jetpack-tiled-gallery']):
         for it in el.find_all('img'):
-            if it.get('srcset'):
+            if it.get('data-srcset'):
+                img_src = utils.image_from_srcset(it['data-srcset'], 1000)
+            elif it.get('srcset'):
                 img_src = utils.image_from_srcset(it['srcset'], 1000)
+            elif it.get('data-src'):
+                img_src = it['data-src']
             else:
                 img_src = it['src']
             captions = []
@@ -430,6 +437,10 @@ def format_content(content_html, item):
         if img:
             if img.get('srcset'):
                 img_src = utils.image_from_srcset(img['srcset'], 1000)
+            elif img.get('data-srcset'):
+                img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+            elif img.get('data-src'):
+                img_src = img['data-src']
             else:
                 img_src = img['src']
             captions = []
@@ -606,7 +617,10 @@ def format_content(content_html, item):
     for el in soup.find_all('figure', class_='wp-block-embed'):
         new_html = None
         if 'wp-block-embed-youtube' in el['class']:
-            new_html = utils.add_embed(el.iframe['src'])
+            if el.iframe.get('data-src'):
+                new_html = utils.add_embed(el.iframe['data-src'])
+            else:
+                new_html = utils.add_embed(el.iframe['src'])
         elif 'wp-block-embed-twitter' in el['class']:
             links = el.find_all('a')
             new_html = utils.add_embed(links[-1]['href'])
@@ -856,6 +870,7 @@ def format_content(content_html, item):
 
 
 def get_content(url, args, save_debug=False):
+    print(url)
     args_copy = args.copy()
     tld = tldextract.extract(url)
     sites_json = utils.read_json_file('./sites.json')

@@ -1,4 +1,4 @@
-import re, pytz, tldextract
+import json, re, pytz, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -19,6 +19,20 @@ def add_image(image, width=1000):
     if image.get('byline'):
         captions.append(image['byline'])
     return utils.add_image(img_src, ' | '.join(captions))
+
+
+def add_hst_exco_video(player_id):
+    player_url = 'https://player.ex.co/player/' + player_id
+    player = utils.get_url_html(player_url)
+    if not player:
+        return None
+    m = re.search(r'window\.STREAM_CONFIGS\[\'{}\'\] = (.*?);\n'.format(player_id), player)
+    if not m:
+        logger.warning('unable to find STREAM_CONFIGS in ' + player_url)
+        return None
+    stream_config = json.loads(m.group(1))
+    utils.write_file(stream_config, './debug/video.json')
+    return utils.add_video(stream_config['contents'][0]['video']['mp4']['src'], 'video/mp4', stream_config['contents'][0]['poster'], stream_config['contents'][0]['title'])
 
 
 def render_content(content):
@@ -54,6 +68,13 @@ def render_content(content):
                 logger.warning('unsupported embedType ' + content['params']['embedType'])
         elif content['params'].get('attributes') and content['params']['attributes'].get('div_class') and content['params']['attributes']['div_class'] == 'hst-exco-player':
             pass
+        elif content['params'].get('attributes') and content['params']['attributes'].get('script_id') and content['params']['attributes']['script_id'] == 'hst-exco-player-code':
+            pass
+            # m = re.search(r'playerId = \'([^\']+)\'', content['params']['html1'])
+            # if m:
+            #     content_html += add_hst_exco_video(m.group(1))
+            # else:
+            #     logger.warning('unknown hst-exco-player-code playerId')
         elif re.search(r'<iframe', content['params']['html1']):
             m = re.search(r'src="([^"]+)"', content['params']['html1'])
             if m:

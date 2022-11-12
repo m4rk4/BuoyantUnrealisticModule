@@ -182,12 +182,15 @@ def get_content(url, args, save_debug=False):
         else:
             i_max = -1
         for i, episode in enumerate(show_json['episodes']['items']):
-            playback_url = utils.get_redirect_url(episode['external_playback_url'])
             if i == i_max:
                 item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View all episodes</a></td></tr>'.format(config.server, quote_plus(url))
                 break
             minutes = math.ceil(episode['duration_ms'] / 1000 / 60)
-            item['content_html'] += '<li><a href="{}">{}</a><br/><small>{} &ndash; {} min</small></li>'.format(playback_url, episode['name'], episode['release_date'], minutes)
+            if episode.get('external_playback_url'):
+                playback_url = utils.get_redirect_url(episode['external_playback_url'])
+                item['content_html'] += '<li><a href="{}">{}</a><br/><small>{} &ndash; {} min</small></li>'.format(playback_url, episode['name'], episode['release_date'], minutes)
+            else:
+                item['content_html'] += '<li>{}<br/><small>{} &ndash; {} min</small></li>'.format(episode['name'], episode['release_date'], minutes)
         if i != i_max:
             item['content_html'] += '</ol></td></tr>'
         item['content_html'] += '</table></center>'

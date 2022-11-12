@@ -62,35 +62,14 @@ def add_video_embed(uuid):
             return utils.add_video(embed_json['embed_assets']['chorus']['hls_url'], 'application/x-mpegURL', embed_json['embed_assets']['chorus']['poster_url'], embed_json['embed_assets']['chorus']['title'])
     logger.warning('unhandled embed player type {} in {}'.format(embed_json['preferred_player_type'], embed_url))
 
-def get_next_json(url):
-    split_url = urlsplit(url)
-    tld = tldextract.extract(url)
-    sites_json = utils.read_json_file('./sites.json')
-    next_url = '{}://{}/_next/data/{}'.format(split_url.scheme, split_url.netloc, sites_json[tld.domain]['buildId'])
 
-    if split_url.path.endswith('/'):
-        path = split_url.path[:-1]
-    else:
-        path = split_url.path
-    if path:
-        next_url += path + '.json'
-    else:
-        next_url += '/index.json'
-
-    next_json = utils.get_url_json(next_url, retries=1)
-    if not next_json:
-        logger.debug('updating {} buildId'.format(tld.domain))
-        article_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', article_html)
-        if m:
-            sites_json[tld.domain]['buildId'] = m.group(1)
-            utils.write_file(sites_json, './sites.json')
-            next_url = re.sub(r'/data/[^/]+/', '/data/{}/'.format(m.group(1)), next_url)
-            next_json = utils.get_url_json(next_url)
-            if not next_json:
-                return None
-    return next_json
-
+def get_next_data(url):
+    page_html = utils.get_url_html(url)
+    soup = BeautifulSoup(page_html, 'html.parser')
+    el = soup.find('script', id='__NEXT_DATA__')
+    if not el:
+        return None
+    return json.loads(el.string)
 
 def render_body_component(component):
     content_html = ''
@@ -362,13 +341,13 @@ def get_item(entry_json, args, save_debug):
     return item
 
 def get_content(url, args, save_debug):
-    next_json = get_next_json(url)
-    if not next_json:
+    next_data = get_next_data(url)
+    if not next_data:
         return None
-    #if save_debug:
-    #    utils.write_file(next_json, './debug/debug.json')
+    if save_debug:
+        utils.write_file(next_data, './debug/debug.json')
 
-    entry_json = next((it['data']['entity'] for it in next_json['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
+    entry_json = next((it['data']['entity'] for it in next_data['props']['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
     return get_item(entry_json, args, save_debug)
 
 
@@ -377,7 +356,7 @@ def get_feed(args, save_debug=False):
     if '/rss/' in args['url']:
         return rss.get_feed(args, save_debug, get_content)
 
-    next_json = get_next_json(args['url'])
+    next_json = get_next_data(args['url'])
     if save_debug:
         utils.write_file(next_json, './debug/feed.json')
 

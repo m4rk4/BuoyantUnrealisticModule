@@ -425,15 +425,16 @@ def bs_get_inner_html(soup):
   # Also strips \n
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
-def add_blockquote(quote):
+def add_blockquote(quote, pullquote_check=True):
   if quote.startswith('<p>'):
     quote = quote.replace('<p>', '')
     quote = quote.replace('</p>', '<br/><br/>')
     if quote.endswith('<br/><br/>'):
       quote = quote[:-10]
-  m = re.search(r'^["“‘]([^"“‘"”’]+)["”’]$', quote)
-  if m:
-    return add_pullquote(quote)
+  if pullquote_check:
+    m = re.search(r'^["“‘]([^"“‘"”’]+)["”’]$', quote)
+    if m:
+      return add_pullquote(quote)
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
@@ -477,39 +478,38 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', gawker=False):
-  begin_html = '<figure '
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading=''):
+  fig_html = '<figure '
   if fig_style:
-    begin_html += 'style="{}">'.format(fig_style)
+    fig_html += 'style="{}">'.format(fig_style)
   else:
-    begin_html += 'style="margin:0; padding:0;">'
+    fig_html += 'style="margin:0; padding:0;">'
+
+  if heading:
+    fig_html += '<div style="text-align:center;"><b>{}</b></div>'.format(heading)
 
   if link:
-    begin_html += '<a href="{}">'.format(link)
+    fig_html += '<a href="{}">'.format(link)
 
-  begin_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
+  fig_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
   if width:
-    begin_html += ' width:{};'.format(width)
+    fig_html += ' width:{};'.format(width)
   else:
-    begin_html += ' width:100%;'
+    fig_html += ' width:100%;'
   if height:
-    begin_html += ' height:{};'.format(height)
+    fig_html += ' height:{};'.format(height)
   if img_style:
-    begin_html += ' {}'.format(img_style)
-  begin_html += '"/>'
+    fig_html += ' {}'.format(img_style)
+  fig_html += '"/>'
 
   if link:
-    begin_html += '</a>'
-
-  end_html = '</figure>'
+    fig_html += '</a>'
 
   if caption:
-    begin_html += '<figcaption><small>' + caption
-    end_html = '</small></figcaption></figure>'
+    fig_html += '<figcaption><small>{}</small></figcaption>'.format(caption)
 
-  if gawker:
-    return begin_html, end_html
-  return begin_html + end_html
+  fig_html += '</figure>'
+  return fig_html
 
 def add_audio(audio_src, title='', poster='', desc='', link=''):
   if not poster:
@@ -518,7 +518,7 @@ def add_audio(audio_src, title='', poster='', desc='', link=''):
     audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', gawker=False):
+def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style=''):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -556,6 +556,8 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     if height:
       poster += '&height={}'.format(height)
     poster += '&overlay=video'
+  elif video_type == 'video/mp4':
+    poster = '{}/image?url={}&width={}&overlay=video'.format(config.server, quote_plus(video_src), width)
   else:
     poster = '{}/image?width={}'.format(config.server, width)
     if height:
@@ -564,7 +566,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       poster += '&height=720'
     poster += '&overlay=video'
 
-  return add_image(poster, caption, '', '', video_src, img_style=img_style, fig_style=fig_style, gawker=gawker)
+  return add_image(poster, caption, '', '', video_src, img_style=img_style, fig_style=fig_style)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -610,7 +612,7 @@ def get_youtube_id(ytstr):
     logger.warning('unable to determine Youtube video id in ' + ytstr)
   return yt_video_id, yt_list_id
 
-def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
+def add_youtube(ytstr, width=None, height=None, caption=''):
   yt_video_id, yt_list_id = get_youtube_id(ytstr)
   if not yt_video_id:
     return ''
@@ -619,31 +621,9 @@ def add_youtube(ytstr, width=None, height=None, caption='', gawker=False):
 def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
 
-def add_vimeo(vimeo_str, width=None, height=None, caption='', gawker=False):
-  # DOES NOT WORK
-  # vimeo_str can be either:
-  # - the id only, e.g. 545162250
-  # - the Vimeo url, e.g. https://vimeo.com/545162250
-  # - the player url, e.g. https://player.vimeo.com/video/545162250
-  # - an embedded iframe (has a player url)
-  vimeo_id = ''
-  if 'https' in vimeo_str:
-    # Vimeo url 
-    m = re.search(r'vimeo\.com\/(\d+)', vimeo_str)
-    if m:
-      vimeo_id = m.group(1)
-    else:
-      # Player url
-      m = re.search(r'player\.vimeo\.com\/video\/(\d+)', vimeo_str)
-      if m:
-        vimeo_id = m.group(1)
-  else:
-    vimeo_id = vimeo_str
-
-  return add_video('https://vimeo.com/' + vimeo_id, 'vimeo', '', caption, gawker)
-
 def get_twitter_url(tweet_id):
-  tweet_json = get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
+  # tweet_json = get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
+  tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en'.format(tweet_id))
   if not tweet_json:
     return ''
   return 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_id)
@@ -657,20 +637,6 @@ def add_twitter(tweet_url, tweet_id=''):
   if not tweet:
     return ''
   return tweet['content_html']
-
-def add_tiktok(tiktok):
-  # tiktok can be url or id
-  if 'https' in tiktok:
-    # Clean up the url
-    split_url = urlsplit(tiktok)
-    tiktok_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
-  else:
-    # Video id. Note: the user doesn't matter here.
-    tiktok_url = 'https://www.tiktok.com/@tiktok/video/{}'.format(tiktok)
-  tiktok_json = get_url_json('https://www.tiktok.com/oembed?url=' + tiktok_url)
-  if tiktok_json is None:
-    return ''
-  return '<div class="embed-tiktok">{}</div>'.format(tiktok_json['html'])
 
 def add_instagram(igstr):
   ig = instagram.get_content(igstr, {}, False)
@@ -721,83 +687,6 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
     graph_html += '<div><small>{}</small></div>'.format(caption)
   graph_html += '</div>'
   return graph_html
-
-def add_apple_podcast(embed_url, save_debug=True):
-  # https://embed.podcasts.apple.com/us/podcast/little-gold-men/id1042433465?itsct=podcast_box_player&itscg=30200&theme=auto
-  m = re.search(r'\/id(\d+)', embed_url)
-  if not m:
-    logger.warning('unable to parse podcast id from ' + embed_url)
-    return ''
-  json_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
-
-  s = requests.Session()
-  headers = {
-    "accept": "*/*",
-    "accept-encoding": "gzip, deflate, br",
-    "accept-language": "en-US,en;q=0.9",
-    "access-control-request-headers": "authorization",
-    "access-control-request-method": "GET",
-    "cache-control": "no-cache",
-    "dnt": "1",
-    "origin": "https://embed.podcasts.apple.com",
-    "pragma": "no-cache",
-    "referer": "https://embed.podcasts.apple.com/",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "sec-gpc": "1",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
-  }
-  preflight = s.options(json_url, headers=headers)
-  if preflight.status_code != 204:
-    logger.warning('status code {} getting preflight podcast info from {}'.format(preflight.status_code, embed_url))
-    return ''
-
-  headers = {
-    "accept": "*/*",
-    "accept-encoding": "gzip, deflate, br",
-    "accept-language": "en-US,en;q=0.9",
-    "authorization": "Bearer eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjI4NTEwOTQ3LCJleHAiOjE2MzQ3MzE3NDcsIm9yaWdpbiI6WyJodHRwczovL2VtYmVkLnBvZGNhc3RzLmFwcGxlLmNvbSJdfQ.4hpyCflT_5hmcLsD2NpwXMaE9ZhznHcoK0T60XVj7bfeIwibz-fiUao_sH3p8WECcw5f-6v0pFN1VwvSr7klkw",
-    "cache-control": "no-cache",
-    "dnt": "1",
-    "origin": "https://embed.podcasts.apple.com",
-    "pragma": "no-cache",
-    "referer": "https://embed.podcasts.apple.com/",
-    "sec-ch-ua": "\"Chromium\";v=\"92\", \" Not A;Brand\";v=\"99\", \"Google Chrome\";v=\"92\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site",
-    "sec-gpc": "1",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
-  }
-  r = s.get(json_url, headers=headers)
-  if r.status_code != 200:
-    logger.warning('status code {} getting request podcast info from {}'.format(r.status_code, embed_url))
-    return ''
-
-  req_json = r.json()
-  if save_debug:
-    write_file(req_json, './debug/podcast.json')
-
-  podcast_info = req_json['data'][0]['attributes']
-  poster = podcast_info['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
-  desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}</small>'.format(podcast_info['url'], podcast_info['name'], podcast_info['artistName'])
-  podcast_html = '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0; border-bottom: 1px solid black;"><a href="{}"><img style="display:block; border-top-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top; border-bottom: 1px solid black;">{}</td></tr><tr><td colspan="2">Episodes:<ol style="margin-top:0;">'.format(podcast_info['url'], poster, desc)
-
-  for episode in req_json['data'][0]['relationships']['episodes']['data']:
-    dt = datetime.fromisoformat(episode['attributes']['releaseDateTime'].replace('Z', '+00:00'))
-    date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-    time = []
-    t = math.floor(episode['attributes']['durationInMilliseconds'] / 3600000)
-    if t >= 1:
-      time.append('{} hr'.format(t))
-    t = math.ceil((episode['attributes']['durationInMilliseconds'] - 3600000*t) / 60000)
-    if t > 0:
-      time.append('{} min.'.format(t))
-    podcast_html += '<li><a style="text-decoration:none;" href="{}">&#9658;</a>&nbsp;<a href="{}">{}</a> ({}, {})</li>'.format(episode['attributes']['assetUrl'], episode['attributes']['url'], episode['attributes']['name'], date, ' , '.join(time))
-  podcast_html += '</ol></td></tr></table></center>'
-  return podcast_html
 
 def add_audio_track(track_info):
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>'.format(track_info['url'], track_info['title'])

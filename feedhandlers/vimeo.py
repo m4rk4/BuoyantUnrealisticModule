@@ -28,6 +28,8 @@ def get_content(url, args, save_debug):
 
   m = re.search(r'var config = (\{.*?\});', vimeo_html)
   if not m:
+    m = re.search(r'window.playerConfig = (\{.*?\});', vimeo_html)
+  if not m:
     logger.warning('unable to parse player config in ' + player_url)
     return None
 
