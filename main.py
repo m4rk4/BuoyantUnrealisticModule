@@ -293,12 +293,21 @@ def screenshot():
     args = request.args
     if not args.get('url'):
         return 'No url specified'
+    if 'width' in args:
+        width = int(args['width'])
+    else:
+        width = 800
+    if 'height' in args:
+        height = int(args['height'])
+    else:
+        height = 800
     with sync_playwright() as playwright:
         webkit = playwright.webkit
         browser = webkit.launch()
-        context = browser.new_context(viewport={"width": 800, "height": 1200})
+        context = browser.new_context(viewport={"width": width, "height": height})
         page = context.new_page()
         page.goto(args['url'])
+        #page.waitForLoadState('domcontentloaded')
         if args.get('locator'):
             ss = page.locator(args['locator']).screenshot()
         else:

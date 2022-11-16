@@ -63,6 +63,110 @@
             }
         }
     },
+    "businessoffashion": {
+        "api_url": "https://www.businessoffashion.com/pf/api/v3/content/fetch/",
+        "resizer_url": "https://img.businessoffashion.com/resizer/",
+        "resizer_secret": "",
+        "module": "fusion",
+        "deployment": 141,
+        "arc_site": "businessoffashion",
+        "content": {
+            "source": "bof-content-api",
+            "query": {
+                "uri": "PATH/",
+                "website_url": "PATH/",
+                "arc-site": "businessoffashion"
+            }
+        },
+        "homepage_feed": {
+            "source": "story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,"query":"type:%20\"story\"",
+                "size": 10
+            }
+        },
+        "sections": {
+            "exclusives": {
+                "source": "bof-story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20(content_restrictions.content_code:%20\"pay-wall\"%20OR%20taxonomy.sites._id:%20\"/professional\")",
+                    "size": 10
+                }
+            },
+            "latest": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,"query":"type:%20\"story\"",
+                    "size": 10
+                }
+            },
+            "news": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"News%20Brief\"",
+                    "size": 10
+                }
+            },
+            "opinions": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Opinion\"",
+                    "size": 10
+                }
+            },
+            "podcasts": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Podcast\"",
+                    "size": 10
+                }
+            },
+            "videos": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Video\"",
+                    "size": 10
+                }
+            }
+        },
+        "author_feed": {
+            "source": "story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,
+                "query": "type:%20\"story\"%20AND%20credits.by.slug:%20\"AUTHOR\"%20AND%20NOT%20subtype:%20\"News%20Brief\"",
+                "size": 10
+            }
+        },
+        "tag_feed": {
+            "source": "bof-story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,
+                "query": "type:\"story\"%20AND%20taxonomy.sites._id:\"PATH\"%20AND%20NOT%20subtype:\"News%20Brief\"",
+                "size": 10
+            }
+        },
+        "resize_image": {
+            "source": "resize-image-api-client",
+            "query": {
+                "raw_image_url": "SRC",
+                "arc-site": "businessoffashion"
+            }
+        }
+    },
     "al": {
         "api_url": "https://www.al.com/pf/api/v3/content/fetch/",
         "resizer_url": "https://www.al.com/resizer/",
@@ -170,6 +274,12 @@
     },
     "axios": {
         "module": "axios"
+    },
+    "babygaga": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.babygaga.com/feed/"
+        ]
     },
     "baltimoresun": {
         "api_url": "https://www.baltimoresun.com/pf/api/v3/content/fetch/",
@@ -329,7 +439,7 @@
         "module": "cbc"
     },
     "cbr": {
-        "module": "thegamer",
+        "module": "valnetinc",
         "test_feed": [
             "https://www.cbr.com/feed/",
             "https://www.cbr.com/feed/category/cbr-exclusives/"
@@ -622,6 +732,12 @@
             }
         }
     },
+    "collider": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://collider.com/feed/"
+        ]
+    },
     "complex": {
         "module": "complex"
     },
@@ -740,6 +856,13 @@
     "documentcloud": {
         "module": "documentcloud"
     },
+    "dualshockers": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.dualshockers.com/feed/",
+            "https://www.dualshockers.com/feed/features/"
+        ]
+    },
     "dw": {
         "module": "dw",
         "test_feed": [
@@ -856,7 +979,7 @@
         ]
     },
     "gamerant": {
-        "module": "thegamer",
+        "module": "valnetinc",
         "test_feed": [
             "https://www.gamerant.com/feed/",
             "https://www.gamerant.com/feed/category/originals/"
@@ -919,6 +1042,12 @@
     "hr-brew": {
         "module": "morningbrew",
         "buildId": "VqvC4s6lx9O6jLFpvu-av"
+    },
+    "hotcars": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.hotcars.com/feed/"
+        ]
     },
     "houstonchronicle": {
         "module": "hearstnews"
@@ -1065,7 +1194,10 @@
         "module": "gawker"
     },
     "linkdhome": {
-        "module": "sqs"
+        "module": "sqs",
+        "test_feed": [
+            "https://linkdhome.com/articles?format=rss"
+        ]
     },
     "linkedin": {
         "module": "linkedin"
@@ -1232,6 +1364,12 @@
             }
         }
     },
+    "moms": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.moms.com/feed/"
+        ]
+    },
     "morningbrew": {
         "module": "morningbrew",
         "buildId": "j0DIsY1PLCjmSQl_b8fne"
@@ -1241,6 +1379,18 @@
     },
     "msnbc": {
         "module": "nbcnews"
+    },
+    "makeuseof": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.makeuseof.com/feed/"
+        ]
+    },
+    "movieweb": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://movieweb.com/feed/"
+        ]
     },
     "nasa": {
         "module": "nasa"
@@ -1556,6 +1706,12 @@
     "plasticsnews": {
         "module": "crains"
     },
+    "pocketnow": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://pocketnow.com/feed/"
+        ]
+    },
     "podbean": {
         "module": "podbean"
     },
@@ -1681,6 +1837,12 @@
     "screencrush": {
         "module": "townsquare"
     },
+    "screenrant": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://screenrant.com/feed/"
+        ]
+    },
     "scribd": {
         "module": "scribd"
     },
@@ -1710,6 +1872,12 @@
     },
     "simplecast": {
         "module": "simplecast"
+    },
+    "simpleflying": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://simpleflying.com/feed/"
+        ]
     },
     "softpedia": {
         "module": "softpedia"
@@ -2006,7 +2174,7 @@
         "module": "pinnacle"
     },
     "thegamer": {
-        "module": "thegamer",
+        "module": "valnetinc",
         "test_feed": [
             "https://www.thegamer.com/feed/",
             "https://www.thegamer.com/feed/category/tg-originals/"
@@ -2050,6 +2218,18 @@
     "thetakeout": {
         "module": "gawker"
     },
+    "thethings": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.thethings.com/feed/"
+        ]
+    },
+    "thetravel": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.thetravel.com/feed/"
+        ]
+    },
     "theverge": {
         "buildId": "GCgIqHD5kb6oHOSBg99hs",
         "module": "theverge"
@@ -2071,6 +2251,12 @@
     },
     "tmz": {
         "module": "tmz"
+    },
+    "topspeed": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.topspeed.com/feed/"
+        ]
     },
     "towardsdatascience": {
         "module": "medium",
@@ -3436,6 +3622,12 @@
     },
     "wsj": {
         "module": "wsj"
+    },
+    "xda-developers": {
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.xda-developers.com/feed/"
+        ]
     },
     "xxlmag": {
         "module": "townsquare"

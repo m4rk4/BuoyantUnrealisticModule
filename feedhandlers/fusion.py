@@ -19,12 +19,31 @@ def get_deployment_value(url):
     return -1
 
 
-def resize_image(image_item, resizer_url, resizer_secret, width=1280):
+def resize_image(image_item, site_json, width=1280):
+    img_src = ''
     if image_item.get('url') and 'washpost' in image_item['url']:
         if width == 1280:
             width = 916
         img_src = 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(quote_plus(image_item['url']), width)
-    elif resizer_secret:
+    elif site_json.get('resize_image'):
+        query = re.sub(r'\s', '', json.dumps(site_json['resize_image']['query'])).replace('SRC', image_item['url'])
+        api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['resize_image']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
+        api_json = utils.get_url_json(api_url)
+        if api_json:
+            images = []
+            for key, val in api_json.items():
+                m = re.search(r'(\d+)x(\d+)', key)
+                if m and m.group(2) == '0':
+                    img = {
+                        "width": int(m.group(1)),
+                        "path": val.replace('=filters:', '=/{}/filters:'.format(key))
+                    }
+                    images.append(img)
+            if images:
+                split_url = urlsplit(image_item['url'])
+                img = utils.closest_dict(images, 'width', width)
+                img_src = site_json['resizer_url'] + img['path'] + split_url.netloc + split_url.path
+    elif site_json.get('resizer_secret'):
         split_url = urlsplit(image_item['url'])
         if split_url.path.startswith('/resizer'):
             m = re.search(r'/([^/]+(advancelocal|arcpublishing).*)', split_url.path)
@@ -37,10 +56,10 @@ def resize_image(image_item, resizer_url, resizer_secret, width=1280):
         operation_path = '{}x0/smart/'.format(width)
         # THUMBOR_SECURITY_KEY (from tampabay.com)
         #security_key = 'Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7'
-        hashed = hmac.new(bytes(resizer_secret, 'ascii'), bytes(operation_path+image_path, 'ascii'), hashlib.sha1)
+        hashed = hmac.new(bytes(site_json['resizer_secret'], 'ascii'), bytes(operation_path+image_path, 'ascii'), hashlib.sha1)
         #resizer_hash = base64.b64encode(hashed.digest()).decode().replace('+', '-').replace('/', '_')
         resizer_hash = base64.urlsafe_b64encode(hashed.digest()).decode()
-        img_src = '{}{}/{}{}'.format(resizer_url, resizer_hash, operation_path, image_path)
+        img_src = '{}{}/{}{}'.format(site_json['resizer_url'], resizer_hash, operation_path, image_path)
     elif image_item.get('renditions'):
         images = []
         for key, val in image_item['renditions']['original'].items():
@@ -51,51 +70,12 @@ def resize_image(image_item, resizer_url, resizer_secret, width=1280):
             images.append(image)
         image = utils.closest_dict(images, 'width', width)
         img_src = image['url']
-    else:
+    if not img_src:
         img_src = image_item['url']
     return img_src
 
 
-def old_resize_image(image_item, width_target=1024):
-    if image_item.get('url') and 'washpost' in image_item['url']:
-        if width_target == 1024:
-            width_target = 916
-        return 'https://www.washingtonpost.com/wp-apps/imrs.php?src={}&w={}'.format(image_item['url'], width_target)
-
-    img_src = ''
-    if image_item.get('image_srcset'):
-        img_src = utils.image_from_srcset(image_item['image_srcset'], width_target)
-    elif image_item.get('renditions'):
-        images = []
-        for key, val in image_item['renditions']['original'].items():
-            image = {}
-            image['width'] = int(key[:-1])
-            image['url'] = val
-            images.append(image)
-        image = utils.closest_dict(images, 'width', width_target)
-        img_src = image['url']
-    elif image_item.get('resized_urls'):
-        images = []
-        for key, val in image_item['resized_urls'].items():
-            if isinstance(val, dict):
-                images.append(val)
-            else:
-                m = re.search(r'\/resizer\/[^\/]+\/(\d+)x', val)
-                if m:
-                    image = {}
-                    image['url'] = val
-                    image['width'] = int(m.group(1))
-                    images.append(image)
-        image = utils.closest_dict(images, 'width', width_target)
-        img_src = image['url']
-    elif image_item.get('src'):
-        img_src = image_item['src']
-    elif image_item.get('url'):
-        img_src = image_item['url']
-    return img_src
-
-
-def process_content_element(element, url, resizer_url, resizer_secret, save_debug):
+def process_content_element(element, url, site_json, save_debug):
     split_url = urlsplit(url)
 
     element_html = ''
@@ -156,7 +136,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
                 captions.append(element['embed']['config']['image_caption'])
             if element['embed']['config'].get('image_credit'):
                 captions.append(element['embed']['config']['image_credit'])
-            img_src = resize_image({"url": element['embed']['config']['image_src']}, resizer_url, resizer_secret)
+            img_src = resize_image({"url": element['embed']['config']['image_src']}, site_json)
             element_html += utils.add_image(img_src, ' | '.join(captions))
         elif element['subtype'] == 'custom-audio':
             episode = element['embed']['config']['episode']
@@ -184,7 +164,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
     elif element['type'] == 'quote':
         text = ''
         for el in element['content_elements']:
-            text += process_content_element(el, url, resizer_url, resizer_secret, save_debug)
+            text += process_content_element(el, url, site_json, save_debug)
         if element.get('citation'):
             cite = element['citation']['content']
         else:
@@ -251,7 +231,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
         element_html += '</table>'
 
     elif element['type'] == 'image':
-        img_src = resize_image(element, resizer_url, resizer_secret)
+        img_src = resize_image(element, site_json)
         captions = []
         if element.get('credits_caption_display'):
             captions.append(element['credits_caption_display'])
@@ -271,7 +251,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             element_html += utils.add_image(img_src, caption)
 
     elif element['type'] == 'gallery':
-        img_src = resize_image(element['content_elements'][0], resizer_url, resizer_secret)
+        img_src = resize_image(element['content_elements'][0], site_json)
         link = '{}://{}{}'.format(split_url.scheme, split_url.netloc, element['canonical_url'])
         caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
         link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
@@ -323,7 +303,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             if element.get('imageResizerUrls'):
                 poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
             elif element.get('promo_image'):
-                poster = resize_image(element['promo_image'], resizer_url, resizer_secret)
+                poster = resize_image(element['promo_image'], site_json)
             else:
                 poster = ''
             element_html += utils.add_video(stream['url'], stream_type, poster, element['headlines']['basic'])
@@ -353,7 +333,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
             element_html += '<p>by {} (updated {})</p>'.format(byline, date)
         else:
             element_html += '<p>updated {}</p>'.format(date)
-        element_html += get_content_html(element, resizer_url, resizer_secret, url, save_debug)
+        element_html += get_content_html(element, url, site_json, save_debug)
 
     elif element['type'] == 'interstitial_link':
         pass
@@ -364,7 +344,7 @@ def process_content_element(element, url, resizer_url, resizer_secret, save_debu
     return element_html
 
 
-def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
+def get_content_html(content, url, site_json, save_debug):
     content_html = ''
     if content['type'] == 'video':
         streams_mp4 = []
@@ -385,7 +365,7 @@ def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
             if content.get('imageResizerUrls'):
                 poster = utils.closest_dict(content['imageResizerUrls'], 'width', 1000)
             elif content.get('promo_image'):
-                poster = resize_image(content['promo_image'], resizer_url, resizer_secret)
+                poster = resize_image(content['promo_image'], site_json)
             else:
                 poster = ''
             if content.get('description'):
@@ -413,7 +393,9 @@ def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
     if content.get('multimedia_main'):
         lead_image = content['multimedia_main']
     elif content.get('promo_items'):
-        if content['promo_items'].get('lead_art'):
+        if content['promo_items'].get('youtube'):
+            content_html += utils.add_embed(content['promo_items']['youtube']['content'])
+        elif content['promo_items'].get('lead_art'):
             lead_image = content['promo_items']['lead_art']
         elif content['promo_items'].get('basic'):
             lead_image = content['promo_items']['basic']
@@ -421,21 +403,21 @@ def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
             lead_image = content['promo_items']['images'][0]
     if lead_image:
         if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
-            content_html += process_content_element(lead_image, url, resizer_url, resizer_secret, save_debug)
+            content_html += process_content_element(lead_image, url, site_json, save_debug)
 
     for element in content['content_elements']:
-        content_html += process_content_element(element, url, resizer_url, resizer_secret, save_debug)
+        content_html += process_content_element(element, url, site_json, save_debug)
 
     if content.get('related_content') and content['related_content'].get('galleries'):
         for gallery in content['related_content']['galleries']:
             if gallery.get('canonical_url'):
-                content_html += process_content_element(gallery, url, resizer_url, resizer_secret, save_debug)
+                content_html += process_content_element(gallery, url, site_json, save_debug)
             else:
                 content_html += '<h3>Photo Gallery</h3>'
                 for element in gallery['content_elements']:
                     if lead_image and lead_image['id'] == element['id']:
                         continue
-                    content_html += process_content_element(element, url, resizer_url, resizer_secret, save_debug)
+                    content_html += process_content_element(element, url, site_json, save_debug)
 
     # Reuters specific
     if content.get('related_content') and content['related_content'].get('videos'):
@@ -448,7 +430,7 @@ def get_content_html(content, url, resizer_url, resizer_secret, save_debug):
     return content_html
 
 
-def get_item(content, url, resizer_url, resizer_secret, args, save_debug):
+def get_item(content, url, site_json, args, save_debug):
     item = {}
     if content.get('_id'):
         item['id'] = content['_id']
@@ -531,21 +513,21 @@ def get_item(content, url, resizer_url, resizer_secret, args, save_debug):
 
     if content.get('promo_items'):
         if content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
-            item['_image'] = resize_image(content['promo_items']['basic'], resizer_url, resizer_secret)
+            item['_image'] = resize_image(content['promo_items']['basic'], site_json)
         elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'gallery':
-            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], resizer_url, resizer_secret)
+            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
         elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'video':
-            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], resizer_url, resizer_secret)
+            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
         elif content['promo_items'].get('images'):
-            item['_image'] = resize_image(content['promo_items']['images'][0], resizer_url, resizer_secret)
+            item['_image'] = resize_image(content['promo_items']['images'][0], site_json)
     elif content.get('content_elements'):
         if content['content_elements'][0]['type'] == 'image':
-            item['_image'] = resize_image(content['content_elements'][0], resizer_url, resizer_secret)
+            item['_image'] = resize_image(content['content_elements'][0], site_json)
         elif content['content_elements'][0]['type'] == 'video':
             if content['content_elements'][0].get('imageResizerUrls'):
                 item['_image'] = utils.closest_dict(content['content_elements'][0]['imageResizerUrls'], 'width', 1000)
             elif content['content_elements'][0].get('promo_image'):
-                item['_image'] = resize_image(content['content_elements'][0]['promo_image'], resizer_url, resizer_secret)
+                item['_image'] = resize_image(content['content_elements'][0]['promo_image'], site_json)
 
     if content.get('description'):
         if isinstance(content['description'], str):
@@ -553,7 +535,7 @@ def get_item(content, url, resizer_url, resizer_secret, args, save_debug):
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
 
-    item['content_html'] = get_content_html(content, url, resizer_url, resizer_secret, save_debug)
+    item['content_html'] = get_content_html(content, url, site_json, save_debug)
     return item
 
 
@@ -568,15 +550,13 @@ def get_content(url, args, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     tld = tldextract.extract(url)
     sites_json = utils.read_json_file('./sites.json')
-    d = sites_json[tld.domain]['deployment']
-    resizer_url = sites_json[tld.domain]['resizer_url']
-    resizer_secret = sites_json[tld.domain]['resizer_secret']
+    site_json = sites_json[tld.domain]
 
     for n in range(2):
-        query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['content']['query'])).replace('PATH', path)
+        query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
         if 'ajc.com' in split_url.netloc:
             query = query.replace('ID', paths[-1])
-        api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], sites_json[tld.domain]['content']['source'], quote_plus(query), d, sites_json[tld.domain]['arc_site'])
+        api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:
             logger.debug('getting content from ' + api_url)
 
@@ -586,8 +566,9 @@ def get_content(url, args, save_debug=False):
         elif n == 0:
             # Failed...try new deployment value
             d = get_deployment_value(url)
-            if d > 0 and d != sites_json[tld.domain]['deployment']:
-                sites_json[tld.domain]['deployment'] = d
+            if d > 0 and d != site_json['deployment']:
+                site_json['deployment'] = d
+                site_json['deployment'] = d
                 utils.write_file(sites_json, './sites.json')
                 logger.warning('retrying with new deployment value {}'.format(d))
             else:
@@ -604,8 +585,8 @@ def get_content(url, args, save_debug=False):
         utils.write_file(content, './debug/debug.json')
 
     if content.get('result'):
-        return get_item(content['result'], url, resizer_url, resizer_secret, args, save_debug)
-    return get_item(content, url, resizer_url, resizer_secret, args, save_debug)
+        return get_item(content['result'], url, site_json, args, save_debug)
+    return get_item(content, url, site_json, args, save_debug)
 
 
 def get_feed(args, save_debug=False):
@@ -618,9 +599,7 @@ def get_feed(args, save_debug=False):
 
     tld = tldextract.extract(args['url'])
     sites_json = utils.read_json_file('./sites.json')
-    d = sites_json[tld.domain]['deployment']
-    resizer_url = sites_json[tld.domain]['resizer_url']
-    resizer_secret = sites_json[tld.domain]['resizer_secret']
+    site_json = sites_json[tld.domain]
 
     split_url = urlsplit(args['url'])
     if split_url.path.endswith('/'):
@@ -631,8 +610,8 @@ def get_feed(args, save_debug=False):
 
     for n in range(2):
         if len(paths) == 0:
-            source = sites_json[tld.domain]['homepage_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['homepage_feed']['query']))
+            source = site_json['homepage_feed']['source']
+            query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
         elif re.search(r'about|author|people|staff', paths[0]):
             if paths[0] == 'about':
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
@@ -648,40 +627,45 @@ def get_feed(args, save_debug=False):
                 else:
                     logger.warning('unhandled author url ' + args['url'])
                     return None
-            source = sites_json[tld.domain]['author_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
+            source = site_json['author_feed']['source']
+            query = re.sub(r'\s', '', json.dumps(site_json['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
         elif paths[0] == 'tags' or paths[0] == 'tag' or paths[0] == 'topics' or (paths[0] == 'topic' and 'thebaltimorebanner' not in split_url.netloc):
             tag = paths[1]
-            source = sites_json[tld.domain]['tag_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path).replace('%20', ' ')
+            source = site_json['tag_feed']['source']
+            query = re.sub(r'\s', '', json.dumps(site_json['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path).replace('%20', ' ')
         elif split_url.netloc == 'www.reuters.com' and split_url.path.startswith('/markets/companies/'):
             tag = paths[-1]
-            source = sites_json[tld.domain]['stock_symbol_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['stock_symbol_feed']['query'])).replace('SYMBOL', tag).replace('PATH', path).replace('%20', ' ')
+            source = site_json['stock_symbol_feed']['source']
+            query = re.sub(r'\s', '', json.dumps(site_json['stock_symbol_feed']['query'])).replace('SYMBOL', tag).replace('PATH', path).replace('%20', ' ')
         else:
-            source = sites_json[tld.domain]['section_feed']['source']
-            if 'washingtonpost' in split_url.netloc:
-                page_html = utils.get_url_html(args['url'])
-                if not page_html:
-                    return None
-                query = ''
-                for m in re.findall(r'"_admin":({[^}]+})', page_html):
-                    admin = json.loads(m)
-                    if path in admin['alias_ids']:
-                        query = '{{"query":"{}"}}'.format(re.sub(r'limit=\d+', 'limit=10', admin['default_content']))
-                        break
-                if not query:
-                    m = re.search(r'(prism://prism\.query/[^&]+)', page_html)
-                    if m:
-                        query = '{{"query":"{}"}}'.format(m.group(1) + '&limit=10')
-                if not query:
-                    logger.warning('unknown feed for ' + args['url'])
-                    return None
-            else:
+            if site_json.get('section_feed'):
+                source = site_json['section_feed']['source']
+                if 'washingtonpost' in split_url.netloc:
+                    page_html = utils.get_url_html(args['url'])
+                    if not page_html:
+                        return None
+                    query = ''
+                    for m in re.findall(r'"_admin":({[^}]+})', page_html):
+                        admin = json.loads(m)
+                        if path in admin['alias_ids']:
+                            query = '{{"query":"{}"}}'.format(re.sub(r'limit=\d+', 'limit=10', admin['default_content']))
+                            break
+                    if not query:
+                        m = re.search(r'(prism://prism\.query/[^&]+)', page_html)
+                        if m:
+                            query = '{{"query":"{}"}}'.format(m.group(1) + '&limit=10')
+                    if not query:
+                        logger.warning('unknown feed for ' + args['url'])
+                        return None
+                else:
+                    section = paths[-1]
+                    query = re.sub(r'\s', '', json.dumps(site_json['section_feed']['query'])).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
+            elif site_json.get('sections') and site_json['sections'].get(paths[-1]):
                 section = paths[-1]
-                query = re.sub(r'\s', '', json.dumps(sites_json[tld.domain]['section_feed']['query'])).replace('PATH', path).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
+                source = site_json['sections'][section]['source']
+                query = re.sub(r'\s', '', json.dumps(site_json['sections'][section]['query'])).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
 
-        api_url = '{}{}?query={}&d={}&_website={}'.format(sites_json[tld.domain]['api_url'], source, quote_plus(query), d, sites_json[tld.domain]['arc_site'])
+        api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], source, quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:
             logger.debug('getting feed from ' + api_url)
 
@@ -691,7 +675,8 @@ def get_feed(args, save_debug=False):
         elif n == 0:
             # Failed...try new deployment value
             d = get_deployment_value(args['url'])
-            if d > 0 and d != sites_json[tld.domain]['deployment']:
+            if d > 0 and d != site_json['deployment']:
+                site_json['deployment'] = d
                 sites_json[tld.domain]['deployment'] = d
                 utils.write_file(sites_json, './sites.json')
                 logger.warning('retrying with new deployment value {}'.format(d))
@@ -729,8 +714,8 @@ def get_feed(args, save_debug=False):
             url = content['website_url']
         elif content.get('url'):
             url = content['url']
-        elif content.get('websites') and content['websites'].get(sites_json[tld.domain]['arc_site']) and content['websites'][sites_json[tld.domain]['arc_site']].get('website_url'):
-            url = content['websites'][sites_json[tld.domain]['arc_site']]['website_url']
+        elif content.get('websites') and content['websites'].get(site_json['arc_site']) and content['websites'][site_json['arc_site']].get('website_url'):
+            url = content['websites'][site_json['arc_site']]['website_url']
 
         if url.startswith('/'):
             url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, url)
@@ -756,9 +741,9 @@ def get_feed(args, save_debug=False):
         if not content.get('type'):
             item = get_content(url, args, save_debug)
         elif content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
-            item = get_item(content, url, resizer_url, resizer_secret, args, save_debug)
+            item = get_item(content, url, site_json, args, save_debug)
         elif content.get('type') and content['type'] == 'video' and content.get('streams'):
-            item = get_item(content, url, resizer_url, resizer_secret, args, save_debug)
+            item = get_item(content, url, site_json, args, save_debug)
         else:
             item = get_content(url, args, save_debug)
 
@@ -774,16 +759,3 @@ def get_feed(args, save_debug=False):
         feed['title'] = feed_title
     feed['items'] = items.copy()
     return feed
-
-
-def test_handler():
-    feeds = ['https://feeds.washingtonpost.com/rss/homepage',
-             'https://www.bostonglobe.com/arc/outboundfeeds/rss/?outputType=xml',
-             'https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml',
-             'https://www.masslive.com/arc/outboundfeeds/rss/?outputType=xml',
-             'https://www.al.com/arc/outboundfeeds/rss/?outputType=xml',
-             'https://www.washingtonpost.com/business/technology/',
-             'https://www.washingtonpost.com/opinions/',
-             'https://www.reuters.com/technology']
-    for url in feeds:
-        get_feed({"url": url}, True)

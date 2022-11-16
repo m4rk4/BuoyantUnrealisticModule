@@ -4,6 +4,17 @@ https://www.commentary.org/wp-json/wp/v2/posts
 https://nichegamer.com/wp-json/wp/v2/posts
 https://www.discoursemagazine.com/wp-json/wp/v2/posts/5051
 https://lastminuteengineers.com/wp-json/wp/v2/posts/485
+https://cordcutterweekly.com/wp-json/wp/v2/posts/4277
+https://www.cnx-software.com/wp-json/wp/v2/posts
+https://blog.adafruit.com/wp-json/wp/v2/posts
+https://www.smarthomebeginner.com/wp-json/wp/v2/posts
+https://mariushosting.com/wp-json/wp/v2/posts
+https://nascompares.com/wp-json/wp/v2/posts/61556
+https://www.tor.com/wp-json/wp/v2/posts
+https://daily.jstor.org/wp-json/wp/v2/posts
+https://www.gizchina.com/wp-json/wp/v2/posts
+https://www.saturdayeveningpost.com/wp-json/wp/v2/posts/1140519
+https://globalnews.ca/wp-json/wp/v2/posts
 
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
 
