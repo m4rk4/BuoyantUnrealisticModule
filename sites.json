@@ -63,110 +63,6 @@
             }
         }
     },
-    "businessoffashion": {
-        "api_url": "https://www.businessoffashion.com/pf/api/v3/content/fetch/",
-        "resizer_url": "https://img.businessoffashion.com/resizer/",
-        "resizer_secret": "",
-        "module": "fusion",
-        "deployment": 141,
-        "arc_site": "businessoffashion",
-        "content": {
-            "source": "bof-content-api",
-            "query": {
-                "uri": "PATH/",
-                "website_url": "PATH/",
-                "arc-site": "businessoffashion"
-            }
-        },
-        "homepage_feed": {
-            "source": "story-feed-query",
-            "query": {
-                "feature": "results-list",
-                "offset": 0,"query":"type:%20\"story\"",
-                "size": 10
-            }
-        },
-        "sections": {
-            "exclusives": {
-                "source": "bof-story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,
-                    "query": "type:%20\"story\"%20AND%20(content_restrictions.content_code:%20\"pay-wall\"%20OR%20taxonomy.sites._id:%20\"/professional\")",
-                    "size": 10
-                }
-            },
-            "latest": {
-                "source": "story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,"query":"type:%20\"story\"",
-                    "size": 10
-                }
-            },
-            "news": {
-                "source": "story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,
-                    "query": "type:%20\"story\"%20AND%20subtype:%20\"News%20Brief\"",
-                    "size": 10
-                }
-            },
-            "opinions": {
-                "source": "story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,
-                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Opinion\"",
-                    "size": 10
-                }
-            },
-            "podcasts": {
-                "source": "story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,
-                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Podcast\"",
-                    "size": 10
-                }
-            },
-            "videos": {
-                "source": "story-feed-query",
-                "query": {
-                    "feature": "results-list",
-                    "offset": 0,
-                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Video\"",
-                    "size": 10
-                }
-            }
-        },
-        "author_feed": {
-            "source": "story-feed-query",
-            "query": {
-                "feature": "results-list",
-                "offset": 0,
-                "query": "type:%20\"story\"%20AND%20credits.by.slug:%20\"AUTHOR\"%20AND%20NOT%20subtype:%20\"News%20Brief\"",
-                "size": 10
-            }
-        },
-        "tag_feed": {
-            "source": "bof-story-feed-query",
-            "query": {
-                "feature": "results-list",
-                "offset": 0,
-                "query": "type:\"story\"%20AND%20taxonomy.sites._id:\"PATH\"%20AND%20NOT%20subtype:\"News%20Brief\"",
-                "size": 10
-            }
-        },
-        "resize_image": {
-            "source": "resize-image-api-client",
-            "query": {
-                "raw_image_url": "SRC",
-                "arc-site": "businessoffashion"
-            }
-        }
-    },
     "al": {
         "api_url": "https://www.al.com/pf/api/v3/content/fetch/",
         "resizer_url": "https://www.al.com/resizer/",
@@ -233,7 +129,12 @@
         "buildId": "UjuoivvJjybyyZeE7sUjE"
     },
     "androidpolice": {
-        "module": "androidpolice"
+        "module": "valnetinc",
+        "test_feed": [
+            "https://www.androidpolice.com/feed/",
+            "https://www.androidpolice.com/feed/deals/",
+            "https://www.androidpolice.com/feed/reviews/"
+        ]
     },
     "apnews": {
         "module": "apnews"
@@ -419,6 +320,110 @@
     },
     "businessinsider": {
         "module": "insider"
+    },
+    "businessoffashion": {
+        "api_url": "https://www.businessoffashion.com/pf/api/v3/content/fetch/",
+        "resizer_url": "https://img.businessoffashion.com/resizer/",
+        "resizer_secret": "",
+        "module": "fusion",
+        "deployment": 141,
+        "arc_site": "businessoffashion",
+        "content": {
+            "source": "bof-content-api",
+            "query": {
+                "uri": "PATH/",
+                "website_url": "PATH/",
+                "arc-site": "businessoffashion"
+            }
+        },
+        "homepage_feed": {
+            "source": "story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,"query":"type:%20\"story\"",
+                "size": 10
+            }
+        },
+        "sections": {
+            "exclusives": {
+                "source": "bof-story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20(content_restrictions.content_code:%20\"pay-wall\"%20OR%20taxonomy.sites._id:%20\"/professional\")",
+                    "size": 10
+                }
+            },
+            "latest": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,"query":"type:%20\"story\"",
+                    "size": 10
+                }
+            },
+            "news": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"News%20Brief\"",
+                    "size": 10
+                }
+            },
+            "opinions": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Opinion\"",
+                    "size": 10
+                }
+            },
+            "podcasts": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Podcast\"",
+                    "size": 10
+                }
+            },
+            "videos": {
+                "source": "story-feed-query",
+                "query": {
+                    "feature": "results-list",
+                    "offset": 0,
+                    "query": "type:%20\"story\"%20AND%20subtype:%20\"Video\"",
+                    "size": 10
+                }
+            }
+        },
+        "author_feed": {
+            "source": "story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,
+                "query": "type:%20\"story\"%20AND%20credits.by.slug:%20\"AUTHOR\"%20AND%20NOT%20subtype:%20\"News%20Brief\"",
+                "size": 10
+            }
+        },
+        "tag_feed": {
+            "source": "bof-story-feed-query",
+            "query": {
+                "feature": "results-list",
+                "offset": 0,
+                "query": "type:\"story\"%20AND%20taxonomy.sites._id:\"PATH\"%20AND%20NOT%20subtype:\"News%20Brief\"",
+                "size": 10
+            }
+        },
+        "resize_image": {
+            "source": "resize-image-api-client",
+            "query": {
+                "raw_image_url": "SRC",
+                "arc-site": "businessoffashion"
+            }
+        }
     },
     "bustle": {
         "module": "bustle"
@@ -735,7 +740,8 @@
     "collider": {
         "module": "valnetinc",
         "test_feed": [
-            "https://collider.com/feed/"
+            "https://collider.com/feed/",
+            "https://collider.com/feed/category/all-reviews/"
         ]
     },
     "complex": {
@@ -776,6 +782,9 @@
     },
     "crainscleveland": {
         "module": "crains"
+    },
+    "crunch": {
+        "module": "crunch"
     },
     "ctinsider": {
         "module": "hearstnews"
@@ -860,7 +869,8 @@
         "module": "valnetinc",
         "test_feed": [
             "https://www.dualshockers.com/feed/",
-            "https://www.dualshockers.com/feed/features/"
+            "https://www.dualshockers.com/feed/features/",
+            "https://www.dualshockers.com/feed/gaming-reviews/"
         ]
     },
     "dw": {
@@ -962,6 +972,10 @@
     "foxsports": {
         "module": "fox"
     },
+    "freep": {
+        "module": "gannett",
+        "site_code": "PDTF"
+    },
     "ft": {
         "module": "ft"
     },
@@ -1046,7 +1060,9 @@
     "hotcars": {
         "module": "valnetinc",
         "test_feed": [
-            "https://www.hotcars.com/feed/"
+            "https://www.hotcars.com/feed/",
+            "https://www.hotcars.com/feed/category/car-reviews/",
+            "https://www.hotcars.com/feed/category/hotcars-exclusives/"
         ]
     },
     "houstonchronicle": {
@@ -1389,7 +1405,9 @@
     "movieweb": {
         "module": "valnetinc",
         "test_feed": [
-            "https://movieweb.com/feed/"
+            "https://movieweb.com/feed/",
+            "https://movieweb.com/feed/features/",
+            "https://movieweb.com/feed/movie-reviews/"
         ]
     },
     "nasa": {
@@ -1840,7 +1858,9 @@
     "screenrant": {
         "module": "valnetinc",
         "test_feed": [
-            "https://screenrant.com/feed/"
+            "https://screenrant.com/feed/",
+            "https://screenrant.com/feed/sr-originals/",
+            "https://screenrant.com/feed/movie-reviews/"
         ]
     },
     "scribd": {
@@ -2091,6 +2111,10 @@
         "test_feed": [
             "https://www.techsponential.com/reports?format=rss"
         ]
+    },
+    "tennessean": {
+        "module": "gannett",
+        "site_code": "PNAS"
     },
     "theathletic": {
         "module": "athletic"
@@ -3626,7 +3650,8 @@
     "xda-developers": {
         "module": "valnetinc",
         "test_feed": [
-            "https://www.xda-developers.com/feed/"
+            "https://www.xda-developers.com/feed/",
+            "https://www.xda-developers.com/feed/reviews/"
         ]
     },
     "xxlmag": {
@@ -3638,6 +3663,12 @@
     "ydr": {
         "module": "gannett",
         "site_code": "PPYR"
+    },
+    "yougov": {
+        "module": "yougov",
+        "test_feed": [
+            "https://today.yougov.com/news/feeds/latest/"
+        ]
     },
     "youtube": {
         "module": "youtube"

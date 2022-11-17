@@ -11,8 +11,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def add_image(el, gallery=False):
-    print(el)
+def resize_image(img_src, width=1000):
+    split_url = urlsplit(img_src)
+    if split_url.query:
+        query = re.sub(r'w=\d+', 'w={}'.format(width), split_url.query)
+        query = re.sub(r'(\?|&)h=\d+', '', query)
+    else:
+        query = 'w={}'.format(width)
+    return '{}://{}{}?{}'.format(split_url.scheme, split_url.netloc, split_url.path, query)
+
+
+def add_image(el, gallery=False, width=1000):
     if gallery:
         it = el.find(class_='img-gallery-thumbnail-img')
     else:
@@ -23,7 +32,7 @@ def add_image(el, gallery=False):
             caption = ''
     else:
         caption = ''
-    return utils.add_image(it['data-img-url'], caption)
+    return utils.add_image(resize_image(it['data-img-url']), caption)
 
 
 def get_content(url, args, save_debug=False):
@@ -122,13 +131,26 @@ def get_content(url, args, save_debug=False):
             caption = ''
         item['content_html'] += utils.add_image(item['_image'], caption)
 
+    el = soup.find(class_='w-rating-widget')
+    if el:
+        it = el.find(class_='rating-text')
+        if it:
+            item['content_html'] += '<h2>{}</h2>'.format(it.get_text().strip())
+
     body = soup.find(id='article-body')
     if body:
+        for el in body.find_all(class_='emaki-custom-update'):
+            new_html = ''
+            for it in el.find_all(class_='update'):
+                new_html += it.decode_contents()
+            item['content_html'] += utils.add_blockquote(new_html)
+            el.decompose()
+
         # Remove comment sections
         for el in body.find_all(text=lambda text: isinstance(text, Comment)):
             el.extract()
 
-        for el in body.find_all(class_=re.compile('ad-even|ad-odd|ad-zone|affiliate-sponsored')):
+        for el in body.find_all(class_=re.compile('ad-even|ad-odd|ad-zone|affiliate-sponsored|article-jumplink|article-table-contents')):
             el.decompose()
 
         for el in body.find_all(id='article-waypoint'):
@@ -138,19 +160,28 @@ def get_content(url, args, save_debug=False):
             if el.parent and el.parent.name == 'p':
                 el.parent.decompose()
 
-        for el in body.find_all(class_='article__gallery'):
-            new_html = ''
-            for it in el.find_all(class_='gallery__images__item'):
-                new_html += add_image(it, True)
+        for el in body.find_all('blockquote', class_=False):
+            new_html = utils.add_pullquote(el.get_text().strip())
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
 
-        for el in body.find_all(class_='body-img'):
-            new_html = add_image(el)
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+        for el in body.find_all(class_='emaki-custom-block'):
+            new_html = ''
+            if 'emaki-custom-pullquote' in el['class']:
+                it = el.find(class_='pullquote')
+                if it:
+                    new_html = utils.add_pullquote(it.decode_contents())
+            elif 'emaki-custom-note' in el['class']:
+                it = el.find(class_='note')
+                if it:
+                    new_html = utils.add_blockquote('<b>Note:</b>' + it.decode_contents())
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled emaki-custom-block {} in {}'.format(el['class'], item['url']))
 
         for el in body.find_all(class_='w-rich'):
             new_html = ''
@@ -160,7 +191,7 @@ def get_content(url, args, save_debug=False):
                     links = it.find_all('a')
                     new_html = utils.add_embed(links[-1]['href'])
                 else:
-                    new_html = utils.add_embed(utils.get_twitter_url(it['id']))
+                    new_html = utils.add_embed(utils.get_twitter_url(el['id']))
             elif 'w-youtube' in el['class']:
                 new_html = utils.add_embed('https://www.youtube.com/embed/' + el['id'])
             elif 'w-instagram' in el['class']:
@@ -178,6 +209,32 @@ def get_content(url, args, save_debug=False):
                 new_html = utils.add_embed(it['href'])
             elif 'w-twitch' in el['class']:
                 new_html = utils.add_embed('https://player.twitch.tv/?video=' + el['id'])
+            elif 'w-play_store_app' in el['class']:
+                new_html = '<table><tr>'
+                it = el.find('img')
+                if it:
+                    new_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(resize_image(it['src']))
+                new_html += '<td style="vertical-align:top;">'
+                it = el.find(class_='app-widget-name')
+                if it:
+                    new_html += '<a href="{}"><b>{}</b></a>'.format(it['href'], it.get_text().strip())
+                it = el.find(class_='app-developer-name')
+                if it:
+                    if it.a:
+                        new_html += ' (<a href="{}">{}</a>)'.format(it.a['href'], it.get_text().strip())
+                    else:
+                        new_html += ' ({})'.format(it.get_text().strip())
+                it = el.find(class_='app-widget-price')
+                if it:
+                    new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
+                it = el.find(class_=re.compile(r'app-widget-rating'))
+                if it:
+                    new_html += '<div><small>Rating: {}</small></div>'.format(it.get_text().strip())
+                it = el.find(class_='app-widget-download')
+                if it:
+                    new_html += '<div><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
+                new_html += '</td></tr></table>'
+
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -185,11 +242,136 @@ def get_content(url, args, save_debug=False):
             else:
                 logger.warning('unhandled {} in {}'.format(el['class'], item['url']))
 
-        for el in body.find_all('img', attrs={"alt": True}):
-            new_html = utils.add_image(el['src'])
+        for el in body.find_all(class_='display-card'):
+            it = el.find(class_='w-display-card-info')
+            if it and it.get_text().strip():
+                new_html = '<table><tr>'
+                it = el.find(class_='display-card-title')
+                if it:
+                    if it.a:
+                        new_html += '<tr><td style="text-align:center;"><a href="{}"><span style="font-size:1.3em; font-weight:bold;">{}</span></a></td></tr>'.format(it.a['href'], it.get_text().strip())
+                    else:
+                        new_html += '<tr><td style="text-align:center;"><span style="font-size:1.3em; font-weight:bold;">{}</span></td></tr>'.format(it.get_text().strip())
+                it = el.find(class_='display-card-rating')
+                if it:
+                    new_html += '<tr><td style="text-align:center;"><span style="font-size:1.5em; font-weight:bold;">{}</span></td></tr>'.format(it.get_text().strip())
+                for it in body.find_all(class_='article__gallery'):
+                    img = it.find(attrs={"data-img-url": re.compile(r'reco-badge', flags=re.I)})
+                    if img:
+                        new_html += '<tr><td style="text-align:center;"><img src="{}" style="width:128px;"/></td></tr>'.format(resize_image(img['data-img-url'], 128))
+                        it.decompose()
+                        break
+                it = el.find(class_='w-img')
+                if it:
+                    new_html += '<tr><td>{}</td></tr>'.format(add_image(it))
+                it = el.find(class_='w-display-card-description')
+                if it:
+                    new_html += '<tr><td>{}</td></tr>'.format(it.decode_contents())
+                it = el.find(class_='w-display-card-info')
+                if it:
+                    new_html += '<tr><td>{}</td></tr>'.format(it.decode_contents())
+                it = el.find(class_='w-display-card-link')
+                if it:
+                    new_html += '<tr><td><ul>'
+                    for link in it.find_all('a'):
+                        new_html += '<li><a href="{}">{}</a></li>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                    new_html += '</ul></td></tr>'
+                new_html += '</table>'
+            else:
+                new_html = '<table><tr>'
+                it = el.find('img')
+                if it:
+                    if it.get('src'):
+                        new_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(resize_image(it['src']))
+                    elif it.get('data-img-url'):
+                        new_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(resize_image(it['data-img-url']))
+                    else:
+                        logger.warning('unhandled display-card image in ' + item['url'])
+                new_html += '<td style="vertical-align:top;">'
+                it = el.find(class_='display-card-title')
+                if it:
+                    if it.a:
+                        new_html += '<a href="{}"><b>{}</b></a>'.format(it.a['href'], it.get_text().strip())
+                    else:
+                        new_html += '<b>{}</b>'.format(it.get_text().strip())
+                it = el.find(class_='display-card-rating')
+                if it:
+                    new_html += '<div>Rating: {}</div>'.format(it.get_text().strip())
+                it = el.find(class_='w-display-card-description')
+                if it:
+                    new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
+                it = el.find(class_='w-display-card-link')
+                if it:
+                    for link in it.find_all('a'):
+                        new_html += '<a href="{}">{}</a><br/>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                    new_html = new_html[:-5]
+                new_html += '</td></tr></table>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
+
+        for el in body.find_all(class_='w-review-item'):
+            new_html = '<table style="width:100%;">'
+            it = el.find(class_='review-item-title')
+            if it:
+                new_html += '<tr><td style="text-align:center;"><span style="font-size:1.3em; font-weight:bold;">{}</span></td></tr>'.format(it.get_text().strip())
+            it = el.find(class_=re.compile('rai?ting-number'))
+            if it:
+                new_html += '<tr><td style="text-align:center;"><span style="font-size:1.5em; font-weight:bold;">{}</span></td></tr>'.format(it.get_text().strip())
+            it = el.find(class_='w-review-item-img')
+            if it:
+                img = it.find(class_='body-img')
+                new_html += '<tr><td>{}</td></tr>'.format(add_image(img))
+            for it in el.find_all(class_='review-item-details'):
+                new_html += '<tr><td>{}</td></tr>'.format(it.decode_contents())
+            if el.find(class_='item-buy-btn'):
+                new_html += '<tr><td><strong>Buy this product:</strong><ul>'
+                for it in el.find_all(class_='item-buy-btn'):
+                    new_html += '<li><a href="{}">{}</a>'.format(utils.get_redirect_url(it['href']), it.get_text().strip())
+                new_html += '</ul></td></tr>'
+            new_html += '</table>'
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
+        for el in body.find_all(class_='article__gallery'):
+            new_html = ''
+            for it in el.find_all(class_='gallery__images__item'):
+                new_html += add_image(it, True)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
+        for el in body.find_all(class_='body-img'):
+            new_html = add_image(el)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
+        for el in body.find_all('img', attrs={"alt": True}):
+            if el.parent and el.parent.name == 'a':
+                new_html = utils.add_image(resize_image(el['src']), link=el.parent['href'])
+                if el.parent.parent and el.parent.parent.name == 'div':
+                    it = el.parent.parent
+                else:
+                    it = el.parent
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                it.insert_after(new_el)
+                it.decompose()
+            else:
+                new_html = utils.add_image(resize_image(el['src']))
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+
+        for el in body.find_all(class_='table-container'):
+            el.unwrap()
+
+        for el in body.find_all(class_='gallery-lightbox'):
+            el.decompose()
+
+        for el in body.find_all('a', href=re.compile(r'^/')):
+            el['href'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, el['href'])
 
         item['content_html'] += body.decode_contents()
 

@@ -31,8 +31,24 @@ def get_content(url, args, save_debug=False):
         logger.warning('unable to parse Instgram url ' + url)
         return None
 
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "sec-ch-prefers-color-scheme": "dark",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"107\", \"Chromium\";v=\"107\", \"Not=A?Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "none",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
+    }
     ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(2), m.group(3))
-    ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1')
+    ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1', headers=headers)
     if not ig_embed:
         return ''
     if save_debug:
@@ -51,6 +67,7 @@ def get_content(url, args, save_debug=False):
             logger.warning('embMessage "{}" in {}'.format(el.get_text(), ig_url))
             return None
 
+    ig_data = None
     m = re.search(r"window\.__additionalDataLoaded\('extra',(.+)\);<\/script>", ig_embed)
     if m:
         try:
@@ -58,17 +75,46 @@ def get_content(url, args, save_debug=False):
         except:
             ig_data = None
 
+    if not ig_data:
+        soup = BeautifulSoup(ig_embed, 'html.parser')
+        el = soup.find('script', string=re.compile(r'gql_data'))
+        if el:
+            m = re.search(r'handle\((.*?)\);requireLazy', el.string)
+            if m:
+                try:
+                    script_data = json.loads(m.group(1))
+                    #utils.write_file(script_data, './debug/instagram.json')
+                    for data in script_data['require']:
+                        if data[0] == 'PolarisEmbedSimple':
+                            context_json = json.loads(data[3][0]['contextJSON'])
+                            ig_data = context_json['gql_data']
+                            break
+                except:
+                    ig_data = None
+
+    avatars = []
+    users = []
     if ig_data:
         if save_debug:
             utils.write_file(ig_data, './debug/instagram.json')
-        avatar = ig_data['shortcode_media']['owner']['profile_pic_url']
-        username = ig_data['shortcode_media']['owner']['username']
+        avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['shortcode_media']['owner']['profile_pic_url']))
+        avatars.append(avatar)
+        users.append(ig_data['shortcode_media']['owner']['username'])
     else:
         el = soup.find(class_='Avatar')
-        avatar = el.img['src']
-        username = soup.find(class_='UsernameText').get_text()
-    avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(avatar))
+        if el:
+            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
+            avatars.append(avatar)
+            users.append(soup.find(class_='UsernameText').get_text())
+        else:
+            for el in soup.find_all(class_='CollabAvatar'):
+                avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
+                avatars.append(avatar)
+                m = re.search(r'^/([^/]+)/', urlsplit(el['href']).path)
+                if m:
+                    users.append(m.group(1))
 
+    username = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(users))
     title = '{} posted on Instagram'.format(username)
     caption = None
     post_caption = '<a href="{}"><small>Open in Instagram</small></a>'.format(ig_url)
@@ -186,7 +232,10 @@ def get_content(url, args, save_debug=False):
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
 
-    item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr><tr><td colspan="2">'.format(avatar, username)
+    item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
+    for i in range(len(users)):
+        item['content_html'] += '<tr><td style="width:48px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr>'.format(avatars[i], users[i])
+    item['content_html'] += '<tr><td colspan="2">'
 
     if post_media:
         item['content_html'] += post_media

@@ -15,14 +15,20 @@ https://daily.jstor.org/wp-json/wp/v2/posts
 https://www.gizchina.com/wp-json/wp/v2/posts
 https://www.saturdayeveningpost.com/wp-json/wp/v2/posts/1140519
 https://globalnews.ca/wp-json/wp/v2/posts
+https://revealnews.org/wp-json/wp/v2/posts
+https://bytecellar.com/wp-json/wp/v2/posts
+https://reason.com/wp-json/
+https://techiegamers.com/wp-json/wp/v2/posts
+
+https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
 
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
-
-https://compactmag.com/article/before-fauci-there-was-comte?_data=routes/article/$slug
 
 https://www.drive.com.au/_next/data/d67eec33886c2abb9d746c9f1915820374216679/news/2024-volkswagen-id-4-id-5-australia-new-details.json
 
 https://sfstandard.com/ (NEXT_DATA)
+
+https://compactmag.com/article/before-fauci-there-was-comte?_data=routes/article/$slug
 
 https://www.wpxi.com/pf/api/v3/content/fetch/resize-image-api-client?query=%7B%22raw_image_url%22%3A%22https%3A%2F%2Fcloudfront-us-east-1.images.arcpublishing.com%2Fcmg%2FVVY7A3FJARDYFMDWGJKK2QVTUA.jpg%22%2C%22respect_aspect_ratio%22%3Atrue%7D&d=539&_website=cmg-tv-10080
 
