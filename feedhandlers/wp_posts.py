@@ -240,7 +240,10 @@ def get_post_content(post, args, save_debug=False):
 def format_content(content_html, item):
     soup = BeautifulSoup(content_html, 'html.parser')
 
-    for el in soup.find_all(class_='ad-aligncenter'):
+    for el in soup.find_all(class_=re.compile(r'ad-aligncenter|c-message_kit__gutter')):
+        el.decompose()
+
+    for el in soup.find_all('section', class_=re.compile('wp-block-newsletterglue')):
         el.decompose()
 
     for el in soup.find_all(id='piano-meter-offer'):
@@ -248,6 +251,14 @@ def format_content(content_html, item):
 
     for el in soup.find_all('div', class_=re.compile(r'GutenbergParagraph_gutenbergParagraph_')):
         el.unwrap()
+
+    for el in soup.find_all(class_='c-message_actions__container'):
+        # https://theathletic.com/3900893/2022/11/16/deshaun-watson-return-browns/
+        it = el.find(class_='c-message_actions__group')
+        it.name = 'p'
+        it.attrs = {}
+        el.insert_after(it)
+        el.decompose()
 
     for el in soup.find_all(id='review-body'):
         # This is probably specific to techhive.com

@@ -237,11 +237,17 @@
         "module": "gannett",
         "site_code": "NABJ"
     },
+    "bestproducts": {
+        "module": "hearstmags"
+    },
     "betterhumans": {
         "module": "medium",
         "test_feed": [
             "https://betterhumans.pub/rss"
         ]
+    },
+    "bicycling": {
+        "module": "hearstmags"
     },
     "bigthink": {
         "module": "bigthink",
@@ -340,7 +346,8 @@
             "source": "story-feed-query",
             "query": {
                 "feature": "results-list",
-                "offset": 0,"query":"type:%20\"story\"",
+                "offset": 0,
+                "query": "type:%20\"story\"",
                 "size": 10
             }
         },
@@ -358,7 +365,8 @@
                 "source": "story-feed-query",
                 "query": {
                     "feature": "results-list",
-                    "offset": 0,"query":"type:%20\"story\"",
+                    "offset": 0,
+                    "query": "type:%20\"story\"",
                     "size": 10
                 }
             },
@@ -436,6 +444,9 @@
     },
     "captivate": {
         "module": "captivate"
+    },
+    "caranddriver": {
+        "module": "hearstmags"
     },
     "carbuzz": {
         "module": "carbuzz"
@@ -530,7 +541,7 @@
         "resizer_url": "https://www.cleveland.com/resizer/",
         "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
         "module": "fusion",
-        "deployment": 935,
+        "deployment": 942,
         "arc_site": "cleveland",
         "content": {
             "source": "article-beta-content-api",
@@ -847,6 +858,9 @@
     "deadspin": {
         "module": "gawker"
     },
+    "delish": {
+        "module": "hearstmags"
+    },
     "detroitnews": {
         "module": "gannett",
         "site_code": "PDTN"
@@ -1025,6 +1039,12 @@
         "module": "typepad",
         "blogid": "6a00d8341c4fbe53ef00d83451b09e69e2"
     },
+    "greencarreports": {
+        "module": "highgearmedia",
+        "test_feed": [
+            "https://feeds.highgearmedia.com/?sites=GreenCarReports"
+        ]
+    },
     "gq": {
         "module": "cne",
         "test_feed": [
@@ -1053,9 +1073,8 @@
         "module": "hackster",
         "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDMtMjFUMTM6NTk6MDUrMDAwMCIsImV4cCI6IjIwMjItMDMtMjFUMTU6NTk6MDUrMDAwMCIsInJuZCI6IjFmMmRhMzYzN2EwZDU4NmVmODQyMDRiYjU1NTkwNDE1In0.19HJWh5GM_DfXSPzRCwMqgPxG03sref6DRELrfQcBlRy8jHjimCj6QyQgoUBKT_FU3aJBC-Edha1bNmb8tTn7Q"
     },
-    "hr-brew": {
-        "module": "morningbrew",
-        "buildId": "VqvC4s6lx9O6jLFpvu-av"
+    "highgearmedia": {
+        "module": "highgearmedia"
     },
     "hotcars": {
         "module": "valnetinc",
@@ -1067,6 +1086,10 @@
     },
     "houstonchronicle": {
         "module": "hearstnews"
+    },
+    "hr-brew": {
+        "module": "morningbrew",
+        "buildId": "VqvC4s6lx9O6jLFpvu-av"
     },
     "ieee": {
         "module": "rebelmouse",
@@ -1309,6 +1332,9 @@
     "megaphone.fm": {
         "module": "megaphonefm"
     },
+    "menshealth": {
+        "module": "hearstmags"
+    },
     "miamiherald": {
         "module": "mcclatchy",
         "test_feed": [
@@ -1389,6 +1415,12 @@
     "morningbrew": {
         "module": "morningbrew",
         "buildId": "j0DIsY1PLCjmSQl_b8fne"
+    },
+    "motorauthority": {
+        "module": "highgearmedia",
+        "test_feed": [
+            "https://feeds.highgearmedia.com/?sites=MotorAuthority"
+        ]
     },
     "motortrend": {
         "module": "motortrend"
@@ -1571,6 +1603,9 @@
     "omnycontent": {
         "module": "omnyfm",
         "buildId": "W0H5leqJ_nFP5-Sghfufg"
+    },
+    "oprahdaily": {
+        "module": "hearstmags"
     },
     "orlandosentinel": {
         "api_url": "https://www.orlandosentinel.com/pf/api/v3/content/fetch/",
@@ -1846,6 +1881,9 @@
     "rubbernews": {
         "module": "crains"
     },
+    "runnersworld": {
+        "module": "hearstmags"
+    },
     "sacbee": {
         "module": "mcclatchy",
         "test_feed": [
@@ -2110,6 +2148,12 @@
         "module": "sqs",
         "test_feed": [
             "https://www.techsponential.com/reports?format=rss"
+        ]
+    },
+    "teenvogue": {
+        "module": "cne",
+        "test_feed": [
+            "https://www.teenvogue.com/feed/rss"
         ]
     },
     "tennessean": {
@@ -2568,6 +2612,14 @@
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://commercialobserver.com/feed"
+        ]
+    },
+    "cordcutterweekly": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://cordcutterweekly.com/feed"
         ]
     },
     "cordcuttingreport": {

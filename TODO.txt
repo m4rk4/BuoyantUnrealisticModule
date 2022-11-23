@@ -1,5 +1,9 @@
+Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
+https://news.pollstar.com/wp-json/wp/v2/posts
+https://www.innovations-report.com/wp-json/wp/v2/posts
+https://www.brickfanatics.com/wp-json/wp/v2/posts
 https://www.commentary.org/wp-json/wp/v2/posts
 https://nichegamer.com/wp-json/wp/v2/posts
 https://www.discoursemagazine.com/wp-json/wp/v2/posts/5051
@@ -19,6 +23,23 @@ https://revealnews.org/wp-json/wp/v2/posts
 https://bytecellar.com/wp-json/wp/v2/posts
 https://reason.com/wp-json/
 https://techiegamers.com/wp-json/wp/v2/posts
+https://randomnerdtutorials.com/wp-json/wp/v2/posts
+https://www.open-electronics.org/wp-json/wp/v2/posts
+https://blog.adafruit.com/wp-json/wp/v2/posts
+https://home-assistant-guide.com/wp-json/wp/v2/posts
+https://hackaday.com/wp-json/wp/v2/posts
+https://ohiostatebuckeyes.com/wp-json/wp/v2/posts
+https://www.superherohype.com/wp-json/wp/v2/posts
+https://www.schneier.com/wp-json/wp/v2/posts
+https://threatpost.com/wp-json/wp/v2/posts/
+https://krebsonsecurity.com/wp-json/wp/v2/posts/61870 (forbidden)
+https://www.cyberscoop.com/wp-json/wp/v2/posts
+https://borncity.com/win/wp-json/wp/v2/posts/
+https://www.teslarati.com/wp-json/wp/v2/posts
+https://95octane.com/wp-json/wp/v2/posts
+https://makezine.com/wp-json/wp/v2/posts
+https://linuxhint.com/wp-json/wp/v2/posts
+
 
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
 
@@ -26,13 +47,15 @@ https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-
 
 https://www.drive.com.au/_next/data/d67eec33886c2abb9d746c9f1915820374216679/news/2024-volkswagen-id-4-id-5-australia-new-details.json
 
+https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
+
+https://futurism.com/_next/data/ZL9EuavDBWdZMqrxRiTgB/neoscope/feds-cracking-down-vaping-law.json
+
 https://sfstandard.com/ (NEXT_DATA)
 
 https://compactmag.com/article/before-fauci-there-was-comte?_data=routes/article/$slug
 
 https://www.wpxi.com/pf/api/v3/content/fetch/resize-image-api-client?query=%7B%22raw_image_url%22%3A%22https%3A%2F%2Fcloudfront-us-east-1.images.arcpublishing.com%2Fcmg%2FVVY7A3FJARDYFMDWGJKK2QVTUA.jpg%22%2C%22respect_aspect_ratio%22%3Atrue%7D&d=539&_website=cmg-tv-10080
-
-https://futurism.com/_next/data/ZL9EuavDBWdZMqrxRiTgB/neoscope/feds-cracking-down-vaping-law.json
 
 https://bigthink.com/questions/will-true-ai-turn-against-us/
 
@@ -45,13 +68,6 @@ https://newsinteractive.post-gazette.com/investigation-art-rooney-steelers/
 https://www.nbcsportsedge.com/article/fantasy-football-pregame-matthew-berry/replay-fantasy-football-pregame-october-02-2022
 
 https://www.pcmag.com/opinions/an-ode-to-pcmag-a-personal-computing-legacy
-
-https://news.pollstar.com/wp-json/wp/v2/posts
-https://www.innovations-report.com/wp-json/wp/v2/posts
-https://www.brickfanatics.com/wp-json/wp/v2/posts
-
-https://www.elle.com/culture/celebrities/g41809471/best-celebrity-halloween-costumes-2022/
-https://www.elle.com/culture/movies-tv/g36894230/best-thriller-movies-on-netflix/
 
 https://www.afr.com/world/asia/asean-to-consider-banning-myanmar-from-meetings-20221102-p5bv49
 https://infogram.com/oembed/?url=https%3A%2F%2Finfogram.com%2Fafrg-nov2020-jdi-dink-1hnq410kjjvlp23

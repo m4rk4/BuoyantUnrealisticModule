@@ -478,7 +478,7 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading=''):
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc=''):
   fig_html = '<figure '
   if fig_style:
     fig_html += 'style="{}">'.format(fig_style)
@@ -486,7 +486,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     fig_html += 'style="margin:0; padding:0;">'
 
   if heading:
-    fig_html += '<div style="text-align:center;"><b>{}</b></div>'.format(heading)
+    fig_html += '<div style="text-align:center; font-size:1.1em; font-weight:bold">{}</div>'.format(heading)
 
   if link:
     fig_html += '<a href="{}">'.format(link)
@@ -507,6 +507,9 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
 
   if caption:
     fig_html += '<figcaption><small>{}</small></figcaption>'.format(caption)
+
+  if desc:
+    fig_html += desc
 
   fig_html += '</figure>'
   return fig_html
