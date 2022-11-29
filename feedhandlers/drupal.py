@@ -1,4 +1,4 @@
-import json, re, tldextract
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -11,25 +11,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_api_json(api_root, data_type, id, browser=None, loop=None, filters=''):
+def get_api_json(api_root, data_type, id, filters=''):
     api_url = '{}{}'.format(api_root, data_type.replace('--', '/'))
     if id:
         api_url += '/{}'.format(id)
     if filters:
         api_url += '?{}'.format(filters)
-    print(api_url)
+    #print(api_url)
     #headers = {"cache-control": "max-age=0"}
-    if browser:
-        page_html = loop.run_until_complete(utils.browser_get_url_html(browser, api_url))
-        utils.write_file(page_html, './debug/debug.html')
-        soup = BeautifulSoup(page_html, 'html.parser')
-        try:
-            api_json = json.loads(soup.pre.string)
-        except:
-            logger.warning('unable to convert to json')
-            return None
-    else:
-        api_json = utils.get_url_json(api_url)
+    api_json = utils.get_url_json(api_url)
     return api_json
 
 
@@ -43,10 +33,10 @@ def get_img_src(fig_html):
     return img_src, caption
 
 
-def get_field_data(data, api_root, netloc, browser, loop, caption='', video_poster=''):
+def get_field_data(data, api_root, netloc, caption='', video_poster=''):
     if data['id'] == 'missing':
         return ''
-    field_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+    field_json = get_api_json(api_root, data['type'], data['id'])
     if field_json:
         if field_json['data']['type'] == 'media--image':
             captions = []
@@ -64,7 +54,7 @@ def get_field_data(data, api_root, netloc, browser, loop, caption='', video_post
             if field_json['data']['attributes'].get('field_image_source'):
                 if field_json['data']['attributes']['field_image_source'] not in captions:
                     captions.append(field_json['data']['attributes']['field_image_source'])
-            img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_root, netloc, browser, loop)
+            img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_root, netloc)
             return utils.add_image(img_src, ' | '.join(captions))
 
         elif field_json['data']['type'] == 'media--mpx_video':
@@ -84,7 +74,7 @@ def get_field_data(data, api_root, netloc, browser, loop, caption='', video_post
                         video_type = 'application/x-mpegURL'
                     if not video_poster:
                         if field_json['data']['relationships'].get('field_thumbnail') and field_json['data']['relationships']['field_thumbnail'].get('data'):
-                            video_poster = get_field_data(field_json['data']['relationships']['field_thumbnail']['data'], api_root, netloc, browser, loop)
+                            video_poster = get_field_data(field_json['data']['relationships']['field_thumbnail']['data'], api_root, netloc)
                         else:
                             el = player_soup.find('meta', attrs={"property": "og:image"})
                             if el:
@@ -108,21 +98,11 @@ def get_field_data(data, api_root, netloc, browser, loop, caption='', video_post
 
 def get_content(url, args, save_debug=False):
     split_url = urlsplit(url)
-    tld = tldextract.extract(url)
-    sites_json = utils.read_json_file('./sites.json')
-    api_prefix = sites_json[tld.domain]['api_prefix']
+    site_json = utils.get_site_json(url)
+    api_prefix = site_json['api_prefix']
 
-    loop = None
-    browser = None
-    if sites_json[tld.domain].get('use_browser'):
-        loop = utils.get_or_create_event_loop()
-        browser = loop.run_until_complete(utils.browser_launch())
-        page_html = loop.run_until_complete(utils.browser_get_url_html(browser, url))
-    else:
-        page_html = utils.get_url_html(url)
+    page_html = utils.get_url_html(url)
     if not page_html:
-        if browser:
-            loop.run_until_complete(utils.browser_close(browser))
         return None
 
     path_prefix = ''
@@ -155,10 +135,8 @@ def get_content(url, args, save_debug=False):
 
     api_root = '{}://{}/{}{}'.format(split_url.scheme, split_url.netloc, path_prefix, api_prefix)
     filters = 'filter[nid-filter][condition][path]=drupal_internal__nid&filter[nid-filter][condition][value]={}'.format(node_id)
-    api_json = get_api_json(api_root, page_type, '', browser, loop, filters)
+    api_json = get_api_json(api_root, page_type, '', filters)
     if not api_json:
-        if browser:
-            loop.run_until_complete(utils.browser_close(browser))
         return None
 
     page_json = api_json['data'][0]
@@ -184,28 +162,28 @@ def get_content(url, args, save_debug=False):
     if page_json['relationships'].get('field_author') and page_json['relationships']['field_author'].get('data'):
         if isinstance(page_json['relationships']['field_author']['data'], list):
             for data in page_json['relationships']['field_author']['data']:
-                api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+                api_json = get_api_json(api_root, data['type'], data['id'])
                 if api_json:
                     authors.append(api_json['data']['attributes']['title'])
         else:
             data = page_json['relationships']['field_author']['data']
-            api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+            api_json = get_api_json(api_root, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('field_article_author') and page_json['relationships']['field_article_author'].get('data'):
         if isinstance(page_json['relationships']['field_article_author']['data'], list):
             for data in page_json['relationships']['field_article_author']['data']:
-                api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+                api_json = get_api_json(api_root, data['type'], data['id'])
                 if api_json:
                     authors.append(api_json['data']['attributes']['title'])
         else:
             data = page_json['relationships']['field_article_author']['data']
-            api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+            api_json = get_api_json(api_root, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('field_authors') and page_json['relationships']['field_authors'].get('data'):
         for data in page_json['relationships']['field_authors']['data']:
-            api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+            api_json = get_api_json(api_root, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     if authors:
@@ -218,14 +196,14 @@ def get_content(url, args, save_debug=False):
             if isinstance(val['data'], list):
                 for data in val['data']:
                     if data['type'].startswith('taxonomy_term'):
-                        api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+                        api_json = get_api_json(api_root, data['type'], data['id'])
                         if api_json:
                             if api_json['data']['attributes']['name'] not in item['tags']:
                                 item['tags'].append(api_json['data']['attributes']['name'])
             else:
                 data = val['data']
                 if data['type'].startswith('taxonomy_term'):
-                    api_json = get_api_json(api_root, data['type'], data['id'], browser, loop)
+                    api_json = get_api_json(api_root, data['type'], data['id'])
                     if api_json:
                         if api_json['data']['attributes']['name'] not in item['tags']:
                             item['tags'].append(api_json['data']['attributes']['name'])
@@ -238,23 +216,23 @@ def get_content(url, args, save_debug=False):
     else:
         caption = ''
     if page_json['relationships'].get('field_lede_image') and page_json['relationships']['field_lede_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_root, split_url.netloc, caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_article_hero_image') and page_json['relationships']['field_article_hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_root, split_url.netloc, caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_root, split_url.netloc, caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_media') and page_json['relationships']['field_media'].get('data') and page_json['relationships']['field_media']['data']['type'] == 'media--image':
-        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_root, split_url.netloc, caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_root, split_url.netloc, browser, loop, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_root, split_url.netloc, caption=caption)
         item['_image'], caption = get_img_src(data_html)
 
     if page_json['attributes'].get('field_video_pid'):
@@ -287,12 +265,12 @@ def get_content(url, args, save_debug=False):
     if page_json['type'] == 'node--gallery':
         item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
         for it in page_json['relationships']['field_gallery_items']['data']:
-            item['content_html'] += get_field_data(it, api_root, split_url.netloc, browser, loop)
+            item['content_html'] += get_field_data(it, api_root, split_url.netloc)
 
     elif page_json['type'] == 'node--video_page':
         if page_json['relationships'].get('field_mpx_video') and page_json['relationships']['field_mpx_video'].get(
                 'data'):
-            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], api_root, split_url.netloc, browser, loop)
+            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], api_root, split_url.netloc)
             item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
 
     elif page_json['type'] == 'node--article':
@@ -303,7 +281,7 @@ def get_content(url, args, save_debug=False):
             'field_mpx_video_lede'].get('data'):
             if lede_html:
                 poster, caption = get_img_src(lede_html)
-            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], api_root, split_url.netloc, browser, loop, video_poster=poster)
+            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], api_root, split_url.netloc, video_poster=poster)
         if lede_html:
             item['content_html'] += lede_html
 
@@ -321,13 +299,13 @@ def get_content(url, args, save_debug=False):
                     it = el.find(class_=re.compile(r'media--type-'))
                     if it:
                         if 'media--type-image' in it['class']:
-                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_root, split_url.netloc)
                         elif 'media--type-twitter' in it['class']:
-                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_root, split_url.netloc)
                         elif 'media--type-instagram' in it['class']:
-                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_root, split_url.netloc)
                 elif el['data-embed-button'] == 'mpx_video_embed':
-                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_root, split_url.netloc, browser, loop)
+                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_root, split_url.netloc)
                 elif el['data-embed-button'] == 'teaser_embed':
                     el.decompose()
                     continue
@@ -385,14 +363,11 @@ def get_content(url, args, save_debug=False):
 
             item['content_html'] += str(body_soup)
             item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
-
-    if browser:
-        loop.run_until_complete(utils.browser_close(browser))
     return item
 
 
 def get_feed(args, save_debug=False):
-    # TODO: fiercevideo needs to use browser to load
+    # TODO: fiercevideo needs to use browser to load rss
     split_url = urlsplit(args['url'])
     if '/rss' in split_url.path:
         return rss.get_feed(args, save_debug, get_content)

@@ -2,7 +2,7 @@ import asyncio, importlib, io, json, math, os, pytz, random, re, requests, strin
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
-from pyppeteer import launch
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -14,6 +14,32 @@ from feedhandlers import instagram, twitter, vimeo, youtube
 import logging
 logger = logging.getLogger(__name__)
 
+
+def get_site_json(url):
+  tld = tldextract.extract(url.strip())
+  if tld.domain == 'youtu' and tld.suffix == 'be':
+    domain = 'youtu.be'
+  elif tld.domain == 'megaphone' and tld.suffix == 'fm':
+    domain = 'megaphone.fm'
+  elif tld.domain == 'go':
+    domain = tld.subdomain
+  elif tld.domain == 'feedburner':
+    domain = urlsplit(url).path.split('/')[1].lower()
+  else:
+    domain = tld.domain
+  sites_json = read_json_file('./sites.json')
+  if sites_json.get(domain):
+    site_json = sites_json[domain]
+  elif domain in sites_json['wp-posts']['sites']:
+    site_json = {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": "/wp/v2/posts"
+    }
+  else:
+    site_json = None
+  return site_json
+
 def get_module(url, handler=''):
   module = None
   module_name = ''
@@ -23,23 +49,9 @@ def get_module(url, handler=''):
     if 'wp-json' in url:
       module_name = '.wp_posts'
     else:
-      tld = tldextract.extract(url.strip())
-      if tld.domain == 'youtu' and tld.suffix == 'be':
-        domain = 'youtu.be'
-      elif tld.domain == 'megaphone' and tld.suffix == 'fm':
-        domain = 'megaphone.fm'
-      elif tld.domain == 'go':
-        domain = tld.subdomain
-      elif tld.domain == 'feedburner':
-        domain = urlsplit(url).path.split('/')[1].lower()
-      else:
-        domain = tld.domain
-      sites_json = read_json_file('./sites.json')
-      if sites_json.get(domain):
-        module_name = '.{}'.format(sites_json[domain]['module'])
-      else:
-        if domain in sites_json['wp-posts']['sites']:
-          module_name = '.wp_posts'
+      site_json = get_site_json(url)
+      if site_json:
+        module_name = '.{}'.format(site_json['module'])
   if not module_name:
     split_url = urlsplit(url)
     if url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
@@ -61,10 +73,8 @@ def get_module(url, handler=''):
 
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
 # https://findwork.dev/blog/advanced-usage-python-requests-timeouts-retries-hooks/#retry-on-failure
-def requests_retry_session(retries=4, proxies=None):
+def requests_retry_session(retries=4):
   session = requests.Session()
-  if proxies:
-    session.proxies.update(proxies)
   retry = Retry(
     total=retries,
     read=retries,
@@ -78,7 +88,7 @@ def requests_retry_session(retries=4, proxies=None):
   session.mount('https://', adapter)
   return session
 
-def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False):
+def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
   if user_agent == 'desktop':
     ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.182 Safari/537.36'
   elif user_agent == 'mobile':
@@ -95,42 +105,49 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     headers = {}
     headers['user-agent'] = ua
 
-  if use_proxy and config.proxies:
-    proxies = config.proxies
-  else:
-    proxies = None
-
   r = None
-  for i in range(2):
-    try:
-      if proxies:
-        verify = False
+  try:
+    r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects)
+    r.raise_for_status()
+  except Exception as e:
+    if r != None:
+      if r.status_code == 402:
+        return r
       else:
-        verify = True
-      r = requests_retry_session(retries, proxies).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, verify=verify)
-      r.raise_for_status()
-    except Exception as e:
-      if r != None:
-        if r.status_code == 402:
-          return r
-        else:
-          status_code = ' status code {}'.format(r.status_code)
-      else:
-        status_code = ''
-      logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
-      r = None
-    if r:
-      break
+        status_code = ' status code {}'.format(r.status_code)
     else:
-      # Try again using the proxy
-      if config.proxies:
-        proxies = config.proxies
-      else:
-        break
+      status_code = ''
+    logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+    r = None
   return r
 
-def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
+def get_browser_request(url, get_json=False, save_screenshot=False):
+  with sync_playwright() as playwright:
+    webkit = playwright.webkit
+    dev = playwright.devices['iPhone 13']
+    browser = webkit.launch()
+    context = browser.new_context(**dev)
+    page = context.new_page()
+    try:
+      r = page.goto(url)
+      if get_json:
+        content = r.json()
+      else:
+        content = r.text()
+      if save_screenshot:
+        page.screenshot(path="./debug/screenshot.png")
+    except PlaywrightTimeoutError:
+      logger.warning('timeout error getting ' + url)
+      content = None
+    browser.close()
+    return content
+
+def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False):
+  site_json = get_site_json(url)
+  if use_browser or (site_json and site_json.get('use_browser')):
+    return get_browser_request(url, get_json=True)
+
+  r = get_request(url, user_agent, headers, retries, allow_redirects)
   if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404):
     try:
       return r.json()
@@ -139,14 +156,22 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
       write_file(r.text, './debug/json.txt')
   return None
 
-def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False):
+  site_json = get_site_json(url)
+  if use_browser or (site_json and site_json.get('use_browser')):
+    return get_browser_request(url)
+
+  r = get_request(url, user_agent, headers, retries, allow_redirects)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
 
-def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_proxy=False):
-  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy)
+def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_browser=False):
+  site_json = get_site_json(url)
+  if use_browser or (site_json and site_json.get('use_browser')):
+    return get_browser_request(url)
+
+  r = get_request(url, user_agent, headers, retries, allow_redirects)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.content
   return None
@@ -258,17 +283,6 @@ def get_or_create_event_loop():
       loop = asyncio.new_event_loop()
       asyncio.set_event_loop(loop)
       return asyncio.get_event_loop()
-
-async def browser_launch():
-  return await launch(handleSIGINT=False, handleSIGTERM=False, handleSIGHUP=False)
-
-async def browser_get_url_html(browser, url):
-  page = await browser.newPage()
-  await page.goto(url)
-  return await page.content()
-
-async def browser_close(browser):
-  await browser.close()
 
 def write_file(data, filename):
   if filename.endswith('.json'):

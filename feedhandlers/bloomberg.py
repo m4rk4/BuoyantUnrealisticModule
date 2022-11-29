@@ -1,7 +1,6 @@
 import feedparser, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
@@ -38,22 +37,8 @@ def get_bb_url(url, get_json=False):
         headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
         content = utils.get_url_html(url, headers=headers, allow_redirects=False)
     if not content:
-        with sync_playwright() as playwright:
-            webkit = playwright.webkit
-            browser = webkit.launch()
-            context = browser.new_context()
-            page = context.new_page()
-            try:
-                page.goto(url)
-                if get_json:
-                    content = json.loads(page.content())
-                else:
-                    content = page.content()
-                # page.screenshot(path="./debug/screenshot.png")
-            except PlaywrightTimeoutError:
-                logger.warning('timeout error getting ' + url)
-                content = ''
-            browser.close()
+        # Try through browser
+        content = utils.get_browser_request(url, get_json)
     return content
 
 
