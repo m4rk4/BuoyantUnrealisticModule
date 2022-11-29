@@ -14,14 +14,12 @@ def get_content(url, args, save_debug=False):
     split_url = urlsplit(url)
     if split_url.netloc == 'player.simplecast.com':
         paths = list(filter(None, split_url.path.split('/')))
-        episode_json = utils.get_url_json('https://api.simplecast.com/episodes/{}/player'.format(paths[0]))
-        if episode_json:
-            episode_url = episode_json['episode_url']
+        episode_json = utils.get_url_json('https://api.simplecast.com/episodes/{}'.format(paths[0]))
     else:
-        episode_url = utils.clean_url(url)
+        # TODO: no longer works
+        data = {"url": utils.clean_url(url)}
+        episode_json = utils.post_url('https://api.simplecast.com/episodes/search', json_data=data)
 
-    data = {"url": episode_url}
-    episode_json = utils.post_url('https://api.simplecast.com/episodes/search', json_data=data)
     if not episode_json:
         return None
     if save_debug:

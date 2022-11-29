@@ -10,7 +10,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
 def resize_img_src(img_src, width=1000):
     split_url = urlsplit(img_src)
     return '{}://{}{}?resize={}:*'.format(split_url.scheme, split_url.netloc, split_url.path, width)

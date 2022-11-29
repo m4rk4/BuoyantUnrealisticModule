@@ -39,6 +39,10 @@ https://www.teslarati.com/wp-json/wp/v2/posts
 https://95octane.com/wp-json/wp/v2/posts
 https://makezine.com/wp-json/wp/v2/posts
 https://linuxhint.com/wp-json/wp/v2/posts
+https://www.thedetroitbureau.com/wp-json/wp/v2/posts/235200
+https://austinkleon.com/wp-json/wp/v2/posts
+https://www.motorcycle.com/wp-json/wp/v2/posts
+https://ultimatemotorcycling.com/wp-json/wp/v2/posts
 
 
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team

@@ -750,10 +750,15 @@ def add_embed(url, args={}, save_debug=False):
       img_src = el['content']
       el = soup.find('meta', attrs={"property": "og:title"})
       if el:
-        caption = el['content']
+        title = el['content'].strip()
       else:
-        caption = ''
-      return add_image(img_src, caption, link=embed_url)
+        el = soup.find('title')
+        if el:
+          title = el.get_text().strip()
+        else:
+          title = embed_url
+      embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div><small>{3}</small></td></tr></table>'.format(embed_url, img_src, title, urlsplit(embed_url).netloc)
+      return embed_html
 
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
 

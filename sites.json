@@ -635,57 +635,6 @@
             }
         }
     },
-    "cycleworld": {
-        "api_url": "https://www.cycleworld.com/pf/api/v3/content/fetch/",
-        "resizer_url": "https://www.cycleworld.com/resizer/",
-        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
-        "module": "fusion",
-        "deployment": 32,
-        "arc_site": "cycleworld",
-        "content": {
-            "source": "content-api-v4",
-            "query": {
-                "uri": "PATH",
-                "website_url": "PATH",
-                "imageResizerSet": "article",
-                "arc-site": "cycleworld"
-            }
-        },
-        "homepage_feed": {
-            "source": "content-feed-query-v4",
-            "query": {
-                "Feed-Query": "type:story%20AND%20NOT%20taxonomy.tags.text:('no-ticker'%20OR%20'bg')",
-                "Feed-Offset": "0",
-                "Feed-Size": "10"
-            }
-        },
-        "section_feed": {
-            "source": "story-feed-sections-v4",
-            "query": {
-                "feedOffset": 0,
-                "feedSize": 10,
-                "includeSections": "PATH"
-            }
-        },
-        "author_feed": {
-            "source": "story-feed-author-v4",
-            "query": {
-                "uri": "PATH",
-                "authorSlug": "AUTHOR",
-                "feedOffset": 0,
-                "feedSize": 10,
-                "arc-site": "cycleworld"
-            }
-        },
-        "tag_feed": {
-            "source": "story-feed-tag-v4",
-            "query": {
-                "feedOffset": 0,
-                "feedSize": 10,
-                "tagSlug": "TAG"
-            }
-        }
-    },
     "cnbc": {
         "module": "cnbc"
     },
@@ -802,6 +751,57 @@
     },
     "curbed": {
         "module": "nymag"
+    },
+    "cycleworld": {
+        "api_url": "https://www.cycleworld.com/pf/api/v3/content/fetch/",
+        "resizer_url": "https://www.cycleworld.com/resizer/",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "module": "fusion",
+        "deployment": 32,
+        "arc_site": "cycleworld",
+        "content": {
+            "source": "content-api-v4",
+            "query": {
+                "uri": "PATH",
+                "website_url": "PATH",
+                "imageResizerSet": "article",
+                "arc-site": "cycleworld"
+            }
+        },
+        "homepage_feed": {
+            "source": "content-feed-query-v4",
+            "query": {
+                "Feed-Query": "type:story%20AND%20NOT%20taxonomy.tags.text:('no-ticker'%20OR%20'bg')",
+                "Feed-Offset": "0",
+                "Feed-Size": "10"
+            }
+        },
+        "section_feed": {
+            "source": "story-feed-sections-v4",
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "includeSections": "PATH"
+            }
+        },
+        "author_feed": {
+            "source": "story-feed-author-v4",
+            "query": {
+                "uri": "PATH",
+                "authorSlug": "AUTHOR",
+                "feedOffset": 0,
+                "feedSize": 10,
+                "arc-site": "cycleworld"
+            }
+        },
+        "tag_feed": {
+            "source": "story-feed-tag-v4",
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "tagSlug": "TAG"
+            }
+        }
     },
     "dallasnews": {
         "api_url": "https://www.dallasnews.com/pf/api/v3/content/fetch/",
@@ -1227,6 +1227,14 @@
         "module": "kqed",
         "test_feed": [
             "https://ww2.kqed.org/news/feed/"
+        ]
+    },
+    "latimes": {
+        "module": "latimes",
+        "test_feed": [
+            "https://www.latimes.com/index.rss",
+            "https://www.latimes.com/entertainment-arts.rss",
+            "https://www.latimes.com/sports.rss"
         ]
     },
     "lifehacker": {
