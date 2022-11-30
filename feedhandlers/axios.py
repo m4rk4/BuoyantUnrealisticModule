@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -241,21 +241,30 @@ def get_content(url, args, save_debug=False):
         if '/local/' in split_url.path:
             m = re.search('/local/(.*)', split_url.path)
             content_id = m.group(1)
-    if not content_id:
-        logger.warning('unable to determine content id for ' + url)
-        return None
-
-    if '/newsletters/' in split_url.path:
-        api_url = 'https://api.axios.com/api/render/newsletters/{}/'.format(content_id)
-    elif 'local' in split_url.path:
-        api_url = 'https://api.axios.com/api/render/audience-content/{}'.format(content_id)
+    if content_id:
+        if '/newsletters/' in split_url.path:
+            api_url = 'https://api.axios.com/api/render/newsletters/{}/'.format(content_id)
+        elif 'local' in split_url.path:
+            api_url = 'https://api.axios.com/api/render/audience-content/{}'.format(content_id)
+        else:
+            #api_url = 'https://www.axios.com/api/axios-web/get-story/by-id/{}'.format(content_id)
+            api_url = 'https://api.axios.com/api/render/content/{}/'.format(content_id)
+        content_json = utils.get_url_json(api_url)
+        if not content_json:
+            return None
     else:
-        #api_url = 'https://www.axios.com/api/axios-web/get-story/by-id/{}'.format(content_id)
-        api_url = 'https://api.axios.com/api/render/content/{}/'.format(content_id)
-
-    content_json = utils.get_url_json(api_url)
-    if not content_json:
-        return None
+        if '/newsletters/' in split_url.path:
+            page_html = utils.get_url_html(url)
+            soup = BeautifulSoup(page_html, 'html.parser')
+            el = soup.find('script', id='__NEXT_DATA__')
+            if not el:
+                logger.warning('unable to find NEXT_DATA in ' + url)
+                return None
+            next_data = json.loads(el.string)
+            content_json = next_data['props']['pageProps']['data']['newsletter']
+        else:
+            logger.warning('unable to determine content id for ' + url)
+            return None
     return get_item(content_json, args, save_debug)
 
 
@@ -268,8 +277,10 @@ def get_feed(args, save_debug=False):
         # https://api.axios.com/feed/technology/
         return rss.get_feed(args, save_debug, get_content)
 
-    newsletter = ''
-    render_type = 'content'
+    feed = utils.init_jsonfeed(args)
+    feed_items = []
+
+    api_url = ''
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
     if len(paths) == 0:
@@ -283,24 +294,47 @@ def get_feed(args, save_debug=False):
         api_url = 'https://api.axios.com/api/render/stream/content/?author_username={}&page_size=10'.format(paths[1])
 
     elif paths[0] == 'newsletters':
-        render_type = 'newsletters'
+        page_html = utils.get_url_html(args['url'])
+        soup = BeautifulSoup(page_html, 'html.parser')
         if len(paths) > 1:
-            newsletter = paths[1]
-        dt = datetime.utcnow()
-        api_url = 'https://api.axios.com/api/render/newsletters/?audience_slug=national&year={}&month={}'.format(dt.year, dt.month)
-        api_json = utils.get_url_json(api_url)
-        if not api_json:
-            return None
-        content_ids = []
-        for it in api_json:
-            # Check age
-            if 'age' in args:
-                dt = datetime.fromisoformat(it['published_date'].replace('Z', '+00:00'))
-                item = {}
-                item['_timestamp'] = dt.timestamp()
-                if not utils.check_age(item, args):
-                    continue
-            content_ids.append(it['id'])
+            # Only gets the most recent newsletter
+            if save_debug:
+                logger.debug('getting content for ' + args['url'])
+            item = get_content(args['url'], args, save_debug)
+            if item:
+                if utils.filter_item(item, args) == True:
+                    feed_items.append(item)
+        else:
+            for el in soup.find_all('a', class_=re.compile('link--newsletter')):
+                if save_debug:
+                    logger.debug('getting content for ' + el['href'])
+                item = get_content(el['href'], args, save_debug)
+                if item:
+                    if utils.filter_item(item, args) == True:
+                        feed_items.append(item)
+        feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+        return feed
+
+        # No longer works
+        # render_type = 'newsletters'
+        # if len(paths) > 1:
+        #     newsletter = paths[1]
+        # dt = datetime.utcnow()
+        # api_url = 'https://api.axios.com/api/render/newsletters/?audience_slug=national&year={}&month={}'.format(dt.year, dt.month)
+        # print(api_url)
+        # api_json = utils.get_url_json(api_url)
+        # if not api_json:
+        #     return None
+        # content_ids = []
+        # for it in api_json:
+        #     # Check age
+        #     if 'age' in args:
+        #         dt = datetime.fromisoformat(it['published_date'].replace('Z', '+00:00'))
+        #         item = {}
+        #         item['_timestamp'] = dt.timestamp()
+        #         if not utils.check_age(item, args):
+        #             continue
+        #     content_ids.append(it['id'])
 
     else:
         if len(paths) == 1:
@@ -308,31 +342,29 @@ def get_feed(args, save_debug=False):
         elif len(paths) == 2:
             api_url = 'https://api.axios.com/api/render/stream/content/?subtopic_slug={}&page_size=10'.format(paths[1])
 
-    if not render_type == 'newsletters':
-        api_json = utils.get_url_json(api_url)
-        content_ids = api_json['results']
+    if not api_url:
+        logger.warning('unhandled feed url ' + args['url'])
+        return None
+    api_json = utils.get_url_json(api_url)
+    if not api_json:
+        return None
 
     n = 0
-    items = []
-    for id in content_ids:
-        content_json = utils.get_url_json('https://api.axios.com/api/render/{}/{}/'.format(render_type, id))
+    feed_items = []
+    for id in api_json['results']:
+        content_json = utils.get_url_json('https://api.axios.com/api/render/content/{}/'.format(id))
         if not content_json:
             logger.warning('unable to get content for {} in {}'.format(id, args['url']))
             continue
-        if newsletter:
-            if content_json['subscription']['slug'] != newsletter:
-                continue
         if save_debug:
             logger.debug('getting content for ' + content_json['permalink'])
-            utils.write_file(content_json, './debug/debug.json')
         item = get_item(content_json, args, save_debug)
         if item:
           if utils.filter_item(item, args) == True:
-            items.append(item)
+            feed_items.append(item)
             n += 1
             if 'max' in args:
                 if n == int(args['max']):
                     break
-    feed = utils.init_jsonfeed(args)
-    feed['items'] = items.copy()
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
