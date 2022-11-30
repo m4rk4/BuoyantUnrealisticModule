@@ -125,7 +125,7 @@ def get_content(url, args, save_debug=False):
 
     el = soup.find(class_='heading_image')
     if el:
-        item['_image'] = el['data-img-url']
+        item['_image'] = resize_image(el['data-img-url'])
         caption = re.sub('^"|"$', '', el['data-img-caption'])
         if caption == 'null':
             caption = ''
@@ -204,6 +204,10 @@ def get_content(url, args, save_debug=False):
                     new_html = utils.add_embed(it['src'])
                 else:
                     new_html = utils.add_embed(el['id'])
+            elif 'w-soundcloud' in el['class']:
+                it = el.find('iframe')
+                if it:
+                    new_html = utils.add_embed(it['src'])
             elif 'w-reddit' in el['class']:
                 it = el.find('a')
                 new_html = utils.add_embed(it['href'])

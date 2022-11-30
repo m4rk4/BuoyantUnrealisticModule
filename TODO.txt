@@ -43,9 +43,19 @@ https://www.thedetroitbureau.com/wp-json/wp/v2/posts/235200
 https://austinkleon.com/wp-json/wp/v2/posts
 https://www.motorcycle.com/wp-json/wp/v2/posts
 https://ultimatemotorcycling.com/wp-json/wp/v2/posts
+https://guitar.com/wp-json/wp/v2/posts
+https://understandingcompassion.com/wp-json/wp/v2/posts
+https://tinybuddha.com/wp-json/wp/v2/posts
+https://reasonstobecheerful.world/wp-json/wp/v2/posts
+https://www.positive.news/wp-json/wp/v2/posts
+https://dailydad.com/wp-json/wp/v2/posts
+https://philip.greenspun.com/blog/wp-json/wp/v2/posts
+https://nextdraft.com/wp-json/wp/v2/posts
+
 
 https://abcnews.go.com/gemini/news/story/94147226
 
+NEXT_DATA sites:
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
 
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
@@ -56,7 +66,13 @@ https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-e
 
 https://futurism.com/_next/data/ZL9EuavDBWdZMqrxRiTgB/neoscope/feds-cracking-down-vaping-law.json
 
-https://sfstandard.com/ (NEXT_DATA)
+https://sfstandard.com/
+
+https://thesportsrush.com/_next/data/ga_EJdLvwrcW-wAJYJUVG/nba-news-this-is-why-malika-andrews-aint-no-rachel-nichols-jimmy-butlers-moment-with-former-espn-host-could-hilariously-be-undoing-of-successor.json
+https://thesportsrush.com/_next/data/C0bI8h5P6uM-55T7KzA5j/nba-news-its-all-luka-doncic-all-the-time-charles-barkley-reveals-why-mavericks-will-never-win-a-championship.json
+
+https://www.today.com/shop/haus-labs-foundation-lady-gaga-review-t269129
+
 
 https://compactmag.com/article/before-fauci-there-was-comte?_data=routes/article/$slug
 
@@ -162,8 +178,3 @@ http://localhost:8080/content?debug&read&url=https%3A%2F%2Fsonoff.tech%2Fproduct
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.wcpo.com%2Fsports%2Fhigh-school-sports%2Fweek-8-high-school-football-scoreboard
 
-https://thesportsrush.com/_next/data/ga_EJdLvwrcW-wAJYJUVG/nba-news-this-is-why-malika-andrews-aint-no-rachel-nichols-jimmy-butlers-moment-with-former-espn-host-could-hilariously-be-undoing-of-successor.json
-https://thesportsrush.com/_next/data/C0bI8h5P6uM-55T7KzA5j/nba-news-its-all-luka-doncic-all-the-time-charles-barkley-reveals-why-mavericks-will-never-win-a-championship.json
-
-NEXT_DATA
-https://www.today.com/shop/haus-labs-foundation-lady-gaga-review-t269129

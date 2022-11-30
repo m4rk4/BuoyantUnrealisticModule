@@ -41,16 +41,19 @@ def get_content(url, args, save_debug=False):
 
     # not sure about timezone
     if giphy_json.get('create_datetime'):
-        dt = datetime.fromisoformat(giphy_json['create_datetime'])
+        date = giphy_json['create_datetime']
     elif giphy_json.get('import_datetime'):
-        dt = datetime.fromisoformat(giphy_json['import_datetime'])
+        date = giphy_json['import_datetime']
     elif giphy_json.get('update_datetime'):
-        dt = datetime.fromisoformat(giphy_json['update_datetime'])
+        date = giphy_json['update_datetime']
     elif giphy_json.get('trending_datetime'):
-        dt = datetime.fromisoformat(giphy_json['trending_datetime'])
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+        date = giphy_json['trending_datetime']
+    if date:
+        date = re.sub('\+(\d\d)(\d\d)$', r'+\1:\2', date)
+        dt = datetime.fromisoformat(date)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
     item['author'] = {}
     if giphy_json.get('user'):
