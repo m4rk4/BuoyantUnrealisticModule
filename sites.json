@@ -1806,22 +1806,22 @@
         "resizer_url": "https://www.reuters.com/resizer/",
         "resizer_secret": "",
         "module": "fusion",
-        "deployment": 114,
+        "deployment": 123,
         "arc_site": "reuters",
         "content": {
             "source": "article-by-id-or-url-v1",
             "query": {
-                "uri": "PATH",
+                "uri": "PATH/",
                 "website": "reuters",
                 "published": "true",
-                "website_url": "PATH"
+                "website_url": "PATH/",
+                "arc-site": "reuters"
             }
         },
         "homepage_feed": {
             "source": "articles-by-section-alias-or-id-v1",
             "query": {
                 "website": "reuters",
-                "id": "/home",
                 "size": 11,
                 "fetch_type": null,
                 "section_id": "/home",
@@ -1833,25 +1833,22 @@
         "section_feed": {
             "source": "articles-by-section-alias-or-id-v1",
             "query": {
-                "called_from_a_component": true,
-                "fetch_type": "section",
-                "section_id": "PATH",
+                "website": "reuters",
+                "fetch_type": null,
                 "size": 15,
-                "sophi_page": "",
-                "sophi_widget": "",
-                "website": "reuters"
+                "section_optional_fields": "all",
+                "section_id": "PATH/",
+                "arc-site": "reuters"
             }
         },
         "author_feed": {
             "source": "articles-by-topic-v1",
             "query": {
-                "arc-site": "reuters",
-                "offset": 0,
-                "orderby": "",
-                "size": "10",
-                "topic_url": "/authors/AUTHOR/",
                 "uri": "/authors/AUTHOR/",
-                "website": "reuters"
+                "website": "reuters",
+                "topic_url": "/authors/AUTHOR/",
+                "size": "10",
+                "arc-site": "reuters"
             }
         },
         "search_feed": {
@@ -2406,7 +2403,7 @@
         "api_url": "https://www.washingtonpost.com/prism/api/",
         "resizer_url": "",
         "resizer_secret": "",
-        "module": "fusion",
+        "module": "wapo",
         "deployment": 0,
         "arc_site": "washpost",
         "content": {

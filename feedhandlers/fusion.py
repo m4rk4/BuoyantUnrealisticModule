@@ -143,6 +143,8 @@ def process_content_element(element, url, site_json, save_debug):
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
             element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"></div><blockquote><small>{}</small></blockquote></div>'.format(
                 episode['audio'], poster, episode['title'], episode['summary'])
+        elif element['subtype'] == 'datawrapper':
+            element_html += utils.add_embed(element['embed']['url'])
         elif re.search(r'iframe', element['subtype'], flags=re.I):
             embed_html = base64.b64decode(element['embed']['config']['base64HTML']).decode('utf-8')
             m = re.search(r'src="([^"]+)"', embed_html)
@@ -270,12 +272,11 @@ def process_content_element(element, url, site_json, save_debug):
             logger.warning('unhandled graphic type {}'.format(element['graphic_type']))
 
     elif element['type'] == 'video':
-        if not element.get('streams'):
-            if 'washingtonpost.com' in split_url.netloc:
-                api_url = 'https://video-api.washingtonpost.com/api/v1/ansvideos/findByUuid?uuid=' + element['_id']
-                api_json = utils.get_url_json(api_url)
-                if api_json:
-                    video_json = api_json[0]
+        if 'washingtonpost.com' in split_url.netloc:
+            api_url = 'https://video-api.washingtonpost.com/api/v1/ansvideos/findByUuid?uuid=' + element['_id']
+            api_json = utils.get_url_json(api_url)
+            if api_json:
+                video_json = api_json[0]
         else:
             video_json = element
         #utils.write_file(video_json, './debug/video.json')
@@ -323,7 +324,8 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += '<hr><h2>{}</h2>'.format(headline)
         authors = []
         for author in element['credits']['by']:
-            authors.append(author['name'])
+            if author.get('name'):
+                authors.append(author['name'])
         tz_est = pytz.timezone('US/Eastern')
         dt = datetime.fromisoformat(element['display_date'].replace('Z', '+00:00')).astimezone(tz_est)
         date = utils.format_display_date(dt)
@@ -559,7 +561,6 @@ def get_content(url, args, save_debug=False):
         api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:
             logger.debug('getting content from ' + api_url)
-
         api_json = utils.get_url_json(api_url)
         if api_json:
             break
