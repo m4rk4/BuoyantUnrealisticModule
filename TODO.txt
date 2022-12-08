@@ -51,9 +51,21 @@ https://www.positive.news/wp-json/wp/v2/posts
 https://dailydad.com/wp-json/wp/v2/posts
 https://philip.greenspun.com/blog/wp-json/wp/v2/posts
 https://nextdraft.com/wp-json/wp/v2/posts
+https://www.the-sun.com/wp-json/wp/v2/posts
 
+
+https://assets.msn.com/content/view/v2/Detail/en-us/AA14Z1ir
+https://assets.msn.com/content/view/v1/Detail/AA14Wxfd
 
 https://abcnews.go.com/gemini/news/story/94147226
+
+https://asia.nikkei.com/Business/Tech/Semiconductors/TSMC-founder-Morris-Chang-says-globalization-almost-dead
+session = requests.Session()
+r = session.get(url, headers=headers)
+c = session.cookies.get_dict()
+https://asia.nikkei.com/__service/v1/piano/article_access/ + c['otp']
+Bad Token
+
 
 NEXT_DATA sites:
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team

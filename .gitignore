@@ -1,8 +1,8 @@
 **/__pycache__
 .idea/
 debug/
+packages/
 venv/
 .breakpoints
 config.py
 poetry.lock
-pyproject.toml
