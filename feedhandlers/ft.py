@@ -42,21 +42,36 @@ def get_content(url, args, save_debug=False):
         # skip
         return None
 
+    # headers = {
+    #     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+    #     "accept-encoding": "gzip, deflate, br",
+    #     "accept-language": "en-US,en;q=0.9,de;q=0.8",
+    #     "host": "www.ft.com",
+    #     "referrer": "https://www.google.com/",
+    #     "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Microsoft Edge\";v=\"101\"",
+    #     "sec-ch-ua-mobile": "?0",
+    #     "sec-ch-ua-platform": "\"Windows\"",
+    #     "sec-fetch-dest": "document",
+    #     "sec-fetch-mode": "navigate",
+    #     "sec-fetch-site": "cross-site",
+    #     "sec-fetch-user": "?1",
+    #     "upgrade-insecure-requests": "1",
+    #     "user-agent": "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53"
+    # }
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-        "accept-encoding": "gzip, deflate, br",
-        "accept-language": "en-US,en;q=0.9,de;q=0.8",
-        "host": "www.ft.com",
+        "accept-language": "en-US,en;q=0.9",
         "referrer": "https://www.google.com/",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Microsoft Edge\";v=\"101\"",
+        "sec-ch-ua": "\"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"108\", \"Microsoft Edge\";v=\"108\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "document",
         "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "cross-site",
+        "sec-fetch-site": "same-origin",
         "sec-fetch-user": "?1",
         "upgrade-insecure-requests": "1",
-        "user-agent": "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.64 Safari/537.36 Edg/101.0.1210.53"
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 Edg/108.0.1462.42"
+
     }
     article_html = utils.get_url_html(url, headers=headers)
     if not article_html:
@@ -121,7 +136,10 @@ def get_content(url, args, save_debug=False):
         item['author']['name'] = 'Financial Times'
 
     if ld_json.get('image'):
-        item['_image'] = ld_json['image']['url']
+        if isinstance(ld_json['image'], dict):
+            item['_image'] = ld_json['image']['url']
+        elif isinstance(ld_json['image'], str):
+            item['_image'] = ld_json['image']
 
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
