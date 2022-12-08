@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "repl_python3_BuoyantUnrealisticModule-1"
+name = "BuoyantUnrealisticModule"
 version = "0.1.0"
 description = ""
 authors = ["m4rk4 <<>>"]
@@ -7,13 +7,22 @@ authors = ["m4rk4 <<>>"]
 [tool.poetry.dependencies]
 python = "^3.8"
 Flask = "^2.0.1"
-pytube = "^11.0.0"
-snscrape = "^0.3.4"
+flask-cors = "^3.0.10"
+av = "^10.0.0"
 bs4 = "^0.0.1"
-feedparser = "^6.0.8"
-pytz = "^2021.1"
-
-[tool.poetry.dev-dependencies]
+feedparser = "^6.0.10"
+lxml = [
+    {file = "packages/lxml-4.9.0-cp311-cp311-win_amd64.whl", markers = "sys_platform == 'win32'"},
+    {version = "=4.9.0", markers = "sys_platform == 'linux'"}
+]
+markdown2 = "^2.4.6"
+Pillow = "^9.3.0"
+playwright = "1.28.0"
+pycryptodome = "^3.16.0"
+pytz = "^2022.6"
+requests = "^2.28.0"
+snscrape = "^0.4.3"
+tldextract = "^3.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
