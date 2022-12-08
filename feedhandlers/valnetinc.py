@@ -1,4 +1,4 @@
-import json, re
+import html, json, re
 from bs4 import BeautifulSoup, Comment
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
@@ -35,19 +35,45 @@ def add_image(el, gallery=False, width=1000):
     return utils.add_image(resize_image(it['data-img-url']), caption)
 
 
+def add_play_store_app(el):
+    new_html = '<table><tr>'
+    it = el.find('img')
+    if it:
+        new_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(it['src'])
+    new_html += '<td style="vertical-align:top;">'
+    it = el.find(class_='app-widget-name')
+    if it:
+        new_html += '<a href="{}"><b>{}</b></a>'.format(it['href'], it.get_text().strip())
+    it = el.find(class_='app-developer-name')
+    if it:
+        if it.a:
+            new_html += ' (<a href="{}">{}</a>)'.format(it.a['href'], it.get_text().strip())
+        else:
+            new_html += ' ({})'.format(it.get_text().strip())
+    it = el.find(class_='app-widget-price')
+    if it:
+        new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
+    it = el.find(class_=re.compile(r'app-widget-rating'))
+    if it:
+        new_html += '<div><small>Rating: {}</small></div>'.format(it.get_text().strip())
+    it = el.find(class_='app-widget-download')
+    if it:
+        new_html += '<div><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
+    new_html += '</td></tr></table>'
+    return new_html
+
+
 def get_content(url, args, save_debug=False):
     # Sites: https://www.valnetinc.com/en/publishing-detail#our_brand
     split_url = urlsplit(url)
     article_json = utils.get_url_json('{}://{}/fetch/next-article{}'.format(split_url.scheme, split_url.netloc, split_url.path))
-    if not article_json:
-        return None
-    if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
-
-    soup = BeautifulSoup(article_json['html'], 'html.parser')
+    if article_json:
+        if save_debug:
+            utils.write_file(article_json, './debug/debug.json')
+        soup = BeautifulSoup(article_json['html'], 'html.parser')
 
     item = {}
-    if article_json.get('gaCustomDimensions'):
+    if article_json and article_json.get('gaCustomDimensions'):
         item['id'] = article_json['gaCustomDimensions']['postID']
         item['url'] = article_json['gaCustomDimensions']['location']
         item['title'] = article_json['gaCustomDimensions']['title']
@@ -79,9 +105,9 @@ def get_content(url, args, save_debug=False):
         page_html = utils.get_url_html(url)
         if not page_html:
             return None
-        page_soup = BeautifulSoup(page_html, 'html.parser')
+        soup = BeautifulSoup(page_html, 'html.parser')
         ld_json = None
-        for el in page_soup.find_all('script', attrs={"type": "application/ld+json"}):
+        for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
             ld_json = json.loads(el.string)
             if ld_json.get('@type') and ld_json['@type'] == 'Article':
                 break
@@ -110,8 +136,13 @@ def get_content(url, args, save_debug=False):
             item['author'] = {}
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
-        if ld_json.get('articleSection'):
-            item['tags'] = ld_json['articleSection'].copy()
+        if ld_json.get('keywords'):
+            item['tags'] = ld_json['keywords'].copy()
+        elif ld_json.get('articleSection'):
+            if isinstance(ld_json['articleSection'], list):
+                item['tags'] = ld_json['articleSection'].copy()
+            elif isinstance(ld_json['articleSection'], str):
+                item['tags'] = list(ld_json['articleSection'])
 
         if ld_json.get('description'):
             item['summary'] = ld_json['description']
@@ -214,30 +245,7 @@ def get_content(url, args, save_debug=False):
             elif 'w-twitch' in el['class']:
                 new_html = utils.add_embed('https://player.twitch.tv/?video=' + el['id'])
             elif 'w-play_store_app' in el['class']:
-                new_html = '<table><tr>'
-                it = el.find('img')
-                if it:
-                    new_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(resize_image(it['src']))
-                new_html += '<td style="vertical-align:top;">'
-                it = el.find(class_='app-widget-name')
-                if it:
-                    new_html += '<a href="{}"><b>{}</b></a>'.format(it['href'], it.get_text().strip())
-                it = el.find(class_='app-developer-name')
-                if it:
-                    if it.a:
-                        new_html += ' (<a href="{}">{}</a>)'.format(it.a['href'], it.get_text().strip())
-                    else:
-                        new_html += ' ({})'.format(it.get_text().strip())
-                it = el.find(class_='app-widget-price')
-                if it:
-                    new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
-                it = el.find(class_=re.compile(r'app-widget-rating'))
-                if it:
-                    new_html += '<div><small>Rating: {}</small></div>'.format(it.get_text().strip())
-                it = el.find(class_='app-widget-download')
-                if it:
-                    new_html += '<div><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
-                new_html += '</td></tr></table>'
+                new_html = add_play_store_app(el)
 
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
@@ -368,6 +376,23 @@ def get_content(url, args, save_debug=False):
                 el.insert_after(new_el)
                 el.decompose()
 
+        for el in body.find_all('script'):
+            new_html = ''
+            m = re.search(r'window\.arrayOfEmbeds\[[^\]]+\] = \{\'([^\']+)\' : \'(.*?)\'\};\s*$', el.string, flags=re.S)
+            if m:
+                if m.group(1) == 'play_store_app':
+                    it = BeautifulSoup(html.unescape(m.group(2).replace('\\', '')), 'html.parser')
+                    new_html = add_play_store_app(it)
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled script ' + item['url'])
+
+        for el in body.find_all('button'):
+            el.decompose()
+
         for el in body.find_all(class_='table-container'):
             el.unwrap()
 
@@ -379,7 +404,7 @@ def get_content(url, args, save_debug=False):
 
         item['content_html'] += body.decode_contents()
 
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
+    item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 
