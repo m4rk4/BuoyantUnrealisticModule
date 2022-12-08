@@ -1,6 +1,6 @@
 import math, re
 from datetime import datetime
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
 
@@ -23,15 +23,26 @@ def calculate_duration(sec):
 def get_content(url, args, save_debug=False):
     # Only handles single episodes
     # https://playlist.megaphone.fm/?e=ESP3970143369
-    m = re.search(r'playlist\.megaphone\.fm/?\?([ep])=(\w+)', url)
-    if not m:
-        logger.warning('unhandled megaphone.fm url ' + url)
+    item = {}
+    api_url = ''
+    split_url = urlsplit(url)
+    if split_url.netloc == 'megaphone.link':
+        paths = list(filter(None, split_url.path[1:].split('/')))
+        item['id'] = paths[0]
+        api_url = 'https://player.megaphone.fm/playlist/episode/' + item['id']
+    elif split_url.netloc == 'playlist.megaphone.fm':
+        query = parse_qs(split_url.query)
+        if query.get('p'):
+            item['id'] = query['p'][0]
+            api_url = 'https://player.megaphone.fm/playlist/' + item['id']
+        elif query.get('e'):
+            item['id'] = query['e'][0]
+            api_url = 'https://player.megaphone.fm/playlist/episode/' + item['id']
+
+    if not api_url:
+        logger.warning('unhandled url ' + url)
         return None
 
-    if m.group(1) == 'p':
-        api_url = 'https://player.megaphone.fm/playlist/' + m.group(2)
-    else:
-        api_url = 'https://player.megaphone.fm/playlist/episode/' + m.group(2)
     podcast_json = utils.get_url_json(api_url)
     if not podcast_json:
         return None
@@ -40,13 +51,11 @@ def get_content(url, args, save_debug=False):
 
     episode = podcast_json['episodes'][0]
 
-    item = {}
-    if m.group(1) == 'p':
-        item['id'] = m.group(2)
-        item['title'] = podcast_json['podcastTitle']
-    else:
+    if '/episode/' in api_url:
         item['id'] = episode['uid']
         item['title'] = episode['title']
+    else:
+        item['title'] = podcast_json['podcastTitle']
 
     item['url'] = url
 
@@ -63,30 +72,28 @@ def get_content(url, args, save_debug=False):
 
     item['summary'] = episode['summary']
 
-    if m.group(1) == 'p':
+    if '/episode/' in api_url:
+        item['_duration'] = calculate_duration(episode['duration'])
+        poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
+        date = '{}. {}'.format(dt.strftime('%b'), dt.day)
+        desc = '<span style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></span><br/>by {}<br/>{} · {}'.format(item['url'], item['title'], item['author']['name'], date, item['_duration'])
+        item['content_html'] = '<table style="width:100%"><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;">{}</td></tr></table>'.format(item['_audio'], poster, desc)
+        if not 'embed' in args:
+            item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    else:
         poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>'.format(item['url'], item['title'])
-        item['content_html'] = '<table style="width:100%"><tr><td style="width:128px;"><img src="{}"/></td><td style="vertical-align:top;">{}</td></tr></table><table style="width:95%; margin-left:auto;">'.format(poster, desc)
-        if 'embed' in args:
-            n = 5
-        else:
-            n = -1
+        desc = '<span style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></span>'.format(item['url'], item['title'])
+        item['content_html'] = '<table style="width:100%"><tr><td style="width:128px;"><img src="{}"/></td><td style="vertical-align:top;">{}</td></tr></table><table style="margin-left:32px; border-left:3px solid #ccc"><tr><td colspan="2"><span style="font-size:1.1em; font-weight:bold;">Episodes:</span></td></tr>'.format(poster, desc)
         poster = '{}/static/play_button-48x48.png'.format(config.server)
         for i, episode in enumerate(podcast_json['episodes']):
             duration = calculate_duration(episode['duration'])
             dt = datetime.fromisoformat(episode['pubDate'].replace('Z', '+00:00'))
             date = '{}. {}'.format(dt.strftime('%b'), dt.day)
-            desc = '<small><strong><a href="{}">{}</a></strong><br/>{} · {}</small>'.format(episode['dataClipboardText'], episode['title'], date, duration)
+            desc = '<b><a href="{}">{}</a></b><br/><small>{} · {}</small>'.format(episode['dataClipboardText'], episode['title'], date, duration)
             item['content_html'] += '<tr><td><a href="{}"><img src="{}"/></a></td><td>{}</td></tr>'.format(episode['audioUrl'], poster, desc)
+            if 'embed' in args and i >= 4:
+                break
         item['content_html'] += '</table>'
-    else:
-        item['_duration'] = calculate_duration(episode['duration'])
-        poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        date = '{}. {}'.format(dt.strftime('%b'), dt.day)
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by {}<br/>{} · {}</small>'.format(item['url'], item['title'], item['author']['name'], date, item['_duration'])
-        item['content_html'] = '<table style="width:100%"><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;">{}</td></tr></table>'.format(item['_audio'], poster, desc)
-        if not 'embed' in args:
-            item['content_html'] += '<p>{}</p>'.format(item['summary'])
     return item
 
 

@@ -541,7 +541,7 @@
         "resizer_url": "https://www.cleveland.com/resizer/",
         "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
         "module": "fusion",
-        "deployment": 942,
+        "deployment": 951,
         "arc_site": "cleveland",
         "content": {
             "source": "article-beta-content-api",
@@ -1336,6 +1336,9 @@
             "https://medium.com/feed/@xander51",
             "https://medium.com/feed/tag/raspberry-pi"
         ]
+    },
+    "megaphone": {
+        "module": "megaphonefm"
     },
     "megaphone.fm": {
         "module": "megaphonefm"
