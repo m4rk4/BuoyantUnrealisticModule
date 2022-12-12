@@ -115,6 +115,9 @@
             }
         }
     },
+    "alignmentforum": {
+        "module": "lesswrong"
+    },
     "allure": {
         "module": "cne",
         "test_feed": [
@@ -274,6 +277,9 @@
             "https://www.bloomberg.com/technology",
             "https://www.bloomberg.com/authors/AS7Hj1mBMGM/mark-gurman.rss"
         ]
+    },
+    "bonappetit": {
+        "module": "cne"
     },
     "bostonglobe": {
         "api_url": "https://www.bostonglobe.com/pf/api/v3/content/fetch/",
@@ -1237,6 +1243,9 @@
             "https://www.latimes.com/sports.rss"
         ]
     },
+    "lesswrong": {
+        "module": "lesswrong"
+    },
     "lifehacker": {
         "module": "gawker"
     },
@@ -1255,6 +1264,9 @@
     "marketingbrew": {
         "module": "morningbrew",
         "buildId": "85o1uNt2Ql4KY_LrXnGBi"
+    },
+    "marketwatch": {
+        "module": "wsj"
     },
     "mashable": {
         "module": "mashable"
@@ -2013,6 +2025,9 @@
                 "tagSlug": "TAG"
             }
         }
+    },
+    "smartnews": {
+        "module": "smartnews"
     },
     "afr": {
         "module": "nine",
