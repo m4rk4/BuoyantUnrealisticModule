@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # Testing:
 # media-object-podcast: https://www.wsj.com/amp/articles/taliban-seize-kandahar-prepare-to-march-on-kabul-11628846975
+
+# TODO: fix
+# https://www.wsj.com/articles/chatgpt-ai-chatbot-punderdome-jokes-11670602696
 
 def get_caption(el):
     caption = []
@@ -182,7 +185,7 @@ def get_content(url, args, save_debug=False):
     clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     if '/video/' in clean_url:
         return get_video_content(clean_url, args, save_debug)
-    elif '/story/' in clean_url:
+    elif 'wsj.com/story/' in clean_url:
         return get_story_content(clean_url, args, save_debug)
 
     if split_url.path.startswith('/amp/'):
@@ -192,6 +195,7 @@ def get_content(url, args, save_debug=False):
     article_html = utils.get_url_html(amp_url, 'googlebot')
     if not article_html:
         return None
+    article_html = re.sub(r'-\s{4,}', '-', article_html)
     if save_debug:
         with open('./debug/debug.html', 'w', encoding='utf-8') as f:
             f.write(article_html)
@@ -199,46 +203,55 @@ def get_content(url, args, save_debug=False):
     soup = BeautifulSoup(article_html, 'html.parser')
 
     item = {}
-    item['id'] = soup.find('meta', attrs={"name": "article.id"}).get('content')
-    item['url'] = clean_url
-    item['title'] = soup.find('meta', attrs={"name": "article.headline"}).get('content')
+    el = soup.find('meta', attrs={"name": "article.id"})
+    if el and el.get('content'):
+        item['id'] = el['content']
+    else:
+        item['id'] = clean_url
 
-    dt = datetime.fromisoformat(
-        soup.find('meta', attrs={"itemprop": "datePublished"}).get('content').replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-    dt = datetime.fromisoformat(
-        soup.find('meta', attrs={"itemprop": "dateModified"}).get('content').replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
+    item['url'] = clean_url
+
+    el = soup.find('meta', attrs={"name": "article.headline"})
+    if el and el.get('content'):
+        item['title'] = el['content']
+    else:
+        item['title'] = soup.title.get_text()
+
+    el = soup.find('meta', attrs={"itemprop": "datePublished"})
+    if el and el.get('content'):
+        dt = datetime.fromisoformat(el['content'].replace('Z', '+00:00'))
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    el = soup.find('meta', attrs={"itemprop": "dateModified"})
+    if el and el.get('content'):
+        dt = datetime.fromisoformat(el['content'].replace('Z', '+00:00'))
+        item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
-    author = soup.find('meta', attrs={"name": "author"})
-    if author:
-        item['author']['name'] = author.get('content')
-    elif soup.find('meta', attrs={"name": "article.type"}).get('content') == 'Letters':
-        item['author']['name'] = 'WSJ Letters'
+    el = soup.find('meta', attrs={"name": "author"})
+    if el and el.get('content'):
+        item['author']['name'] = el['content']
     else:
-        item['author']['name'] = 'WSJ'
+        el = soup.find('meta', attrs={"name": "article.type"})
+        if el and el.get('content') and el['content'] == 'Letters':
+            item['author']['name'] = 'WSJ Letters'
+        else:
+            item['author']['name'] = 'WSJ'
 
-    item['tags'] = soup.find('meta', attrs={"name": "news_keywords"}).get('content').split(',')
+    el = soup.find('meta', attrs={"name": "news_keywords"})
+    if el and el.get('content'):
+        item['tags'] = el['content'].split(',')
 
-    item['_image'] = soup.find('meta', attrs={"itemprop": "image"}).get('content')
-    item['summary'] = soup.find('meta', attrs={"name": "article.summary"}).get('content')
+    el = soup.find('meta', attrs={"itemprop": "image"})
+    if el and el.get('content'):
+        item['_image'] = el['content']
 
-    content_html = ''
-    lead = ''
-    el = soup.find(class_=re.compile(r'articleLead|bigTop-hero'))
-    if el:
-        if el.find(class_='media-object-video'):
-            lead = convert_amp_video(el)
-        else:  # media-object-image
-            lead = convert_amp_image(el)
-    if lead:
-        content_html += lead
-    else:
-        if item.get('_image'):
-            content_html += utils.add_image(item['_image'])
+    item['content_html'] = ''
+    el = soup.find('meta', attrs={"name": "article.summary"})
+    if el and el.get('content'):
+        item['summary'] = el['content']
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     article_body = soup.find(class_="articleBody")
     if not article_body:
@@ -250,6 +263,8 @@ def get_content(url, args, save_debug=False):
     article = article_body.find('section', attrs={"subscriptions-section": "content"})
     if not article:
         article = article_body.find(attrs={"amp-access": "access", "class": False})
+    if not article:
+        article = article_body.find('section')
 
     el = article.find(class_='paywall')
     if el:
@@ -263,11 +278,10 @@ def get_content(url, args, save_debug=False):
 
     for el in article.find_all(class_='media-object'):
         new_html = ''
-        if not list(filter(re.compile(r'scope-web').search, el['class'])):
+        if not list(filter(re.compile(r'scope-web|scope-inline').search, el['class'])):
             el.decompose()
 
-        elif re.search(r'From the Archives|Newsletter Sign-Up|SHARE YOUR THOUGHTS', el.get_text(), flags=re.I) or len(
-                el.contents) == 1:
+        elif re.search(r'From the Archives|Newsletter Sign-Up|SHARE YOUR THOUGHTS', el.get_text(), flags=re.I):
             el.decompose()
 
         elif 'smallrule' in el['class']:
@@ -296,6 +310,11 @@ def get_content(url, args, save_debug=False):
 
         elif el.find(class_='media-object-video'):
             new_html = convert_amp_video(el)
+
+        elif el.find(class_='inset-youtube'):
+            it = el.find('amp-youtube')
+            if it:
+                new_html = utils.add_embed('https://www.youtube.com/embed/' + it['data-videoid'])
 
         elif el.find(class_='media-object-interactiveLink'):
             new_html = '<hr width="60%" /><h4>{}</h4>'.format(str(el.a))
@@ -343,74 +362,108 @@ def get_content(url, args, save_debug=False):
                 logger.warning('unable to get tweet {} in {}'.format(it['data-tweetid'], clean_url))
 
         elif el.find(class_='dynamic-inset-iframe'):
-            iframe_src = el.find('amp-iframe').get('src')
-            m = re.search(r'\?url=(.+)$', iframe_src)
-            if m:
-                url_json = utils.get_url_json(m.group(1))
-                if url_json:
-                    new_html = ''
-                    if url_json.get('subType'):
-                        if url_json['subType'] == 'origami':
-                            logger.debug('WSJ iframe origami in ' + m.group(1))
-                            group_caption = ''
-                            n = len(url_json['serverside']['data']['data']['data']['children']) - 1
-                            for i, it in enumerate(url_json['serverside']['data']['data']['data']['children']):
-                                if it['sub_type'] == 'Origami Photo':
-                                    caption = ''
-                                    if it['json'].get('caption'):
-                                        if url_json['serverside']['data']['data']['data']['json']['groupedCaption'] == True:
-                                            group_caption += it['json']['caption']
-                                        else:
-                                            caption += it['json']['caption']
-                                    if it['json'].get('credit'):
-                                        if url_json['serverside']['data']['data']['data']['json']['groupedCredit'] == True:
-                                            group_caption += it['json']['credit']
-                                        else:
-                                            caption += it['json']['credit']
-                                    if i == n and group_caption:
-                                        if caption:
-                                            group_caption = caption + '<br />' + group_caption
-                                        new_html += utils.add_image(it['json']['media'], group_caption) + '<br/>'
-                                    else:
-                                        new_html += utils.add_image(it['json']['media'], caption) + '<br/>'
-
-                        elif url_json['subType'] == 'parallax-gallery':
-                            for it in url_json['serverside']['data']['data']['items']:
-                                if it['type'] == 'image':
-                                    caption = it['data'].get('mediaBody')
-                                    if caption and caption.startswith('<p>'):
-                                        caption = caption[3:-4]
-                                    if it['data'].get('mediaCredit'):
-                                        caption += ' | ' + it['data']['mediaCredit']
-                                    new_html += utils.add_image(it['data']['media'], caption) + '<br/>'
-                                else:
-                                    logger.warning('unhandled paralax-gallery item in ' + m.group(1))
-
-                        elif url_json['subType'] == 'series-navigation':
-                            new_html = '<h4>{}</h4><ul>'.format(url_json['serverside']['data']['data']['data']['title'])
-                            for it in url_json['serverside']['data']['data']['items']:
-                                new_html += '<li><a href="{}">{}</a></li>'.format(it['link'], it['title'])
-                            new_html += '</ul>'
-
-                        elif url_json['subType'] == 'audio-pullquote':
-                            new_html = utils.add_pullquote(url_json['serverside']['data']['data']['quoteText'])
-
-                        else:
-                            logger.warning('unhandled dynamic-inset-iframe subtype {} in {}'.format(url_json['subType'],
-                                                                                                    clean_url))
-
-                    elif url_json.get('type'):
-                        logger.warning(
-                            'unhandled dynamic-inset-iframe type {} in {}'.format(url_json['type'], clean_url))
-
+            new_html = ''
+            iframe = el.find('amp-iframe')
+            if iframe:
+                m = re.search(r'\?url=(.+)$', iframe['src'])
+                if m:
+                    iframe_url = m.group(1)
+                    if iframe_url.startswith('https://dynamic-insets.s3.amazonaws.com'):
+                        m = re.search(r'&src=(.*?)&', iframe['src'])
+                        if m:
+                            new_html = utils.add_embed(unquote_plus(m.group(1)))
                     else:
-                        logger.warning('unhandled dynamic-inset-iframe {} in {}'.format(m.group(1), clean_url))
+                        iframe_json = utils.get_url_json(iframe_url)
+                        if iframe_json:
+                            if iframe_json.get('subType'):
+                                if iframe_json['subType'] == 'origami':
+                                    if iframe_json['serverside']['data']['data'].get('data'):
+                                        group_caption = ''
+                                        n = len(iframe_json['serverside']['data']['data']['data']['children']) - 1
+                                        for i, it in enumerate(iframe_json['serverside']['data']['data']['data']['children']):
+                                            if it['sub_type'] == 'Origami Photo':
+                                                captions = []
+                                                if it['json'].get('caption'):
+                                                    if iframe_json['serverside']['data']['data']['data']['json']['groupedCaption'] == True:
+                                                        group_caption += it['json']['caption']
+                                                    else:
+                                                        captions.append(it['json']['caption'])
+                                                if it['json'].get('credit'):
+                                                    if iframe_json['serverside']['data']['data']['data']['json']['groupedCredit'] == True:
+                                                        group_caption += it['json']['credit']
+                                                    else:
+                                                        captions.append(it['json']['credit'])
+                                                if i == 0:
+                                                    new_html += utils.add_image(it['json']['media'], ' | '.join(captions), heading=group_caption)
+                                                else:
+                                                    new_html += utils.add_image(it['json']['media'], ' | '.join(captions))
+
+                                    elif iframe_json['serverside']['template'].get('template'):
+                                        template = BeautifulSoup(iframe_json['serverside']['template']['template'], 'html.parser')
+                                        it = template.find(class_='origami-grouped-caption')
+                                        if it:
+                                            group_caption = it.get_text()
+                                        else:
+                                            group_caption = ''
+                                        for img in template.find_all(class_='origami-image'):
+                                            captions = []
+                                            it = img.find(class_='origami-caption')
+                                            if it and it.get_text().strip():
+                                                captions.append(it.get_text().strip())
+                                            it = img.find(class_='origami-credit')
+                                            if it and it.get_text().strip():
+                                                captions.append(it.get_text().strip())
+                                            it = img.find('img')
+                                            if it:
+                                                new_html += utils.add_image(it['src'], ' | '.join(captions), heading=group_caption)
+                                                group_caption = ''
+                                    if not new_html:
+                                        logger.debug('unhandled dynamic-inset-iframe origami in ' + iframe_url)
+
+                                elif iframe_json['subType'] == 'parallax-gallery':
+                                    for it in iframe_json['serverside']['data']['data']['items']:
+                                        if it['type'] == 'image' or it['type'] == 'inset':
+                                            captions = []
+                                            if it['data'].get('mediaBody'):
+                                                captions.append(re.sub('^<p>(.*)</p>$', r'\1', it['data']['mediaBody']))
+                                            if it['data'].get('mediaCredit'):
+                                                captions.append(it['data']['mediaCredit'])
+                                            if it['data'].get('media'):
+                                                new_html += utils.add_image(it['data']['media'], ' | '.join(captions))
+                                            elif it['data'].get('mediaFallback'):
+                                                new_html += utils.add_image(it['data']['mediaFallback'], ' | '.join(captions))
+                                    if not new_html:
+                                        logger.warning('unhandled dynamic-inset-iframe parallax-gallery item in ' + iframe_url)
+
+                                elif iframe_json['subType'] == 'series-navigation':
+                                    new_html = '<h4>{}</h4><ul>'.format(iframe_json['serverside']['data']['data']['data']['title'])
+                                    for it in iframe_json['serverside']['data']['data']['items']:
+                                        new_html += '<li><a href="{}">{}</a></li>'.format(it['link'], it['title'])
+                                    new_html += '</ul>'
+
+                                elif iframe_json['subType'] == 'audio-pullquote':
+                                    new_html = utils.add_pullquote(iframe_json['serverside']['data']['data']['quoteText'])
+
+                                elif iframe_json['subType'] == 'quiz-custom':
+                                    new_html =  '<blockquote><b>View embedded quiz from <a href="{0}">{0}</a></b></blockquote>'.format(iframe['src'])
+
+                                else:
+                                    logger.warning('unhandled dynamic-inset-iframe subtype {} in {}'.format(iframe_json['subType'], clean_url))
+
+                            elif iframe_json.get('type'):
+                                logger.warning('unhandled dynamic-inset-iframe type {} in {}'.format(iframe_json['type'], clean_url))
+
+                            else:
+                                logger.warning('unhandled dynamic-inset-iframe {} in {}'.format(iframe_url, clean_url))
 
         elif el.find(class_='dynamic-inset-fallback'):
             if el.find('amp-img'):
                 new_html = convert_amp_image(el)
             else:
                 logger.warning('unhandled dynamic-inset-fallback in ' + clean_url)
+
+        elif len(el.contents) == 1:
+            el.decompose()
 
         else:
             it = el.find(class_=re.compile(r'media-object-'))
@@ -423,9 +476,19 @@ def get_content(url, args, save_debug=False):
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
-    content_html += str(article)
+    el = article.find()
+    if el.name == 'p':
+        el = soup.find(class_=re.compile(r'articleLead|bigTop-hero'))
+        if el:
+            if el.find(class_='media-object-video'):
+                item['content_html'] += convert_amp_video(el)
+            else:  # media-object-image
+                item['content_html'] += convert_amp_image(el)
+        else:
+            if item.get('_image'):
+                item['content_html'] += utils.add_image(item['_image'])
 
-    item['content_html'] = content_html
+    item['content_html'] += re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', article.decode_contents())
     return item
 
 
@@ -437,16 +500,17 @@ def get_feed(args, save_debug=False):
 
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if len(paths) == 2:
-        articles = utils.get_url_json('https://www.wsj.com/?id=%7B%22count%22%3A20%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22group%22%3A%7B%22name%22%3A%22WSJ%22%7D%7D%2C%7B%22term%22%3A%7B%22key%22%3A%22SectionName%22%2C%22value%22%3A%22{}%22%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22liveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(paths[1]))
-
-    elif len(paths) == 3:
-        if paths[1] == 'author':
-            author = utils.get_url_json('https://www.wsj.com/?id={}&type=author'.format(paths[2]))
-            if not author:
-                return None
-            articles = utils.get_url_json('https://www.wsj.com/?id=%7B%22count%22%3A10%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22term%22%3A%7B%22key%22%3A%22AuthorId%22%2C%22value%22%3A%22{}%22%7D%7D%2C%7B%22terms%22%3A%7B%22key%22%3A%22Product%22%2C%22value%22%3A%5B%22WSJ.com%22%2C%22WSJPRO%22%5D%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22LiveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(author['data']['authorId']))
-
+    if 'author' in paths:
+        author = paths[paths.index('author') + 1]
+        author_json = utils.get_url_json('https://www.wsj.com/?id={}&type=author'.format(author))
+        if author_json:
+            api_url = 'https://www.wsj.com/?id=%7B%22count%22%3A10%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22term%22%3A%7B%22key%22%3A%22AuthorId%22%2C%22value%22%3A%22{}%22%7D%7D%2C%7B%22terms%22%3A%7B%22key%22%3A%22Product%22%2C%22value%22%3A%5B%22WSJ.com%22%2C%22WSJPRO%22%5D%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22LiveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(author_json['data']['authorId'])
+            print(api_url)
+            articles = utils.get_url_json(api_url)
+    else:
+        if paths[0] == 'news':
+            api_url = 'https://www.wsj.com/?id=%7B%22count%22%3A20%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22group%22%3A%7B%22name%22%3A%22WSJ%22%7D%7D%2C%7B%22term%22%3A%7B%22key%22%3A%22SectionName%22%2C%22value%22%3A%22{}%22%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22liveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full'.format(paths[1])
+            articles = utils.get_url_json(api_url)
     if not articles:
         return None
     if save_debug:
