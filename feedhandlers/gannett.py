@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import usatoday_sportswire
+from feedhandlers import rss, usatoday_sportswire
 
 import logging
 
@@ -311,6 +311,9 @@ def get_content(url, args, save_debug=False, article_json=None):
 
 def get_feed(args, save_debug):
     split_url = urlsplit(args['url'])
+    if 'rssfeeds' in split_url.netloc:
+        return rss.get_feed(args, save_debug, get_content)
+
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(args['url'])
     if tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
