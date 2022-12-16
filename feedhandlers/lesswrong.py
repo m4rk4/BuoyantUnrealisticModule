@@ -1,9 +1,9 @@
-import json, re
+import re
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import quote_plus, urlsplit
+from datetime import datetime
+from urllib.parse import urlsplit
 
-import config, utils
+import utils
 from feedhandlers import rss
 
 import logging
