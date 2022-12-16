@@ -303,7 +303,7 @@ def get_gallery_content(soup, url, args, save_debug):
         item['_image'] = resize_img_src(data_json['content']['images']['lede']['url'])
 
     item['content_html'] = ''
-    el = soup.find(class_='slideshow-lede-image')
+    el = soup.find(class_=re.compile('-lede-image'))
     if el:
         it = el.find(class_='content-lede-image-credit')
         if it:
@@ -317,6 +317,10 @@ def get_gallery_content(soup, url, args, save_debug):
             logger.warning('unhandled slideshow-lede-image in ' + item['url'])
 
     el = soup.find(class_='slideshow-desktop-dek')
+    if el:
+        item['content_html'] += el.decode_contents()
+
+    el = soup.find(class_='listicle-intro')
     if el:
         item['content_html'] += el.decode_contents()
 
@@ -336,6 +340,13 @@ def get_gallery_content(soup, url, args, save_debug):
             item['content_html'] += utils.add_embed(media['data']['media']['embed_url'])
             if media['data']['media'].get('dek'):
                 item['content_html'] += media['data']['media']['dek']
+        elif media['data']['type'] == 'product':
+            item['content_html'] += '<table style="width:90%; margin-left:auto; margin-right:auto;">'
+            item['content_html'] += '<tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(resize_img_src(media['data']['thumb']['src'], 128))
+            item['content_html'] += '<td style="vertical-align:top;"><small>{}</small><br/><span style="font-size:1.1em; font-weight:bold;">{}</span>'.format(media['data']['product']['brand'], media['data']['product']['name'])
+            item['content_html'] += '<div style="width:fit-content; padding:4px; background-color:#59E7ED;"><a href="{}" style="text-decoration:none; color:black;">{} at {}</a></div></td></tr></table>'.format(media['data']['product']['outboundLink'], media['data']['product']['price'], media['data']['product']['vendor'])
+            item['content_html'] += media['data']['product']['description']
+
         else:
             logger.warning('unhandled gallery media type {} in {}'.format(media['data']['type'], item['url']))
 
