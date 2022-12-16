@@ -14,6 +14,8 @@ def get_authorization_header():
     # Top Songs - USA
     url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
     spotify_html = utils.get_url_html(url)
+    if not spotify_html:
+        return None
     # utils.write_file(spotify_html, './debug/debug.html')
     m = re.search(r'"accessToken":"([^"]+)', spotify_html)
     if not m:
