@@ -52,10 +52,21 @@ https://dailydad.com/wp-json/wp/v2/posts
 https://philip.greenspun.com/blog/wp-json/wp/v2/posts
 https://nextdraft.com/wp-json/wp/v2/posts
 https://www.the-sun.com/wp-json/wp/v2/posts
+https://www.nationalreview.com/wp-json/wp/v2/posts
+https://punchbowl.news/wp-json/wp/v2/posts
+https://www.fonearena.com/blog/wp-json/wp/v2/posts
+https://www.opensecrets.org/news/wp-json/wp/v2/posts
+https://www.insidehook.com/wp-json/wp/v2/article/623487
+https://consequence.net/wp-json/wp/v2/posts
+https://www.thetechoutlook.com/wp-json/wp/v2/posts
 
+wp-posts without access to wp-json:
+https://www.bellingcat.com/news/2022/11/28/moscows-mule-how-russia-rewrote-a-narcotics-case-to-get-its-spy-back/
 
-https://assets.msn.com/content/view/v2/Detail/en-us/AA14Z1ir
-https://assets.msn.com/content/view/v1/Detail/AA14Wxfd
+PRELOAD_STATE
+https://www.edmunds.com/car-news/2023-honda-civic-the-one-wed-buy.html
+https://www.edmunds.com/gateway/api/editorial/v3/content/?path=/research/best/car-news/honda-civic-how-wed-spec-it-for-2023,/research/car-news/honda-civic-how-wed-spec-it-for-2023,/car-news/honda-civic-how-wed-spec-it-for-2023&fetchcontents=true&ispreview=true&tree=true&externalfetch=true
+
 
 https://abcnews.go.com/gemini/news/story/94147226
 
@@ -66,8 +77,13 @@ c = session.cookies.get_dict()
 https://asia.nikkei.com/__service/v1/piano/article_access/ + c['otp']
 Bad Token
 
+https://www.nhl.com/penguins/news/penguins-captain-sidney-crosby-named-nhls-first-star-of-the-week/c-337863176
+https://www.nhl.com/penguins/news/article-body/337863176
+
 
 NEXT_DATA sites:
+https://clutchpoints.com/_next/data/vw2yRwsg-eaPoGVQcFkmX/en/ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans.json?slug=ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans
+
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
 
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
@@ -107,42 +123,6 @@ https://infogram.com/oembed/?url=https%3A%2F%2Finfogram.com%2Fafrg-nov2020-jdi-d
 
 https://www.gocomics.com/calvinandhobbes
 
-fetch("https://www.lesswrong.com/graphql", {
-  "headers": {
-    "accept": "*/*",
-    "accept-language": "en-US,en;q=0.9,de;q=0.8",
-    "content-type": "application/json",
-    "dpr": "1",
-    "sec-ch-ua": "\"Chromium\";v=\"106\", \"Microsoft Edge\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-origin",
-    "viewport-width": "988"
-  },
-  "referrer": "https://www.lesswrong.com/",
-  "referrerPolicy": "strict-origin-when-cross-origin",
-  "body": "[{\"operationName\":\"singlePostQuery\",\"variables\":{\"input\":{\"selector\":{\"documentId\":\"rP66bz34crvDudzcJ\"}}},\"query\":\"query singlePostQuery($input: SinglePostInput) {\\n  post(input: $input) {\\n    result {\\n      ...PostsList\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\\nfragment PostsList on Post {\\n  ...PostsListBase\\n  deletedDraft\\n  contents {\\n    _id\\n    htmlHighlight\\n    wordCount\\n    version\\n    __typename\\n  }\\n  fmCrosspost\\n  __typename\\n}\\n\\nfragment PostsListBase on Post {\\n  ...PostsBase\\n  ...PostsAuthors\\n  readTimeMinutes\\n  moderationGuidelines {\\n    _id\\n    html\\n    __typename\\n  }\\n  customHighlight {\\n    _id\\n    html\\n    __typename\\n  }\\n  lastPromotedComment {\\n    user {\\n      ...UsersMinimumInfo\\n      __typename\\n    }\\n    __typename\\n  }\\n  bestAnswer {\\n    ...CommentsList\\n    __typename\\n  }\\n  tags {\\n    ...TagPreviewFragment\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment PostsBase on Post {\\n  ...PostsMinimumInfo\\n  url\\n  postedAt\\n  createdAt\\n  sticky\\n  metaSticky\\n  stickyPriority\\n  status\\n  frontpageDate\\n  meta\\n  deletedDraft\\n  shareWithUsers\\n  sharingSettings\\n  coauthorStatuses\\n  hasCoauthorPermission\\n  commentCount\\n  voteCount\\n  baseScore\\n  extendedScore\\n  unlisted\\n  score\\n  lastVisitedAt\\n  isFuture\\n  isRead\\n  lastCommentedAt\\n  lastCommentPromotedAt\\n  canonicalCollectionSlug\\n  curatedDate\\n  commentsLocked\\n  commentsLockedToAccountsCreatedAfter\\n  question\\n  hiddenRelatedQuestion\\n  originalPostRelationSourceId\\n  userId\\n  location\\n  googleLocation\\n  onlineEvent\\n  globalEvent\\n  startTime\\n  endTime\\n  localStartTime\\n  localEndTime\\n  eventRegistrationLink\\n  joinEventLink\\n  facebookLink\\n  meetupLink\\n  website\\n  contactInfo\\n  isEvent\\n  eventImageId\\n  eventType\\n  types\\n  groupId\\n  reviewedByUserId\\n  suggestForCuratedUserIds\\n  suggestForCuratedUsernames\\n  reviewForCuratedUserId\\n  authorIsUnreviewed\\n  afDate\\n  suggestForAlignmentUserIds\\n  reviewForAlignmentUserId\\n  afBaseScore\\n  afExtendedScore\\n  afCommentCount\\n  afLastCommentedAt\\n  afSticky\\n  hideAuthor\\n  moderationStyle\\n  submitToFrontpage\\n  shortform\\n  onlyVisibleToLoggedIn\\n  reviewCount\\n  reviewVoteCount\\n  positiveReviewVoteCount\\n  reviewVoteScoreAllKarma\\n  reviewVotesAllKarma\\n  reviewVoteScoreHighKarma\\n  reviewVotesHighKarma\\n  reviewVoteScoreAF\\n  reviewVotesAF\\n  finalReviewVoteScoreHighKarma\\n  finalReviewVotesHighKarma\\n  finalReviewVoteScoreAllKarma\\n  finalReviewVotesAllKarma\\n  finalReviewVoteScoreAF\\n  finalReviewVotesAF\\n  group {\\n    _id\\n    name\\n    organizerIds\\n    __typename\\n  }\\n  nominationCount2018\\n  reviewCount2018\\n  nominationCount2019\\n  reviewCount2019\\n  __typename\\n}\\n\\nfragment PostsMinimumInfo on Post {\\n  _id\\n  slug\\n  title\\n  draft\\n  hideCommentKarma\\n  af\\n  currentUserReviewVote {\\n    _id\\n    qualitativeScore\\n    __typename\\n  }\\n  userId\\n  __typename\\n}\\n\\nfragment PostsAuthors on Post {\\n  user {\\n    ...UsersMinimumInfo\\n    biography {\\n      ...RevisionDisplay\\n      __typename\\n    }\\n    profileImageId\\n    moderationStyle\\n    bannedUserIds\\n    moderatorAssistance\\n    __typename\\n  }\\n  coauthors {\\n    ...UsersMinimumInfo\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment UsersMinimumInfo on User {\\n  _id\\n  slug\\n  createdAt\\n  username\\n  displayName\\n  previousDisplayName\\n  fullName\\n  karma\\n  afKarma\\n  deleted\\n  isAdmin\\n  htmlBio\\n  postCount\\n  commentCount\\n  sequenceCount\\n  afPostCount\\n  afCommentCount\\n  spamRiskScore\\n  tagRevisionCount\\n  __typename\\n}\\n\\nfragment RevisionDisplay on Revision {\\n  _id\\n  version\\n  updateType\\n  editedAt\\n  userId\\n  html\\n  wordCount\\n  htmlHighlight\\n  plaintextDescription\\n  __typename\\n}\\n\\nfragment CommentsList on Comment {\\n  _id\\n  postId\\n  tagId\\n  tagCommentType\\n  parentCommentId\\n  topLevelCommentId\\n  descendentCount\\n  contents {\\n    _id\\n    html\\n    plaintextMainText\\n    __typename\\n  }\\n  postedAt\\n  repliesBlockedUntil\\n  userId\\n  deleted\\n  deletedPublic\\n  deletedReason\\n  hideAuthor\\n  user {\\n    ...UsersMinimumInfo\\n    __typename\\n  }\\n  currentUserVote\\n  currentUserExtendedVote\\n  baseScore\\n  extendedScore\\n  score\\n  voteCount\\n  af\\n  afDate\\n  moveToAlignmentUserId\\n  afBaseScore\\n  afExtendedScore\\n  suggestForAlignmentUserIds\\n  reviewForAlignmentUserId\\n  needsReview\\n  answer\\n  parentAnswerId\\n  retracted\\n  postVersion\\n  reviewedByUserId\\n  shortform\\n  lastSubthreadActivity\\n  moderatorHat\\n  nominatedForReview\\n  reviewingForReview\\n  promoted\\n  promotedByUser {\\n    ...UsersMinimumInfo\\n    __typename\\n  }\\n  directChildrenCount\\n  votingSystem\\n  isPinnedOnProfile\\n  __typename\\n}\\n\\nfragment TagPreviewFragment on Tag {\\n  ...TagBasicInfo\\n  parentTag {\\n    name\\n    slug\\n    __typename\\n  }\\n  subTags {\\n    name\\n    slug\\n    __typename\\n  }\\n  description {\\n    _id\\n    htmlHighlight\\n    __typename\\n  }\\n  __typename\\n}\\n\\nfragment TagBasicInfo on Tag {\\n  _id\\n  userId\\n  name\\n  slug\\n  core\\n  postCount\\n  adminOnly\\n  canEditUserIds\\n  suggestedAsFilter\\n  needsReview\\n  descriptionTruncationCount\\n  createdAt\\n  wikiOnly\\n  deleted\\n  __typename\\n}\\n\"}]",
-  "method": "POST",
-  "mode": "cors",
-  "credentials": "include"
-});
-
-
-https://www.fonearena.com/blog/wp-json/wp/v2/posts
-"wpjson_path": "/blog/wp-json/"
-"posts": "posts"
-
-https://www.opensecrets.org/news/wp-json/wp/v2/posts
-"wpjson_path": "/news/wp-json/"
-"posts": "posts"
-
-https://www.insidehook.com/wp-json/wp/v2/article/623487
-"wpjson_path": "/wp-json/"
-"posts": "article"
-
-
 https://www.slashgear.com/1026441/the-real-reason-why-the-linux-logo-is-a-penguin/?ajax=1
 
 https://newrepublic.com/article/167617/evanston-illinois-reparations-great-experiment
@@ -165,12 +145,6 @@ http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.nationalgeographi
 https://www.nationalgeographic.com/magazine/article/a-german-bunker-full-of-blood-and-urine-has-the-best-record-of-how-chemicals-contaminate-us
 
 http://magazine.recyclingtoday.com/article/july-2021/michelin-where-the-recycled-rubber-meets-the-road.aspx
-
-https://api-aggregate.eonline.com/graphql
-
-\n\tquery ARTICLE(\n\t\t$id: ID!\n\t\t$edition: EDITIONKEY!\n\t\t$sanitizer: SANITIZATION_TYPE\n\t\t$limit: Limit\n\t\t$source: PUBLISHABLE_SOURCE\n\t) {\n\t\tarticle(id: $id, source: $source) {\n\t\t\ttitle\n\t\t\tshortTitle\n\t\t\tsubhead\n\t\t\tautoPlayTopVideo\n\t\t\tpageMetaData(edition: $edition) {\n\t\t\t\tdefaultUrl\n\t\t\t\tcanonicalUrl\n\t\t\t\tredirectUrl\n\t\t\t\threflang {\n\t\t\t\t\turi\n\t\t\t\t\tedition\n\t\t\t\t}\n\t\t\t}\n\t\t\turi(edition: $edition)\n\t\t\tedition\n\t\t\tpublishDate\n\t\t\tlastModDate\n\t\t\tsnipe\n\t\t\tenableVideoPlaylist\n\t\t\tthumbnail(edition: $edition) {\n\t\t\t\turi\n\t\t\t\ttitle\n\t\t\t}\n\t\t\ttranslators\n\t\t\tauthors {\n\t\t\t\tid\n\t\t\t\tfullName\n\t\t\t\turi\n\t\t\t}\n\t\t\tcategories(filterWorkflow: true) {\n\t\t\t\tid\n\t\t\t\tname\n\t\t\t\tdisplayName(edition: $edition)\n\t\t\t\turi(edition: $edition)\n\t\t\t\ttitle\n\t\t\t\tkey\n\t\t\t}\n\t\t\tbranding {\n\t\t\t\tbrandingType\n\t\t\t\tdisplayText\n\t\t\t\tads {\n\t\t\t\t\tadKeywords\n\t\t\t\t}\n\t\t\t\tadTracking {\n\t\t\t\t\tadvertiser\n\t\t\t\t}\n\t\t\t}\n\t\t\tshow(edition: $edition) {\n\t\t\t\turi(edition: $edition)\n\t\t\t\tlogo(edition: $edition) {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\turi\n\t\t\t\t\tsourceWidth\n\t\t\t\t\tsourceHeight\n\t\t\t\t}\n\t\t\t\ttuneIn\n\t\t\t\tyoutubeAccountUrl\n\t\t\t\tfacebookAccountUrl\n\t\t\t\tinstagramAccountUrl\n\t\t\t\ttwitterAccountUrl\n\t\t\t\tbrandHexColor1\n\t\t\t}\n\t\t\tsegments(sanitizer: $sanitizer) {\n\t\t\t\tcta {\n\t\t\t\t\tid\n\t\t\t\t\ttype\n\t\t\t\t\turi(edition: $edition)\n\t\t\t\t\ttitle\n\t\t\t\t\tthumbnail(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\turi\n\t\t\t\tsocialContent {\n\t\t\t\t\tid\n\t\t\t\t\ttype\n\t\t\t\t\toembedHtml\n\t\t\t\t}\n\t\t\t\tgallery {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\turi(edition: $edition)\n\t\t\t\t\tthumbnail(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\tgalleryitems(filter: { limit: $limit }) {\n\t\t\t\t\t\ttotalCount\n\t\t\t\t\t\tnodes {\n\t\t\t\t\t\t\tcaption\n\t\t\t\t\t\t\ttitle\n\t\t\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\t\t\tid\n\t\t\t\t\t\t\t\ttitle\n\t\t\t\t\t\t\t\turi\n\t\t\t\t\t\t\t\tsourceWidth\n\t\t\t\t\t\t\t\tsourceHeight\n\t\t\t\t\t\t\t\tagency\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\ttext\n\t\t\t\thtml\n\t\t\t\ttype\n\t\t\t\tpoll {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\tisExpired\n\t\t\t\t\tisCaptchaEnabled\n\t\t\t\t\tisShowResult\n\t\t\t\t\tquestions {\n\t\t\t\t\t\tquestionId\n\t\t\t\t\t\tquestionText\n\t\t\t\t\t\tchoices {\n\t\t\t\t\t\t\tchoiceId\n\t\t\t\t\t\t\tchoiceText\n\t\t\t\t\t\t\tresultPercentage\n\t\t\t\t\t\t\tisWinner\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tsubmitText\n\t\t\t\t\tsubmitMessage\n\t\t\t\t\tsubmitTitle\n\t\t\t\t}\n\t\t\t\timage(edition: $edition) {\n\t\t\t\t\turi\n\t\t\t\t\ttitle\n\t\t\t\t\tid\n\t\t\t\t\tsourceWidth\n\t\t\t\t\tsourceHeight\n\t\t\t\t\turi\n\t\t\t\t\tagency\n\t\t\t\t}\n\t\t\t\tvideo {\n\t\t\t\t\tid\n\t\t\t\t\tpublicId\n\t\t\t\t\ttitle\n\t\t\t\t\tvideoUri\n\t\t\t\t\tduration\n\t\t\t\t\tdescription\n\t\t\t\t\tpublishDate\n\t\t\t\t\texpirationDate\n\t\t\t\t\tthumbnail {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\thdThumbnail {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tproductOffer {\n\t\t\t\t\tid\n\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\titemTitle\n\t\t\t\t\titemText\n\t\t\t\t\tproductLinks {\n\t\t\t\t\t\tcurrentPrice\n\t\t\t\t\t\toriginalPrice\n\t\t\t\t\t\tlinkUri\n\t\t\t\t\t\tlinkText\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tcheckoutItem {\n\t\t\t\t\tbrandTitle\n\t\t\t\t\tbuyButtonText\n\t\t\t\t\tchannelKey\n\t\t\t\t\tid\n\t\t\t\t\titemTitle\n\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t\tsourceHeight\n\t\t\t\t\t\tsourceWidth\n\t\t\t\t\t}\n\t\t\t\t\titemText\n\t\t\t\t\titemPrice\n\t\t\t\t\tproductKey\n\t\t\t\t\tsoldBy\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n
-
-\n\tquery ARTICLE($id: ID!, $edition: EDITIONKEY!, $sanitizer: SANITIZATION_TYPE, $limit: Limit) {\n\t\tarticle(id: $id) {\n\t\t\ttitle\n\t\t\tshortTitle\n\t\t\tsubhead\n\t\t\tautoPlayTopVideo\n\t\t\tpageMetaData(edition: $edition) {\n\t\t\t\tdefaultUrl\n\t\t\t\tcanonicalUrl\n\t\t\t\tredirectUrl\n\t\t\t\tampRedirectUrl\n\t\t\t\threflang {\n\t\t\t\t\turi\n\t\t\t\t\tedition\n\t\t\t\t}\n\t\t\t}\n\t\t\turi(edition: $edition)\n\t\t\tedition\n\t\t\tpublishDate\n\t\t\tlastModDate\n\t\t\tsnipe\n\t\t\tenableVideoPlaylist\n\t\t\tthumbnail(edition: $edition) {\n\t\t\t\turi\n\t\t\t\ttitle\n\t\t\t}\n\t\t\ttranslators\n\t\t\tauthors {\n\t\t\t\tid\n\t\t\t\tfullName\n\t\t\t\turi\n\t\t\t}\n\t\t\tcategories(filterWorkflow: true) {\n\t\t\t\tid\n\t\t\t\tname\n\t\t\t\tdisplayName(edition: $edition)\n\t\t\t\turi(edition: $edition)\n\t\t\t\ttitle\n\t\t\t\tkey\n\t\t\t}\n\t\t\tbranding {\n\t\t\t\tbrandingType\n\t\t\t\tdisplayText\n\t\t\t\tads {\n\t\t\t\t\tadKeywords\n\t\t\t\t}\n\t\t\t\tadTracking {\n\t\t\t\t\tadvertiser\n\t\t\t\t}\n\t\t\t}\n\t\t\tshow(edition: $edition) {\n\t\t\t\turi(edition: $edition)\n\t\t\t\tlogo(edition: $edition) {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\turi\n\t\t\t\t\tsourceWidth\n\t\t\t\t\tsourceHeight\n\t\t\t\t}\n\t\t\t\ttuneIn\n\t\t\t\tyoutubeAccountUrl\n\t\t\t\tfacebookAccountUrl\n\t\t\t\tinstagramAccountUrl\n\t\t\t\ttwitterAccountUrl\n\t\t\t\tbrandHexColor1\n\t\t\t}\n\t\t\tsegments(sanitizer: $sanitizer) {\n\t\t\t\tcta {\n\t\t\t\t\tid\n\t\t\t\t\ttype\n\t\t\t\t\turi(edition: $edition)\n\t\t\t\t\ttitle\n\t\t\t\t\tthumbnail(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t\tsourceWidth\n\t\t\t\t\t\tsourceHeight\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\turi\n\t\t\t\tsocialContent {\n\t\t\t\t\tid\n\t\t\t\t\ttype\n\t\t\t\t\toembedHtml\n\t\t\t\t}\n\t\t\t\tgallery {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\turi(edition: $edition)\n\t\t\t\t\tthumbnail(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\tgalleryitems(filter: { limit: $limit }) {\n\t\t\t\t\t\ttotalCount\n\t\t\t\t\t\tnodes {\n\t\t\t\t\t\t\tcaption\n\t\t\t\t\t\t\ttitle\n\t\t\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\t\t\tid\n\t\t\t\t\t\t\t\ttitle\n\t\t\t\t\t\t\t\turi\n\t\t\t\t\t\t\t\tsourceWidth\n\t\t\t\t\t\t\t\tsourceHeight\n\t\t\t\t\t\t\t\tagency\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\ttext\n\t\t\t\thtml\n\t\t\t\ttype\n\t\t\t\tpoll {\n\t\t\t\t\tid\n\t\t\t\t\ttitle\n\t\t\t\t\tisExpired\n\t\t\t\t\tisCaptchaEnabled\n\t\t\t\t\tisShowResult\n\t\t\t\t\tquestions {\n\t\t\t\t\t\tquestionId\n\t\t\t\t\t\tquestionText\n\t\t\t\t\t\tchoices {\n\t\t\t\t\t\t\tchoiceId\n\t\t\t\t\t\t\tchoiceText\n\t\t\t\t\t\t\tresultPercentage\n\t\t\t\t\t\t\tisWinner\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tsubmitText\n\t\t\t\t\tsubmitMessage\n\t\t\t\t\tsubmitTitle\n\t\t\t\t}\n\t\t\t\timage(edition: $edition) {\n\t\t\t\t\turi\n\t\t\t\t\ttitle\n\t\t\t\t\tid\n\t\t\t\t\tsourceWidth\n\t\t\t\t\tsourceHeight\n\t\t\t\t\turi\n\t\t\t\t\tagency\n\t\t\t\t}\n\t\t\t\tvideo {\n\t\t\t\t\tid\n\t\t\t\t\tpublicId\n\t\t\t\t\ttitle\n\t\t\t\t\tvideoUri\n\t\t\t\t\tduration\n\t\t\t\t\tdescription\n\t\t\t\t\tpublishDate\n\t\t\t\t\texpirationDate\n\t\t\t\t\tthumbnail {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\thdThumbnail {\n\t\t\t\t\t\tid\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tproductOffer {\n\t\t\t\t\tid\n\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\tid\n\t\t\t\t\t\turi\n\t\t\t\t\t}\n\t\t\t\t\titemTitle\n\t\t\t\t\titemText\n\t\t\t\t\tproductLinks {\n\t\t\t\t\t\tcurrentPrice\n\t\t\t\t\t\toriginalPrice\n\t\t\t\t\t\tlinkUri\n\t\t\t\t\t\tlinkText\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tcheckoutItem {\n\t\t\t\t\tbrandTitle\n\t\t\t\t\tbuyButtonText\n\t\t\t\t\tchannelKey\n\t\t\t\t\tid\n\t\t\t\t\titemTitle\n\t\t\t\t\timage(edition: $edition) {\n\t\t\t\t\t\ttitle\n\t\t\t\t\t\turi\n\t\t\t\t\t\tsourceHeight\n\t\t\t\t\t\tsourceWidth\n\t\t\t\t\t}\n\t\t\t\t\titemText\n\t\t\t\t\titemPrice\n\t\t\t\t\tproductKey\n\t\t\t\t\tsoldBy\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n
 
 https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
 view-source:https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
