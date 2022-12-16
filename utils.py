@@ -728,6 +728,8 @@ def add_embed(url, args={}, save_debug=False):
 
   if 'twitter.com' in embed_url:
     embed_url = clean_url(embed_url)
+  elif '/t.co/' in embed_url:
+    embed_url = utils.get_redirect_url(embed_url)
   elif 'youtube.com/embed' in embed_url:
     if 'list=' not in embed_url:
       embed_url = clean_url(embed_url)
