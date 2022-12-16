@@ -925,6 +925,12 @@
     "engadget": {
         "module": "yahoo"
     },
+    "eonline": {
+        "module": "eonline",
+        "test_feed": [
+            "https://www.eonline.com"
+        ]
+    },
     "espn": {
         "module": "espn"
     },
@@ -1089,6 +1095,9 @@
             "https://www.hotcars.com/feed/category/car-reviews/",
             "https://www.hotcars.com/feed/category/hotcars-exclusives/"
         ]
+    },
+    "housebeautiful": {
+        "module": "hearstmags"
     },
     "houstonchronicle": {
         "module": "hearstnews"
@@ -1447,6 +1456,9 @@
     },
     "motortrend": {
         "module": "motortrend"
+    },
+    "msn": {
+        "module": "msn"
     },
     "msnbc": {
         "module": "nbcnews"
