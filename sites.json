@@ -809,6 +809,9 @@
             }
         }
     },
+    "dailymotion": {
+        "module": "dailymotion"
+    },
     "dallasnews": {
         "api_url": "https://www.dallasnews.com/pf/api/v3/content/fetch/",
         "resizer_url": "https://www.dallasnews.com/resizer/",
@@ -1805,6 +1808,9 @@
     },
     "popcrush": {
         "module": "townsquare"
+    },
+    "prevention": {
+        "module": "hearstmags"
     },
     "protocol": {
         "module": "rebelmouse"
