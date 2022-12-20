@@ -99,6 +99,7 @@ def get_content(url, args, save_debug=False):
         m = re.search(r'-(\d+)-.{4}$', split_url.path)
         if not m:
             logger.warning('unhandled LinkedIn url ' + url)
+            return None
         embed_url = 'https://www.linkedin.com/embed/feed/update/urn:li:activity:' + m.group(1)
     embed_html = utils.get_url_html(embed_url)
     if not embed_html:
