@@ -59,9 +59,18 @@ https://www.opensecrets.org/news/wp-json/wp/v2/posts
 https://www.insidehook.com/wp-json/wp/v2/article/623487
 https://consequence.net/wp-json/wp/v2/posts
 https://www.thetechoutlook.com/wp-json/wp/v2/posts
+https://www.sci.news/wp-json/wp/v2/posts/89044
+https://www.the-diy-life.com/wp-json/wp/v2/posts
+https://petri.com/wp-json/wp/v2/posts
+https://news.thewindowsclub.com/wp-json/wp/v2/posts
+https://www.windowslatest.com/wp-json/wp/v2/posts
+https://www.maketecheasier.com/wp-json/wp/v2/posts
+
 
 wp-posts without access to wp-json:
 https://www.bellingcat.com/news/2022/11/28/moscows-mule-how-russia-rewrote-a-narcotics-case-to-get-its-spy-back/
+https://blogs.windows.com/windows-insider/wp-json/wp/v2/posts/176000
+
 
 PRELOAD_STATE
 https://www.edmunds.com/car-news/2023-honda-civic-the-one-wed-buy.html
