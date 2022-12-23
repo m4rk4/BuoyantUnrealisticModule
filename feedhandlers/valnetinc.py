@@ -52,13 +52,13 @@ def add_play_store_app(el):
             new_html += ' ({})'.format(it.get_text().strip())
     it = el.find(class_='app-widget-price')
     if it:
-        new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
+        new_html += '<br/><small>{}</small>'.format(it.get_text().strip())
     it = el.find(class_=re.compile(r'app-widget-rating'))
     if it:
-        new_html += '<div><small>Rating: {}</small></div>'.format(it.get_text().strip())
+        new_html += '<br/><small>Rating: {}</small>'.format(it.get_text().strip())
     it = el.find(class_='app-widget-download')
     if it:
-        new_html += '<div><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
+        new_html += '<br/><a href="{}">{}</a>'.format(it['href'], it.get_text().strip())
     new_html += '</td></tr></table>'
     return new_html
 
