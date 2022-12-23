@@ -2343,9 +2343,6 @@
         "buildId": "GCgIqHD5kb6oHOSBg99hs",
         "module": "theverge"
     },
-    "theweek": {
-        "module": "theweek"
-    },
     "thrillist": {
         "module": "pinnacle"
     },
@@ -2360,6 +2357,155 @@
     },
     "tmz": {
         "module": "tmz"
+    },
+    "androidcentral": {
+        "module": "future",
+        "test_feed": [
+            "https://www.androidcentral.com/feeds/all",
+            "https://www.androidcentral.com/reviews"
+        ]
+    },
+    "cinemablend": {
+        "module": "future",
+        "test_feed": [
+            "https://www.cinemablend.com/feeds/all",
+            "https://www.cinemablend.com/reviews"
+        ]
+    },
+    "gamesradar": {
+        "module": "future",
+        "test_feed": [
+            "https://www.gamesradar.com/feeds/all",
+            "https://www.gamesradar.com/reviews",
+            "https://www.gamesradar.com/edge",
+            "https://www.gamesradar.com/newsarama",
+            "https://www.gamesradar.com/playmag",
+            "https://www.gamesradar.com/retrogamer",
+            "https://www.gamesradar.com/sfx",
+            "https://www.gamesradar.com/totalfilm"
+        ]
+    },
+    "guitarworld": {
+        "module": "future",
+        "test_feed": [
+            "https://www.guitarworld.com/feeds/all"
+        ]
+    },
+    "imore": {
+        "module": "future",
+        "test_feed": [
+            "https://www.imore.com/feeds/all",
+            "https://www.imore.com/reviews"
+        ]
+    },
+    "laptopmag": {
+        "module": "future",
+        "test_feed": [
+            "https://www.laptopmag.com/feeds/all",
+            "https://www.laptopmag.com/reviews"
+        ]
+    },
+    "livescience": {
+        "module": "future",
+        "test_feed": [
+            "https://www.livescience.com/feeds/all"
+        ]
+    },
+    "loudersound": {
+        "module": "future",
+        "test_feed": [
+            "https://www.loudersound.com/feeds/all"
+        ]
+    },
+    "marieclaire": {
+        "module": "future",
+        "test_feed": [
+            "https://www.marieclaire.com/feeds/all"
+        ]
+    },
+    "musicradar": {
+        "module": "future",
+        "test_feed": [
+            "https://www.musicradar.com/feeds/all"
+        ]
+    },
+    "nexttv": {
+        "module": "future",
+        "test_feed": [
+            "https://www.nexttv.com/feeds/all"
+        ]
+    },
+    "pcgamer": {
+        "module": "future",
+        "test_feed": [
+            "https://www.pcgamer.com/feeds/all",
+            "https://www.pcgamer.com/reviews"
+        ]
+    },
+    "space": {
+        "module": "future",
+        "test_feed": [
+            "https://www.space.com/feeds/all"
+        ]
+    },
+    "t3": {
+        "module": "future",
+        "test_feed": [
+            "https://www.t3.com/feeds/all",
+            "https://www.t3.com/reviews"
+        ]
+    },
+    "techradar": {
+        "module": "future",
+        "test_feed": [
+            "https://www.techradar.com/rss",
+            "https://www.techradar.com/rss/reviews"
+        ]
+    },
+    "tomsguide": {
+        "module": "future",
+        "test_feed": [
+            "https://www.tomsguide.com/feeds/all",
+            "https://www.tomsguide.com/reviews"
+        ]
+    },
+    "tomshardware": {
+        "module": "future",
+        "test_feed": [
+            "https://www.tomshardware.com/feeds/all",
+            "https://www.tomshardware.com/reviews"
+        ]
+    },
+    "whathifi": {
+        "module": "future",
+        "test_feed": [
+            "https://www.whathifi.com/feeds/all",
+            "https://www.whathifi.com/us/products"
+        ]
+    },
+    "whattowatch": {
+        "module": "future",
+        "test_feed": [
+            "https://www.whattowatch.com/feeds/all"
+        ]
+    },
+    "windowscentral": {
+        "module": "future",
+        "test_feed": [
+            "https://www.windowscentral.com/feeds/all",
+            "https://www.windowscentral.com/reviews"
+        ]
+    },
+    "itpro": {
+        "module": "future_polaris"
+    },
+    "theweek": {
+        "module": "future_polaris",
+        "test_feed": [
+            "https://theweek.com",
+            "https://theweek.com/briefing",
+            "https://theweek.com/speedreads"
+        ]
     },
     "topspeed": {
         "module": "valnetinc",
