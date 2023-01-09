@@ -163,7 +163,7 @@ def get_content(url, args, save_debug):
           user = m.group(1)
           gist = utils.get_url_html(m.group(0))
           if gist:
-            new_html = '<h4>Gist: <a href="https://gist.github.com/{0}/{1}">https://gist.github.com/{0}/{1}</a></h4><pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">{2}</pre>'.format(user, gist_id, html.escape(gist))
+            new_html = '<h4>Gist: <a href="https://gist.github.com/{0}/{1}">https://gist.github.com/{0}/{1}</a></h4><pre style="margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;">{2}</pre>'.format(user, gist_id, html.escape(gist))
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 

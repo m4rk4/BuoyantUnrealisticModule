@@ -104,7 +104,12 @@ def get_content(url, args, save_debug=False):
             content_html += '<h3>{}</h3>'.format(it.get_text())
         if 'item--paragraph--type--body' in el['class']:
             it = el.find(class_='field--name-field-paragraph-body')
-            content_html += it.body.decode_contents()
+            if it and it.body:
+                content_html += it.body.decode_contents()
+            elif el.find(class_='field--name-field-subhead'):
+                pass
+            else:
+                logger.warning('unhandled item--paragraph--type--body in ' + item['url'])
         elif 'item--paragraph--type--photographs' in el['class']:
             it = el.find(class_='article-images-wrapper')
             content_html += add_image(it)
@@ -116,8 +121,10 @@ def get_content(url, args, save_debug=False):
                 logger.warning('unhandled video in ' + item['url'])
         elif 'item--paragraph--type--embed' in el['class']:
             it = el.find(class_='field--name-field-embed-code')
-            if it.iframe:
+            if it and it.iframe:
                 content_html += utils.add_embed(it.iframe['src'])
+            elif re.search(r'Subscribe to', el.get_text(), flags=re.I):
+                pass
             else:
                 logger.warning('unhandled embed in ' + item['url'])
         elif 'item--paragraph--type--factbox' in el['class']:

@@ -234,7 +234,7 @@ def get_content(url, args, save_debug=False):
             rating = it.find(class_='rating')
             if rating:
                 new_html = get_rating(rating, soup.find(class_='sprite-award-editors-choice'))
-                rating.insert_after(BeautifulSoup(new_html, 'lxml'))
+                rating.insert_after(BeautifulSoup(new_html, 'html.parser'))
                 rating.decompose()
             it.unwrap()
         it = el.find(class_='pretty-verdict__verdict')
@@ -245,7 +245,7 @@ def get_content(url, args, save_debug=False):
                 it.h4.attrs = {}
             for li in it.find_all('li'):
                 new_html = '<li>{}</li>'.format(re.sub(r'^(\+|-)', '', li.get_text().strip()))
-                li.insert_after(BeautifulSoup(new_html, 'lxml'))
+                li.insert_after(BeautifulSoup(new_html, 'html.parser'))
                 li.decompose()
             it.unwrap()
         for it in el.find_all('aside'):
@@ -262,11 +262,11 @@ def get_content(url, args, save_debug=False):
                     if price:
                         new_html += price.get_text() + ' '
                     new_html += '{}</a></li>'.format(link.get_text())
-                it.insert_after(BeautifulSoup(new_html, 'lxml'))
+                it.insert_after(BeautifulSoup(new_html, 'html.parser'))
             elif 'widget' in it.get('data-name'):
                 new_html = add_widget(it['data-model-name'], it['data-widget-type'], ffte)
                 if new_html:
-                    it.insert_after(BeautifulSoup(new_html, 'lxml'))
+                    it.insert_after(BeautifulSoup(new_html, 'html.parser'))
             else:
                 logger.warning('unhandled pretty-verdict aside in ' + item['url'])
             it.decompose()
@@ -322,14 +322,14 @@ def get_content(url, args, save_debug=False):
                         author = it.get_text().strip()
                     el.figcaption.decompose()
                 new_html = utils.add_pullquote(el.blockquote.decode_contents(), author)
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
 
         for el in body.find_all('figure', class_='van-image-figure'):
             new_html = add_image(el)
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 if el.parent and el.parent.name == 'a':
                     el.parent.insert_after(new_el)
                     el.parent.decompose()
@@ -361,7 +361,7 @@ def get_content(url, args, save_debug=False):
                             new_html += utils.add_image(slide['image']['src'], caption)
                     it.decompose()
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -375,7 +375,7 @@ def get_content(url, args, save_debug=False):
                 if m:
                     new_html = utils.add_embed('https://cdn.jwplayer.com/v2/media/' + m.group(1))
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -390,7 +390,7 @@ def get_content(url, args, save_debug=False):
                 elif it.get('src'):
                     new_html = utils.add_embed(it['src'])
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -402,7 +402,7 @@ def get_content(url, args, save_debug=False):
                 links = el.find_all('a')
                 new_html = utils.add_embed(links[-1]['href'])
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -414,11 +414,21 @@ def get_content(url, args, save_debug=False):
             if it:
                 new_html = utils.add_embed(it['data-url'])
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
                 logger.warning('unhandled instagram-embed in ' + item['url'])
+
+        for el in body.find_all(class_='soundcloud-embed'):
+            it = el.find('iframe')
+            if it:
+                new_html = utils.add_embed(it['data-lazy-src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled soundcloud-embed in ' + item['url'])
 
         for el in body.find_all(class_='hawk-nest'):
             if el.name == 'aside':
@@ -432,7 +442,7 @@ def get_content(url, args, save_debug=False):
                 if el.get('data-widget-introduction'):
                     new_html += '<td>{}</td>'.format(el['data-widget-introduction'])
                 new_html += '</tr></table>'
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -456,7 +466,7 @@ def get_content(url, args, save_debug=False):
                 new_html += it.decode_contents()
             if 'featured_block_horizontal' in el['class']:
                 new_html += '</td></tr></table>'
-            new_el = BeautifulSoup(new_html, 'lxml')
+            new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
 
@@ -466,7 +476,7 @@ def get_content(url, args, save_debug=False):
                 it.unwrap()
             it = el.find(class_='rating')
             if it:
-                new_el = BeautifulSoup(get_rating(it, None), 'lxml')
+                new_el = BeautifulSoup(get_rating(it, None), 'html.parser')
                 it.insert_after(new_el)
                 it.decompose()
             it = el.find(class_='subtitle')
@@ -481,7 +491,7 @@ def get_content(url, args, save_debug=False):
                     for entry in elm.find_all(class_='spec__entry'):
                         new_html += '<li>{}&nbsp;{}</li>'.format(entry.find(class_='spec__name').get_text(), entry.find(class_='spec_value').get_text())
                     new_html += '</ul>'
-                    new_el = BeautifulSoup(new_html, 'lxml')
+                    new_el = BeautifulSoup(new_html, 'html.parser')
                     elm.insert_after(new_el)
                     elm.decompose()
                 it.unwrap()
@@ -493,7 +503,7 @@ def get_content(url, args, save_debug=False):
                     for entry in el.find_all(class_='cons__entry'):
                         new_html += '<li>{}</li>'.format(entry.get_text().strip())
                     new_html += '</ul>'
-                    new_el = BeautifulSoup(new_html, 'lxml')
+                    new_el = BeautifulSoup(new_html, 'html.parser')
                     elm.insert_after(new_el)
                     elm.decompose()
                 it.unwrap()
@@ -505,7 +515,7 @@ def get_content(url, args, save_debug=False):
                     for entry in el.find_all(class_='cons__entry'):
                         new_html += '<li>{}</li>'.format(entry.get_text().strip())
                     new_html += '</ul>'
-                    new_el = BeautifulSoup(new_html, 'lxml')
+                    new_el = BeautifulSoup(new_html, 'html.parser')
                     elm.insert_after(new_el)
                     elm.decompose()
                 it.unwrap()
@@ -525,7 +535,7 @@ def get_content(url, args, save_debug=False):
             if it:
                 new_html += it.decode_contents()
             new_html += '</p>'
-            new_el = BeautifulSoup(new_html, 'lxml')
+            new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
 

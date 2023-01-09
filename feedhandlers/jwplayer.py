@@ -40,11 +40,10 @@ def get_content(url, args, save_debug=False):
     video = utils.closest_dict(videos, 'height', 480)
     item['_video'] = video['file']
 
-    caption = item['title']
     if video_json['playlist'][0].get('description'):
         item['summary'] = video_json['playlist'][0]['description']
-        caption += ' | ' + item['summary']
 
+    caption = 'Watch: ' + item['title']
     item['content_html'] = utils.add_video(video['file'], video['type'], image['src'], caption)
     return item
 

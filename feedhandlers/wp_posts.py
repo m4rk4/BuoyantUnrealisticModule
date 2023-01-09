@@ -233,7 +233,7 @@ def get_post_content(post, args, save_debug=False):
 
     content_html = content_html.replace('\u2028', '')
     item['content_html'] = format_content(content_html, item)
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
+    item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
@@ -455,11 +455,16 @@ def format_content(content_html, item):
             else:
                 img_src = img['src']
             captions = []
-            if el.figcaption:
-                captions.append(el.figcaption.get_text())
+            it = el.find(class_='credit')
+            if it and it.get_text().strip():
+                captions.append(it.get_text().strip())
+                it.decompose()
+            it = el.find('figcaption')
+            if it and it.get_text().strip():
+                captions.insert(0, it.get_text().strip())
             it = el.find(class_='imageCredit')
-            if it:
-                captions.append(it.get_text())
+            if it and it.get_text().strip():
+                captions.append(it.get_text().strip())
             if not captions:
                 if img.get('data-image-title'):
                     captions.append(img['data-image-title'])
@@ -639,6 +644,10 @@ def format_content(content_html, item):
             it = el.find('blockquote')
             if it:
                 new_html = utils.add_embed(it['data-instgrm-permalink'])
+        elif 'wp-block-embed-tiktok' in el['class']:
+            it = el.find('blockquote')
+            if it:
+                new_html = utils.add_embed(it['cite'])
         elif 'wp-block-embed-facebook' in el['class']:
             links = el.find_all('a')
             new_html = utils.add_embed(links[-1]['href'])
@@ -881,22 +890,25 @@ def format_content(content_html, item):
 
 
 def get_content(url, args, save_debug=False):
-    print(url)
     args_copy = args.copy()
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    slug = paths[-1].split('.')[0]
     tld = tldextract.extract(url)
     sites_json = utils.read_json_file('./sites.json')
     if sites_json.get(tld.domain) and sites_json[tld.domain].get('wpjson_path'):
         wpjson_path = sites_json[tld.domain]['wpjson_path']
-        posts_path = sites_json[tld.domain]['posts_path']
+        if isinstance(sites_json[tld.domain]['posts_path'], str):
+            posts_path = sites_json[tld.domain]['posts_path']
+        elif isinstance(sites_json[tld.domain]['posts_path'], dict):
+            for key, val in sites_json[tld.domain]['posts_path'].items():
+                if key in paths:
+                    posts_path = val
         if sites_json[tld.domain].get('args'):
             args_copy.update(sites_json[tld.domain]['args'])
     else:
         wpjson_path = '/wp-json'
         posts_path = '/wp/v2/posts'
-
-    split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path[1:].split('/')))
-    slug = paths[-1].split('.')[0]
 
     post_url = '{}://{}{}{}?slug={}'.format(split_url.scheme, split_url.netloc, wpjson_path, posts_path, slug)
     post = utils.get_url_json(post_url)
@@ -955,9 +967,3 @@ def get_feed(args, save_debug=False):
         feed = rss.get_feed(args, save_debug, get_content)
     return feed
 
-def test_handler():
-    feeds = ['https://www.techhive.com/wp-json/wp/v2/posts?story_types=3'
-             'https://www.9to5mac.com/guides/review/feed',
-             'https://www.9to5google.com/feature/review/feed']
-    for url in feeds:
-        get_feed({"url": url}, True)

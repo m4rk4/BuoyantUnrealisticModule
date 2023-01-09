@@ -1,19 +1,21 @@
-import html, json, operator, re, requests
+import html, operator, re
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
+import config, utils
 from feedhandlers import rss
-import utils
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-graphql_json = None
 
-
-def medium_image_src(image_id, width=1000):
-    return 'https://miro.medium.com/max/{}/{}'.format(width, image_id)
+def add_image(image, caption='', width=1000):
+    img_src = 'https://miro.medium.com/max/{}/{}'.format(width, image['id'])
+    if image.get('originalWidth'):
+        if image['originalWidth'] < width:
+            img_src = '{}/image?url={}&width={}'.format(config.server, quote_plus(img_src), width)
+    return utils.add_image(img_src, caption)
 
 
 def get_content(url, args, save_debug=False):
@@ -68,7 +70,7 @@ def get_content(url, args, save_debug=False):
         del item['tags']
 
     if post_json.get('previewImage') and post_json['previewImage'].get('id'):
-        item['_image'] = medium_image_src(post_json['previewImage']['id'])
+        item['_image'] = 'https://miro.medium.com/max/1000/{}'.format(post_json['previewImage']['id'])
 
     if post_json.get('previewContent'):
         item['summary'] = post_json['previewContent']['subtitle']
@@ -83,8 +85,7 @@ def get_content(url, args, save_debug=False):
             paragraph_text = paragraph['text']
 
         elif paragraph_type == 'img':
-            image = paragraph['metadata']
-            start_tag = utils.add_image(medium_image_src(image['id']), paragraph['text'])
+            start_tag = add_image(paragraph['metadata'], paragraph['text'])
             end_tag = ''
             paragraph_text = ''
 
