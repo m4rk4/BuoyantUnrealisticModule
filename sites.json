@@ -809,6 +809,9 @@
             }
         }
     },
+    "dailymail": {
+        "module": "dailymail"
+    },
     "dailymotion": {
         "module": "dailymotion"
     },
@@ -1631,6 +1634,18 @@
     "nymag": {
         "module": "nymag"
     },
+    "nypost": {
+        "module": "nypost",
+        "test_feed": [
+            "https://nypost.com/feed/"
+        ]
+    },
+    "pagesix": {
+        "module": "nypost",
+        "test_feed": [
+            "https://pagesix.com/feed/"
+        ]
+    },
     "nytimes": {
         "module": "nyt-v2"
     },
@@ -1942,6 +1957,13 @@
     "scribd": {
         "module": "scribd"
     },
+    "scriptype": {
+        "module": "scriptype",
+        "test_feed": [
+            "https://www.scriptype.com/feed",
+            "https://www.scriptype.com/category/hudson/feed/"
+        ]
+    },
     "seekingalpha": {
         "module": "seekingalpha"
     },
@@ -1959,6 +1981,9 @@
     },
     "semafor": {
         "module": "semafor"
+    },
+    "sendtonews": {
+        "module": "sendtonews"
     },
     "sfchronicle": {
         "module": "hearstnews"
@@ -2476,6 +2501,12 @@
             "https://www.tomshardware.com/reviews"
         ]
     },
+    "tvtechnology": {
+        "module": "future",
+        "test_feed": [
+            "https://www.tvtechnology.com/feeds/all"
+        ]
+    },
     "whathifi": {
         "module": "future",
         "test_feed": [
@@ -2518,6 +2549,81 @@
         "test_feed": [
             "https://towardsdatascience.com/rss"
         ]
+    },
+    "bitdefender": {
+        "module": "ghost",
+        "data-key": "64578fbe66af3aee68c8947a0f",
+        "data-api": "https://blogapp.bitdefender.com/hotforsecurity/ghost/api/v3/content/",
+        "post_filters": ["tag:en"],
+        "test_feed": [
+            "https://www.bitdefender.com/blog/"
+        ]
+    },
+    "itsfoss": {
+        "module": "ghost",
+        "data-key": "a2a0f24fedb151c066f63e6155",
+        "data-api": "https://news.itsfoss.com/ghost/api/content/",
+        "post_filters": [],
+        "test_feed": [
+            "https://news.itsfoss.com"
+        ]
+    },
+    "levernews": {
+        "module": "ghost",
+        "data-key": "25d42557b67628391ce6ec97b1",
+        "data-api": "https://the-daily-poster.ghost.io/ghost/api/content/",
+        "post_filters": [],
+        "test_feed": [
+            "https://www.levernews.com/rss/"
+        ]
+    },
+    "linuxhandbook": {
+        "module": "ghost",
+        "data-key": "8b9deb200a68e07efbb9794a5a",
+        "data-api": "https://linuxhandbook.com/ghost/api/content/",
+        "post_filters": []
+    },
+    "openai": {
+        "module": "ghost",
+        "data-key": "23f7e2ddba37b787ce1ea90e77",
+        "data-api": "https://openaidev.ghost.io/ghost/api/content/",
+        "post_filters": []
+    },
+    "readtangle": {
+        "module": "ghost",
+        "data-key": "49854d5d213e5d644321a5f410",
+        "data-api": "https://isaacsaul.ghost.io/ghost/api/content/",
+        "post_filters": [],
+        "test_feed": [
+            "https://www.readtangle.com/"
+        ]
+    },
+    "scotthelme": {
+        "module": "ghost",
+        "data-key": "05928c196e63cd7d49c10cd1e1",
+        "data-api": "https://scotthelme.co.uk/ghost/api/content/",
+        "post_filters": [],
+        "test_feed": [
+            "https://scotthelme.co.uk/rss/"
+        ]
+    },
+    "seethelittlethings": {
+        "module": "ghost",
+        "data-key": "f9da7583cb42574c04407613c7",
+        "data-api": "https://stlt.ghost.io/ghost/api/content/",
+        "post_filters": []
+    },
+    "troyhunt": {
+        "module": "ghost",
+        "data-key": "5e03cd80efbea6ff26214a466b",
+        "data-api": "https://troyhunt.ghost.io/ghost/api/content/",
+        "post_filters": [],
+        "test_feed": [
+            "https://feeds.feedburner.com/TroyHunt"
+        ]
+    },
+    "transistor": {
+        "module": "transistor"
     },
     "tvguide": {
         "module": "zdnet",
@@ -3007,6 +3113,15 @@
         "posts_path": "/wp/v2/posts",
         "test_feed": [
             "https://www.fonearena.com/blog/feed"
+        ]
+    },
+    "foreignpolicy": {
+        "module": "wp_posts",
+        "wpjson_path": "/blog/wp-json",
+        "posts_path": "/wp/v2/posts",
+        "test_feed": [
+            "https://foreignpolicy.com/feed",
+            "https://foreignpolicy.com/category/morning-brief/feed/"
         ]
     },
     "fossbytes": {
@@ -3544,6 +3659,14 @@
             "https://psu.com/feed"
         ]
     },
+    "roku": {
+        "module": "wp_posts",
+        "wpjson_path": "/blog/api",
+        "posts_path": "/v1/posts",
+        "test_feed": [
+            "https://www.roku.com/blog/feed/tag/US"
+        ]
+    },
     "sadanduseless": {
         "module": "wp_posts",
         "wpjson_path": "/wp-json",
@@ -3557,7 +3680,7 @@
         "wpjson_path": "/wp-json",
         "posts_path": "/wp/v2/posts",
         "test_feed": [
-            "https://sdtimes.com/feed"
+            "https://www.scriptype.com/feed/"
         ]
     },
     "singularityhub": {
@@ -3688,6 +3811,17 @@
             "http://www.truthorfiction.com/feed"
         ]
     },
+    "truthout": {
+        "module": "wp_posts",
+        "wpjson_path": "/wp-json",
+        "posts_path": {
+            "article": "/wp/v2/to4_article_post",
+            "video": "/wp/v2/to4_video_post"
+        },
+        "test_feed": [
+            "http://truthout.org/feed"
+        ]
+    },
     "twinfinite": {
         "module": "wp_posts",
         "wpjson_path": "/wp-json",
@@ -3789,7 +3923,6 @@
             "robbreport",
             "sammobile",
             "scalawagmagazine",
-            "scriptype",
             "servethehome",
             "singularityhub",
             "sixcolors",
