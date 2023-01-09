@@ -1,6 +1,8 @@
 Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
+https://locusmag.com/wp-json/wp/v2/posts
+https://www.pittsburghmagazine.com/wp-json/wp/v2/posts
 https://news.pollstar.com/wp-json/wp/v2/posts
 https://www.innovations-report.com/wp-json/wp/v2/posts
 https://www.brickfanatics.com/wp-json/wp/v2/posts
@@ -65,11 +67,22 @@ https://petri.com/wp-json/wp/v2/posts
 https://news.thewindowsclub.com/wp-json/wp/v2/posts
 https://www.windowslatest.com/wp-json/wp/v2/posts
 https://www.maketecheasier.com/wp-json/wp/v2/posts
+https://avc.com/wp-json/wp/v2/posts
+https://www.necn.com/wp-json/wp/v2/posts
+https://www.wundertech.net/wp-json/wp/v2/posts
+https://www.telecompetitor.com/wp-json/wp/v2/posts
+https://www.groundedreason.com/wp-json/wp/v2/posts
+https://metaroids.com/wp-json/wp/v2/posts
+https://undark.org/wp-json/wp/v2/posts
+https://mpost.io/wp-json/wp/v2/posts
 
 
 wp-posts without access to wp-json:
 https://www.bellingcat.com/news/2022/11/28/moscows-mule-how-russia-rewrote-a-narcotics-case-to-get-its-spy-back/
 https://blogs.windows.com/windows-insider/wp-json/wp/v2/posts/176000
+
+Seems to be wp-posts format
+https://www.roku.com/blog/api/v1/posts?embed=true&page=1&limit=18&tags=578
 
 ???
 https://www.treehugger.com/legend-christmas-spiders-4868322
@@ -78,6 +91,8 @@ PRELOAD_STATE
 https://www.edmunds.com/car-news/2023-honda-civic-the-one-wed-buy.html
 https://www.edmunds.com/gateway/api/editorial/v3/content/?path=/research/best/car-news/honda-civic-how-wed-spec-it-for-2023,/research/car-news/honda-civic-how-wed-spec-it-for-2023,/car-news/honda-civic-how-wed-spec-it-for-2023&fetchcontents=true&ispreview=true&tree=true&externalfetch=true
 
+https://comicbook.com/gaming/news/steam-games-pc-best-2022/
+https://comicbook.com/article/json/442656/
 
 https://abcnews.go.com/gemini/news/story/94147226
 
