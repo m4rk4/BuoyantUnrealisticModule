@@ -69,7 +69,7 @@ def convert_amp_video(iframe, src='', caption=''):
     return video_html
 
 
-def get_video_content(url, args, save_debug=False):
+def get_video_content(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url, 'googlebot')
     if not article_html:
         return None
@@ -114,7 +114,7 @@ def get_video_content(url, args, save_debug=False):
         return item
 
 
-def get_story_content(url, args, save_debug=False):
+def get_story_content(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url, 'googlebot')
     if not article_html:
         return None
@@ -180,13 +180,13 @@ def get_story_content(url, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     if '/video/' in clean_url:
-        return get_video_content(clean_url, args, save_debug)
+        return get_video_content(clean_url, args, site_json, save_debug)
     elif 'wsj.com/story/' in clean_url:
-        return get_story_content(clean_url, args, save_debug)
+        return get_story_content(clean_url, args, site_json, save_debug)
 
     if split_url.path.startswith('/amp/'):
         amp_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
@@ -492,9 +492,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if args['url'].endswith('.xml'):
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
     # https://www.wsj.com/?id=%7B%22count%22%3A20%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22group%22%3A%7B%22name%22%3A%22WSJ%22%7D%7D%2C%7B%22term%22%3A%7B%22key%22%3A%22SectionType%22%2C%22value%22%3A%22Personal%20Technology%3A%20Joanna%20Stern%22%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22liveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full
     # https://www.wsj.com/?id=%7B%22count%22%3A10%2C%22query%22%3A%7B%22and%22%3A%5B%7B%22term%22%3A%7B%22key%22%3A%22AuthorId%22%2C%22value%22%3A%227867%22%7D%7D%2C%7B%22terms%22%3A%7B%22key%22%3A%22Product%22%2C%22value%22%3A%5B%22WSJ.com%22%2C%22WSJPRO%22%5D%7D%7D%5D%7D%2C%22sort%22%3A%5B%7B%22key%22%3A%22LiveDate%22%2C%22order%22%3A%22desc%22%7D%5D%7D%2Fpage%3D0&type=allesseh_content_full
 
@@ -528,7 +528,7 @@ def get_feed(args, save_debug=False):
         if save_debug:
             #utils.write_file(article_json, './debug/debug.json')
             logger.debug('getting content for ' + article_json['data']['url'])
-        item = get_content(article_json['data']['url'], args, save_debug)
+        item = get_content(article_json['data']['url'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

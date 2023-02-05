@@ -100,7 +100,7 @@ def format_post_message(post_message):
     return post_message.decode_contents()
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     query = parse_qs(split_url.query)
     if query.get('href'):

@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     page_html = utils.get_url_html(clean_url)

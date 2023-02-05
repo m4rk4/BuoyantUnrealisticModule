@@ -7,7 +7,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_gallery_content(url, args, save_debug=False):
+def get_gallery_content(url, args, site_json, save_debug=False):
   article_html = utils.get_url_html(url)
   if not article_html:
     return None
@@ -21,7 +21,7 @@ def get_gallery_content(url, args, save_debug=False):
   if not post:
     return None
 
-  item = wp_posts.get_post_content(post, args, save_debug)
+  item = wp_posts.get_post_content(post, args, site_json, save_debug)
   if not item:
     return None
 
@@ -57,11 +57,11 @@ def get_gallery_content(url, args, save_debug=False):
   item['content_html'] = content_html
   return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   # https://variety.com/2021/digital/news/youtube-bans-vaccine-misinformation-conspiracy-theories-1235076916/
   split_url = urlsplit(url)
   if '/lists/' in split_url.path or '/gallery/' in split_url.path:
-    return get_gallery_content(url, args, save_debug)
+    return get_gallery_content(url, args, site_json, save_debug)
 
   m = re.search(r'-(\d+)\/?$', split_url.path)
   if not m:
@@ -72,9 +72,9 @@ def get_content(url, args, save_debug=False):
   if not post:
     return None
 
-  return wp_posts.get_post_content(post, args, save_debug)
+  return wp_posts.get_post_content(post, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   # https://variety.com/v/digital/feed/
-  return rss.get_feed(args, save_debug, get_content)
+  return rss.get_feed(url, args, site_json, save_debug, get_content)

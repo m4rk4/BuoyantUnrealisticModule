@@ -54,7 +54,7 @@ def get_next_json(url, build_id=''):
     return next_json
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     next_json = get_next_json(url)
     if not next_json:
         return None
@@ -148,7 +148,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     next_json = get_next_json(args['url'])
     if not next_json:
         return None
@@ -177,7 +177,7 @@ def get_feed(args, save_debug=False):
             continue
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

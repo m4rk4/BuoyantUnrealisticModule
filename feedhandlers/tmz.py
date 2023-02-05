@@ -49,7 +49,7 @@ def add_video(video_ref):
         return ''
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     split_url = urlsplit(url)
     page_html = utils.get_url_html(url)
     m = re.search(r'node: ({.+?}),\n', page_html)
@@ -133,9 +133,9 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if 'rss' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     articles = None
     page_html = utils.get_url_html(args['url'])
@@ -171,7 +171,7 @@ def get_feed(args, save_debug=False):
                 continue
         if save_debug:
             logger.debug('getting content from ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

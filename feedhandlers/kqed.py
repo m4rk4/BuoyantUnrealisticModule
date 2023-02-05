@@ -33,7 +33,7 @@ def add_image(image, width=1024):
     return utils.add_image(img_src, ' | '.join(captions))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     #api_url = 'https://media-api.kqed.org/posts/{}/{}'.format(paths[0], paths[1])
@@ -41,10 +41,10 @@ def get_content(url, args, save_debug=False):
     post_json = utils.get_url_json(api_url)
     if not post_json:
         return None
-    return get_item(post_json['data'][0], post_json['included'], args, save_debug)
+    return get_item(post_json['data'][0], post_json['included'], args, site_json, save_debug)
 
 
-def get_item(post_data, post_included, args, save_debug=False):
+def get_item(post_data, post_included, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(post_data, './debug/debug.json')
 
@@ -137,9 +137,9 @@ def get_item(post_data, post_included, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/feed/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     posts_json = None
     split_url = urlsplit(args['url'])
@@ -166,7 +166,7 @@ def get_feed(args, save_debug=False):
         url = 'https://www.kqed.com/{}/{}'.format(post_data['id'].replace('_', '/'), post_data['attributes']['slug'])
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_item(post_data, posts_json['included'], args, save_debug)
+        item = get_item(post_data, posts_json['included'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

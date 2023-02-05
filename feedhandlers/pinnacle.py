@@ -115,7 +115,7 @@ def format_block(block):
     return block_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     print(url)
     split_url = urlsplit(url)
     api_url = 'https://{}/api/pages?pinn_url={}'.format(split_url.netloc, split_url.path[1:])
@@ -263,7 +263,7 @@ def get_content(url, args, save_debug=False):
         ep_json = utils.get_url_json('https://{}/api/pages?pinn_uuid={}'.format(split_url.netloc, ep['uuid']))
         if save_debug:
             utils.write_file(ep_json, './debug/video.json')
-        ep_item = get_content('https://{}/{}'.format(split_url.netloc, ep_json['page']['canonical_url']), args, save_debug)
+        ep_item = get_content('https://{}/{}'.format(split_url.netloc, ep_json['page']['canonical_url']), args, site_json, save_debug)
         if ep_item:
             item['content_html'] += ep_item['content_html']
         item['content_html'] += '<p><a href="{}">Watch series</a></p>'.format(item['url'])
@@ -294,11 +294,11 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     # https://feeds.groupninemedia.com/feeds/thrillist/discover-news
     if split_url.path.startswith('/feeds/'):
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
     next_data = get_next_data(args['url'])
     if save_debug:
         utils.write_file(next_data, './debug/feed.json')
@@ -326,7 +326,7 @@ def get_feed(args, save_debug=False):
     for url in article_urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

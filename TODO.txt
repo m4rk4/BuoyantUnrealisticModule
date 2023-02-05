@@ -1,53 +1,60 @@
+need to convert sites to use netloc
+https://thetriad.thebulwark.com/p/the-memphis-police-affirmative-action
+https://screentime.thebulwark.com/p/netflix-cuts-off-cheapskates ==> substack
+https://presspass.thebulwark.com/p/the-house-covid-subcommittee-has
+
+Mastodon embeds
+https://matthewcassinelli.com/shortcuts-mac-menu-bar-progress-meter/
+https://mastodon.social/@matthewcassinelli/109638714164145222/embed
+
+
+Fix formatting
+reviewBox: https://www.playstationlifestyle.net/2022/12/06/crisis-core-final-fantasy-7-reunion-review-ps5/
+https://www.seeedstudio.com/blog/2022/12/31/year-in-review-seeed-in-2022/
+https://dongknows.com/synologys-new-ds723-nas-server-review/
+https://www.motorcycle.com/products/mo-tested-tcx-infinity-3-gtx-boots-review
+
+
+Podcast
+https://www.brewersjournal.info/91-new-beginnings/
+
 Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
+
+WP
+https://eclecticlight.co/
+https://www.thenation.com/wp-json/wp/v2/posts
+https://techfundingnews.com/wp-json/wp/v2/posts
+https://vinepair.com/wp-json/wp/v2/posts
+https://www.jonandnic.com/wp-json/wp/v2/posts
 https://locusmag.com/wp-json/wp/v2/posts
-https://www.pittsburghmagazine.com/wp-json/wp/v2/posts
 https://news.pollstar.com/wp-json/wp/v2/posts
-https://www.innovations-report.com/wp-json/wp/v2/posts
 https://www.brickfanatics.com/wp-json/wp/v2/posts
 https://www.commentary.org/wp-json/wp/v2/posts
 https://nichegamer.com/wp-json/wp/v2/posts
 https://www.discoursemagazine.com/wp-json/wp/v2/posts/5051
 https://lastminuteengineers.com/wp-json/wp/v2/posts/485
-https://cordcutterweekly.com/wp-json/wp/v2/posts/4277
-https://www.cnx-software.com/wp-json/wp/v2/posts
 https://blog.adafruit.com/wp-json/wp/v2/posts
-https://www.smarthomebeginner.com/wp-json/wp/v2/posts
 https://mariushosting.com/wp-json/wp/v2/posts
 https://nascompares.com/wp-json/wp/v2/posts/61556
-https://www.tor.com/wp-json/wp/v2/posts
-https://daily.jstor.org/wp-json/wp/v2/posts
 https://www.gizchina.com/wp-json/wp/v2/posts
 https://www.saturdayeveningpost.com/wp-json/wp/v2/posts/1140519
 https://globalnews.ca/wp-json/wp/v2/posts
 https://revealnews.org/wp-json/wp/v2/posts
-https://bytecellar.com/wp-json/wp/v2/posts
 https://reason.com/wp-json/
 https://techiegamers.com/wp-json/wp/v2/posts
-https://randomnerdtutorials.com/wp-json/wp/v2/posts
-https://www.open-electronics.org/wp-json/wp/v2/posts
-https://blog.adafruit.com/wp-json/wp/v2/posts
 https://home-assistant-guide.com/wp-json/wp/v2/posts
-https://hackaday.com/wp-json/wp/v2/posts
 https://ohiostatebuckeyes.com/wp-json/wp/v2/posts
-https://www.superherohype.com/wp-json/wp/v2/posts
 https://www.schneier.com/wp-json/wp/v2/posts
 https://threatpost.com/wp-json/wp/v2/posts/
-https://krebsonsecurity.com/wp-json/wp/v2/posts/61870 (forbidden)
 https://www.cyberscoop.com/wp-json/wp/v2/posts
 https://borncity.com/win/wp-json/wp/v2/posts/
-https://www.teslarati.com/wp-json/wp/v2/posts
-https://95octane.com/wp-json/wp/v2/posts
 https://makezine.com/wp-json/wp/v2/posts
-https://linuxhint.com/wp-json/wp/v2/posts
 https://www.thedetroitbureau.com/wp-json/wp/v2/posts/235200
 https://austinkleon.com/wp-json/wp/v2/posts
-https://www.motorcycle.com/wp-json/wp/v2/posts
 https://ultimatemotorcycling.com/wp-json/wp/v2/posts
-https://guitar.com/wp-json/wp/v2/posts
 https://understandingcompassion.com/wp-json/wp/v2/posts
-https://tinybuddha.com/wp-json/wp/v2/posts
 https://reasonstobecheerful.world/wp-json/wp/v2/posts
 https://www.positive.news/wp-json/wp/v2/posts
 https://dailydad.com/wp-json/wp/v2/posts
@@ -56,18 +63,12 @@ https://nextdraft.com/wp-json/wp/v2/posts
 https://www.the-sun.com/wp-json/wp/v2/posts
 https://www.nationalreview.com/wp-json/wp/v2/posts
 https://punchbowl.news/wp-json/wp/v2/posts
-https://www.fonearena.com/blog/wp-json/wp/v2/posts
 https://www.opensecrets.org/news/wp-json/wp/v2/posts
 https://www.insidehook.com/wp-json/wp/v2/article/623487
 https://consequence.net/wp-json/wp/v2/posts
 https://www.thetechoutlook.com/wp-json/wp/v2/posts
 https://www.sci.news/wp-json/wp/v2/posts/89044
-https://www.the-diy-life.com/wp-json/wp/v2/posts
-https://petri.com/wp-json/wp/v2/posts
-https://news.thewindowsclub.com/wp-json/wp/v2/posts
-https://www.windowslatest.com/wp-json/wp/v2/posts
 https://www.maketecheasier.com/wp-json/wp/v2/posts
-https://avc.com/wp-json/wp/v2/posts
 https://www.necn.com/wp-json/wp/v2/posts
 https://www.wundertech.net/wp-json/wp/v2/posts
 https://www.telecompetitor.com/wp-json/wp/v2/posts
@@ -75,11 +76,20 @@ https://www.groundedreason.com/wp-json/wp/v2/posts
 https://metaroids.com/wp-json/wp/v2/posts
 https://undark.org/wp-json/wp/v2/posts
 https://mpost.io/wp-json/wp/v2/posts
+https://aanwire.com/wp-json/wp/v2/posts
+
+https://wwd.com/eye/parties/whitney-art-party-2023-ashley-graham-rebecca-hall-1235505976/
+posts can be extracted by wp, but galleries need wp-json
 
 
 wp-posts without access to wp-json:
-https://www.bellingcat.com/news/2022/11/28/moscows-mule-how-russia-rewrote-a-narcotics-case-to-get-its-spy-back/
+https://www.politico.eu/wp-json/wp/v2/posts
 https://blogs.windows.com/windows-insider/wp-json/wp/v2/posts/176000
+https://unherd.com/wp-json/wp/v2/posts
+
+WP_PUBLIC
+Need to convert sites.json to use netloc instead of domain
+https://yahooeysblog.wordpress.com/, siteId=17277507
 
 Seems to be wp-posts format
 https://www.roku.com/blog/api/v1/posts?embed=true&page=1&limit=18&tags=578
@@ -108,6 +118,9 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://dirt.fyi/_next/data/MxxwEgBdOy1Fl3bMzPo0a/article/2023/01/the-death-of-canon.json
+https://dirt.fyi/api/static/post?id=7hIuoBtnp5JE8jhsqV5CFK
+
 https://clutchpoints.com/_next/data/vw2yRwsg-eaPoGVQcFkmX/en/ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans.json?slug=ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans
 
 https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
@@ -176,20 +189,76 @@ https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott
 view-source:https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
 
 DRUPAL
+https://www.jeffgeerling.com/blog
+https://beerconnoisseur.com/
 https://www.technobuffalo.com/jackery-explorer-1500-solar-generator-review
-
+https://statetechmagazine.com/h
 https://www.sportingnews.com/us/nba/news/warriors-starting-closing-lineup-projecting-2022-23-season/pbak8jf2b6shpsvf5qfry4oa
 view-source:https://www.sportingnews.com/us/nba/news/warriors-starting-closing-lineup-projecting-2022-23-season/pbak8jf2b6shpsvf5qfry4oa
 https://www.sportingnews.com/us/jsonapi/node/article?filter[drupal_internal__nid][value]=699421
 https://www.sportingnews.com/us/jsonapi/node/article/8c15c8ce-d55f-440c-88e3-269be88a552f
+https://www.rokuguide.com/
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
 
 http://localhost:8080/feed?debug&read&url=https%3A%2F%2Ffeeds.feedblitz.com%2Fusatoday-NewsTopStories
 
-https://www.commondreams.org/api/node/article/340123
-
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fsonoff.tech%2Fproduct-review%2Fsonoff-zigbee-3-0-usb-dongle-plus-tutorials%2F
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.wcpo.com%2Fsports%2Fhigh-school-sports%2Fweek-8-high-school-football-scoreboard
 
+Content json:
+    Find data-entry-id="235933">
+    https://uncrate.com/api/v5/post/235933.json
+Feed for https://uncrate.com/supply/xxxxx
+    Find <script>var catID = 2931;</script>
+    https://uncrate.com/api/v5/section/2931/latest.json
+Main rss feed: https://feeds.feedburner.com/uncrate
+
+
+Content: https://www.thisiswhyimbroke.com/api/posts/industrial-grade-glow-sticks-2/?size=large
+Main feed: https://www.thisiswhyimbroke.com/api/lists/new/1
+Buying guide: https://www.thisiswhyimbroke.com/api/buying-guide/man-cave-gifts
+Buying guide feed: https://www.thisiswhyimbroke.com/api/buying-guides/latest
+
+__NUXT__
+https://www.fox5atlanta.com/
+
+__INITIAL_STATE__
+https://www.hydrogeninsight.com/policy/a-campaign-built-on-dishonesty-hydrogen-heating-trial-residents-accuse-gas-distributor-cadent-of-withholding-key-safety-data/2-1-1385294
+https://www.rechargenews.com/wind/avangrid-doubles-down-on-power-deal-pull-out-as-economic-gales-hit-us-offshore-wind/2-1-1392327
+
+Hugo-based blogs (https://github.com/gohugoio/hugo)
+https://jimmyislive.dev/
+https://notes.ghed.in/
+https://palant.info/
+https://pradyunsg.me/blog/
+https://matthewc.dev/
+https://notes.ghed.in/
+
+https://m.arenaev.com/reallife_test_reveals_how_much_range_evs_and_phevs_lose_during_winter-news-1308.php
+https://m.gsmarena.com/
+
+Google maps embed
+http://jsbin.com/?html,output
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>JS Bin</title>
+</head>
+<body>
+<iframe style="width:800px; height:800px;" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2036.1076664343543!2d-91.13981355847015!3d30.420462377142552!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8626a6a8914ad1ff%3A0xdf5193b5cf94af5c!2s4600%20Bennington%20Ave%2C%20Baton%20Rouge%2C%20LA%2070808!5e1!3m2!1sen!2sus!4v1674376045866!5m2!1sen!2sus">
+  </iframe>
+</body>
+</html>
+
+
+TCMS - needs authenticationj
+https://www.theadvocate.com/tncms/webservice/
+
+APOLLO_STATE
+https://www.thecrimson.com/article/2023/1/25/comaroff-walkout-spring-23/
+https://api.thecrimson.com/graphql
+query GetContent

@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     api_url = '{}://{}/api/article/{}'.format(split_url.scheme, split_url.netloc, '/'.join(paths[-4:]))
@@ -85,9 +85,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/feeds/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     feed = None
     if '/topics/' in args['url']:
@@ -106,7 +106,7 @@ def get_feed(args, save_debug=False):
             url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['url'])
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)

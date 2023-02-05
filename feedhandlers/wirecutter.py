@@ -20,7 +20,7 @@ def resize_image(src, width=1024):
   split_url = urlsplit(img_src)
   return '{}://{}{}?auto=webp&width={}'.format(split_url.scheme, split_url.netloc, split_url.path, width)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   article_html = utils.get_url_html(url)
   if not article_html:
     return None

@@ -58,7 +58,7 @@ def add_video(video_id):
         return ''
 
 
-def get_video_content(url, args, save_debug):
+def get_video_content(url, args, site_json, save_debug):
     if args and 'embed' in args:
         video_id = url
         bb_json = None
@@ -131,7 +131,7 @@ def get_video_content(url, args, save_debug):
     return item
 
 
-def get_newsletter_content(url, args, save_debug):
+def get_newsletter_content(url, args, site_json, save_debug):
     bb_html = get_bb_url(url)
     if save_debug:
         utils.write_file(bb_html, './debug/debug.html')
@@ -144,14 +144,14 @@ def get_newsletter_content(url, args, save_debug):
         logger.warning('unable to find newsletter props in ' + url)
         return None
     article_json = json.loads(el.string)
-    return get_item(article_json, args, save_debug)
+    return get_item(article_json, args, site_json, save_debug)
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     if '/videos/' in url:
-        return get_video_content(url, args, save_debug)
+        return get_video_content(url, args, site_json, save_debug)
     elif '/newsletters/' in url:
-        return get_newsletter_content(url, args, save_debug)
+        return get_newsletter_content(url, args, site_json, save_debug)
 
     api_url = ''
     split_url = urlsplit(url)
@@ -178,10 +178,10 @@ def get_content(url, args, save_debug):
         logger.warning('unable to find ArticleBody in ' + url)
         return None
     article_json = json.loads(el.string)
-    return get_item(article_json, args, save_debug)
+    return get_item(article_json, args, site_json, save_debug)
 
 
-def get_item(article_json, args, save_debug):
+def get_item(article_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -376,7 +376,7 @@ def get_item(article_json, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     urls = []
     split_url = urlsplit(args['url'])
     paths = split_url.path[1:].split('/')
@@ -429,7 +429,7 @@ def get_feed(args, save_debug=False):
     for url in urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

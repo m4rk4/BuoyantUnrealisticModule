@@ -33,7 +33,7 @@ def get_next_data(url):
     return json.loads(el.string)
 
 
-def get_news_content(url, args, save_debug=False):
+def get_news_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     post_data = {"query": "\n  query NewsItemPage($id: ID!) {\n    newsById(id: $id, version: current) {\n      byline\n      byline_linkable {\n        ... on LinkableString {\n          raw_string\n          web_linked_string\n        }\n      }\n      comment_count\n      content(filter: { status: \"live\" }) {\n        ... on BackgroundReading {\n          article {\n            author {\n              id\n              name\n            }\n            excerpt\n            id\n            permalink\n            title\n            published_at\n          }\n          id\n        }\n        ... on Brief {\n          created_at\n          id\n          images {\n            image_uri\n          }\n          text\n          user {\n            ... on Staff {\n              avatar_uri\n              full_description\n              id\n              league_id\n              name\n              slug\n              team_id\n            }\n          }\n        }\n        ... on Development {\n          created_at\n          id\n          text\n          tweets\n        }\n        ... on Insight {\n          created_at\n          id\n          images {\n            image_uri\n          }\n          text\n          user {\n            ... on Staff {\n              avatar_uri\n              full_description\n              id\n              league_id\n              name\n              slug\n              team_id\n            }\n          }\n        }\n        ... on RelatedArticle {\n          id\n          article {\n            author {\n              id\n              name\n            }\n            excerpt\n            id\n            image_uri\n            permalink\n            published_at\n            title\n          }\n        }\n        ... on RelatedPodcastEpisode {\n          id\n          podcast_episode {\n            description\n            duration_formatted\n            id\n            image_uri\n            permalink\n            series_title\n            title\n          }\n        }\n      }\n      custom_meta_description\n      custom_search_title\n      disable_comments\n      headline\n      headline_type\n      id\n      images {\n        image_height\n        image_uri\n        image_width\n        thumbnail_height\n        thumbnail_uri\n        thumbnail_width\n      }\n      last_activity_at\n      lede\n      localization\n      lock_comments\n      permalink\n      published_at\n      short_title\n      slug\n      smart_brevity\n      smart_brevity_cta\n      smart_brevity_headers\n      tags {\n        game {\n          id\n          league\n          title\n        }\n        leagues {\n          id\n          league\n          title\n          shortname\n          sportType\n        }\n        players {\n          id\n          league\n          title\n        }\n        teams {\n          id\n          league\n          title\n          leagueShortname\n          sportType\n        }\n      }\n    }\n  }\n",
@@ -55,10 +55,10 @@ def get_news_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
-    return get_news_item(article_json, next_data, args, save_debug)
+    return get_news_item(article_json, next_data, args, site_json, save_debug)
 
 
-def get_news_item(article_json, next_data, args, save_debug):
+def get_news_item(article_json, next_data, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['id']
     item['url'] = article_json['permalink']
@@ -117,7 +117,7 @@ def get_news_item(article_json, next_data, args, save_debug):
     return item
 
 
-def get_news_feed(args, save_debug):
+def get_news_feed(url, args, site_json, save_debug):
     # This gets the articles and contents
     post_data = {"query": "\n  query NewsPage($limit: Int, $filter: NewsFilter) {\n    news(limit: $limit, filter: $filter) {\n      ...News_news\n    }\n  }\n\n\n  fragment News_news on News {\n    byline\n    byline_authors {\n      ... on Staff {\n        avatar_uri\n        bio\n        description\n        id\n        league_id\n        league_avatar_uri\n        name\n        role\n        slack_user_id\n        team_id\n        team_avatar_uri\n      }\n    }\n    byline_linkable {\n      ... on LinkableString {\n        raw_string\n        app_linked_string\n        web_linked_string\n      }\n    }\n    comment_count\n    created_at\n    custom_meta_description\n    custom_search_title\n    disable_comments\n    experts_group {\n      ... on Staff {\n        avatar_uri\n        bio\n        description\n        id\n        league_id\n        league_avatar_uri\n        name\n        role\n        slack_user_id\n        team_id\n        team_avatar_uri\n      }\n    }\n    has_unpublished_changes\n    headline\n    headline_type\n    id\n    images {\n      image_height\n      image_uri\n      image_width\n      thumbnail_height\n      thumbnail_uri\n      thumbnail_width\n    }\n    importance\n    last_activity_at\n    lede\n    localization\n    lock_comments\n    permalink\n    primary_tag {\n      title\n    }\n    published_at\n    slug\n    smart_brevity\n    smart_brevity_cta\n    status\n    tags {\n      game {\n        id\n        league\n        title\n      }\n      leagues {\n        id\n        league\n        title\n        shortname\n        sportType\n      }\n      players {\n        id\n        league\n        title\n      }\n      teams {\n        id\n        league\n        title\n        leagueShortname\n        sportType\n      }\n    }\n    updated_at\n    user_id\n    version\n  }\n\n",
         "variables": {"limit": 10, "filter": {"status": "live", "region": "us"}}}
@@ -140,9 +140,9 @@ def get_news_feed(args, save_debug):
         if save_debug:
             logger.debug('getting content from ' + article['permalink'])
         if article.get('lede'):
-            item = get_news_item(article, None, args, save_debug)
+            item = get_news_item(article, None, args, site_json, save_debug)
         else:
-            item = get_news_content(article['permalink'], args, save_debug)
+            item = get_news_content(article['permalink'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)
@@ -156,7 +156,7 @@ def get_news_feed(args, save_debug):
     return feed
 
 
-def get_podcast_clip(url, args, save_debug):
+def get_podcast_clip(url, args, site_json, save_debug):
     # This is basic and only for embeds
     # https://theathletic.com/report/podcast-clip?clip_id=5661
     s = requests.session()
@@ -202,11 +202,11 @@ def get_podcast_clip(url, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/news/' in url:
-        return get_news_content(url, args, save_debug)
+        return get_news_content(url, args, site_json, save_debug)
     elif 'podcast-clip' in url:
-        return get_podcast_clip(url, args, save_debug)
+        return get_podcast_clip(url, args, site_json, save_debug)
 
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
@@ -283,11 +283,11 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if 'rss' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
     if '/news/' in args['url']:
-        return get_news_feed(args, save_debug)
+        return get_news_feed(args, site_json, save_debug)
     return None
 
 

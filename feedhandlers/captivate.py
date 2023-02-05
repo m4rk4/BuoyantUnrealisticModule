@@ -8,7 +8,7 @@ import config, utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://player.captivate.fm/episode/466b78ff-8033-410d-9244-a350e3039e28
     m = re.search(r'/episode/([a-f0-9\-]+)', url)
     if not m:

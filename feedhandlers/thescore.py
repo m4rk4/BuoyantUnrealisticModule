@@ -24,13 +24,13 @@ def get_next_data(url):
 
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url)
     if not next_data:
         return None
-    return get_article_content(next_data['props']['pageProps']['initialProps']['article'], args, save_debug)
+    return get_article_content(next_data['props']['pageProps']['initialProps']['article'], args, site_json, save_debug)
 
-def get_article_content(article_json, args, save_debug=False):
+def get_article_content(article_json, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -112,9 +112,9 @@ def get_article_content(article_json, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     if args['url'].endswith('.rss'):
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     next_data = get_next_data(args['url'])
     if not next_data:
@@ -151,16 +151,16 @@ def get_feed(args, save_debug):
         if article['type'] == 'theScoreArticleCard':
             if save_debug:
                 logger.debug('getting content for ' + article['data']['share_url'])
-            item = get_article_content(article['data'], args, save_debug)
+            item = get_article_content(article['data'], args, site_json, save_debug)
         elif article['type'] == 'TwitterVideoCard':
             if save_debug:
                 logger.debug('getting content for ' + article['data']['url'])
-            item = twitter.get_content(article['data']['url'], args, save_debug)
+            item = twitter.get_content(article['data']['url'], args, {}, save_debug)
             item['title'] = article['caption']
         elif article['type'] == 'SourcedArticleCard':
             if save_debug:
                 logger.debug('getting content for ' + article['data']['url'])
-            item = utils.get_content(article['data']['url'], args, save_debug)
+            item = utils.get_content(article['data']['url'], args, site_json, save_debug)
         else:
             # TODO: AmpStoryCard https://www.thescore.com/story/23042062
             logger.warning('unhandled article type ' + article['type'])

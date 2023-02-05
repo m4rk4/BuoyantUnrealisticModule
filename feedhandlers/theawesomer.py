@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     s = requests.session()
     page = s.get(url)
     soup = None
@@ -70,12 +70,12 @@ def get_content(url, args, save_debug=False):
                 media = next((it for it in media_json if it['slug'] == slug), None)
                 item['content_html'] += utils.add_image(media['source_url'], media['caption']['rendered'])
 
-    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2',item['content_html'])
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2',item['content_html'])
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/wp-json/' in args['url']:
-        return wp_posts.get_feed(args, save_debug)
+        return wp_posts.get_feed(url, args, site_json, save_debug)
     else:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)

@@ -122,7 +122,7 @@ def get_album_track(track):
     return item
 
 
-def get_album(url, args, save_debug=False):
+def get_album(url, args, site_json, save_debug=False):
     m = re.search(r'/album/[^/]+/(\d+)', url)
     if not m:
         logger.warning('unable to get album id from ' + url)
@@ -194,7 +194,7 @@ def get_album(url, args, save_debug=False):
     return item
 
 
-def get_playlist(url, args, save_debug=False):
+def get_playlist(url, args, site_json, save_debug=False):
     m = re.search(r'/(pl\.[0-9a-f]+)', url)
     if not m:
         logger.warning('unable to get album id from ' + url)
@@ -276,7 +276,7 @@ def get_podcast_episode(episode):
     return item
 
 
-def get_podcast(url, args, save_debug):
+def get_podcast(url, args, site_json, save_debug):
     m = re.search(r'/id(\d+)', url)
     if not m:
         logger.warning('unable to parse podcast id in ' + url)
@@ -350,19 +350,19 @@ def get_podcast(url, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/podcast' in url:
-        return get_podcast(url, args, save_debug)
+        return get_podcast(url, args, site_json, save_debug)
 
     if '/album' in url:
-        return get_album(url, args, save_debug)
+        return get_album(url, args, site_json, save_debug)
 
     if '/playlist/' in url or '/album' in url:
-        return get_playlist(url, args, save_debug)
+        return get_playlist(url, args, site_json, save_debug)
 
     logger.warning('unhandled Apple url ' + url)
     return None
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

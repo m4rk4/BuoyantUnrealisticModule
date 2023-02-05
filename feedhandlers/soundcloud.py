@@ -156,7 +156,7 @@ def get_playlist_content(playlist_id, client_id, secret_token, save_debug):
     return item
 
 
-def old_content(url, args, save_debug):
+def old_content(url, args, site_json, save_debug):
     item = None
     sc_key = get_soundcloud_key()
     if not sc_key:
@@ -205,7 +205,7 @@ def old_content(url, args, save_debug):
     return None
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     api_url = ''
     if url.startswith('https://api.soundcloud.com/'):
         api_url = url
@@ -371,6 +371,6 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     # For podcasts: https://feeds.soundcloud.com/users/soundcloud:users:58576458/sounds.rss
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

@@ -201,9 +201,9 @@ def format_body(body_json):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if re.search(r'wired\.com/\d+/\d+/geeks-guide', url):
-        return wp_posts.get_content(url, args, save_debug)
+        return wp_posts.get_content(url, args, site_json, save_debug)
 
     article_json = None
     split_url = urlsplit(url)
@@ -330,5 +330,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

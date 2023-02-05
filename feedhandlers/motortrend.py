@@ -61,7 +61,7 @@ def render_block(block, images, videos):
     return block_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://www.motortrend.com/api/v2/resource/' + quote_plus(split_url.path[1:])
     api_json = utils.get_url_json(api_url)
@@ -171,7 +171,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
     if len(paths) == 0:
@@ -208,7 +208,7 @@ def get_feed(args, save_debug=False):
         url = it['source']['seo']['canonicalUrl']
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

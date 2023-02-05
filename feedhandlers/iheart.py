@@ -39,7 +39,7 @@ def get_episode(episode, show):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     clean_url = utils.clean_url(url)
     show = None
     m = re.search(r'/podcast/[^/]+-(\d+)', clean_url)

@@ -490,7 +490,7 @@ def get_article(id):
     return gql_json['data']['article']
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if paths[0] == 'news':
@@ -642,7 +642,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
     if len(paths) == 0:
@@ -667,7 +667,7 @@ def get_feed(args, save_debug=False):
         url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['uri'])
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

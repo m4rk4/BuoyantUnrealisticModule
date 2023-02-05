@@ -8,7 +8,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   split_url = urlsplit(url)
   if not split_url.path.startswith('/ifr/'):
     split_path = re.split(r'\/|-', split_url.path)
@@ -96,5 +96,5 @@ def get_content(url, args, save_debug=False):
   item['content_html'] = utils.add_image(item['_image'], caption, width, height)
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   return None

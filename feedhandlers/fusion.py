@@ -432,7 +432,7 @@ def get_content_html(content, url, site_json, save_debug):
     return content_html
 
 
-def get_item(content, url, site_json, args, save_debug):
+def get_item(content, url, args, site_json, save_debug):
     item = {}
     if content.get('_id'):
         item['id'] = content['_id']
@@ -541,7 +541,7 @@ def get_item(content, url, site_json, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if not url.startswith('http'):
         return None
     split_url = urlsplit(url)
@@ -550,9 +550,6 @@ def get_content(url, args, save_debug=False):
     else:
         path = split_url.path
     paths = list(filter(None, split_url.path[1:].split('/')))
-    tld = tldextract.extract(url)
-    sites_json = utils.read_json_file('./sites.json')
-    site_json = sites_json[tld.domain]
 
     for n in range(2):
         query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
@@ -568,10 +565,9 @@ def get_content(url, args, save_debug=False):
             # Failed...try new deployment value
             d = get_deployment_value(url)
             if d > 0 and d != site_json['deployment']:
+                logger.debug('retrying with new deployment value {}'.format(d))
                 site_json['deployment'] = d
-                site_json['deployment'] = d
-                utils.write_file(sites_json, './sites.json')
-                logger.warning('retrying with new deployment value {}'.format(d))
+                utils.update_sites(url, site_json)
             else:
                 return None
         else:
@@ -586,21 +582,17 @@ def get_content(url, args, save_debug=False):
         utils.write_file(content, './debug/debug.json')
 
     if content.get('result'):
-        return get_item(content['result'], url, site_json, args, save_debug)
-    return get_item(content, url, site_json, args, save_debug)
+        return get_item(content['result'], url, args, site_json, save_debug)
+    return get_item(content, url, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.baltimoresun.com/rss/
     # https://www.baltimoresun.com/arcio/rss/
     # https://feeds.washingtonpost.com/rss/business/technology/
 
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
-
-    tld = tldextract.extract(args['url'])
-    sites_json = utils.read_json_file('./sites.json')
-    site_json = sites_json[tld.domain]
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     split_url = urlsplit(args['url'])
     if split_url.path.endswith('/'):
@@ -677,10 +669,9 @@ def get_feed(args, save_debug=False):
             # Failed...try new deployment value
             d = get_deployment_value(args['url'])
             if d > 0 and d != site_json['deployment']:
+                logger.debug('retrying with new deployment value {}'.format(d))
                 site_json['deployment'] = d
-                sites_json[tld.domain]['deployment'] = d
-                utils.write_file(sites_json, './sites.json')
-                logger.warning('retrying with new deployment value {}'.format(d))
+                utils.update_sites(args['url'], site_json)
             else:
                 return None
         else:
@@ -740,13 +731,13 @@ def get_feed(args, save_debug=False):
             logger.debug('getting content from ' + url)
 
         if not content.get('type'):
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
         elif content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
-            item = get_item(content, url, site_json, args, save_debug)
+            item = get_item(content, url, args, site_json, save_debug)
         elif content.get('type') and content['type'] == 'video' and content.get('streams'):
-            item = get_item(content, url, site_json, args, save_debug)
+            item = get_item(content, url, args, site_json, save_debug)
         else:
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
 
         if item:
             if utils.filter_item(item, args) == True:

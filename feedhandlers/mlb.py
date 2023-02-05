@@ -21,7 +21,7 @@ def get_initial_state(url):
     return json.loads(m.group(1))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/news/' not in url:
         logger.warning('unhandled url ' + url)
         return None
@@ -133,5 +133,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

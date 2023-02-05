@@ -123,7 +123,7 @@ def add_podcast(podcast_id, episode_id):
     return item['content_html']
 
 
-def get_podcast_content(url, args, save_debug):
+def get_podcast_content(url, args, site_json, save_debug):
     page_json = get_page_json(url)
     if not page_json:
         return None
@@ -197,9 +197,9 @@ def get_podcast_content(url, args, save_debug):
             item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
     return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/podcasts/' in url:
-        return get_podcast_content(url, args, save_debug)
+        return get_podcast_content(url, args, site_json, save_debug)
 
     page_json = get_page_json(url)
     if not page_json:
@@ -265,7 +265,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     page_json = get_page_json(args['url'])
     if not page_json:
         return None
@@ -301,7 +301,7 @@ def get_feed(args, save_debug=False):
     for article in articles:
         if save_debug:
             logger.debug('getting contents for ' + article['canonicalUrl'])
-        item = get_content(article['canonicalUrl'], args, save_debug)
+        item = get_content(article['canonicalUrl'], args, site_json, save_debug)
         if item:
             if '/topic/' not in args['url'] and not item['url'].startswith(args['url'].lower()):
                 continue

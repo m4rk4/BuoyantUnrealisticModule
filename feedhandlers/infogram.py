@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -37,7 +37,12 @@ def get_content(url, args, save_debug=False):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['_image'] = info_json['embedImageUrl']
+    if info_json.get('embedImageUrl'):
+        item['_image'] = info_json['embedImageUrl']
+    elif info_json.get('previewImageUrl'):
+        item['_image'] = info_json['previewImageUrl']
+    elif info_json.get('thumb'):
+        item['_image'] = info_json['thumb']
 
     caption = '<a href="{}">{}</a>'.format(item['url'], item['title'])
     item['content_html'] = utils.add_image(item['_image'], caption, link=item['url'])

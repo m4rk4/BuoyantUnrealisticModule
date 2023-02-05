@@ -180,7 +180,7 @@ def render_content(content):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     soup = BeautifulSoup(page_html, 'html.parser')
     el = soup.find('script', string=re.compile(r'window\.__s_data'))
@@ -277,6 +277,6 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.cnbc.com/rss-feeds/
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://cdn.jwplayer.com/players/QjZKj8Po-AjIcq1uW.js
     m = re.search(r'/(players|previews|v2/media)/([^-]+)', url)
     if not m:
@@ -48,5 +48,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

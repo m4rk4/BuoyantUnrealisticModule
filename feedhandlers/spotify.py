@@ -25,7 +25,7 @@ def get_authorization_header():
     return header
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     m = re.search(r'https://open\.spotify\.com/embed(-legacy)?/([^/]+)/([0-9a-zA-Z]+)', url)
     if m:
         content_type = m.group(2)
@@ -241,5 +241,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

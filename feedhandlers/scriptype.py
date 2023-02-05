@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1].split('.')[0]
@@ -88,5 +88,5 @@ def get_content(url, args, save_debug=False):
     item['content_html'] += wp_posts.format_content(str(soup), item)
     return item
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

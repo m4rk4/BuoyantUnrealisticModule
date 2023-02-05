@@ -68,7 +68,7 @@ def add_video(url, video_id):
     args['data-video-id'] = video_id
     args['data-key'] = m.group(1)
     args['embed'] = True
-    bc_item = brightcove.get_content(url, args, False)
+    bc_item = brightcove.get_content(url, args, {}, False)
     return bc_item['content_html']
 
 
@@ -118,7 +118,7 @@ def get_article_url(article_json, domain, netloc):
         return article_json['urls']['webslug']
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     tld = tldextract.extract(url)
 
@@ -240,5 +240,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

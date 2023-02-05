@@ -19,7 +19,7 @@ def resize_image(image_item, width_target):
   image = utils.closest_dict(images, 'width', width_target)
   return image['url']
 
-def get_investigates_content(url, args, save_debug):
+def get_investigates_content(url, args, site_json, save_debug):
   content = utils.get_url_content(url)
   if not content:
     return None
@@ -208,7 +208,7 @@ def get_investigates_content(url, args, save_debug):
   item['content_html'] += utils.bs_get_inner_html(story)
   return item
 
-def get_item(content, url, args, save_debug):
+def get_item(content, url, args, site_json, save_debug):
   item = {}
   item['id'] = content['id']
   item['url'] = 'https://www.reuters.com' + content['canonical_url']
@@ -245,9 +245,9 @@ def get_item(content, url, args, save_debug):
   item['content_html'] = fusion.get_content_html(content, lead_image, resize_image, url, save_debug)
   return item
 
-def get_content(url, args, save_debug=False, d=''):
+def get_content(url, args, site_json, save_debug=False, d=''):
   if '/investigates/' in url:
-    return get_investigates_content(url, args, save_debug)
+    return get_investigates_content(url, args, site_json, save_debug)
 
   split_url = urlsplit(url)
   if not d:
@@ -269,9 +269,9 @@ def get_content(url, args, save_debug=False, d=''):
     with open('./debug/debug.json', 'w') as file:
       json.dump(content, file, indent=4)
 
-  return get_item(content, url, args, save_debug)
+  return get_item(content, url, args, site_json, save_debug)
 
-def get_investigates_feed(args, save_debug=False):
+def get_investigates_feed(url, args, site_json, save_debug=False):
   content = utils.get_url_content(args['url'])
   if not content:
     return None
@@ -282,7 +282,7 @@ def get_investigates_feed(args, save_debug=False):
   n = 0
   items = []
   for article in soup.find_all('article'):
-    item = get_investigates_content(article.a['href'], args, save_debug)
+    item = get_investigates_content(article.a['href'], args, site_json, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)
@@ -294,9 +294,9 @@ def get_investigates_feed(args, save_debug=False):
   feed['items'] = items.copy()
   return feed
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   if '/investigates/' in args['url']:
-    return get_investigates_feed(args, save_debug)
+    return get_investigates_feed(url, args, site_json, save_debug)
 
   split_url = urlsplit(args['url'])
   d = fusion.get_deployment_value('{}://{}'.format(split_url.scheme, split_url.netloc))
@@ -331,7 +331,7 @@ def get_feed(args, save_debug=False):
           logger.debug('skipping old article ' + url)
         continue
 
-    item = get_content(url, args, save_debug, d)
+    item = get_content(url, args, site_json, save_debug, d)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)

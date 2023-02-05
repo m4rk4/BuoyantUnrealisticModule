@@ -136,10 +136,10 @@ def get_natgeo_json(url):
     return json.loads(el.string[21:-1])
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.netloc == 'www.nationalgeographic.co.uk':
-        return natgeo_uk.get_content(url, args, save_debug)
+        return natgeo_uk.get_content(url, args, site_json, save_debug)
 
     natgeo_json = get_natgeo_json(url)
     if not natgeo_json:
@@ -221,10 +221,10 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     if split_url.netloc == 'www.nationalgeographic.co.uk':
-        return natgeo_uk.get_feed(args, save_debug)
+        return natgeo_uk.get_feed(url, args, site_json, save_debug)
 
     natgeo_json = get_natgeo_json(args['url'])
     page_json = natgeo_json['page']
@@ -242,7 +242,7 @@ def get_feed(args, save_debug=False):
                     if tile['ctas'][0]['icon'] == 'article':
                         if save_debug:
                             logger.debug('getting content for ' + url)
-                        item = get_content(url, args, save_debug)
+                        item = get_content(url, args, site_json, save_debug)
                         if item:
                             if utils.filter_item(item, args) == True:
                                 feed_items.append(item)

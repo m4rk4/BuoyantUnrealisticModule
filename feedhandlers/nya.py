@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_article(article_json, args, save_debug=False):
+def get_article(article_json, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -126,7 +126,7 @@ def get_article(article_json, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://neilyoungarchives.com/news/1/article?id=A-Message-From-Neil-I-Say
     split_url = urlsplit(url)
     m = re.search(r'id=([^&]+)', split_url.query)
@@ -136,10 +136,10 @@ def get_content(url, args, save_debug=False):
     article_json = utils.get_url_json('https://nya-management-prod.herokuapp.com/api/v2/article/{}'.format(m.group(1)))
     if not article_json:
         return None
-    return get_article(article_json['data']['article'], args, save_debug)
+    return get_article(article_json['data']['article'], args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     m = re.search(r'/news/(\d)', args['url'])
     if m:
         page = m.group(1)
@@ -158,7 +158,7 @@ def get_feed(args, save_debug=False):
     items = []
     for key, section in nya_data.items():
         for article in section:
-            item = get_article(article, args, save_debug)
+            item = get_article(article, args, site_json, save_debug)
             if item:
               if utils.filter_item(item, args) == True:
                 items.append(item)

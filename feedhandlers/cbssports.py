@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     xhr_url = utils.clean_url(url)
     if xhr_url.endswith('/'):
         xhr_url += 'xhr/?showTaboola=true'
@@ -205,10 +205,10 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.cbssports.com/xml/rss
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     page_html = utils.get_url_html(args['url'])
     if not page_html:
@@ -238,7 +238,7 @@ def get_feed(args, save_debug=False):
     for url in feed_urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

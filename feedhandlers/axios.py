@@ -149,7 +149,7 @@ def format_blocks(blocks):
             logger.warning('unhandled block type ' + block['type'])
     return content_html
 
-def get_item(content_json, args, save_debug):
+def get_item(content_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(content_json, './debug/debug.json')
 
@@ -231,7 +231,7 @@ def get_item(content_json, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     content_id = ''
     m = re.search(r'([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)\.html', split_url.path)
@@ -265,17 +265,17 @@ def get_content(url, args, save_debug=False):
         else:
             logger.warning('unable to determine content id for ' + url)
             return None
-    return get_item(content_json, args, save_debug)
+    return get_item(content_json, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # Author feed: https://api.axios.com/api/render/stream/content/?author_username=mikeallen
     # Topic feed: https://api.axios.com/api/render/stream/content/?topic_slug=technology
     # All newsletters for the month: https://api.axios.com/api/render/newsletters/?audience_slug=national&year=2022&month=02
     if 'api.axios.com/feed' in args['url']:
         # https://api.axios.com/feed/
         # https://api.axios.com/feed/technology/
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     feed = utils.init_jsonfeed(args)
     feed_items = []
@@ -300,7 +300,7 @@ def get_feed(args, save_debug=False):
             # Only gets the most recent newsletter
             if save_debug:
                 logger.debug('getting content for ' + args['url'])
-            item = get_content(args['url'], args, save_debug)
+            item = get_content(args['url'], args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)
@@ -308,7 +308,7 @@ def get_feed(args, save_debug=False):
             for el in soup.find_all('a', class_=re.compile('link--newsletter')):
                 if save_debug:
                     logger.debug('getting content for ' + el['href'])
-                item = get_content(el['href'], args, save_debug)
+                item = get_content(el['href'], args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         feed_items.append(item)
@@ -358,7 +358,7 @@ def get_feed(args, save_debug=False):
             continue
         if save_debug:
             logger.debug('getting content for ' + content_json['permalink'])
-        item = get_item(content_json, args, save_debug)
+        item = get_item(content_json, args, site_json, save_debug)
         if item:
           if utils.filter_item(item, args) == True:
             feed_items.append(item)

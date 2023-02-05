@@ -35,7 +35,7 @@ def add_image(image, width=1000, gallery_url=''):
     return utils.add_image(img_src, ' | '.join(captions), link=gallery_url)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     m = re.search(r'detailUrl:"([^"]+)"', page_html)
     if not m:
@@ -115,5 +115,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

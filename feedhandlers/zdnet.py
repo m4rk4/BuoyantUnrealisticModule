@@ -34,7 +34,7 @@ def get_article_soup(url):
     return soup.find('article')
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     url = re.sub(r'#ftag=\w+', '', url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
@@ -154,7 +154,7 @@ def get_content(url, args, save_debug=False):
             video_url = '{}://{}/videos/{}'.format(split_url.scheme, split_url.netloc, article_json['videos'][0]['slug'])
             if save_debug:
                 logger.debug('getting content from ' + video_url)
-            video_item = get_content(video_url, {"embed": True}, False)
+            video_item = get_content(video_url, {"embed": True}, site_json, False)
             if video_item:
                 item['_image'] = video_item['_image']
                 item['content_html'] += video_item['content_html']
@@ -447,9 +447,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/rss' in args['url'] or '/feed' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     # TODO: CNET tag feeds
     # TODO: CNET author feeds
@@ -513,7 +513,7 @@ def get_feed(args, save_debug=False):
         for url in urls:
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)

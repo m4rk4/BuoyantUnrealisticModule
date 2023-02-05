@@ -271,7 +271,7 @@ def format_block(block, content, netloc):
     return block_html
 
 
-def get_gallery_content(soup, url, args, save_debug):
+def get_gallery_content(soup, url, args, site_json, save_debug):
     el = soup.find('script', id='data-layer')
     if not el:
         logger.warning('unable to find data-layer in ' + url)
@@ -354,7 +354,7 @@ def get_gallery_content(soup, url, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     page_html = utils.get_url_html(url)
     soup = BeautifulSoup(page_html, 'html.parser')
@@ -362,7 +362,7 @@ def get_content(url, args, save_debug=False):
     if not el:
         el = soup.find('meta', attrs={"name": "sailthru.contenttype"})
         if el and (el['content'] == 'gallery' or el['content'] == 'listicle'):
-            return get_gallery_content(soup, url, args, save_debug)
+            return get_gallery_content(soup, url, args, site_json, save_debug)
         else:
             logger.warning('unhandled content in ' + url)
             return None
@@ -554,7 +554,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     page_html = utils.get_url_html(args['url'])
     soup = BeautifulSoup(page_html, 'html.parser')
@@ -583,7 +583,7 @@ def get_feed(args, save_debug=False):
     for url in urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

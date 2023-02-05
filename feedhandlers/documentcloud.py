@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     m = re.search(r'documentcloud\.org/documents/(\d+)', url)
     if not m:
         logger.warning('unhandled url ' + url)

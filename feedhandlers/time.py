@@ -25,7 +25,7 @@ def add_image(image):
     return utils.add_image(resize_image(image['image']), ' | '.join(captions))
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     split_url = urlsplit(url)
     api_url = 'https://api.time.com/wp-json/tempo/v1/documents?path={}'.format(quote_plus(split_url.path))
     api_json = utils.get_url_json(api_url)
@@ -116,21 +116,5 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://www.time.com/feed',
-             'https://www.time.com/business/feed',
-             'https://www.time.com/climate/feed',
-             'https://www.time.com/entertainment/feed',
-             'https://www.time.com/history/feed',
-             'https://www.time.com/ideas/feed',
-             'https://www.time.com/politics/feed',
-             'https://www.time.com/science/feed',
-             'https://www.time.com/sports/feed',
-             'https://www.time.com/us/feed',
-             'https://www.time.com/world/feed']
-    for url in feeds:
-        get_feed({"url": url}, True)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

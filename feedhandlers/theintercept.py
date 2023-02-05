@@ -69,8 +69,24 @@ def render_content(content):
         elif content['shortcode'] == 'chapter':
             content_html += '<h2>{}. {}</h2>'.format(content['props']['number'], content['props']['title'])
 
+        elif content['shortcode'] == 'photo-grid':
+            captions = []
+            if content['props'].get('caption'):
+                captions.append(content['props']['caption'])
+            if content['props'].get('credit'):
+                captions.append(content['props']['credit'])
+            n = len(content['props']['photos']) - 1
+            for i, photo in enumerate(content['props']['photos']):
+                if i < n:
+                    content_html += utils.add_image(resize_image(photo['src']))
+                else:
+                    content_html += utils.add_image(resize_image(photo['src']), ' | '.join(captions))
+
         elif content['shortcode'] == 'youtube':
             content_html += utils.add_embed('https://www.youtube.com/embed/' + content['props']['sourceId'])
+
+        elif content['shortcode'] == 'jw-video':
+            content_html += utils.add_embed('https://cdn.jwplayer.com/v2/media/' + content['props']['sourceId'])
 
         elif content['shortcode'] == 'acast':
             content_html += utils.add_embed('https://shows.acast.com/{}/episodes/{}'.format(content['props']['podcast'], content['props']['id']))
@@ -91,9 +107,11 @@ def render_content(content):
 
     else:
         logger.warning('unhandled content type ' + content['type'])
+    content_html = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', content_html)
     return content_html
 
-def get_content(url, args, save_debug=False):
+
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     api_url = 'https://theintercept.com/api/requestPostBySlug/?realm=theintercept&slug={}'.format(paths[-1])
@@ -147,5 +165,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

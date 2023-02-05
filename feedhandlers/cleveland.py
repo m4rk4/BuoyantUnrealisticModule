@@ -42,7 +42,7 @@ def resize_image(image_item, width_target):
     return image['url']
 
 
-def get_item(content, url, args, save_debug):
+def get_item(content, url, args, site_json, save_debug):
     item = {}
     item['id'] = content['_id']
     item['url'] = url
@@ -90,7 +90,7 @@ def get_item(content, url, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False, d=''):
+def get_content(url, args, site_json, save_debug=False, d=''):
     split_url = urlsplit(url)
     if not d:
         d = fusion.get_deployment_value(url)
@@ -107,10 +107,10 @@ def get_content(url, args, save_debug=False, d=''):
         return None
     if save_debug:
         utils.write_file(content, './debug/debug.json')
-    return get_item(content, url, args, save_debug)
+    return get_item(content, url, args, site_json, save_debug)
 
 
-def get_search_feed(args, save_debug=False):
+def get_search_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     d = fusion.get_deployment_value('https://www.cleveland.com')
     if d < 0:
@@ -134,7 +134,7 @@ def get_search_feed(args, save_debug=False):
     n = 0
     items = []
     for result in queryly_results['items']:
-        item = get_content(result['link'], args, save_debug)
+        item = get_content(result['link'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)
@@ -147,9 +147,9 @@ def get_search_feed(args, save_debug=False):
     return feed
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/search/' in args['url']:
-        return get_search_feed(args, save_debug)
+        return get_search_feed(url, args, site_json, save_debug)
 
     split_url = urlsplit(args['url'])
     d = fusion.get_deployment_value('{}://{}'.format(split_url.scheme, split_url.netloc))
@@ -186,7 +186,7 @@ def get_feed(args, save_debug=False):
             logger.debug('getting content from ' + url)
             if content['_id'] == 'URN6T4ADLRAF7KG364WIEJUZMA':
                 utils.write_file(content, './debug/debug.json')
-        item = get_item(content, url, args, save_debug)
+        item = get_item(content, url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

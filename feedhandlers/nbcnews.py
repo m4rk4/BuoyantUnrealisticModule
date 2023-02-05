@@ -64,7 +64,7 @@ def add_video(video):
     return utils.add_video(video_src, 'video/mp4', poster, ' | '.join(captions))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url)
     article_soup = BeautifulSoup(article_html, 'html.parser')
     next_data = article_soup.find('script', id='__NEXT_DATA__')
@@ -272,7 +272,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     article_html = utils.get_url_html(args['url'])
     article_soup = BeautifulSoup(article_html, 'html.parser')
@@ -310,9 +310,9 @@ def get_feed(args, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + it['url'])
         if split_url.netloc in it['url']:
-            item = get_content(it['url'], args, save_debug)
+            item = get_content(it['url'], args, site_json, save_debug)
         elif '3rd_party' in args:
-            item = utils.get_content(it['url'], args, save_debug)
+            item = utils.get_content(it['url'], args, site_json, save_debug)
         else:
             continue
         if item:

@@ -80,7 +80,7 @@ def get_datetime(date):
     dt_est = datetime.fromisoformat(date)
     return tz_est.localize(dt_est).astimezone(pytz.utc)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://api.inc.com/rest/byfilelocation' + split_url.path
     api_json = utils.get_url_json(api_url)
@@ -206,7 +206,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.inc.com/rest/category/startup
     # https://www.inc.com/rest/homepackages
     # https://www.inc.com/rest/magazinetoc
@@ -214,7 +214,7 @@ def get_feed(args, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if paths[0] == 'rss':
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
     elif paths[0] == 'category':
         api_url = 'https://api.inc.com/rest' + split_url.path
     elif paths[0] == 'author':
@@ -256,7 +256,7 @@ def get_feed(args, save_debug=False):
         url = article['baseurl'] + article['inc_filelocation']
         if save_debug:
             logger.debug('getting contents for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

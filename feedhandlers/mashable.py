@@ -8,14 +8,14 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   if url.endswith('/'):
     json_url = url[:-1] + '.json'
   else:
     json_url = url + '.json'
   article_json = utils.get_url_json(json_url)
   if not article_json:
-    return get_content_from_html(url, args, save_debug)
+    return get_content_from_html(url, args, site_json, save_debug)
   if save_debug:
     with open('./debug/debug.json', 'w') as file:
       json.dump(article_json, file, indent=4)
@@ -154,12 +154,12 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = content_html + str(soup)
   return item
   
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   n = 0
   items = []
-  feed = rss.get_feed(args, save_debug)
+  feed = rss.get_feed(url, args, site_json, save_debug)
   for feed_item in feed['items']:
-    item = get_content(feed_item['url'], args, save_debug)
+    item = get_content(feed_item['url'], args, site_json, save_debug)
     if feed_item.get('tags'):
       item['tags'] = feed_item['tags'].copy()
     if utils.filter_item(item, args) == True:

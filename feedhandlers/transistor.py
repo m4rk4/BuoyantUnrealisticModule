@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://share.transistor.fm/e/602f95a2/dark
     page_html = utils.get_url_html(url)
     if not page_html:
@@ -55,5 +55,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

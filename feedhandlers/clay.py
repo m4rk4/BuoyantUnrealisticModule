@@ -183,7 +183,7 @@ def get_content_html(content_uri):
     return content_html
 
 
-def get_content(url, args, save_debug=False, page_uri=''):
+def get_content(url, args, site_json, save_debug=False, page_uri=''):
     if not page_uri:
         article_html = utils.get_url_html(url)
         if article_html:
@@ -280,5 +280,5 @@ def get_content(url, args, save_debug=False, page_uri=''):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

@@ -54,7 +54,7 @@ def get_title_offers(node_id, headers):
     return utils.post_url('https://apis.justwatch.com/graphql', json_data=query, headers=headers)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     session = requests.Session()
     r = session.get('https://www.justwatch.com/us')
     cookies = session.cookies.get_dict()
@@ -136,5 +136,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

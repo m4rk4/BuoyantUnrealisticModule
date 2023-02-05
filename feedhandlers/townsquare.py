@@ -128,7 +128,7 @@ def render_content(content, netloc, inc_gallery=False):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://{}/rest/carbon/filter/main{}'.format(split_url.netloc, split_url.path)
     api_json = utils.get_url_json(api_url)
@@ -180,8 +180,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

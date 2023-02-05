@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     post = None
     page_html = utils.get_url_html(url)
     if not page_html:
@@ -24,7 +24,7 @@ def get_content(url, args, save_debug=False):
     if not post:
         logger.warning('failed to get post data from ' + url)
         return None
-    item = wp_posts.get_post_content(post, args, save_debug)
+    item = wp_posts.get_post_content(post, args, site_json, save_debug)
     content = BeautifulSoup(item['content_html'], 'html.parser')
     lede_fig = content.find('figure')
 
@@ -71,8 +71,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/wp-json/' in args['url']:
-        return wp_posts.get_feed(args, save_debug)
+        return wp_posts.get_feed(url, args, site_json, save_debug)
     else:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)

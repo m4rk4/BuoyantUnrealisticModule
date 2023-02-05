@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://cdn.knightlab.com/libs/juxtapose/latest/embed/index.html?uid=322232da-3859-11ed-b5bc-6595d9b17862
     # Embeds only
     if '/juxtapose/' not in url:

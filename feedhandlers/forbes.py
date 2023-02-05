@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_wheels_content(url, args, save_debug=False):
+def get_wheels_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     wp_url = 'https://www.forbes.com/wheels/wp-json/web-stories/v1/web-story?slug={}'.format(paths[-1])
@@ -21,22 +21,22 @@ def get_wheels_content(url, args, save_debug=False):
         return None
     if save_debug:
         utils.write_file(post_json, './debug/debug.json')
-    return wp_posts.get_post_content(post_json[0], args, save_debug)
+    return wp_posts.get_post_content(post_json[0], args, site_json, save_debug)
 
 
-def get_video_content(url, args, save_debug=False):
+def get_video_content(url, args, site_json, save_debug=False):
     m = re.search(r'/video/(\d+)/', url)
     if not m:
         logger.warning('unable to determine video id in ' + url)
         return None
     bc_url = 'https://players.brightcove.net/2097119709001/60dyn27d5_default/index.html?videoId={}'.format(m.group(1))
-    item = brightcove.get_content(bc_url, {}, save_debug)
+    item = brightcove.get_content(bc_url, {}, {}, save_debug)
     if item:
         item['url'] = utils.clean_url(url)
     return item
 
 
-def get_gallery_content(url, args, save_debug=False):
+def get_gallery_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -98,14 +98,14 @@ def get_gallery_content(url, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.path.startswith('/pictures/'):
-        return get_gallery_content(url, args, save_debug)
+        return get_gallery_content(url, args, site_json, save_debug)
     elif split_url.path.startswith('/video/'):
-        return get_video_content(url, args, save_debug)
+        return get_video_content(url, args, site_json, save_debug)
     elif split_url.path.startswith('/wheels/'):
-        return get_wheels_content(url, args, save_debug)
+        return get_wheels_content(url, args, site_json, save_debug)
 
     api_url = 'https://www.forbes.com{}?malcolm=A&api=true&streamIndex=1'.format(split_url.path)
     api_json = utils.get_url_json(api_url)
@@ -307,8 +307,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(args, site_json, save_debug, get_content)
 
 
 def test_handler():

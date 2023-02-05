@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -35,11 +35,11 @@ def get_content(url, args, save_debug=False):
     sites_json = utils.read_json_file('./sites.json')
     site_json = sites_json[tld.domain]
 
-    return fusion.get_item(content, url, site_json, args, save_debug)
+    return fusion.get_item(content, url, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
     else:
-        return fusion.get_feed(args, save_debug)
+        return fusion.get_feed(url, args, site_json, save_debug)

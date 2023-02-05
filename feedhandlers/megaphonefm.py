@@ -20,7 +20,7 @@ def calculate_duration(sec):
     return ', '.join(duration)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # Only handles single episodes
     # https://playlist.megaphone.fm/?e=ESP3970143369
     item = {}
@@ -97,5 +97,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

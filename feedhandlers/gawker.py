@@ -243,7 +243,7 @@ def render_content(content):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     item = {}
     split_url = urlsplit(url)
     m = re.search(r'-(\d+)$', split_url.path)
@@ -317,8 +317,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

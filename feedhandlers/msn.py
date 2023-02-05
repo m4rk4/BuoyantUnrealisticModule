@@ -55,7 +55,7 @@ def add_media(media_id):
     return media_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     id = paths[-1].split('-')[-1]
@@ -174,17 +174,17 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_card_item(url, args, save_debug):
+def get_card_item(url, args, site_json, save_debug):
     if save_debug:
         logger.debug('getting content for ' + url)
-    item = get_content(url, args, save_debug)
+    item = get_content(url, args, site_json, save_debug)
     if item:
         if utils.filter_item(item, args) == True:
             return item
     return None
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(args['url'])
     if not page_html:
         return None
@@ -411,7 +411,7 @@ def get_feed(args, save_debug=False):
         if 'www.msn.com' in url:
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
         else:
             logger.debug('skipping url ' + url)
             continue

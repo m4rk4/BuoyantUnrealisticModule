@@ -19,7 +19,7 @@ def add_image(image):
     captions.append(image['credit'].encode('iso-8859-1').decode('utf-8'))
   return utils.add_image(img_src, ' | '.join(captions))
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
   article_html = utils.get_url_html(url)
   if not article_html:
     return None
@@ -103,6 +103,6 @@ def get_content(url, args, save_debug):
 
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   # Topic feeds: https://www.theplayerstribune.com/api/properties/theplayertribune/posts?topic=football&limit=10
-  return rss.get_feed(args, save_debug, get_content)
+  return rss.get_feed(url, args, site_json, save_debug, get_content)

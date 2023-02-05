@@ -42,7 +42,7 @@ def get_video_src(vpid):
     caption = 'Unable to get video info'
   return video_src, caption
 
-def get_av_content(url, args, save_debug=False):
+def get_av_content(url, args, site_json, save_debug=False):
   initial_data = get_initial_data(url)
   if save_debug:
     utils.write_file(initial_data, './debug/debug.json')
@@ -103,22 +103,22 @@ def get_av_content(url, args, save_debug=False):
   item['content_html'] += bbcnews.format_content(article_json['data']['initialItem']['mediaItem']['summary'])
   return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   if '/av/' in url:
-    return get_av_content(url, args, save_debug)
+    return get_av_content(url, args, site_json, save_debug)
   elif '/article/' in url:
-    return bbcarticle.get_content(url, args, save_debug)
+    return bbcarticle.get_content(url, args, site_json, save_debug)
   elif '/news/' in url:
-    return bbcnews.get_content(url, args, save_debug)
+    return bbcnews.get_content(url, args, site_json, save_debug)
   elif '/sport/' in url:
-    return bbcsport.get_content(url, args, save_debug)
+    return bbcsport.get_content(url, args, site_json, save_debug)
   else:
     logger.warning('unknown BBC handler for ' + url)
     return None
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   # RSS feeds: https://www.bbc.co.uk/news/10628494
   if 'rss.xml' in args['url']:
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
   else:
-    return bbcarticle.get_feed(args, save_debug)
+    return bbcarticle.get_feed(url, args, site_json, save_debug)

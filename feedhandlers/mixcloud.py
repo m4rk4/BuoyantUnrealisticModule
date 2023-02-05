@@ -32,7 +32,7 @@ def decode_stream_url(encoded):
     return output
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if '/widget/iframe' in url:
         url_query = parse_qs(split_url.query)
@@ -79,5 +79,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

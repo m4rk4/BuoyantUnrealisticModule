@@ -157,7 +157,7 @@ def format_block(block):
     return block_html
 
 
-def get_player_content(url, args, save_debug):
+def get_player_content(url, args, site_json, save_debug):
     m = re.search(r'https://www\.cbc\.ca/player/play/(\d+)$', url)
     if not m:
         logger.warning('unable to determine mediaId from ' + url)
@@ -220,9 +220,9 @@ def get_player_content(url, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if url.startswith('https://www.cbc.ca/player/play/'):
-        return get_player_content(url, args, save_debug)
+        return get_player_content(url, args, site_json, save_debug)
     split_url = urlsplit(url)
     m = re.search(r'([0-9\.]+)$', split_url.path)
     if not m:
@@ -288,6 +288,6 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.cbc.ca/rss/
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

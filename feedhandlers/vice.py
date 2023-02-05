@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
     src = '{}?resize={}:*'.format(utils.clean_url(img_src), width)
-    if 'localhost' in config.server:
-        src = '{}/image?url={}'.format(config.server, quote_plus(src))
+    #if 'localhost' in config.server:
+    #    src = '{}/image?url={}'.format(config.server, quote_plus(src))
     return src
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     is_video = False
     m = re.search(r'/article/([^/]+)/', url)
     if m:
@@ -83,7 +83,7 @@ def get_content(url, args, save_debug=False):
 
     if article_json.get('dek'):
         item['summary'] = article_json['dek']
-        item['content_html'] += '<p>{}</p>'.format(article_json['dek'])
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
 
     if article_json.get('thumbnail_url'):
         item['_image'] = article_json['thumbnail_url']
@@ -151,8 +151,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.vice.com/en/rss
     # https://www.vice.com/en/rss/section/tech
     # https://www.vicetv.com/en_us/rss
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

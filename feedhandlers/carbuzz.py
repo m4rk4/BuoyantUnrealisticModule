@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if 'carbuzz.com/cars/' in url:
         page_html = utils.get_url_html(url)
         m = re.search(r'src="https://api\.carbuzz\.com/v\d\.0/tracking/post-view/([^"]+)"', page_html)
@@ -128,5 +128,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

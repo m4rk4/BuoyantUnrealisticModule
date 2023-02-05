@@ -48,7 +48,7 @@ def get_slideshow_data(slug, cursor=0, count=20):
     return api_data['data']['slideshow']
 
 
-def get_slideshow_content(slug, args, save_debug):
+def get_slideshow_content(slug, args, site_json, save_debug):
     slideshow_json = get_slideshow_data(slug)
     if not slideshow_json:
         return None
@@ -86,7 +86,7 @@ def get_slideshow_content(slug, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     if paths[0] == 'articles':
@@ -94,7 +94,7 @@ def get_content(url, args, save_debug=False):
     elif paths[0] == 'videos':
         page_json = get_video_data(paths[1])
     elif paths[0] == 'slideshow':
-        return get_slideshow_content(paths[1], args, save_debug)
+        return get_slideshow_content(paths[1], args, site_json, save_debug)
     else:
         logger.warning('unhandled url ' + url)
         return None
@@ -308,7 +308,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) == 0:
@@ -415,7 +415,7 @@ def get_feed(args, save_debug=False):
                 if save_debug:
                     logger.debug('skipping old article ' + url)
                 continue
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

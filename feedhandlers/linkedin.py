@@ -10,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_content_item(soup, reshare_item, args, save_debug):
+def get_content_item(soup, reshare_item, args, site_json, save_debug):
     item = {}
     el = soup.find('link', attrs={"rel": "canonical"})
     if el:
@@ -89,7 +89,7 @@ def get_content_item(soup, reshare_item, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.path.startswith('/embed/'):
         embed_url = url
@@ -111,9 +111,9 @@ def get_content(url, args, save_debug=False):
 
     el = soup.find(class_='share-update-card--reshare')
     if el:
-        reshare_item = get_content_item(el.extract(), None, args, save_debug)
+        reshare_item = get_content_item(el.extract(), None, args, site_json, save_debug)
     else:
         reshare_item = None
 
-    item = get_content_item(soup, reshare_item, args, save_debug)
+    item = get_content_item(soup, reshare_item, args, site_json, save_debug)
     return item

@@ -42,7 +42,7 @@ def get_jsonapi_data(root_url, data_type, id, query=''):
     return utils.get_url_json(api_url)
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -154,8 +154,8 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

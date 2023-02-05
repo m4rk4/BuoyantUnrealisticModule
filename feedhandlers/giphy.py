@@ -14,7 +14,7 @@ def get_image(img_src):
     return 'https://i.giphy.com{}'.format(split_url.path)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     m = re.search(r'^/(embed|gifs|media)/([^/]+)', split_url.path)
     if not m:
@@ -80,5 +80,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

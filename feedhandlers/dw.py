@@ -59,7 +59,7 @@ def add_image(image, width=1000):
     return utils.add_image(resize_image(image), ' | '.join(captions))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     path = paths[-1].split('-')
@@ -237,7 +237,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     path = paths[-1].split('-')
@@ -268,7 +268,7 @@ def get_feed(args, save_debug=False):
     for url in urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

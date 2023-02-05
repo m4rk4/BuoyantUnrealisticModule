@@ -44,7 +44,7 @@ def get_video(video):
     return vid_src, vid_type, poster, caption
 
 
-def get_story(story_json, args, save_debug=False):
+def get_story(story_json, args, site_json, save_debug=False):
     item = {}
     item['id'] = story_json['id']
     url = story_json['links']['web']['href']
@@ -261,7 +261,7 @@ def get_story(story_json, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     id = ''
     if '/story/_/id/' in url:
         m = re.search(r'/id/(\d+)', url)
@@ -313,10 +313,10 @@ def get_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(story_json, './debug/debug.json')
 
-    return get_story(story_json, args, save_debug)
+    return get_story(story_json, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # API: https://www.espn.com/apis/devcenter/docs/headlines.html
     # All: https://now.core.api.espn.com/v1/sports/news/
     # League: https://now.core.api.espn.com/v1/sports/basketball/nba/news
@@ -356,9 +356,9 @@ def get_feed(args, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + url)
         if story.get('story'):
-            item = get_story(story, args, save_debug)
+            item = get_story(story, args, site_json, save_debug)
         else:
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

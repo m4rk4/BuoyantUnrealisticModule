@@ -290,7 +290,7 @@ def get_tweet_json(tweet_id, save_debug=False):
     return tweet_json
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     tweet_id = ''
     tweet_user = ''
     clean_url = ''
@@ -404,7 +404,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     user = ''
     if args.get('url'):
         m = re.search('https:\/\/twitter\.com\/([^\/]+)', args['url'])
@@ -428,7 +428,7 @@ def get_feed(args, save_debug=False):
         query += ' within_time:{}h'.format(args['age'])
     try:
         for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
-            item = get_content('https://twitter.com/{}/status/{}'.format(user, tweet.id), args, save_debug)
+            item = get_content('https://twitter.com/{}/status/{}'.format(user, tweet.id), args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     items.append(item)

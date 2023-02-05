@@ -6,7 +6,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   # This probably only works for embed urls for now
   # https://delivery.vidible.tv/htmlembed/pid=5706c5c8e4b03b51471aefba/564f3144ff690c0a7c285e51.html?vid=61259d340815f73ecceceea1&amp;m.playback=autoplay&amp;m.disable_moat=1
   m = re.search(r'vid=([0-9a-f]+)', url)
@@ -73,5 +73,5 @@ def get_content(url, args, save_debug=False):
       break
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   return None

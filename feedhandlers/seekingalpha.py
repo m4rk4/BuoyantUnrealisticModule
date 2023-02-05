@@ -9,7 +9,7 @@ from feedhandlers import rss
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   # https://seekingalpha.com/article/4474162-eastman-chemical-exposed-to-supply-shortages-especially-in-automotive?source=feed_symbol_EMN
   m = re.search(r'\/[^\/]+\/(\d+)-', url)
   if not m:
@@ -215,10 +215,10 @@ def get_content(url, args, save_debug=False):
   item['content_html'] += str(soup)
   return item
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
   # Company RSS: https://seekingalpha.com/api/sa/combined/TSLA.xml
   if args['url'].endswith('.xml'):
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
   # Trending news: https://seekingalpha.com/api/v3/news/trending?filter[category]=market-news%3A%3Aall&page[number]=1&page[size]=12
   # Trending articles: https://seekingalpha.com/api/v3/articles/trending?filter[category]=latest-articles&include=author&page[number]=1&page[size]=12
@@ -238,7 +238,7 @@ def get_feed(args, save_debug):
     article_url = 'https://seekingalpha.com' + article['links']['self']
     if save_debug:
       logger.debug('getting content for ' + article_url)
-    item = get_content(article_url, args, save_debug)
+    item = get_content(article_url, args, site_json, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         feed_items.append(item)

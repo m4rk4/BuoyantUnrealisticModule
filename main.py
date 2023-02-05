@@ -60,11 +60,15 @@ def feed():
 
     url = args.get('url')
 
-    module = utils.get_module(url, handler)
+    module, site_json = utils.get_module(url, handler)
     if not module:
         return 'feed handler not found'
 
-    feed = module.get_feed(args, save_debug)
+    args_copy = args.copy()
+    if site_json.get('args'):
+        args_copy.update(site_json['args'])
+
+    feed = module.get_feed(url, args_copy, site_json, save_debug)
     if not feed:
         return 'No feed found'
 
@@ -125,11 +129,15 @@ def content():
 
     url = args.get('url')
 
-    module = utils.get_module(url, handler)
+    module, site_json = utils.get_module(url, handler)
     if not module:
         return 'content handler not found'
 
-    content = module.get_content(url, args, save_debug)
+    args_copy = args.copy()
+    if site_json.get('args'):
+        args_copy.update(site_json['args'])
+
+    content = module.get_content(url, args_copy, site_json, save_debug)
     if 'read' in args:
         return render_template('content.html', content=content)
 
@@ -155,11 +163,11 @@ def audio():
     else:
         handler = ''
 
-    module = utils.get_module(args['url'], handler)
+    module, site_json = utils.get_module(args['url'], handler)
     if not module:
         return 'No content module for this url'
 
-    content = module.get_content(args['url'], args, save_debug)
+    content = module.get_content(args['url'], args, site_json, save_debug)
     if not content.get('_audio'):
         return 'No audio sources found for this url'
 
@@ -185,11 +193,11 @@ def video():
     else:
         handler = ''
 
-    module = utils.get_module(args['url'], handler)
+    module, site_json = utils.get_module(args['url'], handler)
     if not module:
         return 'No content module for this url'
 
-    content = module.get_content(args['url'], args, save_debug)
+    content = module.get_content(args['url'], args, site_json, save_debug)
     if not content.get('_video'):
         return 'No audio sources found for this url'
 
@@ -224,7 +232,7 @@ def openplayer():
     args = request.args
     player_args = args.copy()
     if player_args.get('url'):
-        item = utils.get_content(player_args['url'], {}, False)
+        item = utils.get_content(player_args['url'], {}, {}, False)
         if not item:
             return 'Unable to get url content'
         if player_args.get('content_type'):
@@ -288,6 +296,15 @@ def image():
 
 @app.route('/screenshot')
 def screenshot():
+    # Make sure playwright browsers are installed
+    #   playwright install
+    # Or from script:
+    # impoty install_playwright
+    # from playwright.sync_api import sync_playwright
+    # with sync_playwright() as p:
+    #     install_playwright.install(p.webkit)
+    #     install_playwright.install(p.chromium)
+    #     install_playwright.install(p.firefox)
     args = request.args
     if not args.get('url'):
         return 'No url specified'
@@ -300,11 +317,19 @@ def screenshot():
     else:
         height = 800
     with sync_playwright() as playwright:
-        webkit = playwright.webkit
-        browser = webkit.launch()
-        context = browser.new_context(viewport={"width": width, "height": height})
+        engine = None
+        if 'browser' in args:
+            if args['browser'] == 'chrome' or args['browser'] == 'chromium':
+                engine = playwright.chromium
+            elif args['browser'] == 'firefox':
+                engine = playwright.firefox
+        if not engine:
+            engine = playwright.webkit
+        browser = engine.launch()
+        context = browser.new_context(viewport={"width": width, "height": height}, ignore_https_errors=True)
         page = context.new_page()
         page.goto(args['url'])
+        #page.goto(args['url'], wait_until="networkidle")
         #page.waitForLoadState('domcontentloaded')
         if args.get('locator'):
             ss = page.locator(args['locator']).screenshot()

@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     m = re.search(r'/ubernode/(\d+)', page_html)
     if not m:
@@ -20,10 +20,10 @@ def get_content(url, args, save_debug=False):
     ubernode = utils.get_url_json('https://www.nasa.gov/api/2/ubernode/' + m.group(1))
     if not ubernode:
         return None
-    return get_item(ubernode, args, save_debug)
+    return get_item(ubernode, args, site_json, save_debug)
 
 
-def get_item(ubernode, args, save_debug):
+def get_item(ubernode, args, site_json, save_debug):
     if save_debug:
         utils.write_file(ubernode, './debug/debug.json')
 
@@ -92,10 +92,10 @@ def get_item(ubernode, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://blogs.nasa.gov/webb/feed/
     if '/feed/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     page_html = utils.get_url_html(args['url'])
     m = re.search(r'window\.cardFeed = (.+);\s*\n', page_html)
@@ -135,7 +135,7 @@ def get_feed(args, save_debug=False):
     for ubernode in feed_json['hits']['hits']:
         if save_debug:
             logger.debug('getting content for ' + 'https://www.nasa.gov' + ubernode['_source']['uri'])
-        item = get_item(ubernode, args, save_debug)
+        item = get_item(ubernode, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

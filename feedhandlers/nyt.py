@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content_from_html(article_html, url, args, save_debug):
+def get_content_from_html(article_html, url, args, site_json, save_debug):
     logger.debug('getting content from html for ' + url)
 
     soup = BeautifulSoup(article_html, 'html.parser')
@@ -826,9 +826,9 @@ def get_block_item(block_id, initial_state):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/wirecutter/' in url:
-        return wirecutter.get_content(url, args, save_debug)
+        return wirecutter.get_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if not article_html:
@@ -848,7 +848,7 @@ def get_content(url, args, save_debug=False):
         logger.warning('Error loading json data from ' + url)
         if save_debug:
             utils.write_file(m.group(1), './debug/debug.txt')
-        return get_content_from_html(article_html, url, args, save_debug)
+        return get_content_from_html(article_html, url, args, site_json, save_debug)
     if save_debug:
         utils.write_file(json_data, './debug/debug.json')
 
@@ -868,5 +868,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

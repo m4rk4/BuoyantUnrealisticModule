@@ -92,7 +92,7 @@ def format_element(element):
     return content_html
 
 
-def get_user_post(url, args, save_debug=False):
+def get_user_post(url, args, site_json, save_debug=False):
     post_html = utils.get_url_html(url)
     if not post_html:
         return None
@@ -136,16 +136,16 @@ def get_user_post(url, args, save_debug=False):
     return item
 
 
-def get_track_content(track, args, save_debug=False):
+def get_track_content(track, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(track, './debug/debug.json')
 
     url = track['content']['metadata']['share_url']
     if url.startswith('https://bleacherreport.com/articles/'):
-        return get_content(url, args, save_debug)
+        return get_content(url, args, site_json, save_debug)
 
     if '/user_post/' in url:
-        return get_user_post(url, args, save_debug)
+        return get_user_post(url, args, site_json, save_debug)
 
     if track['content_type'] == 'poll' or track['content_type'] == 'external_article' or track['content_type'] == 'deeplink' or track['content_type'] == 'bet_track':
         logger.warning('skipping track content_type {} in {}'.format(track['content_type'], url))
@@ -212,15 +212,15 @@ def get_track_content(track, args, save_debug=False):
 
     return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/post/' in url:
         post_json = utils.get_url_json('https://layserbeam-cached.bleacherreport.com/djay/content?url=' + quote_plus(url))
         if not post_json:
             return None
-        return get_track_content(post_json['tracks'][0], args, save_debug)
+        return get_track_content(post_json['tracks'][0], args, site_json, save_debug)
 
     if '/user_post' in url:
-        return get_user_post(url, args, save_debug)
+        return get_user_post(url, args, site_json, save_debug)
 
     m = re.search(r'\/articles\/(\d+)', url)
     if not m:
@@ -265,7 +265,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) > 0:
@@ -294,7 +294,7 @@ def get_feed(args, save_debug=False):
             game_json = utils.get_url_json('https://layserbeam-cached.bleacherreport.com' + re.sub('^\/game\/', '/gamecast/', track['permalink']))
             if game_json:
                 for game_track in game_json['social']['tracks']:
-                    item = get_track_content(game_track, args, save_debug)
+                    item = get_track_content(game_track, args, site_json, save_debug)
                     if item:
                         if utils.filter_item(item, args) == True:
                             items.append(item)
@@ -303,7 +303,7 @@ def get_feed(args, save_debug=False):
                                 if n == int(args['max']):
                                     break
         else:
-            item = get_track_content(track, args, save_debug)
+            item = get_track_content(track, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     items.append(item)

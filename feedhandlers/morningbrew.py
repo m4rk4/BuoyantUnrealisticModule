@@ -110,7 +110,7 @@ def format_content(content):
     return content_html + end_tag
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     next_json = get_next_json(url)
     if not next_json:
         return None
@@ -261,7 +261,7 @@ def get_content(url, args, save_debug=False):
                             continue
                         content_links.append(article_url)
                         article_html += '<h2 style="margin-top:0;"><a href="{}">{}</a></h2>'.format(article_url, title.get_text().strip())
-                        article_item = get_content(article_url, {}, False)
+                        article_item = get_content(article_url, {}, site_json, False)
                     else:
                         article_html += '<h2 style="margin-top:0;">{}</h2>'.format(title.get_text().strip())
                 elif subtitle:
@@ -330,7 +330,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_author_feed(args, save_debug):
+def get_author_feed(url, args, site_json, save_debug):
     query = '''fragment ImageWithAltFragment on ImageWithAlt {
   alt
   asset {
@@ -456,7 +456,7 @@ query GetAuthorStories($username: String!, $filters: AllStoriesByAuthorFilters, 
     return feed_urls
 
 
-def get_tag_feed(args, save_debug):
+def get_tag_feed(url, args, site_json, save_debug):
     query = '''fragment ImageWithAltFragment on ImageWithAlt {
   alt
   asset {
@@ -587,7 +587,7 @@ query GetSearchStories($limit: Int, $offset: Int, $query: String, $filters: AllS
     return feed_urls
 
 
-def get_issues_feed(args, save_debug):
+def get_issues_feed(url, args, site_json, save_debug):
     query = '''query IssuesSearch($query: String!, $newsletter: String!, $limit: Int!, $offset: Int!) {
   allArchiveIssues(
     query: $query
@@ -632,17 +632,17 @@ def get_issues_feed(args, save_debug):
     return feed_urls
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     feed_urls = []
     feed_title = ''
     if '/contributor/' in args['url']:
-        feed_urls = get_author_feed(args, save_debug)
+        feed_urls = get_author_feed(url, args, site_json, save_debug)
     elif '/search?tag' in args['url']:
-        feed_urls = get_tag_feed(args, save_debug)
+        feed_urls = get_tag_feed(url, args, site_json, save_debug)
     elif '/issues/' in args['url']:
-        feed_urls = get_issues_feed(args, save_debug)
+        feed_urls = get_issues_feed(url, args, site_json, save_debug)
     elif '/archive?v' in args['url']:
-        feed_urls = get_issues_feed(args, save_debug)
+        feed_urls = get_issues_feed(url, args, site_json, save_debug)
     else:
         next_json = get_next_json(args['url'])
         if not next_json:
@@ -677,7 +677,7 @@ def get_feed(args, save_debug=False):
     for url in feed_urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

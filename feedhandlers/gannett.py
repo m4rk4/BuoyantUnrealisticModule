@@ -98,7 +98,7 @@ def get_gallery_content(gallery_id, site_code):
     return gallery_html
 
 
-def get_content(url, args, save_debug=False, article_json=None):
+def get_content(url, args, site_json, save_debug=False, article_json=None):
     split_url = urlsplit(url)
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(url)
@@ -107,7 +107,7 @@ def get_content(url, args, save_debug=False, article_json=None):
         logger.warning('unhandled storytelling content ' + url)
         return None
     elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
-        return usatoday_sportswire.get_content(url, args, save_debug)
+        return usatoday_sportswire.get_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if save_debug:
@@ -226,7 +226,7 @@ def get_content(url, args, save_debug=False, article_json=None):
                         video_url = video_json['url']
                         if video_url.startswith('/'):
                             video_url = base_url + video_url
-                        video = get_content(video_url, {}, save_debug)
+                        video = get_content(video_url, {}, site_json, save_debug)
                         if video:
                             new_el = BeautifulSoup(utils.add_video(video['_video'], 'video/mp4', video['_image'], video['summary']), 'html.parser')
                 elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
@@ -309,15 +309,15 @@ def get_content(url, args, save_debug=False, article_json=None):
     return item
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     split_url = urlsplit(args['url'])
     if 'rssfeeds' in split_url.netloc:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(args['url'])
     if tld.domain == 'usatoday' and tld.subdomain.endswith('wire'):
-        return wp_posts.get_feed(args, save_debug)
+        return wp_posts.get_feed(url, args, site_json, save_debug)
 
     page_html = utils.get_url_html(args['url'])
     m = re.search(r'"siteCode[":\\]+(\w{4})', page_html)
@@ -364,9 +364,9 @@ def get_feed(args, save_debug):
         if save_debug:
             logger.debug('getting content for ' + url)
         if split_url.netloc in url:
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
         else:
-            item = utils.get_content(url, args, save_debug, article)
+            item = utils.get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)
@@ -377,5 +377,3 @@ def get_feed(args, save_debug):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
-
-#http://localhost:8080/feed?debug&read&url=https%3A%2F%2Fwww.beaconjournal.com%2F?tagIds=2a456b3f-53a1-4a9a-965d-d59445f34794,89c8ea3a-1755-44c7-82e2-b70f7b7ea5fb,2b88a3a1-66b8-4949-b039-db1646545181

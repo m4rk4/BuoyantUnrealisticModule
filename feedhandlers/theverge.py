@@ -270,7 +270,7 @@ def render_body_component(component):
     return content_html
 
 
-def get_item(entry_json, args, save_debug):
+def get_item(entry_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(entry_json, './debug/debug.json')
 
@@ -340,7 +340,7 @@ def get_item(entry_json, args, save_debug):
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     next_data = get_next_data(url)
     if not next_data:
         return None
@@ -348,13 +348,13 @@ def get_content(url, args, save_debug):
         utils.write_file(next_data, './debug/debug.json')
 
     entry_json = next((it['data']['entity'] for it in next_data['props']['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
-    return get_item(entry_json, args, save_debug)
+    return get_item(entry_json, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     #  https://www.theverge.com/rss/full.xml
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     next_json = get_next_data(args['url'])
     if save_debug:
@@ -378,9 +378,9 @@ def get_feed(args, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + entry['url'])
         if entry['type'] == 'QUICK_POST':
-            item = get_item(entry, args, save_debug)
+            item = get_item(entry, args, site_json, save_debug)
         else:
-            item = get_content(entry['url'], args, save_debug)
+            item = get_content(entry['url'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

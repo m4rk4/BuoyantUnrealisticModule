@@ -20,7 +20,7 @@ def get_leads_tracker_link(a_tag):
         dest_url = utils.get_redirect_url(leads_json['trackingData']['destUrl'])
   return dest_url
 
-def get_video_content(url, args, save_debug=False):
+def get_video_content(url, args, site_json, save_debug=False):
   split_url = urlsplit(url)
   if split_url.path.endswith('/'):
     slug = split_url.path.split('/')[-2]
@@ -126,12 +126,12 @@ def get_video_content(url, args, save_debug=False):
   logger.warning('unable to get video content for ' + url)
   return None
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   item = {}
   clean_url = utils.clean_url(url)
 
   if '/videos/' in clean_url:
-    return get_video_content(clean_url, args, save_debug)
+    return get_video_content(clean_url, args, site_json, save_debug)
 
   # Try to use the amphtml url
   page_url = ''
@@ -611,14 +611,14 @@ def get_content(url, args, save_debug=False):
 
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   n = 0
   items = []
-  feed = rss.get_feed(args, save_debug)
+  feed = rss.get_feed(url, args, site_json, save_debug)
   for feed_item in feed['items']:
     if save_debug:
       logger.debug('getting content for ' + feed_item['url'])
-    item = get_content(feed_item['url'], args, save_debug)
+    item = get_content(feed_item['url'], args, site_json, save_debug)
     if utils.filter_item(item, args) == True:
       items.append(item)
       n += 1

@@ -63,7 +63,7 @@ def add_video(video):
     return ''
 
 
-def get_video_content(url, args, save_debug=False):
+def get_video_content(url, args, site_json, save_debug=False):
     m = re.search(r'/v/(\d+)', url)
     if not m:
         logger.warning('unhandled video url ' + url)
@@ -112,10 +112,10 @@ def get_video_content(url, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.netloc.startswith('video.'):
-        return get_video_content(url, args, save_debug)
+        return get_video_content(url, args, site_json, save_debug)
     elif 'foxbusiness' in split_url.netloc:
         canonical_url = 'foxbusiness.com' + split_url.path
         api_url = 'https://api.foxbusiness.com/spark/articles?searchBy=urls&type=&values=' + quote_plus(canonical_url)
@@ -295,9 +295,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if re.search(r'\.xml|rss', args['url']):
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     page_html = utils.get_url_html(args['url'])
     if not page_html:
@@ -323,7 +323,7 @@ def get_feed(args, save_debug=False):
             url = 'https://video.{}.com/v/{}/?playlist_id={}'.format(site, it['media-content']['mvn-assetUUID'], playlist_id)
             if save_debug:
                 logger.debug('getting content from ' + url)
-            item = get_video_content(url, args, save_debug)
+            item = get_video_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     items.append(item)
@@ -341,7 +341,7 @@ def get_feed(args, save_debug=False):
                 url = 'https://www.foxsports.com/watch/' + paths[-1]
                 if save_debug:
                     logger.debug('getting content from ' + url)
-                item = get_content(url, args, save_debug)
+                item = get_content(url, args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         items.append(item)
@@ -357,7 +357,7 @@ def get_feed(args, save_debug=False):
                 query = parse_qs(split_url.query)
                 args_copy = args.copy()
                 args_copy['url'] = 'https://api.foxsports.com/v2/content/optimized-rss?partnerKey=MB0Wehpmuj2lUhuRhQaafhBjAJqaPU244mlTDK1i&size=10&tags=' + query['uri'][0]
-                return rss.get_feed(args_copy, save_debug, get_content)
+                return rss.get_feed(url, args_copy, site_json, save_debug, get_content)
 
     if not items:
         return None

@@ -1,10 +1,9 @@
-import json, pytz, re, requests
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit, quote_plus
 
 import config, utils
-from feedhandlers import rss, wp_posts
 
 import logging
 
@@ -103,7 +102,7 @@ def render_block(block):
     return content_html
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     next_data = get_next_data(url)
     if not next_data:
         return None
@@ -125,7 +124,15 @@ def get_content(url, args, save_debug):
         dt = datetime.fromisoformat(article_json['lastPublished'].replace('Z', '+00:00'))
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {"name": article_json['author']['name']}
+    if article_json.get('author'):
+        item['author'] = {"name": article_json['author']['name']}
+    elif article_json.get('authors'):
+        authors = []
+        for it in article_json['authors']:
+            authors.append(it['name'])
+        if authors:
+            item['author'] = {}
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     # TODO: tags
     item['tags'] = []
@@ -143,7 +150,7 @@ def get_content(url, args, save_debug):
         item['summary'] = article_json['seoDescription']
 
     item['content_html'] = ''
-    if article_json.get('intro'):
+    if article_json.get('intro') and article_json['intro'].get('body'):
         for block in article_json['intro']['body']:
             item['content_html'] += render_block(block)
 
@@ -179,7 +186,7 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     next_data = get_next_data(args['url'])
     if not next_data:
         return None
@@ -192,7 +199,7 @@ def get_feed(args, save_debug=False):
         url = 'https://www.semafor.com' + article['slug']
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

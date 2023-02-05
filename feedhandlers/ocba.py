@@ -9,8 +9,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug):
-    item = wp_posts.get_content(url, args, save_debug)
+def get_content(url, args, site_json, save_debug):
+    item = wp_posts.get_content(url, args, site_json, save_debug)
 
     def vc_entity(matchobj):
         if matchobj.group(1).startswith('column') or matchobj.group(1).startswith('row'):
@@ -49,5 +49,5 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

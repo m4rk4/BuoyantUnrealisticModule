@@ -11,11 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
-    return drupal.get_content(url, args, save_debug)
+def get_content(url, args, site_json, save_debug=False):
+    return drupal.get_content(url, args, site_json, save_debug)
 
 
-def get_item(news_json, args, save_debug):
+def get_item(news_json, args, site_json, save_debug):
     item = {}
     source_item = {}
     item['id'] = news_json['id']
@@ -49,7 +49,7 @@ def get_item(news_json, args, save_debug):
             item['_image'] = source_item['_image']
     return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(args['url'])
     if not page_html:
         return None
@@ -91,9 +91,9 @@ def get_feed(args, save_debug=False):
             url = 'https://www.nbcsportsedge.com' + data['attributes']['path']['alias']
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = drupal.get_content(url, args, save_debug)
+            item = drupal.get_content(url, args, site_json, save_debug)
         elif data['type'] == 'player_news':
-            item = get_item(data, args, save_debug)
+            item = get_item(data, args, site_json, save_debug)
         else:
             logger.warning('unhandled feed data type ' + data['type'])
             continue

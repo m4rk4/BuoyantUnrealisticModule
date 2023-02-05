@@ -25,7 +25,7 @@ def resize_image(img_src, width=1000):
     return '{}?auto=compress&ar=3%3A2&fit=crop&crop=faces&fm=jpg&ixlib=react-9.0.2&w={}&q=65&dpr=1'.format(img_src, width)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     query = '''
 
   query ($id: ID, $nid: ID) {
@@ -260,9 +260,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if args['url'].endswith('rss.xml'):
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     query = ''
     split_url = urlsplit(args['url'])
@@ -373,7 +373,7 @@ fragment ArticleListFields on Article {
         url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['url'])
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

@@ -59,7 +59,7 @@ def add_image(image, orig_size=False):
     return utils.add_image(img_src, caption)
 
 
-def get_photo_content(url, args, save_debug=False):
+def get_photo_content(url, args, site_json, save_debug=False):
     photo_html = utils.get_url_html(url)
     if not photo_html:
         return None
@@ -128,9 +128,9 @@ def get_photo_content(url, args, save_debug=False):
         item['content_html'] += utils.add_image(image['src'], caption) + '<br/>'
     return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/photo/' in url:
-        return get_photo_content(url, args, save_debug)
+        return get_photo_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url)
     if not article_html:
@@ -285,9 +285,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # All: https://www.theatlantic.com/feed/all/
     # Best of: https://www.theatlantic.com/feed/best-of/
     # Section: https://www.theatlantic.com/feed/channel/-----
     # Photos: http://feeds.feedburner.com/theatlantic/infocus
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

@@ -20,7 +20,7 @@ def add_image(image):
   img_src = image['TemplateUrl'].replace('$recipe', '976x549')
   return utils.add_image(img_src, caption)
 
-def get_article(article_json, url, args, save_debug):
+def get_article(article_json, url, args, site_json, save_debug):
   item = {}
   item['id'] = article_json['_id']
   item['url'] = url
@@ -93,7 +93,7 @@ def get_article(article_json, url, args, save_debug):
   item['content_html'] = content_html.replace('<p>&nbsp;</p>', '')
   return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   split_url = urlsplit(url)
   json_url = '{}://{}/{}/data/site{}'.format(split_url.scheme, split_url.netloc, split_url.path.split('/')[1], split_url.path)
   article_json = utils.get_url_json(json_url)
@@ -101,9 +101,9 @@ def get_content(url, args, save_debug=False):
     return None
   if save_debug:
     utils.write_file(article_json, './debug/debug.json')
-  return get_article(article_json, url, args, save_debug)
+  return get_article(article_json, url, args, site_json, save_debug)
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   split_url = urlsplit(args['url'])
   paths = split_url.path[1:].split('/')
   feed_url = ''
@@ -140,7 +140,7 @@ def get_feed(args, save_debug=False):
     url = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, it['Metadata']['Id'])
     if save_debug:
       logger.debug('getting content for ' + url)
-    item = get_article(it, url, args, save_debug)
+    item = get_article(it, url, args, site_json, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)

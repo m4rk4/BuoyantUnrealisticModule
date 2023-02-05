@@ -86,7 +86,7 @@ def format_content(model):
 
   return content_html
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   initial_data = bbc.get_initial_data(url)
   if save_debug:
     utils.write_file(initial_data, './debug/debug.json')

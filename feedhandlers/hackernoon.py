@@ -34,7 +34,7 @@ def get_next_json(url):
         return None
   return next_json
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
   next_json = get_next_json(url)
   if not next_json:
     return None
@@ -42,7 +42,7 @@ def get_content(url, args, save_debug):
     utils.write_file(next_json, './debug/debug.json')
 
   if next_json['pageProps'].get('__N_REDIRECT'):
-    return get_content('https://hackernoon' + next_json['pageProps']['__N_REDIRECT'], args, save_debug)
+    return get_content('https://hackernoon' + next_json['pageProps']['__N_REDIRECT'], args, site_json, save_debug)
 
   article_json = next_json['pageProps']['data']
   item = {}
@@ -199,10 +199,10 @@ def get_content(url, args, save_debug):
   item['content_html'] += str(soup)
   return item
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
   # Only https://hackernoon.com/feed
   if args['url'].endswith('/feed'):
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
   n = 0
   m = re.search('\/tagged/([-\w]+)', args['url'])
@@ -221,7 +221,7 @@ def get_feed(args, save_debug):
       article_url = 'https://hackernoon.com/' + article['slug']
       if save_debug:
         logger.debug('getting content from ' + article_url)
-      item = get_content(article_url, args, save_debug)
+      item = get_content(article_url, args, site_json, save_debug)
       if item:
         if utils.filter_item(item, args) == True:
           feed['items'].append(item)
@@ -242,7 +242,7 @@ def get_feed(args, save_debug):
       article_url = 'https://hackernoon.com/' + article['slug']
       if save_debug:
         logger.debug('getting content from ' + article_url)
-      item = get_content(article_url, args, save_debug)
+      item = get_content(article_url, args, site_json, save_debug)
       if item:
         if utils.filter_item(item, args) == True:
           feed['items'].append(item)

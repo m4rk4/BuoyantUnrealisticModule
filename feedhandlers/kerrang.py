@@ -44,7 +44,7 @@ def get_next_json(url):
     return next_json
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     next_json = get_next_json(url)
     if not next_json:
         return None
@@ -166,10 +166,10 @@ def get_content(url, args, save_debug):
 
     return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.kerrang.com/feed.rss
     if 'feed.rss' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     next_json = get_next_json(args['url'])
     if save_debug:
@@ -189,7 +189,7 @@ def get_feed(args, save_debug=False):
         url = 'https://www.kerrang.com/' + article['slug']
         if save_debug:
             logger.debug('getting contents for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

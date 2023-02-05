@@ -15,7 +15,7 @@ def resize_image(img_src, width=1080):
     return utils.clean_url(img_src) + '?format={}w'.format(width)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     page_json = utils.get_url_json('{}://{}{}?format=json-pretty'.format(split_url.scheme, split_url.netloc, split_url.path))
     if not page_json:
@@ -58,7 +58,12 @@ def get_content(url, args, save_debug=False):
         item['summary'] = soup.get_text()
 
     item['content_html'] = ''
-    soup = BeautifulSoup(post_json['body'], 'html.parser')
+
+    if post_json.get('promotedBlock'):
+        soup = BeautifulSoup(post_json['promotedBlock'] + post_json['body'], 'html.parser')
+    else:
+        soup = BeautifulSoup(post_json['body'], 'html.parser')
+
     for el in soup.find_all(['h2', 'h3', 'h4', 'p', 'ol', 'ul']):
         el.attrs = {}
 
@@ -199,8 +204,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

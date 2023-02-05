@@ -52,16 +52,16 @@ def get_next_data(url):
     return next_data
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url)
     if not next_data:
         return None
     if save_debug:
         utils.write_file(next_data, './debug/debug.json')
-    return get_item(next_data['pageProps']['data']['result'], args, save_debug)
+    return get_item(next_data['pageProps']['data']['result'], args, site_json, save_debug)
 
 
-def get_item(article_json, args, save_debug):
+def get_item(article_json, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['uid']
     item['url'] = 'https://www.gamedeveloper.com/{}{}'.format(article_json['term_selector']['primaryTerm'], article_json['url'])
@@ -154,11 +154,11 @@ def get_item(article_json, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # Site feed: https://www.gamedeveloper.com/rss.xml
     # Author feed: https://www.gamedeveloper.com/rss.xml?a=bryant-francis
     if 'rss.xml' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     next_data = get_next_data(args['url'])
     if not next_data:
@@ -174,9 +174,9 @@ def get_feed(args, save_debug=False):
             if save_debug:
                 logger.debug('getting content for ' + url)
             if article.get('body'):
-                item = get_item(article, args, save_debug)
+                item = get_item(article, args, site_json, save_debug)
             else:
-                item = get_content(url, args, save_debug)
+                item = get_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)
@@ -191,9 +191,9 @@ def get_feed(args, save_debug=False):
             if save_debug:
                 logger.debug('getting content for ' + url)
             if article.get('body'):
-                item = get_item(article, args, save_debug)
+                item = get_item(article, args, site_json, save_debug)
             else:
-                item = get_content(url, args, save_debug)
+                item = get_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)

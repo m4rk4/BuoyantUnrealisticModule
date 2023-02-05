@@ -9,7 +9,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_post_content(post, args, save_debug=False):
+def get_post_content(post, args, site_json, save_debug=False):
   item = {}
   if 'guid' in post:
     if 'rendered' in post['guid']:
@@ -135,28 +135,28 @@ def get_next_data_json(url, save_debug=False, user_agent='desktop'):
     utils.write_file(next_json, './debug/debug.json')
   return next_json
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   next_json = get_next_data_json(url, save_debug)
   if not next_json:
     return None
 
   if 'data' in next_json['props']['pageProps']:
-    item = get_post_content(next_json['props']['pageProps']['data'], args, save_debug)
+    item = get_post_content(next_json['props']['pageProps']['data'], args, site_json, save_debug)
   elif 'post' in next_json['props']['pageProps']:
-    item = get_post_content(next_json['props']['pageProps']['post'], args, save_debug)
+    item = get_post_content(next_json['props']['pageProps']['post'], args, site_json, save_debug)
   else:
     logger.warning('unknown NEXT_DATA post format in ' + url)
     return None
 
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   if re.search(r'\/rss|\/feed', args['url']):
     n = 0
     items = []
-    feed = rss.get_feed(args, save_debug)
+    feed = rss.get_feed(url, args, site_json, save_debug)
     for feed_item in feed['items']:
-      item = get_content(feed_item['url'], args)
+      item = get_content(feed_item['url'], args, site_json, save_debug)
       if utils.filter_item(item, args) == True:
         items.append(item)
         n += 1
@@ -204,7 +204,7 @@ def get_feed(args, save_debug=False):
             json.dump(posts, file, indent=4)
 
         for post in posts:
-          item = get_post_content(post, args)
+          item = get_post_content(post, args, site_json, save_debug)
           if utils.filter_item(item, args) == True:
             feed['items'].append(item)
   return feed

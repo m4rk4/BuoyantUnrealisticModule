@@ -1,9 +1,8 @@
-import pytz, re
-from bs4 import BeautifulSoup
+import re
 from datetime import datetime
 from urllib.parse import urlsplit, quote_plus
 
-import config, utils
+import utils
 from feedhandlers import rss, wp_posts
 
 import logging
@@ -28,7 +27,7 @@ def get_graphql_json(url):
     return utils.get_url_json(url, headers=headers)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if paths[0] == 'program':
@@ -124,10 +123,10 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/rss/' in args['url']:
         # https://www.aljazeera.com/xml/rss/all.xml
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     feed_title = ''
     articles = []
@@ -180,7 +179,7 @@ def get_feed(args, save_debug=False):
             url = 'https://www.aljazeera.com' + article['link']
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)

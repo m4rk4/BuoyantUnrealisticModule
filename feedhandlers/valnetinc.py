@@ -59,11 +59,11 @@ def add_play_store_app(el):
     it = el.find(class_='app-widget-download')
     if it:
         new_html += '<br/><a href="{}">{}</a>'.format(it['href'], it.get_text().strip())
-    new_html += '</div><div style="clear:left;"></div></div>'
+    new_html += '</div><span style="clear:left;"></span></div>'
     return new_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # Sites: https://www.valnetinc.com/en/publishing-detail#our_brand
     split_url = urlsplit(url)
     article_json = utils.get_url_json('{}://{}/fetch/next-article{}'.format(split_url.scheme, split_url.netloc, split_url.path))
@@ -337,7 +337,7 @@ def get_content(url, args, save_debug=False):
                 if it:
                     for link in it.find_all('a'):
                         new_html += '<br/><a href="{}">{}</a>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
-                new_html += '</div><div style="clear:left;"></div></div>'
+                new_html += '</div><span style="clear:left;"></span></div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
@@ -428,5 +428,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

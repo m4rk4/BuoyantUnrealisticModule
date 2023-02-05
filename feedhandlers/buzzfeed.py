@@ -126,7 +126,7 @@ def get_next_data(url):
     return json.loads(el.string)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url)
     if not next_data:
         return None
@@ -246,8 +246,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

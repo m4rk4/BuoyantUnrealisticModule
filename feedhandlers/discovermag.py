@@ -41,7 +41,7 @@ def get_next_json(url):
     return next_json
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     next_json = get_next_json(url)
     if not next_json:
         return None
@@ -170,10 +170,10 @@ def get_content(url, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     # https://www.discovermagazine.com/rss/all
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     # Use category url: https://www.discovermagazine.com/technology
     next_json = get_next_json(args['url'])
@@ -189,7 +189,7 @@ def get_feed(args, save_debug):
         article_url = 'https://www.discovermagazine.com/{}/{}'.format(article['refs']['category']['slug'], article['slug'])
         if save_debug:
             logger.debug('getting content for ' + article_url)
-        item = get_content(article_url, args, save_debug)
+        item = get_content(article_url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed['items'].append(item)

@@ -296,7 +296,7 @@ def render_content(content):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     api_json = get_api_content('page', url)
     if not api_json:
         return None
@@ -380,10 +380,10 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = str(soup)
     return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://fortune.com/feed/?tag=datasheet
     if '/feed' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     api_json = get_api_content('page', args['url'])
     if save_debug:
@@ -413,7 +413,7 @@ def get_feed(args, save_debug=False):
     for url in article_links:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

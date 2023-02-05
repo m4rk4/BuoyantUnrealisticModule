@@ -109,10 +109,10 @@ def render_content(content):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.netloc.startswith('storystudio'):
-        return wp_posts.get_content(url, args, save_debug)
+        return wp_posts.get_content(url, args, site_json, save_debug)
     m = re.search(r'-(\d+)\.php', split_url.path)
     if not m:
         logger.warning('unable to determine content id from ' + url)
@@ -211,11 +211,11 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/feed/' in args['url']:
         # https://www.sfgate.com/rss/
         # https://www.seattlepi.com/local/feed/seattlepi-com-Local-News-218.php
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
@@ -245,7 +245,7 @@ def get_feed(args, save_debug=False):
     for url in article_urls:
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

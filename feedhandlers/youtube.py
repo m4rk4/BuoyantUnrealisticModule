@@ -23,7 +23,7 @@ def search(query, save_debug=False):
   logger.warning('unable to get Youtube search results for query "{}"'.format(query))
   return ''
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   yt_video_id, yt_list_id = utils.get_youtube_id(url)
   if not yt_video_id:
     return None
@@ -127,14 +127,14 @@ def get_content(url, args, save_debug=False):
   item['content_html'] += '<p>{}</p>'.format(summary_html)
   return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   n = 0
   items = []
-  feed = rss.get_feed(args, save_debug)
+  feed = rss.get_feed(url, args, site_json, save_debug)
   for feed_item in feed['items']:
     if save_debug:
       logger.debug('getting content for ' + feed_item['url'])
-    item = get_content(feed_item['url'], args, save_debug)
+    item = get_content(feed_item['url'], args, site_json, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)

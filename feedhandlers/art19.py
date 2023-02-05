@@ -17,7 +17,7 @@ def calc_duration(sec):
     duration.append('{} min.'.format(t))
   return duration
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   show = ''
   m = re.search(r'\/shows\/([^\/]+)', url)
   if m:

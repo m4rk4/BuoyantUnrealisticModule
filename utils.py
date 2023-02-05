@@ -1,10 +1,9 @@
-import asyncio, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import asyncio, importlib, io, json, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter, Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_site_json(url):
+  split_url = urlsplit(url)
   tld = tldextract.extract(url.strip())
   if tld.domain == 'youtu' and tld.suffix == 'be':
     domain = 'youtu.be'
@@ -27,40 +27,61 @@ def get_site_json(url):
     domain = urlsplit(url).path.split('/')[1].lower()
   else:
     domain = tld.domain
+  site_json = None
   sites_json = read_json_file('./sites.json')
   if sites_json.get(domain):
     site_json = sites_json[domain]
   elif domain in sites_json['wp-posts']['sites']:
     site_json = {
         "module": "wp_posts",
-        "wpjson_path": "/wp-json",
-        "posts_path": "/wp/v2/posts"
+        "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
+        "posts_path": "/wp/v2/posts",
+        "feeds": [
+          "{}://{}/feed".format(split_url.scheme, split_url.netloc)
+        ]
     }
-  else:
-    site_json = None
+  elif url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
+    site_json = {
+        "module": "wp_posts",
+        "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
+        "posts_path": "/wp/v2/posts",
+        "feeds": [
+          "{}://{}/feed".format(split_url.scheme, split_url.netloc)
+        ]
+    }
+    logger.debug('adding site ' + tld.domain)
+    sites_json[tld.domain] = site_json
+    utils.write_file(sites_json, './sites.json')
+  elif url_exists('{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, datetime.utcnow().strftime('%Y/%B/%d/'))):
+    page_html = get_url_html('{}://{}'.format(split_url.scheme, split_url.netloc))
+    if page_html:
+      m = re.search(r'"siteCode":"([^"]+)"', page_html)
+      if m:
+        site_json = {
+            "module": "gannett",
+            "site_code": m.group(1)
+        }
+        logger.debug('adding site ' + tld.domain)
+        sites_json[tld.domain] = site_json
+        utils.write_file(sites_json, './sites.json')
   return site_json
 
+def update_sites(url, site_json):
+  tld = tldextract.extract(url)
+  sites_json = utils.read_json_file('./sites.json')
+  sites_json[tld.domain] = site_json
+  utils.write_file(sites_json, './sites.json')
+
 def get_module(url, handler=''):
+  site_json = {}
   module = None
   module_name = ''
-  if handler:
+  if url:
+    site_json = get_site_json(url)
+    if site_json:
+      module_name = '.{}'.format(site_json['module'])
+  if handler and not module_name:
     module_name = '.{}'.format(handler)
-  elif url:
-    if 'wp-json' in url:
-      module_name = '.wp_posts'
-    else:
-      site_json = get_site_json(url)
-      if site_json:
-        module_name = '.{}'.format(site_json['module'])
-  if not module_name:
-    split_url = urlsplit(url)
-    if url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
-      module_name = '.wp_posts'
-    else:
-      dt = datetime.utcnow().date()
-      gannet_url = '{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, dt.strftime('%Y/%B/%d/'))
-      if url_exists(gannet_url.lower()):
-        module_name = '.gannett'
   if module_name:
     try:
       module = importlib.import_module(module_name, 'feedhandlers')
@@ -69,10 +90,11 @@ def get_module(url, handler=''):
       module = None
   else:
     logger.warning('unknown module for ' + url)
-  return module
+  return module, site_json
 
 # https://www.peterbe.com/plog/best-practice-with-retries-with-requests
 # https://findwork.dev/blog/advanced-usage-python-requests-timeouts-retries-hooks/#retry-on-failure
+# https://stackoverflow.com/questions/15431044/can-i-set-max-retries-for-requests-request
 def requests_retry_session(retries=4):
   session = requests.Session()
   retry = Retry(
@@ -179,11 +201,27 @@ def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_
   return None
 
 def get_redirect_url(url):
-  if 'cloudfront.net' in url:
+  split_url = urlsplit(url)
+  if 'cloudfront.net' in split_url.netloc:
     url_html = get_url_html(url)
     m = re.search(r'"redirect":"([^"]+)"', url_html)
     if m:
       return m.group(1)
+
+  if split_url.query:
+    query = parse_qs(split_url.query)
+    if split_url.netloc == 'goto.target.com' and query.get('u'):
+      return query['u'][0]
+    elif split_url.netloc == 'go.skimresources.com' and query.get('url'):
+      return query['url'][0]
+    elif split_url.netloc == 'shopping.yahoo.com' and query.get('itemId'):
+      m = re.search(r'amazon_(.*)', query['itemId'][0])
+      if m:
+        return 'https://www.amazon.com/dp/' + m.group(1)
+    else:
+      for key, val in query.items():
+        if val[0].startswith('http'):
+          return get_redirect_url(val[0])
 
   # It would be better to use requests.head because some servers may not support the Range header and the whole file will be downloaded; however, request.get seems to work better for getting redirects
   i = 0
@@ -203,24 +241,8 @@ def get_redirect_url(url):
       status_code = r.status_code
     else:
       status_code = ''
-    logger.warning('exception error {}{} getting {}'.format(e.__class__.__name__, status_code, redirect_url))
-    return redirect_url
-
-  # Check for a url in the query parameters
-  check_query = True
-  while check_query:
-    check_query = False
-    split_url = urlsplit(redirect_url)
-    if split_url.query:
-      if redirect_url.startswith('https://www.amazon.com/'):
-        redirect_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
-      else:
-        for key, val in parse_qs(split_url.query).items():
-          # val[0].startswith('http://') or val[0].startswith('https://')
-          if re.search(r'^https?:\/\/', val[0]):
-            redirect_url = val[0]
-            check_query = True
-            break
+    logger.debug('exception error {}{} getting {}'.format(e.__class__.__name__, status_code, redirect_url))
+    return get_redirect_url(redirect_url)
   return redirect_url
 
 def get_url_title_desc(url):
@@ -274,22 +296,17 @@ def post_url(url, data=None, json_data=None, headers=None):
   return None
 
 def url_exists(url):
-  r = requests.head(url)
-  return r.status_code == requests.codes.ok
-
-def get_or_create_event_loop():
   try:
-    return asyncio.get_event_loop()
-  except RuntimeError as ex:
-    if "There is no current event loop in thread" in str(ex):
-      loop = asyncio.new_event_loop()
-      asyncio.set_event_loop(loop)
-      return asyncio.get_event_loop()
+    r = requests.head(url, headers=config.default_headers)
+    return r.status_code == requests.codes.ok
+  except Exception as e:
+    logger.warning('exception error {} getting {}'.format(e.__class__.__name__, url))
+    return None
 
 def write_file(data, filename):
   if filename.endswith('.json'):
     with open(filename, 'w', encoding='utf-8') as file:
-      json.dump(data, file, indent=4)
+      json.dump(data, file, indent=4, sort_keys=True)
   else:
     with open(filename, 'w', encoding='utf-8') as f:
       f.write(data)
@@ -320,12 +337,32 @@ def closest_dict(lst, k, target):
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i][k]) - target))]
 
 def image_from_srcset(srcset, target):
+  # https://developer.mozilla.org/en-US/docs/Learn/HTML/Multimedia_and_embedding/Responsive_images
+  # Two types of srcset:
+  #  Absolute width: elva-fairy-480w.jpg 480w, elva-fairy-800w.jpg 800w
+  #  Relative width: elva-fairy-320w.jpg, elva-fairy-480w.jpg 1.5x, elva-fairy-640w.jpg 2x
   images = []
-  for m in re.findall(r'(http\S+) (\d+)w', srcset):
-      image = {}
-      image['src'] = m[0]
-      image['width'] = int(m[1])
-      images.append(image)
+  base_width = 0
+  for m in re.findall(r'((https:|//).*?)(?=,\s?https:|,\s?//|$)', srcset):
+    it = m[0].strip().split(' ')
+    image = {}
+    if it[0].startswith('//'):
+      image['src'] = 'http:' + it[0]
+    else:
+      image['src'] = it[0]
+    if len(it) == 1:
+      image['width'] = 1.0
+      base_width = get_image_width(image['src'])
+    elif it[1].endswith('x'):
+      image['width'] = float(it[1][:-1])
+      if image['width'] == 1.0:
+        base_width = get_image_width(image['src'])
+    elif it[1].endswith('w'):
+      image['width'] = int(it[1][:-1])
+    images.append(image)
+  if base_width > 0:
+    for image in images:
+      image['width'] = int(image['width'] * base_width)
   if images:
     image = closest_dict(images, 'width', target)
     return image['src']
@@ -442,6 +479,7 @@ def bs_get_inner_html(soup):
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
 def add_blockquote(quote, pullquote_check=True):
+  quote = quote.strip()
   if quote.startswith('<p>'):
     quote = quote.replace('<p>', '')
     quote = quote.replace('</p>', '<br/><br/>')
@@ -454,13 +492,15 @@ def add_blockquote(quote, pullquote_check=True):
   return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
-  return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
+  #return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
+  return '<div style="margin-left:10px;"><div style="float:left; font-size:3em;">“</div><div style="overflow:hidden; padding-top:1em; padding-left:8px;"><em>'
 
 def close_pullquote(author=''):
   end_html = '</em>'
   if author:
     end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
-  end_html += '</td></tr></table>'
+  #end_html += '</td></tr></table>'
+  end_html += '</div><div style="clear:left"></div></div>'
   return end_html
 
 def add_pullquote(quote, author=''):
@@ -475,6 +515,16 @@ def add_pullquote(quote, author=''):
     quote = quote[1:-1]
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
+
+def get_image_width(img_src):
+  query = parse_qs(urlsplit(img_src).query)
+  if query.get('w'):
+    width = int(query['w'][0])
+  elif query.get('width'):
+    width = int(query['width'][0])
+  else:
+    width, height = get_image_size(img_src)
+  return width
 
 def get_image_size(img_src):
   r = requests.get(img_src, headers={"Range": "bytes=0-1024"})
@@ -502,7 +552,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     fig_html += 'style="margin:0; padding:0;">'
 
   if heading:
-    fig_html += '<div style="text-align:center; font-size:1.1em; font-weight:bold">{}</div>'.format(heading)
+    fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
 
   if link:
     fig_html += '<a href="{}">'.format(link)
@@ -546,7 +596,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
-    content = vimeo.get_content(video_url, None, False)
+    content = vimeo.get_content(video_url, {}, {}, False)
     if content.get('_image'):
       poster = content['_image']
     video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
@@ -554,7 +604,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
 
   elif video_type == 'youtube':
-    content = youtube.get_content(video_url, None, False)
+    content = youtube.get_content(video_url, {}, {}, False)
     if content:
       if content.get('_image'):
         poster = content['_image']
@@ -652,13 +702,13 @@ def add_twitter(tweet_url, tweet_id=''):
     url = tweet_url
   elif tweet_id:
     url = get_twitter_url(tweet_id)
-  tweet = twitter.get_content(url, {}, False)
+  tweet = twitter.get_content(url, {}, {}, False)
   if not tweet:
     return ''
   return tweet['content_html']
 
 def add_instagram(igstr):
-  ig = instagram.get_content(igstr, {}, False)
+  ig = instagram.get_content(igstr, {}, {}, False)
   if not ig:
     return ''
   return ig['content_html']
@@ -754,9 +804,9 @@ def add_embed(url, args={}, save_debug=False):
   if re.search(r'(apple|bandcamp|soundcloud|spotify)', embed_url):
     embed_args['max'] = 10
 
-  module = get_module(embed_url)
+  module, site_json = get_module(embed_url)
   if module:
-    content = module.get_content(embed_url, embed_args, save_debug)
+    content = module.get_content(embed_url, embed_args, site_json, save_debug)
     if content:
       return content['content_html']
 
@@ -781,8 +831,17 @@ def add_embed(url, args={}, save_debug=False):
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
 
 def get_content(url, args, save_debug=False):
-  content = None
-  module = get_module(url)
-  if module:
-    content = module.get_content(url, args, save_debug)
-  return content
+  module, site_json = get_module(url)
+  if not module:
+    return None
+  return module.get_content(url, args, site_json, save_debug)
+
+def get_ld_json(url):
+  page_html = get_url_html(url)
+  if not page_html:
+    return None
+  soup = BeautifulSoup(page_html, 'html.parser')
+  ld_json = []
+  for el in soup.find_all('script', type='application/ld+json'):
+    ld_json.append(json.loads(el.string))
+  return ld_json

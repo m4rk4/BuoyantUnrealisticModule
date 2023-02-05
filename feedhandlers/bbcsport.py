@@ -173,7 +173,7 @@ def format_content(block, table=False):
 
   return content_html
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   article_html = utils.get_url_html(url)
   if not article_html:
     return None

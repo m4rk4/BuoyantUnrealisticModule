@@ -79,7 +79,7 @@ def render_content(content):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://{}/page-data{}/page-data.json'.format(split_url.netloc, split_url.path)
     api_json = utils.get_url_json(api_url)
@@ -151,7 +151,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     if len(split_url.path) <= 1:
         path = '/index'
@@ -187,7 +187,7 @@ def get_feed(args, save_debug=False):
         url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, path)
         if save_debug:
             logger.debug('getting content for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

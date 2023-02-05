@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # url looks like https://embed.sendtonews.com/player2/embedcode.php?SC=M6lyh1M9hJ-1931712-8423&autoplay=on
     m = re.search(r'SC=([^&]+)', url)
     if not m:
@@ -45,5 +45,5 @@ def get_content(url, args, save_debug=False):
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
     return item
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     return None

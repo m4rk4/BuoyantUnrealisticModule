@@ -329,12 +329,12 @@ def get_video_json(video_id, save_debug):
     return gql_json['data']['video']
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if re.search('/(live|interactive)/', url):
         logger.warning('unsupported url ' + url)
         return None
     elif '/wirecutter/' in url:
-        return wirecutter.get_content(url, args, save_debug)
+        return wirecutter.get_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if not article_html:
@@ -506,7 +506,7 @@ def get_collection(path):
     return gql_json
 
 
-def get_live_feed(args, save_debug=False):
+def get_live_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     dt = datetime.utcnow().replace(tzinfo=timezone.utc).astimezone(pytz.timezone('US/Eastern'))
@@ -557,10 +557,10 @@ def get_live_feed(args, save_debug=False):
     return gql_json
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     feed = None
     if args['url'].endswith('.xml'):
-        feed = rss.get_feed(args, save_debug, get_content)
+        feed = rss.get_feed(url, args, site_json, save_debug, get_content)
         m = re.search(r'publish/https://www\.nytimes\.com/(.*)/rss\.xml', args['url'])
         if m:
             collection = get_collection(m.group(1))
@@ -579,26 +579,15 @@ def get_feed(args, save_debug=False):
                     if not next((it for it in feed['items'] if it['url'] == url), None):
                         if save_debug:
                             logger.debug('getting content for ' + url)
-                        item = get_content(url, args, save_debug)
+                        item = get_content(url, args, site_json, save_debug)
                         if item:
                             if utils.filter_item(item, args) == True:
                                 feed['items'].append(item)
             feed['items'] = sorted(feed['items'], key=lambda i: i['_timestamp'], reverse=True)
 
     elif '/live/' in args['url']:
-        collection = get_live_feed(args, save_debug)
+        collection = get_live_feed(url, args, site_json, save_debug)
         if save_debug:
             utils.write_file(collection, './debug/feed.json')
 
     return feed
-
-
-def test_handler():
-    feeds = ['https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml',
-             'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/sports/rss.xml',
-             'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/series/us-morning-briefing/rss.xml',
-             'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/series/europe-morning-briefing/rss.xml',
-             'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/section/business/dealbook/rss.xml',
-             'https://www.nytimes.com/svc/collections/v1/publish/https://www.nytimes.com/news-event/coronavirus/rss.xml']
-    for url in feeds:
-        get_feed({"url": url}, True)

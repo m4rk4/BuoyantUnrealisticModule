@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -28,11 +28,11 @@ def get_content(url, args, save_debug=False):
         if article:
             if save_debug:
                 utils.write_file(article, './debug/debug.json')
-            return get_item(article, args, save_debug)
+            return get_item(article, args, site_json, save_debug)
     return None
 
 
-def get_item(article_json, args, save_debug):
+def get_item(article_json, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['id']
     item['url'] = article_json['link']
@@ -122,9 +122,9 @@ def get_item(article_json, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/rss/' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     articles = utils.get_url_json(args['url'] + '/page/1', headers={"x-requested-with": "XMLHttpRequest"})
     if not articles:
@@ -137,7 +137,7 @@ def get_feed(args, save_debug=False):
     for article in articles:
         if save_debug:
             logger.debug('getting content for ' + article['link'])
-        item = get_item(article, args, save_debug)
+        item = get_item(article, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

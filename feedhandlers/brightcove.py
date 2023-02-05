@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     s = requests.Session()
 
     if 'data-key' in args:

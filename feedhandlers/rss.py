@@ -7,7 +7,7 @@ import utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_feed(args, save_debug=False, func_get_content=None):
+def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
   if args.get('rss'):
     rss_url = args['rss']
   elif args.get('fromrss'):
@@ -125,7 +125,7 @@ def get_feed(args, save_debug=False, func_get_content=None):
       for i, it in enumerate(feed_items):
         if save_debug:
           logger.debug('getting content for ' + it['url'])
-        item = func_get_content(it['url'], args, save_debug)
+        item = func_get_content(it['url'], args, site_json, save_debug)
         if item:
           # Add anything missing (except image)
           for key, val in feed_items[i].items():

@@ -1,15 +1,16 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import quote_plus
 
-import utils
+import config, utils
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     content = utils.get_url_html(url)
     if not content:
         return None
@@ -26,7 +27,7 @@ def get_content(url, args, save_debug=False):
             m = re.search(r'url=([^;]+)', el['content'])
             if m:
                 logger.debug('trying ' + m.group(1))
-                return get_content(m.group(1), args, save_debug)
+                return get_content(m.group(1), args, site_json, save_debug)
         return None
 
     content_json = json.loads(json.loads(m.group(1)))
@@ -61,7 +62,7 @@ def get_content(url, args, save_debug=False):
 
     item['_image'] = 'https://datawrapper.dwcdn.net/{}/plain-s.png?v=1'.format(item['id'])
     if not utils.url_exists(item['_image']):
-        return None
+        item['_image'] = '{}/screenshot?url={}&locator=.dw-chart&width=800&height=800'.format(config.server, quote_plus(url))
 
     captions = []
     item['content_html'] = '<h3>{}</h3>'.format(chart_json['title'])
@@ -78,5 +79,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

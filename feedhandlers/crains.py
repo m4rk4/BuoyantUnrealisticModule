@@ -33,7 +33,7 @@ def add_image(image_wrapper):
     return utils.add_image(img_src, ' | '.join(captions))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/aaaggregated/' in url:
         redirect_url = utils.get_redirect_url(url)
         logger.warning('redirect url ' + redirect_url)
@@ -149,8 +149,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

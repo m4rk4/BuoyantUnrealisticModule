@@ -11,12 +11,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://hudsonhubtimes-oh.newsmemory.com/?selDate=20220612&goTo=A01&artid=5
     return None
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://hudsonhubtimes-oh.newsmemory.com/
     # https://hudsonhubtimes-oh.newsmemory.com/eebrowser/ipad/html5.check.22033014/ajax-request.php?pSetup=hudsonhubtimes&preview=1&cc=1&action=issues&maxIssues=14&prefEdi=Hudson%20Hub%20Times
     split_url = urlsplit(args['url'])

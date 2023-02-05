@@ -215,7 +215,7 @@ def replace_entity(matchobj):
     return matchobj.group(0)
 
 
-def get_item(item_info, args, save_debug):
+def get_item(item_info, args, site_json, save_debug):
     item = {}
     item['id'] = item_info['id']
     item['url'] = 'https://www.tiktok.com/@{}/video/{}'.format(item_info['author']['uniqueId'], item_info['id'])
@@ -274,7 +274,7 @@ def get_item(item_info, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if url.startswith('https'):
         m = re.search(r'/video/(\d+)', url)
         if m:
@@ -293,10 +293,10 @@ def get_content(url, args, save_debug=False):
     item_detail = get_item_detail(video_id)
     if save_debug:
         utils.write_file(item_detail, './debug/video.json')
-    return get_item(item_detail['itemInfo']['itemStruct'], args, save_debug)
+    return get_item(item_detail['itemInfo']['itemStruct'], args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     items_data = None
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
@@ -326,7 +326,7 @@ def get_feed(args, save_debug=False):
     n = 0
     items = []
     for item_info in items_data['itemList']:
-        item = get_item(item_info, args, save_debug)
+        item = get_item(item_info, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

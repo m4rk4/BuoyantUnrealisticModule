@@ -18,7 +18,7 @@ def get_full_image(img_src):
     return unquote_plus(m.group(1))
   return img_src
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   # Some content is blocked without this header
   article_html = utils.get_url_html(url, headers={"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9"})
   if save_debug:
@@ -257,5 +257,5 @@ def get_content(url, args, save_debug=False):
   item['content_html'] = content_html
   return item
 
-def get_feed(args, save_debug=False):
-  return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+  return rss.get_feed(url, args, site_json, save_debug, get_content)

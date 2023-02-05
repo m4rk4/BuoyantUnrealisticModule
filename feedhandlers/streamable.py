@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     m = re.search(r'videoObject = ({.*?});\s', page_html)
     if not m:
@@ -62,5 +62,5 @@ def get_content(url, args, save_debug=False):
     item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
     return item
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

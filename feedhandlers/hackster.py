@@ -33,7 +33,7 @@ def format_content(el):
       content_html += format_content(child)
   return content_html
 
-def get_content_by_id(article_id, args, save_debug=False):
+def get_content_by_id(article_id, args, site_json, save_debug=False):
   post_data = {"t": "news_article","variables": {"id": int(article_id)}}
 
   sites_json = utils.read_json_file('./sites.json')
@@ -114,14 +114,14 @@ def get_content_by_id(article_id, args, save_debug=False):
       logger.warning('unhandled content type {} in {}'.format(content['type'], item['url']))
   return item
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   article_html = utils.get_url_html(url)
   m = re.search(r'\'entityId\':\s?\"(\d+)\"', article_html)
   if not m:
     return None
-  return get_content_by_id(m.group(1), args, save_debug)
+  return get_content_by_id(m.group(1), args, site_json, save_debug)
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
   feed = None
   if '/news/' in args['url']:
     post_data = {"t": "news_articles_simple_pagination", "variables": {"offset": 0, "per_page": 10, "by_sponsored":False, "by_status_type": "PUBLISHED", "sort": "PUBLISHED_AT"}}
@@ -157,7 +157,7 @@ def get_feed(args, save_debug=False):
   for article in articles_json['articles']['records']:
     if save_debug:
       logger.debug('getting content for ' + article['url'])
-    item = get_content_by_id(article['id'], args, save_debug)
+    item = get_content_by_id(article['id'], args, site_json, save_debug)
     if item:
       if utils.filter_item(item, args) == True:
         items.append(item)

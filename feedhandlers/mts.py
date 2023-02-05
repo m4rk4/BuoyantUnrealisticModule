@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # Check recent articles in the homepage feed - this is the only way to guarantee getting the full content
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
@@ -22,7 +22,7 @@ def get_content(url, args, save_debug=False):
         api_json = utils.get_url_json(re.sub(r'&to=\d+', '&to=20', api_url))
         article = next((it for it in api_json if it['Id'] == article_id), None)
         if article:
-            return get_item(article, args, save_debug)
+            return get_item(article, args, site_json, save_debug)
 
     if save_debug:
         logger.debug('article not found in feed, trying to get content from widget')
@@ -125,7 +125,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_item(article_json, args, save_debug):
+def get_item(article_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
     item = {}
@@ -190,7 +190,7 @@ def get_item(article_json, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     tld = tldextract.extract(args['url'])
     sites_json = utils.read_json_file('./sites.json')
     portal_id = sites_json[tld.domain]['portal_id']
@@ -231,7 +231,7 @@ def get_feed(args, save_debug=False):
     for article in articles:
         if save_debug:
             logger.debug('getting content for ' + article['Link'])
-        item = get_item(article, args, save_debug)
+        item = get_item(article, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

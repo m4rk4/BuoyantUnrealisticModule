@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_video_content(url, args, save_debug=False):
+def get_video_content(url, args, site_json, save_debug=False):
     video_html = utils.get_url_html(url)
     if not video_html:
         return None
@@ -75,7 +75,7 @@ def get_video_content(url, args, save_debug=False):
     return item
 
 
-def get_review_content(url, args, save_debug=False):
+def get_review_content(url, args, site_json, save_debug=False):
     json_url = 'https://pitchfork.com/api/v2' + urlsplit(url).path
     review_json = utils.get_url_json(json_url)
     if not review_json:
@@ -180,13 +180,13 @@ def get_review_content(url, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/reviews/' in url:
-        return get_review_content(url, args, save_debug)
+        return get_review_content(url, args, site_json, save_debug)
     elif '/tv/' in url:
-        return get_video_content(url, args, save_debug)
-    return cne.get_content(url, args, save_debug)
+        return get_video_content(url, args, site_json, save_debug)
+    return cne.get_content(url, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

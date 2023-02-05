@@ -55,7 +55,7 @@ def add_video(video_id, poster='', embed=True, save_debug=False):
     return video_html
 
 
-def get_item(content_json, content_id, args, save_debug):
+def get_item(content_json, content_id, args, site_json, save_debug):
     if save_debug:
         utils.write_file(content_json, './debug/debug.json')
 
@@ -229,7 +229,7 @@ def get_item(content_json, content_id, args, save_debug):
     return item
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     if '/widgets/' in url:
         return None
 
@@ -243,10 +243,10 @@ def get_content(url, args, save_debug):
     if not content_json:
         return None
 
-    return get_item(content_json['channels'][0], content_id, args, save_debug)
+    return get_item(content_json['channels'][0], content_id, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     split_url = urlsplit(args['url'])
     if not split_url.path or split_url.path == '/':
         feed_url = 'https://abcnews.go.com/rsidxfeed/homepage/json'
@@ -270,7 +270,7 @@ def get_feed(args, save_debug):
                 continue
             if save_debug:
                 logger.debug('getting content from ' + content['link'])
-            item = get_item(content, content['id'], args, save_debug)
+            item = get_item(content, content['id'], args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     items.append(item)

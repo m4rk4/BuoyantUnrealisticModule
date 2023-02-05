@@ -27,7 +27,7 @@ def get_image_url(img_id, file_ext='.jpeg', img_width=600):
     return 'https://storage.googleapis.com/afs-prod/media/{}/{}{}'.format(img_id, img_width, file_ext)
 
 
-def get_item(content_data, args, save_debug=False):
+def get_item(content_data, args, site_json, save_debug=False):
     item = {}
     item['id'] = content_data['id']
     item['url'] = content_data['localLinkUrl']
@@ -167,7 +167,7 @@ def get_item(content_data, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         logger.debug('getting content for ' + url)
     m = re.search('([0-9a-f]+)\/?$', url)
@@ -181,10 +181,10 @@ def get_content(url, args, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
-    return get_item(article_json, args, save_debug)
+    return get_item(article_json, args, site_json, save_debug)
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     if split_url.path.startswith('/hub'):
         tag = split_url.path.split('/')[2]
@@ -205,7 +205,7 @@ def get_feed(args, save_debug=False):
         for content in card['contents']:
             url = 'https://afs-prod.appspot.com/api/v2/content/{}'.format(content['id'])
             if content['contentType'] == 'text':
-                item = get_content(url, args, save_debug)
+                item = get_content(url, args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         items.append(item)
@@ -216,7 +216,7 @@ def get_feed(args, save_debug=False):
             for content in card_feed['contents']:
                 url = 'https://afs-prod.appspot.com/api/v2/content/{}'.format(content['id'])
                 if content['contentType'] == 'text':
-                    item = get_content(url, args, save_debug)
+                    item = get_content(url, args, site_json, save_debug)
                     if item:
                         if utils.filter_item(item, args) == True:
                             items.append(item)

@@ -18,7 +18,7 @@ def format_caption_links(matchobj):
         return '<a href="https://www.instagram.com/{0}/">@{0}</a>'.format(matchobj.group(2))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # Need to use a proxy to show images because of CORS
     # imageproxy = 'https://bibliogram.snopyta.org/imageproxy?url='
 
@@ -244,7 +244,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # For tags there is a json feed at https://www.instagram.com/explore/tags/trending/?__a=1 but it seems to be ip restricted
     rssargs = args.copy()
     m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)', args['url'])
@@ -262,7 +262,7 @@ def get_feed(args, save_debug=False):
     else:
         rssargs['url'] = 'https://bibliogram.snopyta.org/u/{}/rss.xml'.format(username)
 
-    feed = rss.get_feed(rssargs, save_debug, get_content)
+    feed = rss.get_feed(url, rssargs, site_json, save_debug, get_content)
     if feed:
         return feed
     return None

@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://player.twitch.tv/?video=1639676672
     split_url = urlsplit(url)
     if split_url.netloc == 'player.twitch.tv':

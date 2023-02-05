@@ -51,7 +51,7 @@ def add_gallery(url, save_debug=False):
     return gallery_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     m = re.search(r'(\d+)\.html$', split_url.path)
     if not m:
@@ -75,10 +75,10 @@ def get_content(url, args, save_debug=False):
     if not article_json:
         logger.warning('unable to find full content for ' + url)
         return None
-    return get_item(article_json, args, save_debug)
+    return get_item(article_json, args, site_json, save_debug)
 
 
-def get_item(article_json, args, save_debug):
+def get_item(article_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
@@ -148,7 +148,7 @@ def get_item(article_json, args, save_debug):
                         "data-key": video['data-key'],
                         "data-video-id": video['data-video-id']
                     }
-                    video_item = brightcove.get_content(item['url'], video_args)
+                    video_item = brightcove.get_content(item['url'], video_args, {}, False)
                     if video_item:
                         item['content_html'] += video_item['content_html']
 
@@ -200,7 +200,7 @@ def get_item(article_json, args, save_debug):
                         "data-key": video['data-key'],
                         "data-video-id": video['data-video-id']
                     }
-                    video_item = brightcove.get_content(item['url'], video_args)
+                    video_item = brightcove.get_content(item['url'], video_args, {}, False)
                     if video_item:
                         asset_html = video_item['content_html']
 
@@ -233,9 +233,9 @@ def get_item(article_json, args, save_debug):
     return item
 
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
     if 'feeds.mcclatchy.com' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     feed = None
     feed_items = []
@@ -247,7 +247,7 @@ def get_feed(args, save_debug):
         for article in initial_state['content']['contentitems']:
             if save_debug:
                 logger.debug('getting content for ' + article['url'])
-            item = get_content(article['url'], args, save_debug)
+            item = get_content(article['url'], args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)
@@ -275,7 +275,7 @@ def get_feed(args, save_debug):
                         article['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, urlsplit(article['url']).path)
                     if save_debug:
                         logger.debug('getting content for ' + article['url'])
-                    item = get_item(article, args, save_debug)
+                    item = get_item(article, args, site_json, save_debug)
                     if item:
                         if utils.filter_item(item, args) == True:
                             feed_items.append(item)

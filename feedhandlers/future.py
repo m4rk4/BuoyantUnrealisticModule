@@ -85,7 +85,7 @@ def get_rating(el, editors_choice):
     return rating
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -557,9 +557,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     if '/feeds/' in args['url'] or 'rss' in args['url']:
-        return rss.get_feed(args, save_debug, get_content)
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     page_html = utils.get_url_html(args['url'])
     if not page_html:
@@ -573,7 +573,7 @@ def get_feed(args, save_debug=False):
         if it:
             if save_debug:
                 logger.debug('getting content for ' + it['href'])
-            item = get_content(it['href'], args, save_debug)
+            item = get_content(it['href'], args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)

@@ -57,7 +57,7 @@ def get_next_json(url):
     return next_json
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     sites_json = utils.read_json_file('./sites.json')
     tld = tldextract.extract(url)

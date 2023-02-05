@@ -7,7 +7,7 @@ import config, utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   m = re.search(r'embed\.acast\.com/([^/]+)/([^/]+)', url)
   if not m:
     m = re.search(r'play\.acast\.com/s/([^/]+)/([^/]+)', url)

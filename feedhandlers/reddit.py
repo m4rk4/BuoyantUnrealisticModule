@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # For now only handles embed comments
     # https://www.redditmedia.com/r/destiny2/comments/rbs51c/if_you_havent_seen_bungie_added_the_dance_to/?ref_source=embed&ref=share&embed=true
     split_url = urlsplit(url)
@@ -117,8 +117,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

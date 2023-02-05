@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://www.dailymotion.com/video/x8gg6m0
     m = re.search(r'/video/([^/]+)', url)
     if not m:

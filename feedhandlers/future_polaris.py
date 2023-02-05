@@ -74,7 +74,7 @@ def format_block(block, apollo_state):
     return content_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
 
     page_html = utils.get_url_html(url)
@@ -210,7 +210,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
 
     page_html = utils.get_url_html(args['url'])
@@ -286,7 +286,7 @@ def get_feed(args, save_debug=False):
     for article in sorted(articles, key=lambda i: i['_timestamp'], reverse=True):
         if save_debug:
             logger.debug('getting content for ' + article['url'])
-        item = get_content(article['url'], args, save_debug)
+        item = get_content(article['url'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

@@ -34,7 +34,7 @@ def add_image(image_el):
     return utils.add_image(img_src, caption)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if url.startswith('://'):
         url = url.replace('://', 'https://www.ft.com')
 
@@ -203,7 +203,7 @@ def get_content(url, args, save_debug=False):
 
         for el in article_body.find_all(class_='n-content-video'):
             if 'n-content-video--internal' in el['class']:
-                video_item = get_content(el.a['href'], {"embed": True}, False)
+                video_item = get_content(el.a['href'], {"embed": True}, site_json, False)
                 if video_item:
                     new_el = BeautifulSoup(video_item['content_html'], 'html.parser')
                     el.insert_before(new_el)
@@ -263,8 +263,8 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

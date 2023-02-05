@@ -30,7 +30,7 @@ def get_image_src(el_img, width=1000, height=''):
     return img_src
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
@@ -259,7 +259,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(args['url'])
     if not page_html:
         return None
@@ -282,7 +282,7 @@ def get_feed(args, save_debug=False):
             url = 'https://www.pcmag.com' + a['href']
         if save_debug:
             logger.debug('getting content from ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

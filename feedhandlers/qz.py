@@ -49,7 +49,7 @@ def get_article(article_id):
     return get_graphql_query(gql_query)
 
 
-def get_item(post_json, args, save_debug=False):
+def get_item(post_json, args, site_json, save_debug=False):
     item = {}
     item['id'] = post_json['id']
     item['url'] = post_json['link']
@@ -177,7 +177,7 @@ def get_item(post_json, args, save_debug=False):
     return item
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     post_json = None
@@ -202,7 +202,7 @@ def get_content(url, args, save_debug=False):
         return None
     if save_debug:
         utils.write_file(post_json, './debug/debug.json')
-    return get_item(post_json, args, save_debug)
+    return get_item(post_json, args, site_json, save_debug)
 
 
 def get_emails_by_tag(slug_list):
@@ -312,14 +312,14 @@ def get_topics():
     return topics
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     posts = []
     feed_title = ''
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) > 0:
         if paths[-1] == 'feed':
-            return rss.get_feed(args, save_debug, get_content)
+            return rss.get_feed(url, args, site_json, save_debug, get_content)
         if paths[0] == 'discover':
             del paths[0]
         if paths[0] == 'latest':
@@ -406,9 +406,9 @@ def get_feed(args, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + post['link'])
         if post.get('blocks'):
-            item = get_item(post, args, save_debug)
+            item = get_item(post, args, site_json, save_debug)
         else:
-            item = get_content(post['link'], args, save_debug)
+            item = get_content(post['link'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

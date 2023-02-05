@@ -94,7 +94,7 @@ def get_next_data(url, save_debug=False):
     return next_data['props']['pageProps']
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if 'reviews' in paths:
@@ -228,7 +228,7 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path[1:].split('/')))
     if len(paths) == 0:
@@ -250,7 +250,7 @@ def get_feed(args, save_debug=False):
             url = re.sub(r'^{}'.format(article['publications'][0]['furl']), article['publications'][0]['hostname']['primary'], article['urls'][0])
         if save_debug:
             logger.debug('getting contents for ' + url)
-        item = get_content(url, args, save_debug)
+        item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

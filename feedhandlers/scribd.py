@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://www.scribd.com/embeds/595926714/content?start_page=1&view_mode=scroll&access_key=key-YsE0rA9wCDdh6vL0OukK
     if '/embeds/' not in url:
         logger.warning('unhandled url ' + url)

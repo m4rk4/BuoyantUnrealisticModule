@@ -226,7 +226,7 @@ def get_item_info(article_json, save_debug=False):
     return item
 
 
-def get_content_from_html(url, args, save_debug=False):
+def get_content_from_html(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
@@ -385,7 +385,7 @@ def get_content_from_html(url, args, save_debug=False):
     return item
 
 
-def get_content_from_initial_state(url, args, save_debug=False):
+def get_content_from_initial_state(url, args, site_json, save_debug=False):
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
@@ -440,7 +440,7 @@ def get_content_from_initial_state(url, args, save_debug=False):
     return item
 
 
-def get_live_news_content(url, args, save_debug=False):
+def get_live_news_content(url, args, site_json, save_debug=False):
     livestory_id = url.split('/')[-1]
     headers = {
         "accept": "*/*",
@@ -464,19 +464,19 @@ def get_live_news_content(url, args, save_debug=False):
     return None
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     if '/live-news/' in url:
         return None
     if re.search(r'\/(style|travel)\/', url):
-        return get_content_from_initial_state(url, args, save_debug)
+        return get_content_from_initial_state(url, args, site_json, save_debug)
     if re.search(r'\/(cnn-underscored|videos)\/', url):
-        return get_content_from_html(url, args, save_debug)
+        return get_content_from_html(url, args, site_json, save_debug)
 
     split_url = urlsplit(url)
     json_url = 'https://www.cnn.com{}:*.json'.format(split_url.path)
     article_json = utils.get_url_json(json_url)
     if not article_json:
-        return get_content_from_html(url, args, save_debug)
+        return get_content_from_html(url, args, site_json, save_debug)
     if save_debug:
         with open('./debug/debug.json', 'w') as file:
             json.dump(article_json, file, indent=4)
@@ -520,10 +520,10 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     n = 0
     items = []
-    feed = rss.get_feed(args, save_debug)
+    feed = rss.get_feed(url, args, site_json, save_debug)
     for feed_item in feed['items']:
         # Skip non- cnn.com urls
         # Skip coupons/deals
@@ -536,7 +536,7 @@ def get_feed(args, save_debug=False):
 
         if save_debug:
             logger.debug('getting content for ' + feed_item['url'])
-        item = get_content(feed_item['url'], args, save_debug)
+        item = get_content(feed_item['url'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 items.append(item)

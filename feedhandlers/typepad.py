@@ -27,14 +27,13 @@ def resize_image(img_src, images, width=900):
     return image['urlTemplate'].replace('{spec}', '{}wi'.format(width))
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://www.typepad.com/services/apidocs
     tld = tldextract.extract(url)
-    sites_json = utils.read_json_file('./sites.json')
     if tld.domain == 'typepad' or tld.domain == 'blogs':
-        blogid = sites_json[tld.domain]['blogids'][tld.subdomain]
+        blogid = site_json['blogids'][tld.subdomain]
     else:
-        blogid = sites_json[tld.domain]['blogid']
+        blogid = site_json['blogid']
 
     m = re.search(r'/(\d{4})/(\d{2})/([^\.]+)\.html', url)
     if not m:
@@ -105,8 +104,23 @@ def get_content(url, args, save_debug=False):
             el.insert_after(new_el)
             el.decompose()
 
+    for el in soup.find_all('blockquote'):
+        new_html = ''
+        it = el.find('div', attrs={"align": "right"})
+        if it:
+            author = it.get_text()
+            if author.startswith('—'):
+                author = author[1:]
+            it.decompose()
+            new_html = utils.add_pullquote(el.get_text(), author)
+        else:
+            new_html = utils.add_blockquote(el.decode_contents())
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
     item['content_html'] = str(soup)
     return item
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

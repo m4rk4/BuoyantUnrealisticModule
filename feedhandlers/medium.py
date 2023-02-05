@@ -18,7 +18,7 @@ def add_image(image, caption='', width=1000):
     return utils.add_image(img_src, caption)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     post_id = split_url.path.split('-')[-1]
     graphql_url = '{}://{}/_/graphql'.format(split_url.scheme, split_url.netloc)
@@ -143,10 +143,17 @@ def get_content(url, args, save_debug=False):
                 paragraph_text = ''
 
         elif paragraph_type == 'mixtape_embed':
-            start_tag += '<blockquote><ul><li>'
-            end_tag = '</li></ul></blockquote>'
-            paragraph_text = paragraph['text']
-
+            # start_tag += '<blockquote><ul><li>'
+            # end_tag = '</li></ul></blockquote>'
+            # paragraph_text = paragraph['text']
+            src = urlsplit(paragraph['mixtapeMetadata']['href']).netloc
+            paragraph_text = re.sub(r'…{}'.format(src), '', paragraph['text'])
+            if paragraph['mixtapeMetadata'].get('thumbnailImageId'):
+                start_tag += '<div><img src="https://miro.medium.com/max/128/{}" style="float:left; margin-right:8px; width:128px;" /><div style="overflow:hidden;">'.format(paragraph['mixtapeMetadata']['thumbnailImageId'])
+                end_tag = '<br/><small>{}</small></div></div><div style="clear:left;">&nbsp;</div>'.format(src)
+            else:
+                start_tag += '<blockquote>'
+                end_tag = '<br/><small>{}</small></blockquote>'.format(src)
         else:
             logger.warning('unhandled paragraph type {} in {}'.format(paragraph_type, url))
             continue
@@ -199,5 +206,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

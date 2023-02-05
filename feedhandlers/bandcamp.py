@@ -8,7 +8,7 @@ import config, utils
 import logging
 logger = logging.getLogger(__name__)
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
   if '/EmbeddedPlayer/' in url:
     embed_url = url
   else:
@@ -39,7 +39,7 @@ def get_content(url, args, save_debug=False):
   item = {}
   if '/track=' in embed_url:
     if bc_json.get('album_id'):
-      album_item = get_content('https://bandcamp.com/EmbeddedPlayer/v=2/album={}/size=large/tracklist=false/artwork=small/'.format(bc_json['album_id']), args, save_debug)
+      album_item = get_content('https://bandcamp.com/EmbeddedPlayer/v=2/album={}/size=large/tracklist=false/artwork=small/'.format(bc_json['album_id']), args, site_json, save_debug)
     else:
       album_item = None
 
@@ -129,5 +129,5 @@ def get_content(url, args, save_debug=False):
 
   return item
 
-def get_feed(args, save_debug):
+def get_feed(url, args, site_json, save_debug):
   return None

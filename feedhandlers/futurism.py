@@ -10,8 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_next_data(url):
-    tld = tldextract.extract(url)
+def get_next_data(url, site_json):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) == 0:
@@ -22,26 +21,24 @@ def get_next_data(url):
         path = split_url.path
     path += '.json'
 
-    sites_json = utils.read_json_file('./sites.json')
-    build_id = sites_json[tld.domain]['buildId']
-    next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, build_id, path)
+    next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         logger.debug('updating futurism.com buildId')
         page_html = utils.get_url_html(url)
         m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != build_id:
-            sites_json[tld.domain]['buildId'] = m.group(1)
-            utils.write_file(sites_json, './sites.json')
-            next_url = '{}://{}/_next/data/{}/en{}'.format(split_url.scheme, split_url.netloc, m.group(1), path)
+        if m and m.group(1) != site_json['buildId']:
+            site_json['buildId'] = m.group(1)
+            utils.update_sites(url, site_json)
+            next_url = '{}://{}/_next/data/{}/{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
             next_data = utils.get_url_json(next_url)
             if not next_data:
                 return None
     return next_data
 
 
-def get_content(url, args, save_debug=False):
-    next_data = get_next_data(url)
+def get_content(url, args, site_json, save_debug=False):
+    next_data = get_next_data(url, site_json)
     if not next_data:
         return None
     if save_debug:
@@ -58,10 +55,10 @@ def get_content(url, args, save_debug=False):
     else:
         logger.warning('unknown post data in ' + url)
         return None
-    return get_item(post, apollo_state, url, args, save_debug)
+    return get_item(post, apollo_state, url, args, site_json, save_debug)
 
 
-def get_item(post_json, apollo_state, url, args, save_debug=False):
+def get_item(post_json, apollo_state, url, args, site_json, save_debug=False):
     item = {}
     item['id'] = post_json['databaseId']
     item['url'] = url
@@ -112,22 +109,31 @@ def get_item(post_json, apollo_state, url, args, save_debug=False):
 
     soup = BeautifulSoup(post_json['content'], 'html.parser')
     for el in soup.find_all('figure'):
+        img_src = ''
         it = el.find('img')
-        img_src = it['src']
-        it = el.find('figcaption')
         if it:
-            caption = it.decode_contents()
+            img_src = it['src']
         else:
-            caption = ''
-        it = el.find('a')
-        if it:
-            link = it['href']
+            it = el.find('source')
+            if it:
+                img_src = utils.image_from_srcset(it['srcset'], 1000)
+        if img_src:
+            it = el.find('figcaption')
+            if it:
+                caption = it.decode_contents()
+            else:
+                caption = ''
+            it = el.find('a')
+            if it:
+                link = it['href']
+            else:
+                link = ''
+            new_html = utils.add_image(img_src, caption, link=link)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
         else:
-            link = ''
-        new_html = utils.add_image(img_src, caption, link=link)
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+            logger.warning('unhandled figure in ' + item['url'])
 
     for el in soup.find_all('iframe'):
         new_html = utils.add_embed(el['src'])
@@ -139,12 +145,15 @@ def get_item(post_json, apollo_state, url, args, save_debug=False):
             el.insert_after(new_el)
             el.decompose()
 
+    for el in soup.find_all(attrs={"role": "complementary"}):
+        el.decompose()
+
     item['content_html'] += str(soup)
     return item
 
 
-def get_feed(args, save_debug=False):
-    next_data = get_next_data(args['url'])
+def get_feed(url, args, site_json, save_debug=False):
+    next_data = get_next_data(args['url'], site_json)
     if not next_data:
         return None
     if save_debug:
@@ -184,9 +193,9 @@ def get_feed(args, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + url)
         if post.get('content'):
-            item = get_item(post, next_data['pageProps']['initialApolloState'], url, args, save_debug)
+            item = get_item(post, next_data['pageProps']['initialApolloState'], url, args, site_json, save_debug)
         else:
-            item = get_content(url, args, save_debug)
+            item = get_content(url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)

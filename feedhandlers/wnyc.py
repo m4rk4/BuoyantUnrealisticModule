@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.path.startswith('/widgets/'):
         m = re.search(r'/audio/json/(\d+)/', url)
@@ -30,7 +30,7 @@ def get_content(url, args, save_debug=False):
         utils.write_file(api_json, './debug/debug.json')
 
     if api_json['data']['attributes']['item-type'] == 'nprarticle':
-        return npr.get_content(api_json['data']['attributes']['canonical-url'], save_debug)
+        return npr.get_content(api_json['data']['attributes']['canonical-url'], {}, {}, save_debug)
 
     item = {}
     item['id'] = api_json['data']['id']
@@ -83,5 +83,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
-    return rss.get_feed(args, save_debug, get_content)
+def get_feed(url, args, site_json, save_debug=False):
+    return rss.get_feed(url, args, site_json, save_debug, get_content)

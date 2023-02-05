@@ -97,7 +97,7 @@ def format_blocks(blocks):
     return block_html
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     soup = BeautifulSoup(page_html, 'html.parser')
     next_data = soup.find('script', id='__NEXT_DATA__')
@@ -195,9 +195,9 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     # https://www.economist.com/rss
-    return rss.get_feed(args, save_debug, get_content)
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
 
 
 def test_handler():

@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
     # https://embed.sendtonews.com/player4/embedcode.js?SC=i3p78nKk7p-2460057-6761&floatwidth=300&floatposition=bottom-right
     split_url = urlsplit(url)
     query = parse_qs(split_url.query)
@@ -54,5 +54,5 @@ def get_content(url, args, save_debug=False):
     return item
 
 
-def get_feed(args, save_debug=False):
+def get_feed(url, args, site_json, save_debug=False):
     return None

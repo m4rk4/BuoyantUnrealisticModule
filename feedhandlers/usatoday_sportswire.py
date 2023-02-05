@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_content(url, args, save_debug):
+def get_content(url, args, site_json, save_debug):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1].split('.')[0]
@@ -24,7 +24,7 @@ def get_content(url, args, save_debug):
     post = utils.get_url_json(post_url)
     if not post:
         return None
-    item = wp_posts.get_post_content(post[0], args, save_debug)
+    item = wp_posts.get_post_content(post[0], args, site_json, save_debug)
     if not item:
         return None
 
