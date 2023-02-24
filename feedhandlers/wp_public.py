@@ -35,7 +35,10 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(post_json['modified'])
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {"name": '{} {}'.format(post_json['author']['first_name'], post_json['author']['last_name'])}
+    if post_json['author'].get('first_name') and post_json['author'].get('last_name'):
+        item['author'] = {"name": '{} {}'.format(post_json['author']['first_name'], post_json['author']['last_name'])}
+    elif post_json['author'].get('name'):
+        item['author'] = {"name": post_json['author']['name']}
 
     item['tags'] = []
     if post_json.get('categories'):
@@ -60,7 +63,11 @@ def get_content(url, args, site_json, save_debug=False):
     if post_json.get('excerpt'):
         item['summary'] = post_json['excerpt']
 
-    item['content_html'] = wp_posts.format_content(post_json['content'], item)
+    item['content_html'] = ''
+    if 'add_lede_img' in args and item.get('_image'):
+        item['content_html'] += utils.add_image(item['_image'])
+
+    item['content_html'] += wp_posts.format_content(post_json['content'], item)
     return item
 
 

@@ -1,6 +1,7 @@
-import html, json, re
+import json, re
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, unquote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, unquote_plus, urlsplit
 
 import utils
 from feedhandlers import rss
@@ -37,11 +38,23 @@ def render_content(content):
                     img_link = ''
                     captions = []
                     for child in content['children']:
-                        if child['name'] == 'rebelmouse-image':
+                        if not child.get('name'):
+                            content_html += render_content(child)
+                        elif child['name'] == 'rebelmouse-image':
                             if child['attributes'].get('crop_info'):
                                 crop_info = json.loads(unquote_plus(child['attributes']['crop_info']))
-                                img_src = resize_image(crop_info['thumbnails']['origin'])
-                            else:
+                                images = []
+                                for key, val in crop_info['thumbnails'].items():
+                                    m = re.search(r'^(\d+)x$', key)
+                                    if m:
+                                        image = {}
+                                        image['width'] = int(m.group(1))
+                                        image['src'] = val
+                                        images.append(image)
+                                if images:
+                                    image = utils.closest_dict(images, 'width', 1000)
+                                    img_src = image['src']
+                            if not img_src:
                                 img_src = 'https://assets.rbl.ms/{}/origin.jpg'.format(child['attributes']['iden'])
                         elif child['name'] == 'a':
                             img_link = child['attributes']['href']
@@ -49,8 +62,18 @@ def render_content(content):
                                 if nino['name'] == 'rebelmouse-image':
                                     if nino['attributes'].get('crop_info'):
                                         crop_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
-                                        img_src = resize_image(crop_info['thumbnails']['origin'])
-                                    else:
+                                        images = []
+                                        for key, val in crop_info['thumbnails'].items():
+                                            m = re.search(r'(\d+)x$', key)
+                                            if m:
+                                                image = {}
+                                                image['width'] = int(m.group(1))
+                                                image['src'] = val
+                                                images.append(image)
+                                        if images:
+                                            image = utils.closest_dict(images, 'width', 1000)
+                                            img_src = image['src']
+                                    if not img_src:
                                         img_src = 'https://assets.rbl.ms/{}/origin.jpg'.format(nino['attributes']['iden'])
                         elif child.get('attributes') and child['attributes'].get('class'):
                             child_classes = child['attributes']['class'].split(' ')
@@ -202,8 +225,21 @@ def render_content(content):
                                 if nino.get('text') and re.search(r'shortcode-Ad', nino['text'], flags=re.I):
                                     continue
                                 if nino['name'] == 'rebelmouse-image':
-                                    image_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
-                                    img_src = resize_image(image_info['thumbnails']['origin'])
+                                    crop_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
+                                    images = []
+                                    for key, val in crop_info['thumbnails'].items():
+                                        m = re.search(r'^(\d+)x$', key)
+                                        if m:
+                                            image = {}
+                                            image['width'] = int(m.group(1))
+                                            image['src'] = val
+                                            images.append(image)
+                                    if images:
+                                        image = utils.closest_dict(images, 'width', 1000)
+                                        img_src = image['src']
+                                    if not img_src:
+                                        img_src = 'https://assets.rbl.ms/{}/origin.jpg'.format(nino['attributes']['iden'])
+                                        #img_src = resize_image(crop_info['thumbnails']['origin'])
                                     img_link = nino['attributes'].get('link_url')
                                 elif re.search(r'embed|facebook|instagram|tiktok|twitter|youtube',nino['name']):
                                     embed_src = nino['attributes']['iden']
@@ -307,14 +343,22 @@ def render_content(content):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
     article_html = utils.get_url_html(url)
-    m = re.search(r'"fullBootstrapUrl": "([^"]+)"', article_html)
-    if not m:
+    soup = BeautifulSoup(article_html, 'lxml')
+    el = soup.find('script', string=re.compile(r'REBELMOUSE_BOOTSTRAP_DATA'))
+    if not el:
         logger.warning('unable to determine bootstrap url in ' + url)
         return None
-
-    bootstrap_path = m.group(1).replace('\\u0026', '&')
-    split_url = urlsplit(url)
+    s = el.string.strip().replace('true', '1').replace('false', '""')
+    if s.endswith(';'):
+        s = s[:-1]
+    n = s.find('{')
+    bootstrap_data = json.loads(s[n:])
+    if bootstrap_data.get('fullBootstrapUrl'):
+        bootstrap_path = bootstrap_data['fullBootstrapUrl'].replace('\\u0026', '&')
+    else:
+        bootstrap_path = '/res/bootstrap/data.js?site_id={}&resource_id={}&path_params={}&warehouse10x=1&override_device=desktop&post_id={}'.format(bootstrap_data['site']['id'], bootstrap_data['resourceId'], quote_plus(json.dumps(bootstrap_data['pathParams'])), bootstrap_data['post']['id'])
     bootstrap_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, bootstrap_path)
     print(bootstrap_url)
     bootstrap_json = utils.get_url_json(bootstrap_url)
@@ -371,11 +415,14 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = resize_image(val)
 
     if post_json.get('video'):
-        query = parse_qs(urlsplit(post_json['video']).query)
-        if query.get('jwplayer_video_url'):
-            item['content_html'] += utils.add_embed(query['jwplayer_video_url'][0])
+        if post_json.get('video_provider') and post_json['video_provider'] == 'youtube':
+            item['content_html'] += utils.add_embed(post_json['video'])
         else:
-            logger.warning('unhandled video {} in {}'.format(post_json['video'], item['url']))
+            query = parse_qs(urlsplit(post_json['video']).query)
+            if query.get('jwplayer_video_url'):
+                item['content_html'] += utils.add_embed(query['jwplayer_video_url'][0])
+            else:
+                logger.warning('unhandled video {} in {}'.format(post_json['video'], item['url']))
     else:
         captions = []
         if post_json.get('photo_caption'):
@@ -399,6 +446,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     if post_json.get('original_url'):
         item['content_html'] += '<p><a href="{}">Read more at {}</a></p>'.format(post_json['original_url'], post_json['original_domain'])
+
+    if post_json.get('shortcodes'):
+        for key, val in post_json['shortcodes'].items():
+            item['content_html'] = item['content_html'].replace(key, val)
+
     #item['content_html'] = post_json['body']
     return item
 

@@ -129,8 +129,8 @@ def format_block(block, content, netloc):
                 start_tag = '<p>'
                 end_tag = '</p><span style="clear:left;"></span>'
             elif block.get('attribs') and block['attribs'].get('class') and 'body-tip' in block['attribs']['class']:
-                start_tag = '<p style="font-size:1.1em; font-weight:bold;">'
-                end_tag = '</p>'
+                start_tag = '<div style="font-weight:bold; padding:2em; border-top:1px solid black; border-bottom:1px solid black;">'
+                end_tag = '</div>'
             elif block.get('attribs') and block['attribs'].get('class') and re.search(r'body-h\d', block['attribs']['class']):
                 m = re.search(r'body-(h\d)', block['attribs']['class'])
                 start_tag = '<{}>'.format(m.group(1))
@@ -141,17 +141,21 @@ def format_block(block, content, netloc):
 
         elif block['name'] == 'image':
             image = next((it for it in content['media'] if (it.get('id') and it['id'] == block['attribs']['mediaid'])), None)
-            return add_image(image, block['attribs'])
+            if image:
+                return add_image(image, block['attribs'])
+            else:
+                logger.warning('unhandled image mediaid {}'.format(block['attribs']['mediaid']))
 
         elif block['name'] == 'gallery':
             # https://css-tricks.com/snippets/css/a-guide-to-flexbox/
             block_html += '<div style="display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center;">'
+            #block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
             for slide in block['response']['parsedSlides']:
                 block_html += '<div style="width:50%; min-width:400px;">'
-                if slide['__typename'] == 'Product':
-                    block_html += add_product(slide)
-                elif slide['__typename'] == 'Image':
+                if (slide.get('__typename') and slide['__typename'] == 'Image') or (slide.get('media_type') and slide['media_type'] == 'image'):
                     block_html += add_image(slide, gallery=True)
+                elif slide.get('__typename') and slide['__typename'] == 'Product':
+                    block_html += add_product(slide)
                 else:
                     logger.warning('unhandled slide type ' + slide['__typename'])
                 block_html += '</div>'
@@ -184,6 +188,12 @@ def format_block(block, content, netloc):
                 return block_html
             else:
                 logger.warning('unhandled mediaosvideo block')
+
+        elif block['name'] == 'iframe':
+            src = block['attribs']['src']
+            if src.startswith('//'):
+                src = 'https:' + src
+            return utils.add_embed(src)
 
         elif block['name'] == 'blockquote':
             for blk in block['children']:
@@ -247,8 +257,8 @@ def format_block(block, content, netloc):
         elif re.search(r'^(insurance-marketplace|poll|watch-next)$', block['name']):
             return ''
         else:
-            if not re.search(r'^(em|h\d|li|ol|strong|ul)$', block['name']):
-                print(block['name'])
+            if not re.search(r'^(center|em|h\d|li|mark|ol|strong|sup|u|ul)$', block['name']):
+                logger.debug('unhandled tag ' + block['name'])
             start_tag = '<{}>'.format(block['name'])
             end_tag = '</{}>'.format(block['name'])
 
@@ -398,6 +408,18 @@ def get_content(url, args, site_json, save_debug=False):
     if authors:
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+
+
+    item['tags'] = []
+    if content_json.get('section'):
+        item['tags'].append(content_json['section']['title'])
+    if content_json.get('subsection'):
+        item['tags'].append(content_json['subsection']['title'])
+    if content_json.get('tags'):
+        for it in content_json['tags']:
+            item['tags'].append(it['title'])
+    if not item.get('tags'):
+        del item['tags']
 
     # Media roles:
     # SLIDE: 1,
@@ -566,6 +588,8 @@ def get_feed(url, args, site_json, save_debug=False):
     next_data = json.loads(el.string)
     if not next_data:
         return None
+    if save_debug:
+        utils.write_file(next_data, './debug/feed.json')
 
     urls = []
     for feedinfo in next_data['props']['pageProps']['data']['feedInfo']:

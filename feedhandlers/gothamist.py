@@ -1,7 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -22,6 +22,7 @@ def get_img_src(image, width=1000):
     img_src = 'https://cms.prod.nypr.digital/images/{}/fill-{}x{}|format-jpeg|jpegquality-80/'.format(image['id'], w, h)
     return utils.get_redirect_url(img_src)
 
+
 def add_image(image, width=1000, gallery_url=''):
     captions = []
     if image.get('caption'):
@@ -36,12 +37,14 @@ def add_image(image, width=1000, gallery_url=''):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    page_html = utils.get_url_html(url)
-    m = re.search(r'detailUrl:"([^"]+)"', page_html)
-    if not m:
-        logger.warning('unable to find detailUrl in ' + url)
+    split_url = urlsplit(url)
+    api_url = 'https://cms.prod.nypr.digital/api/v2/pages/find/?html_path={}'.format(split_url.path[1:])
+    api_url = utils.get_redirect_url(api_url)
+    if not api_url:
         return None
-    article_json = utils.get_url_json(m.group(1).encode().decode('unicode-escape'))
+    article_json = utils.get_url_json(api_url)
+    if not article_json:
+        return None
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 

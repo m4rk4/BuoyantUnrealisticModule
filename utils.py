@@ -200,28 +200,43 @@ def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_
     return r.content
   return None
 
-def get_redirect_url(url):
+def find_redirect_url(url):
   split_url = urlsplit(url)
   if 'cloudfront.net' in split_url.netloc:
     url_html = get_url_html(url)
     m = re.search(r'"redirect":"([^"]+)"', url_html)
     if m:
       return m.group(1)
-
   if split_url.query:
     query = parse_qs(split_url.query)
     if split_url.netloc == 'goto.target.com' and query.get('u'):
       return query['u'][0]
     elif split_url.netloc == 'go.skimresources.com' and query.get('url'):
       return query['url'][0]
+    elif split_url.netloc == 'events.release.narrativ.com' and query.get('url'):
+      return query['url'][0]
+    elif split_url.netloc == 'www.anrdoezrs.net' and query.get('url'):
+      return query['url'][0]
+    elif split_url.netloc == 'www.dpbolvw.net' and query.get('url'):
+      return query['url'][0]
+    elif split_url.netloc == 'www.kqzyfj.com' and query.get('url'):
+      return query['url'][0]
     elif split_url.netloc == 'shopping.yahoo.com' and query.get('itemId'):
       m = re.search(r'amazon_(.*)', query['itemId'][0])
       if m:
         return 'https://www.amazon.com/dp/' + m.group(1)
+    elif split_url.netloc == 'howl.me':
+      pass
     else:
       for key, val in query.items():
         if val[0].startswith('http'):
           return get_redirect_url(val[0])
+    return ''
+
+def get_redirect_url(url):
+  redirect_url = find_redirect_url(url)
+  if redirect_url:
+    return redirect_url
 
   # It would be better to use requests.head because some servers may not support the Range header and the whole file will be downloaded; however, request.get seems to work better for getting redirects
   i = 0
@@ -242,7 +257,10 @@ def get_redirect_url(url):
     else:
       status_code = ''
     logger.debug('exception error {}{} getting {}'.format(e.__class__.__name__, status_code, redirect_url))
-    return get_redirect_url(redirect_url)
+    #return get_redirect_url(redirect_url)
+  url = find_redirect_url(redirect_url)
+  if url:
+    return url
   return redirect_url
 
 def get_url_title_desc(url):
@@ -307,6 +325,10 @@ def write_file(data, filename):
   if filename.endswith('.json'):
     with open(filename, 'w', encoding='utf-8') as file:
       json.dump(data, file, indent=4, sort_keys=True)
+  elif filename.endswith('.html'):
+    soup = BeautifulSoup(data, 'html.parser')
+    with open(filename, 'w', encoding='utf-8') as f:
+      f.write(soup.prettify())
   else:
     with open(filename, 'w', encoding='utf-8') as f:
       f.write(data)
@@ -343,11 +365,11 @@ def image_from_srcset(srcset, target):
   #  Relative width: elva-fairy-320w.jpg, elva-fairy-480w.jpg 1.5x, elva-fairy-640w.jpg 2x
   images = []
   base_width = 0
-  for m in re.findall(r'((https:|//).*?)(?=,\s?https:|,\s?//|$)', srcset):
+  for m in re.findall(r'((https?:|//).*?)(?=,\s?https?:|,\s?//|$)', srcset):
     it = m[0].strip().split(' ')
     image = {}
     if it[0].startswith('//'):
-      image['src'] = 'http:' + it[0]
+      image['src'] = 'https:' + it[0]
     else:
       image['src'] = it[0]
     if len(it) == 1:
@@ -359,6 +381,8 @@ def image_from_srcset(srcset, target):
         base_width = get_image_width(image['src'])
     elif it[1].endswith('w'):
       image['width'] = int(it[1][:-1])
+    elif it[1].isnumeric():
+      image['width'] = int(it[1])
     images.append(image)
   if base_width > 0:
     for image in images:
@@ -489,7 +513,7 @@ def add_blockquote(quote, pullquote_check=True):
     m = re.search(r'^["“‘]([^"“‘"”’]+)["”’]$', quote)
     if m:
       return add_pullquote(quote)
-  return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
+  return '<div style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</div>'.format(quote)
 
 def open_pullquote():
   #return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
@@ -714,12 +738,18 @@ def add_instagram(igstr):
   return ig['content_html']
 
 def add_bar(label, value, max_value, show_percent=True):
-  pct = 100*value/max_value
+  if max_value == 0:
+    pct = 0
+  else:
+    pct = 100 * value / max_value
   if show_percent:
     val = '{:.1f}%'.format(pct)
   else:
     val = value
-  return '<div style="width:{}%; background-color:lightgrey; margin:10px 0 10px 0;">{}<span style="float:right;">{}</span><span style="clear:right;"></span></div>'.format(round(pct), label, val)
+  pct = int(pct)
+  if pct >= 50:
+    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, lightblue {}%, white {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(pct, 100 - pct, label, val)
+  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {}%, lightblue {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(100 - pct, pct, label, val)
 
 def add_barchart(labels, values, title='', caption='', max_value=0, percent=True, border=True, width="75%"):
   color = 'rgb(196, 207, 214)'

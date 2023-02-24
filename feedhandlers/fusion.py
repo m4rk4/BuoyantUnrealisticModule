@@ -254,7 +254,11 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'gallery':
         img_src = resize_image(element['content_elements'][0], site_json)
-        link = '{}://{}{}'.format(split_url.scheme, split_url.netloc, element['canonical_url'])
+        link = '{}://{}'.format(split_url.scheme, split_url.netloc)
+        if element.get('canonical_url'):
+            link += element['canonical_url']
+        elif element.get('slug'):
+            link += element['slug']
         caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
         link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
         if img_src:
@@ -652,7 +656,8 @@ def get_feed(url, args, site_json, save_debug=False):
                         return None
                 else:
                     section = paths[-1]
-                    query = re.sub(r'\s', '', json.dumps(site_json['section_feed']['query'])).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
+                    section_path = path.replace('/section', '')
+                    query = re.sub(r'\s', '', json.dumps(site_json['section_feed']['query'])).replace('SECTIONPATH', section_path).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
             elif site_json.get('sections') and site_json['sections'].get(paths[-1]):
                 section = paths[-1]
                 source = site_json['sections'][section]['source']

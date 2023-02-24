@@ -68,11 +68,15 @@ def get_content(url, args, site_json, save_debug=False):
         el.attrs = {}
 
     blocks = soup.find_all('div', class_='sqs-block')
-    if 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class']:
+    if 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
         item['content_html'] += utils.add_image(item['_image'])
 
     for block in blocks:
         if 'sqs-block-html' in block['class'] or 'sqs-block-markdown' in block['class']:
+            for el in block.find_all('p'):
+                if re.search(r'^By {}'.format(item['author']['name']), el.get_text().strip(), flags=re.I):
+                    el.decompose()
+                    break
             el = block.find('div', class_='sqs-block-content')
             item['content_html'] += el.decode_contents()
 
@@ -170,6 +174,7 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-code in ' + item['url'])
 
         elif 'sqs-block-summary-v2' in block['class']:
+            #utils.write_file(str(el), './debug/debug.html')
             el = block.find(class_='summary-heading')
             if el and re.search(r'You may also like|Featured', el.get_text(), flags=re.I):
                 continue
@@ -193,6 +198,16 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += str(el)
             else:
                 logger.warning('unhandled sqs-block-button in ' + item['url'])
+
+        elif 'sqs-block-amazon' in block['class']:
+            # https://evanmccann.net/blog/2020/11/iphone-12-mini
+            if block.get('data-block-json'):
+                data_json = json.loads(block['data-block-json'])
+                #utils.write_file(data_json, './debug/data.json')
+                item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><img src="{}" style="width:100%;" /></div>'.format(data_json['amazonProduct']['imageUrlMedium'])
+                item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.2em; font-weight:bold;">{}</div><div>By {}</div><div><a href="{}">Buy on Amazon</a></div></div>'.format(data_json['amazonProduct']['title'], data_json['amazonProduct']['manufacturer'], utils.clean_url(data_json['amazonProduct']['detailPageUrl']))
+                item['content_html'] += '</div>'
 
         elif 'sqs-block-spacer' in block['class']:
             pass

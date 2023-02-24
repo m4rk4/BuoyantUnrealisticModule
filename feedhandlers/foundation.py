@@ -35,7 +35,8 @@ def get_content(url, args, site_json, save_debug=False):
                 meta[key].append(val)
             meta[key].append(el['content'])
         else:
-            meta[key] = el['content']
+            if el.get('content'):
+                meta[key] = el['content']
     if save_debug:
         utils.write_file(meta, './debug/meta.json')
 

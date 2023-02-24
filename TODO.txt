@@ -1,3 +1,10 @@
+
+RSS feed: https://www.popularmechanics.com/contenttype/news/
+
+Embed: https://video.wordpress.com/embed/IfZpygzD?cover=1&posterUrl=https%3A%2F%2Fvideos.files.wordpress.com%2FIfZpygzD%2Fabraham_lincoln_seriously_mp4_std.original.jpg&preloadContent=metadata&useAverageColor=1&hd=1
+
+FIX: https://www.cnn.com/cnn-underscored/home/underscored-editors-favorite-products-january-2023
+
 need to convert sites to use netloc
 https://thetriad.thebulwark.com/p/the-memphis-police-affirmative-action
 https://screentime.thebulwark.com/p/netflix-cuts-off-cheapskates ==> substack
@@ -9,6 +16,9 @@ https://mastodon.social/@matthewcassinelli/109638714164145222/embed
 
 
 Fix formatting
+js-wpv-view-layout https://bestmvno.com/daily-deals/cell-phone-plan-deals/
+lets-review-block__wrap https://primeaudio.org/smsl-c100-dac-review/
+review layout: https://fossbytes.com/sony-wh-1000xm5-headphones-review/
 reviewBox: https://www.playstationlifestyle.net/2022/12/06/crisis-core-final-fantasy-7-reunion-review-ps5/
 https://www.seeedstudio.com/blog/2022/12/31/year-in-review-seeed-in-2022/
 https://dongknows.com/synologys-new-ds723-nas-server-review/
@@ -21,13 +31,23 @@ https://www.brewersjournal.info/91-new-beginnings/
 Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
-
 WP
+https://bookriot.com/interesting-buildings-that-are-now-libraries-and-bookstores/
+https://musicindustryblog.wordpress.com/
+https://devblogs.microsoft.com/commandline/wp-json/wp/v2/posts/8371
+https://www.dailycartoonist.com/ - no wp-json, no meta
+https://www.nbcphiladelphia.com/wp-json/wp/v2/posts
+https://www.nbcnewyork.com/wp-json/wp/v2/posts
+https://www.wivb.com/wp-json/wp/v2/posts
+https://www.wowktv.com/wp-json/wp/v2/posts
+https://www.popsci.com/wp-json/wp/v2/posts
+https://www.popphoto.com/wp-json/wp/v2/posts
+https://www.outdoorlife.com/wp-json/wp/v2/posts
+https://www.fieldandstream.com/wp-json/wp/v2/posts
 https://eclecticlight.co/
 https://www.thenation.com/wp-json/wp/v2/posts
 https://techfundingnews.com/wp-json/wp/v2/posts
 https://vinepair.com/wp-json/wp/v2/posts
-https://www.jonandnic.com/wp-json/wp/v2/posts
 https://locusmag.com/wp-json/wp/v2/posts
 https://news.pollstar.com/wp-json/wp/v2/posts
 https://www.brickfanatics.com/wp-json/wp/v2/posts
@@ -42,14 +62,11 @@ https://www.gizchina.com/wp-json/wp/v2/posts
 https://www.saturdayeveningpost.com/wp-json/wp/v2/posts/1140519
 https://globalnews.ca/wp-json/wp/v2/posts
 https://revealnews.org/wp-json/wp/v2/posts
-https://reason.com/wp-json/
+https://reason.com/wp-json/ videos?
 https://techiegamers.com/wp-json/wp/v2/posts
 https://home-assistant-guide.com/wp-json/wp/v2/posts
 https://ohiostatebuckeyes.com/wp-json/wp/v2/posts
 https://www.schneier.com/wp-json/wp/v2/posts
-https://threatpost.com/wp-json/wp/v2/posts/
-https://www.cyberscoop.com/wp-json/wp/v2/posts
-https://borncity.com/win/wp-json/wp/v2/posts/
 https://makezine.com/wp-json/wp/v2/posts
 https://www.thedetroitbureau.com/wp-json/wp/v2/posts/235200
 https://austinkleon.com/wp-json/wp/v2/posts
@@ -62,7 +79,6 @@ https://philip.greenspun.com/blog/wp-json/wp/v2/posts
 https://nextdraft.com/wp-json/wp/v2/posts
 https://www.the-sun.com/wp-json/wp/v2/posts
 https://www.nationalreview.com/wp-json/wp/v2/posts
-https://punchbowl.news/wp-json/wp/v2/posts
 https://www.opensecrets.org/news/wp-json/wp/v2/posts
 https://www.insidehook.com/wp-json/wp/v2/article/623487
 https://consequence.net/wp-json/wp/v2/posts
@@ -78,6 +94,12 @@ https://undark.org/wp-json/wp/v2/posts
 https://mpost.io/wp-json/wp/v2/posts
 https://aanwire.com/wp-json/wp/v2/posts
 
+Paywall: https://punchbowl.news/wp-json/wp/v2/posts
+
+
+https://www.destructoid.com
+Posts are wp-json, but reviews are a different format using https://www.destructoid.com/wp-json/custom-api/v1/get_reviews
+
 https://wwd.com/eye/parties/whitney-art-party-2023-ashley-graham-rebecca-hall-1235505976/
 posts can be extracted by wp, but galleries need wp-json
 
@@ -86,6 +108,8 @@ wp-posts without access to wp-json:
 https://www.politico.eu/wp-json/wp/v2/posts
 https://blogs.windows.com/windows-insider/wp-json/wp/v2/posts/176000
 https://unherd.com/wp-json/wp/v2/posts
+https://www.phillymag.com/news/2023/02/08/temple-strike-philadelphia/
+https://www.dxomark.com/samsung-galaxy-s23-plus-camera-test-results/
 
 WP_PUBLIC
 Need to convert sites.json to use netloc instead of domain
@@ -93,6 +117,11 @@ https://yahooeysblog.wordpress.com/, siteId=17277507
 
 Seems to be wp-posts format
 https://www.roku.com/blog/api/v1/posts?embed=true&page=1&limit=18&tags=578
+
+https://symantec-enterprise-blogs.security.com/blogs/api/v1/content-item/by-alias?aid=IOTVy1&alias=blog-post/zero-trust-risk-and-visibility&display-context=17202&sid=0ea78691-3b54-45e2-bd5f-b45ee9a86226
+
+https://www.apollographql.com/blog/page-data/announcement/platform/apollo-federation-and-graphos-add-support-for-entity-interfaces-to-streamline-collaboration/page-data.json
+
 
 ???
 https://www.treehugger.com/legend-christmas-spiders-4868322
@@ -118,21 +147,10 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
-https://dirt.fyi/_next/data/MxxwEgBdOy1Fl3bMzPo0a/article/2023/01/the-death-of-canon.json
-https://dirt.fyi/api/static/post?id=7hIuoBtnp5JE8jhsqV5CFK
-
+https://healeycodes.com/_next/data/_Y80jRUyFti1fGejohSRI/my-own-python-web-framework.json
 https://clutchpoints.com/_next/data/vw2yRwsg-eaPoGVQcFkmX/en/ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans.json?slug=ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans
-
-https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
-
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
-
 https://www.drive.com.au/_next/data/d67eec33886c2abb9d746c9f1915820374216679/news/2024-volkswagen-id-4-id-5-australia-new-details.json
-
-https://danfitdegree.hashnode.dev/_next/data/zUx9PSXK2ZQSmFJ79mHZ5/nothing-has-ever-angered-me-more-than-the-google-play-team.json?slug=nothing-has-ever-angered-me-more-than-the-google-play-team
-
-https://futurism.com/_next/data/ZL9EuavDBWdZMqrxRiTgB/neoscope/feds-cracking-down-vaping-law.json
-
 https://sfstandard.com/
 
 https://thesportsrush.com/_next/data/ga_EJdLvwrcW-wAJYJUVG/nba-news-this-is-why-malika-andrews-aint-no-rachel-nichols-jimmy-butlers-moment-with-former-espn-host-could-hilariously-be-undoing-of-successor.json
@@ -198,6 +216,8 @@ view-source:https://www.sportingnews.com/us/nba/news/warriors-starting-closing-l
 https://www.sportingnews.com/us/jsonapi/node/article?filter[drupal_internal__nid][value]=699421
 https://www.sportingnews.com/us/jsonapi/node/article/8c15c8ce-d55f-440c-88e3-269be88a552f
 https://www.rokuguide.com/
+https://www.mcgill.ca/oss/article/health-and-nutrition-history/vinyl-chloride-and-ohio-train-derailment
+
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
 
@@ -262,3 +282,21 @@ APOLLO_STATE
 https://www.thecrimson.com/article/2023/1/25/comaroff-walkout-spring-23/
 https://api.thecrimson.com/graphql
 query GetContent
+
+???
+https://www.industrydive.com/publications
+https://www.smartcitiesdive.com/
+
+
+https://www.itsnicethat.com/articles/olivia-pedigo-discover-digital-200223
+<script id="props" type="application/json">
+
+Posthaven
+https://blog.aaronkharris.com/there-are-no-absolute-red-flags-in-venture-capital
+
+
+Gatsby
+https://www.kctofel.com/im-tired-of-managing-contacts-you-do-it/
+https://freddydumont.com/blog/gatsby-source-json-images
+https://www.gatsbyjs.com/blog/gatsby-is-joining-netlify/
+https://www.apollographql.com/blog/announcement/platform/apollo-federation-and-graphos-add-support-for-entity-interfaces-to-streamline-collaboration/

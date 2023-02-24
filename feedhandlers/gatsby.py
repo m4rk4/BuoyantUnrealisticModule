@@ -11,46 +11,46 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_path, width=1080):
-    return  'https://static.nationalgeographic.co.uk{}?w={}'.format(img_path, width)
+def resize_image(img_path, site_json, width=1080):
+    return  '{}{}?w={}'.format(site_json['image_url'], img_path, width)
 
 
-def add_image(image, width=1080):
+def add_image(image, site_json, width=1080):
     captions = []
     if image['entity'].get('caption'):
         captions.append(re.sub(r'</?p>', '', image['entity']['caption']))
     if image['entity'].get('credit'):
         captions.append(image['entity']['credit'])
-    img_src = resize_image(image['entity']['mediaImage']['url'])
+    img_src = resize_image(image['entity']['mediaImage']['url'], site_json, width)
     return utils.add_image(img_src, ' | '.join(captions))
 
 
-def render_content(content):
+def render_content(content, site_json):
     content_html = ''
     if content['entity']['type'] == 'ParagraphContent':
         content_html += content['entity']['content']['value']
 
     elif content['entity']['type'] == 'ParagraphImageToolkitElement':
-        content_html += add_image(content['entity']['image'])
+        content_html += add_image(content['entity']['image'], site_json)
 
     elif content['entity']['type'] == 'ParagraphImageGroup':
         for image in content['entity']['images']:
-            content_html += add_image(image)
+            content_html += add_image(image, site_json)
 
     elif content['entity']['type'] == 'ParagraphGalleryInlineElement':
         content_html += '<h3>Gallery: {}</h3>'.format(content['entity']['photoGallery']['entity']['title'])
         for image in content['entity']['photoGallery']['entity']['images']:
-            content_html += add_image(image)
+            content_html += add_image(image, site_json)
 
     elif content['entity']['type'] == 'ParagraphImmersiveLead':
         if content['entity'].get('immersiveImage'):
-            content_html += add_image(content['entity']['immersiveImage'])
+            content_html += add_image(content['entity']['immersiveImage'], site_json)
         else:
             logger.warning('unhandled ParagraphImmersiveLead')
 
     elif content['entity']['type'] == 'ParagraphVideoToolkit':
         if content['entity']['video']['entity'].get('image'):
-            poster = resize_image(content['entity']['video']['entity']['image']['entity']['mediaImage']['url'])
+            poster = resize_image(content['entity']['video']['entity']['image']['entity']['mediaImage']['url'], site_json)
         else:
             poster = ''
         caption = '<a href="https://www.nationalgeographic.co.uk{}"><strong>{}</strong></a>'.format(content['entity']['video']['entity']['url']['path'], content['entity']['video']['entity']['title'])
@@ -81,10 +81,17 @@ def render_content(content):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    api_url = 'https://{}/page-data{}/page-data.json'.format(split_url.netloc, split_url.path)
+    if site_json.get('page_data_prefix') and split_url.path.startswith(site_json['page_data_prefix']):
+        path = split_url.path[len(site_json['page_data_prefix']):]
+    else:
+        path = split_url.path
+    if path.endswith('/'):
+        path = path[:-1]
+    api_url = '{}://{}{}/page-data{}/page-data.json'.format(split_url.scheme, split_url.netloc, site_json['page_data_prefix'], path)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
+    utils.write_file(api_json, './debug/debug.json')
 
     article_json = api_json['result']['pageContext']['node']['data']['content']
     if save_debug:
@@ -135,17 +142,17 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['subHeadline'])
 
     if article_json.get('immersiveLead'):
-        item['content_html'] += render_content(article_json['immersiveLead'])
+        item['content_html'] += render_content(article_json['immersiveLead'], site_json)
     elif article_json.get('image'):
-        item['content_html'] += add_image(article_json['image'])
+        item['content_html'] += add_image(article_json['image'], site_json)
 
     if article_json.get('mainContent'):
         for content in article_json['mainContent']:
-            item['content_html'] += render_content(content)
+            item['content_html'] += render_content(content, site_json)
 
     if article_json.get('images'):
         for content in article_json['images']:
-            item['content_html'] += add_image(content)
+            item['content_html'] += add_image(content, site_json)
 
     item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
     return item
@@ -155,9 +162,13 @@ def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     if len(split_url.path) <= 1:
         path = '/index'
+    elif site_json.get('page_data_prefix') and split_url.path.startswith(site_json['page_data_prefix']):
+        path = split_url.path[len(site_json['page_data_prefix']):]
     else:
         path = split_url.path
-    api_url = 'https://{}/page-data/{}/page-data.json'.format(split_url.netloc, path)
+    if path.endswith('/'):
+        path = path[:-1]
+    api_url = '{}://{}{}/page-data{}/page-data.json'.format(split_url.scheme, split_url.netloc, site_json['page_data_prefix'], path)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None

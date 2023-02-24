@@ -244,13 +244,16 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html = utils.add_image(img_src, ' | '.join(captions))
 
             elif el['shortcode'] == 'video':
-                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
-                #utils.write_file(shortcode_json, './debug/shortcode.json')
-                if shortcode_json.get('mp4Url'):
-                    new_html += utils.add_video(shortcode_json['mp4Url'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
-                elif shortcode_json.get('files'):
-                    it = utils.closest_dict(shortcode_json['files']['data'], 'height', 480)
-                    new_html += utils.add_video(it['streamingUrl'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
+                if el.get('api'):
+                    shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                    #utils.write_file(shortcode_json, './debug/shortcode.json')
+                    if shortcode_json.get('mp4Url'):
+                        new_html += utils.add_video(shortcode_json['mp4Url'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
+                    elif shortcode_json.get('files'):
+                        it = utils.closest_dict(shortcode_json['files']['data'], 'height', 480)
+                        new_html += utils.add_video(it['streamingUrl'], 'video/mp4', resize_image(shortcode_json['image']['path'], secret_key), shortcode_json['headline'])
+                else:
+                    logger.warning('unhandled shortcode video with no api in ' + item['url'])
 
             elif el['shortcode'] == 'twitter_tweet' or el['shortcode'] == 'youtube_video':
                 new_html += utils.add_embed(el['url'])
@@ -302,13 +305,38 @@ def get_content(url, args, site_json, save_debug=False):
 
             elif el['shortcode'] == 'chart':
                 chart_json = json.loads(el['chart'].replace('&quot;', '"'))
-                new_html = '<h2>{}</h2><table>'.format(chart_json['chartName'])
-                for row in chart_json['chart']:
-                    new_html += '<tr>'
-                    for it in row:
-                        new_html += '<td>{}</td>'.format(it)
-                    new_html += '</tr>'
-                new_html += '</table>'
+                utils.write_file(chart_json, './debug/chart.json')
+                new_html = '<h2>{}</h2>'.format(chart_json['chartName'])
+                if chart_json.get('chart'):
+                    new_html += '<table>'
+                    for row in chart_json['chart']:
+                        new_html += '<tr>'
+                        for it in row:
+                            new_html += '<td style="padding:8px;">{}</td>'.format(it)
+                        new_html += '</tr>'
+                    new_html += '</table>'
+                elif chart_json.get('products'):
+                    max_rating = 0
+                    for row in chart_json['products']:
+                        rating = row['ratings'][0]
+                        if rating.endswith('%'):
+                            rating = float(rating[:-1])
+                        else:
+                            rating = int(rating.replace(',', ''))
+                        max_rating = max(max_rating, rating)
+                    for row in chart_json['products']:
+                        rating = row['ratings'][0]
+                        if rating.endswith('%'):
+                            rating = float(rating[:-1])
+                        else:
+                            rating = int(rating.replace(',', ''))
+                        pct = int(100*rating/max_rating)
+                        if pct >= 50:
+                            new_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, lightblue {}%, white {}%);"><p>{}</p><p>{}</p></div>'.format(pct, 100-pct, row['productName'], row['ratings'][0])
+                        else:
+                            new_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {}%, lightblue {}%);"><p>{}</p><p>{}</p></div>'.format(100-pct, pct, row['productName'], row['ratings'][0])
+                if chart_json.get('explanation'):
+                    new_html += '<div><small><b>Note:</b> {}</small></div>'.format(chart_json['explanation'])
 
             elif el['shortcode'] == 'cnetlisticle' or el['shortcode'] == 'cross_content_listicle':
                 if el.get('imagegroup'):

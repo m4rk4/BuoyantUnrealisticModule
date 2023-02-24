@@ -1,9 +1,10 @@
-import re, tldextract
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
 
 import utils
+from feedhandlers import wp_posts
 
 import logging
 
@@ -24,10 +25,10 @@ def get_next_data(url, site_json):
     next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
-        logger.debug('updating futurism.com buildId')
         page_html = utils.get_url_html(url)
         m = re.search(r'"buildId":"([^"]+)"', page_html)
         if m and m.group(1) != site_json['buildId']:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
             site_json['buildId'] = m.group(1)
             utils.update_sites(url, site_json)
             next_url = '{}://{}/_next/data/{}/{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
@@ -107,48 +108,7 @@ def get_item(post_json, apollo_state, url, args, site_json, save_debug=False):
     if post_json.get('seo'):
         item['summary'] = post_json['seo']['description']
 
-    soup = BeautifulSoup(post_json['content'], 'html.parser')
-    for el in soup.find_all('figure'):
-        img_src = ''
-        it = el.find('img')
-        if it:
-            img_src = it['src']
-        else:
-            it = el.find('source')
-            if it:
-                img_src = utils.image_from_srcset(it['srcset'], 1000)
-        if img_src:
-            it = el.find('figcaption')
-            if it:
-                caption = it.decode_contents()
-            else:
-                caption = ''
-            it = el.find('a')
-            if it:
-                link = it['href']
-            else:
-                link = ''
-            new_html = utils.add_image(img_src, caption, link=link)
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-        else:
-            logger.warning('unhandled figure in ' + item['url'])
-
-    for el in soup.find_all('iframe'):
-        new_html = utils.add_embed(el['src'])
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        if el.parent and el.parent.name == 'p':
-            el.parent.insert_after(new_el)
-            el.parent.decompose()
-        else:
-            el.insert_after(new_el)
-            el.decompose()
-
-    for el in soup.find_all(attrs={"role": "complementary"}):
-        el.decompose()
-
-    item['content_html'] += str(soup)
+    item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
     return item
 
 

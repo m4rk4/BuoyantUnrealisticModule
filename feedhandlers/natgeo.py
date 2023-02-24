@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import quote_plus, urlsplit, unquote_plus
 
 import config, utils
-from feedhandlers import natgeo_uk
+from feedhandlers import gatsby
 
 import logging
 
@@ -139,7 +139,7 @@ def get_natgeo_json(url):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if split_url.netloc == 'www.nationalgeographic.co.uk':
-        return natgeo_uk.get_content(url, args, site_json, save_debug)
+        return gatsby.get_content(url, args, site_json, save_debug)
 
     natgeo_json = get_natgeo_json(url)
     if not natgeo_json:

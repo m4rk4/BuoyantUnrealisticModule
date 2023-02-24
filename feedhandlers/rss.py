@@ -59,9 +59,9 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
     else:
       entry_id = entry_link
  
-    # Skip duplicates based on the id
+    # Skip duplicates
     if len(feed_items) > 0:
-      if any(it['id'] == entry_id for it in feed_items):
+      if next((it for it in feed_items if (it['id'] == entry_id and it['url'] == entry_link)), None):
         logger.debug('skipping duplicate ' + entry_id)
         continue
 

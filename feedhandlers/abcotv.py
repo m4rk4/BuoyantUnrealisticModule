@@ -265,7 +265,11 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     for body in body_json['props']['body']:
-        item['content_html'] += render_body(body)
+        if isinstance(body, list):
+            for b in body:
+                item['content_html'] += render_body(b)
+        else:
+            item['content_html'] += render_body(body)
 
     if body_json['props']['dateline']:
         item['content_html'] = re.sub(r'<p>', '<p>{} &ndash; '.format(body_json['props']['dateline']), item['content_html'], count=1)
