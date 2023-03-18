@@ -23,8 +23,8 @@ def get_site_json(url):
     domain = 'megaphone.fm'
   elif tld.domain == 'go':
     domain = tld.subdomain
-  elif tld.domain == 'feedburner':
-    domain = urlsplit(url).path.split('/')[1].lower()
+  # elif tld.domain == 'feedburner':
+  #   domain = urlsplit(url).path.split('/')[1].lower()
   else:
     domain = tld.domain
   site_json = None
@@ -363,30 +363,54 @@ def image_from_srcset(srcset, target):
   # Two types of srcset:
   #  Absolute width: elva-fairy-480w.jpg 480w, elva-fairy-800w.jpg 800w
   #  Relative width: elva-fairy-320w.jpg, elva-fairy-480w.jpg 1.5x, elva-fairy-640w.jpg 2x
+  base_width = -1
   images = []
-  base_width = 0
-  for m in re.findall(r'((https?:|//).*?)(?=,\s?https?:|,\s?//|$)', srcset):
-    it = m[0].strip().split(' ')
-    image = {}
-    if it[0].startswith('//'):
-      image['src'] = 'https:' + it[0]
-    else:
-      image['src'] = it[0]
-    if len(it) == 1:
-      image['width'] = 1.0
-      base_width = get_image_width(image['src'])
-    elif it[1].endswith('x'):
-      image['width'] = float(it[1][:-1])
-      if image['width'] == 1.0:
+  srcset = srcset.strip()
+  if srcset.endswith(','):
+    srcset = srcset[:-1]
+  #print(srcset)
+  if srcset.endswith('w'):
+    ss = list(filter(None, re.split(r'\s(\d+)w', srcset)))
+    for i in range(0, len(ss), 2):
+      image = {}
+      if ss[i].startswith(','):
+        image['src'] = ss[i][1:].strip()
+      else:
+        image['src'] = ss[i].strip()
+      if image['src'].startswith('//'):
+        image['src'] = 'https:' + image['src']
+      image['width'] = int(ss[i + 1])
+      images.append(image)
+  elif re.search(r'\s([\d\.]+)x?$', srcset):
+    ss = list(filter(None, re.split(r'\s([\d\.]+)x?', srcset)))
+    for i in range(0, len(ss), 2):
+      image = {}
+      if ss[i].startswith(','):
+        image['src'] = ss[i][1:].strip()
+      else:
+        image['src'] = ss[i].strip()
+      if image['src'].startswith('//'):
+        image['src'] = 'https:' + image['src']
+      image['width'] = int(ss[i + 1])
+      if i == 0 and image['width'] > 1.0:
+          if image['src'].count(',') == 1:
+            m = re.search(r'(.*?),\s?(.*)', image['src'])
+            if m:
+              images.append({"src": m.group(1), "width": 1.0})
+              image['src'] = m.group(2)
+          elif image['src'].count(', ') == 1:
+            m = re.search(r'(.*?),\s(.*)', image['src'])
+            if m:
+              images.append({"src": m.group(1), "width": 1.0})
+              image['src'] = m.group(2)
+      if image['width'] == 1.0 and image['src'].startswith('http'):
         base_width = get_image_width(image['src'])
-    elif it[1].endswith('w'):
-      image['width'] = int(it[1][:-1])
-    elif it[1].isnumeric():
-      image['width'] = int(it[1])
-    images.append(image)
+      images.append(image)
+
   if base_width > 0:
     for image in images:
       image['width'] = int(image['width'] * base_width)
+
   if images:
     image = closest_dict(images, 'width', target)
     return image['src']
@@ -684,9 +708,9 @@ def get_youtube_id(ytstr):
   if '/watch?' in ytstr:
     m = re.search(r'v=([a-zA-Z0-9_-]{11})', ytstr)
   elif '/embed/' in ytstr:
-    m = re.search(r'\/embed\/([a-zA-Z0-9_-]{11})', ytstr)
+    m = re.search(r'/embed//?([a-zA-Z0-9_-]{11})', ytstr)
   elif 'youtu.be' in ytstr:
-    m = re.search(r'youtu\.be\/([a-zA-Z0-9_-]{11})', ytstr)
+    m = re.search(r'youtu\.be/([a-zA-Z0-9_-]{11})', ytstr)
   if m and m.group(1) != 'videoseries':
     yt_video_id = m.group(1)
   else:
@@ -836,6 +860,8 @@ def add_embed(url, args={}, save_debug=False):
 
   module, site_json = get_module(embed_url)
   if module:
+    if site_json.get('args'):
+        embed_args.update(site_json['args'])
     content = module.get_content(embed_url, embed_args, site_json, save_debug)
     if content:
       return content['content_html']
@@ -864,7 +890,10 @@ def get_content(url, args, save_debug=False):
   module, site_json = get_module(url)
   if not module:
     return None
-  return module.get_content(url, args, site_json, save_debug)
+  args_copy = args.copy()
+  if site_json.get('args'):
+      args_copy.update(site_json['args'])
+  return module.get_content(url, args_copy, site_json, save_debug)
 
 def get_ld_json(url):
   page_html = get_url_html(url)

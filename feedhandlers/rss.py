@@ -121,17 +121,19 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
         del feed_items[i:]
 
     # Get content if a function is given
-    if func_get_content:
-      for i, it in enumerate(feed_items):
-        if save_debug:
-          logger.debug('getting content for ' + it['url'])
+    for i, it in enumerate(feed_items):
+      if save_debug:
+        logger.debug('getting content for ' + it['url'])
+      if func_get_content:
         item = func_get_content(it['url'], args, site_json, save_debug)
-        if item:
-          # Add anything missing (except image)
-          for key, val in feed_items[i].items():
-            if not key in item and key != 'image':
-              item[key] = val
-          feed_items[i] = item
+      else:
+        item = utils.get_content(it['url'], args, save_debug)
+      if item:
+        # Add anything missing (except image)
+        for key, val in feed_items[i].items():
+          if not key in item and key != 'image':
+            item[key] = val
+        feed_items[i] = item
 
   feed['items'] = feed_items.copy()
   return feed

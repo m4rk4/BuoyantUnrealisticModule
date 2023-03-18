@@ -15,10 +15,14 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if paths[-1] == 'embed':
-        args['embed'] == True
+        args['embed'] = True
+        del paths[-1]
+        page_url = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, '/'.join(paths))
+    else:
+        page_url = url
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
-    page_html = utils.get_url_html(url)
+    page_html = utils.get_url_html(page_url)
     if not page_html:
         return None
     soup = BeautifulSoup(page_html, 'html.parser')
@@ -62,7 +66,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 elif ld.get('@type'):
                     ld_json.append(ld)
         except:
-            logger.warning('unable to convert ld+json in ' + url)
+            logger.warning('unable to convert ld+json in ' + page_url)
             pass
     if save_debug:
         utils.write_file(ld_json, './debug/debug.json')
@@ -132,7 +136,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if el:
             item['url'] = el['href']
         else:
-            item['url'] = url
+            item['url'] = page_url
 
     if not item.get('id') and item.get('url'):
         item['id'] = item['url']
@@ -158,8 +162,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['title'] = oembed_json['title']
         elif article_json and article_json.get('name'):
             item['title'] = article_json['name']
-        if re.search(r'#\d+', item['title']):
-            item['title'] = html.unescape(item['title'])
+    if item.get('title') and re.search(r'#\d+', item['title']):
+        item['title'] = html.unescape(item['title'])
 
     date = ''
     if meta and meta.get('article:published_time'):
@@ -217,7 +221,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if not authors:
         if ld_json:
             for it in ld_json:
-                if it.get('@type') and it['@type'] == 'Person':
+                if it.get('@type') and ((isinstance(it['@type'], str) and it['@type'] == 'Person') or (isinstance(it['@type'], list) and 'Person' in it['@type'])):
                     authors.append(it['name'])
         if meta and meta.get('author'):
             authors.append(meta['author'])
@@ -233,7 +237,15 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     elif site_json.get('authors'):
         item['author'] = {"name": site_json['authors']['default']}
 
-    if article_json and article_json.get('keywords'):
+    item['tags'] = []
+    if site_json.get('tags'):
+        for el in soup.find_all(site_json['tags']['tag'], attrs=site_json['tags']['attrs']):
+            if el.name == 'a':
+                item['tags'].append(el.get_text().strip())
+            else:
+                for it in el.find_all('a'):
+                    item['tags'].append(it.get_text().strip())
+    elif article_json and article_json.get('keywords'):
         if isinstance(article_json['keywords'], list):
             item['tags'] = article_json['keywords'].copy()
         elif isinstance(article_json['keywords'], str):
@@ -243,6 +255,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['tags'] = meta['article:tag'].copy()
     elif meta and meta.get('parsely-tags'):
         item['tags'] = list(map(str.strip, meta['parsely-tags'].split(',')))
+    elif meta and meta.get('keywords'):
+        item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
+    if not item.get('tags'):
+        del item['tags']
 
     if ld_json:
         for it in ld_json:
@@ -302,6 +318,19 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 if it:
                     item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
                     lede = True
+                else:
+                    it = el.find(id=re.compile(r'jw-player-'))
+                    if it:
+                        if article_json.get('video'):
+                            item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
+                            lede = True
+                        else:
+                            it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
+                            if it:
+                                m = re.search(r'"mediaid":"([^"]+)"', it.string)
+                                if m:
+                                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
+                                    lede = True
         if not lede and site_json.get('lede_img'):
             el = soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
             if el:

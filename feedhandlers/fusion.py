@@ -319,6 +319,12 @@ def process_content_element(element, url, site_json, save_debug):
         links = BeautifulSoup(element['html'], 'html.parser').find_all('a')
         element_html += utils.add_embed(links[-1]['href'])
 
+    elif element['type'] == 'reference':
+        if element['referent']['type'] == 'facebook-post':
+            element_html += utils.add_embed(element['referent']['id'])
+        else:
+            logger.warning('unhandled reference type ' + element['referent']['type'])
+
     elif element['type'] == 'story':
         # This may be Wapo specific
         headline = element['headlines']['basic']

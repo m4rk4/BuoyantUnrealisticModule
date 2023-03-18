@@ -1,20 +1,29 @@
-import json, re
+import copy, html, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from html import unescape
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
-from feedhandlers import rss
+import config, utils
+from feedhandlers import datawrapper, rss
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+def resize_image(img_src, width=1000):
+    split_url = urlsplit(img_src)
+    if split_url.netloc == 'dynaimage.cdn.cnn.com':
+        paths = list(filter(None, split_url.path[1:].split('/')))
+        return 'https://dynaimage.cdn.cnn.com/{}/q_auto,w_{},c_fit/{}'.format('/'.join(paths[:-2]), width, paths[-1])
+    return '{}://{}{}?c=original&q=w_{},c_fill'.format(split_url.scheme, split_url.netloc, split_url.path, width)
+
+
 def get_resized_image(image_cuts, width=1000):
     images = []
     for key, img in image_cuts.items():
+        if img['uri'].startswith('https://dynaimage.cdn.cnn.com'):
+            return resize_image(img['uri'], width)
         images.append(img)
     img = utils.closest_dict(images, 'width', width)
     if img['uri'].startswith('//'):
@@ -24,19 +33,31 @@ def get_resized_image(image_cuts, width=1000):
     return img_src
 
 
-def get_video_info_json(video_id, save_debug):
-    info_url = 'https://fave.api.cnn.io/v1/video?id={}&customer=cnn&edition=domestic&env=prod'.format(video_id)
-    info_json = utils.get_url_json(info_url)
-    if info_json:
-        if save_debug:
-            with open('./debug/video.json', 'w') as file:
-                json.dump(info_json, file, indent=4)
-    else:
-        logger.warning('unable to get video info from ' + info_url)
-    return info_json
+def get_video_info_json(video_id, save_debug=False):
+    headers = {
+        "accept": "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Chromium\";v=\"110\", \"Not A(Brand\";v=\"24\", \"Microsoft Edge\";v=\"110\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36 Edg/110.0.1587.57"
+    }
+    video_url = 'https://fave.api.cnn.io/v1/video?id={}&customer=cnn&edition=domestic&env=prod'.format(video_id)
+    video_json = utils.get_url_json(video_url, headers=headers)
+    if not video_json:
+        logger.warning('unable to get video info from ' + video_url)
+        return None
+    if save_debug:
+        utils.write_file(video_json, './debug/video.json')
+    return video_json
 
 
-def process_element(element, url, save_debug=False):
+def process_element(element):
     element_html = ''
     element_contents = None
     if element.get('elementContents'):
@@ -65,10 +86,10 @@ def process_element(element, url, save_debug=False):
         element_html += '</p>'
 
     elif element['contentType'] == 'editorial-note':
-        element_html += '<p><small><i><b>Editor\'s note:</b> '
+        element_html += '<div style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px; font-style:italic;"><b>Editor\'s note:</b> '
         for text in element_contents:
             element_html += text
-        element_html += '</i></small></p>'
+        element_html += '</div>'
 
     elif element['contentType'] == 'factbox':
         if not re.search(r'get our free|sign up', element_contents['title'], flags=re.I):
@@ -78,12 +99,10 @@ def process_element(element, url, save_debug=False):
             element_html += '</blockquote>'
 
     elif element['contentType'] == 'pullquote':
-        element_html += '<blockquote><b>{}</b><br> &ndash; {}</blockquote>'.format(element_contents['quote'],
-                                                                                   element_contents['author'])
+        element_html += '<blockquote><b>{}</b><br> &ndash; {}</blockquote>'.format(element_contents['quote'], element_contents['author'])
 
     elif element['contentType'] == 'raw-html':
-        if re.search(r'\bjs-cnn-erm\b|Click to subscribe|float:left;|float:right;', element_contents['html'],
-                     flags=re.I):
+        if re.search(r'\bjs-cnn-erm\b|Click to subscribe|float:left;|float:right;', element_contents['html'], flags=re.I):
             pass
         else:
             raw_soup = BeautifulSoup(element_contents['html'], 'html.parser')
@@ -93,41 +112,39 @@ def process_element(element, url, save_debug=False):
                     caption = it.get_text()
                 else:
                     caption = ''
-                element_html += utils.add_video('https:' + raw_soup.source['src'], raw_soup.source['type'],
-                                                'https:' + raw_soup.video['poster'], caption)
+                element_html += utils.add_video('https:' + raw_soup.source['src'], raw_soup.source['type'], 'https:' + raw_soup.video['poster'], caption)
             else:
                 element_html += re.sub(r'(\/\/[^\.]*.cnn\.com)', r'https:\1', element_contents['html'])
 
-    elif element['contentType'] == 'image':
+    elif element['contentType'] == 'image' or element['contentType'] == 'map':
         img_src = get_resized_image(element_contents['cuts'])
-        caption = element_contents['caption']
+        captions = []
+        if element_contents.get('caption'):
+            captions.append(element_contents['caption'])
         if element_contents.get('photographer'):
-            caption += ' ({})'.format(element_contents['photographer'])
+            captions.append(element_contents['photographer'])
         elif element_contents.get('source'):
-            caption += ' ({})'.format(element_contents['source'])
-        element_html += utils.add_image(img_src, caption)
+            captions.append(element_contents['source'])
+        element_html += utils.add_image(img_src, ' | '.join(captions))
 
     elif element['contentType'] == 'gallery-full':
-        n = 1
-        if element.get('gallerycount'):
-            gallery_count = element['gallerycount']
-        else:
-            gallery_count = len(element_contents)
         for content in element_contents:
             if content['contentType'] == 'image':
                 img_src = get_resized_image(content['elementContents']['cuts'])
-                caption = '[{}/{}] '.format(n, gallery_count)
-                caption += content['elementContents']['caption'][0]
+                if content['elementContents'].get('caption'):
+                    desc = content['elementContents']['caption'][0]
+                else:
+                    desc = ''
                 if content['elementContents'].get('photographer'):
-                    caption += ' ({})'.format(content['elementContents']['photographer'])
+                    caption = content['elementContents']['photographer']
                 elif content['elementContents'].get('source'):
-                    caption += ' ({})'.format(content['elementContents']['source'])
-                caption = caption.replace('"', '&quot;')
-                element_html += utils.add_image(img_src, caption)
-                n += 1
+                    caption = content['elementContents']['source']
+                else:
+                    caption = ''
+                element_html += utils.add_image(img_src, caption, desc=desc)
 
     elif element['contentType'] == 'video-demand':
-        video_info = get_video_info_json(element_contents['videoId'], save_debug)
+        video_info = get_video_info_json(element_contents['videoId'])
         if video_info:
             video_src = ''
             for vid in video_info['files']:
@@ -160,14 +177,14 @@ def process_element(element, url, save_debug=False):
         elif element_contents.get('embedHtml'):
             element_html += utils.add_youtube(element_contents['embedHtml'])
         else:
-            logger.warning('trouble embedding YouTube video in ' + url)
+            logger.warning('unhandled contentType youtube')
 
     elif element['contentType'] == 'instagram':
         if element_contents.get('embedUrl'):
             element_html += utils.add_embed(element_contents['embedUrl'])
         else:
-            logger.warning('CNN instagram embed in ' + url)
-            element_html += utils.add_instagram(element_contents['embedHtml'])
+            logger.warning('unhandled contentType instagram')
+            #element_html += utils.add_instagram(element_contents['embedHtml'])
 
     elif element['contentType'] == 'twitter':
         if element_contents.get('embedUrl'):
@@ -177,11 +194,47 @@ def process_element(element, url, save_debug=False):
             if m:
                 element_html += utils.add_embed(m[-1])
             else:
-                logger.warning('unable to find embed Twitter url in {} ' + url)
+                logger.warning('unhandled contentType twitter')
 
     else:
-        logger.warning('unhandled element type {} in {}'.format(element['contentType'], url))
+        logger.warning('unhandled contentType ' + element['contentType'])
     return element_html
+
+
+def format_page_contents(page_contents, item):
+    first_element = True
+    content_html = ''
+    for pages in page_contents:
+        for page in pages:
+            if page:
+                for zone in page['zoneContents']:
+                    if isinstance(zone, list):
+                        if len(zone) >= 1 and zone[0]:
+                            content_html += '<p>'
+                            for z in zone:
+                                content_html += z
+                            content_html += '</p>'
+                        continue
+                    if zone.get('type'):
+                        # Note: "containers" seem to be ads, related articles, etc.
+                        if zone['type'] == 'element':
+                            # Remove the feed image if there's a lead photo/video
+                            if first_element:
+                                if re.search(r'^(gallery|image|video)', zone['contentType']):
+                                    item['_image'] = item['image']
+                                    del item['image']
+                            else:
+                                if item.get('image'):
+                                    content_html += utils.add_image(item['image'])
+                                    item['_image'] = item['image']
+                                    del item['image']
+                            content_html += process_element(zone)
+                            first_element = False
+                    else:
+                        if zone.get('formattedText'):
+                            for text in zone['formattedText']:
+                                content_html += '<p>{}</p>'.format(text)
+    return content_html
 
 
 def get_item_info(article_json, save_debug=False):
@@ -226,217 +279,702 @@ def get_item_info(article_json, save_debug=False):
     return item
 
 
-def get_content_from_html(url, args, site_json, save_debug=False):
+def get_content(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if 'live-news' in paths or 'spanish' in paths:
+        return None
+    if split_url.netloc == 'ix.cnn.io' and 'dailygraphics' not in paths:
+        return datawrapper.get_content(url, args, site_json, True)
+
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
     if save_debug:
-        with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-            f.write(article_html)
+        utils.write_file(article_html, './debug/debug.html')
 
-    item = {}
-    item['id'] = url
-    item['url'] = url
+    soup = BeautifulSoup(article_html, 'lxml')
 
-    soup = BeautifulSoup(article_html, 'html.parser')
+    if split_url.netloc == 'ix.cnn.io' and 'dailygraphics' in paths:
+        el = soup.find(id='g-ai2html-graphic-desktop')
+        if el:
+            m = re.search(r'max-width:(\d+)px;.*max-height:(\d+)px', el['style'])
+            item = {}
+            item['id'] = url
+            item['url'] = url
+            item['_image'] = '{}/screenshot?url={}&width={}&height={}&locator=%23g-ai2html-graphic-desktop'.format(config.server, quote_plus(url), m.group(1), m.group(2))
+            item['content_html'] = utils.add_image(item['_image'], link=url)
+            return item
+
+    ld_json = []
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
-        info = json.loads(el.string)
-        if save_debug:
-            with open('./debug/debug.json', 'w') as file:
-                json.dump(info, file, indent=4)
+        ld_json.append(json.loads(el.string))
+    if not ld_json:
+        logger.warning('unable to find ld+json data in ' + url)
+        return None
+    if save_debug:
+        utils.write_file(ld_json, './debug/debug.json')
 
-        if info.get('headline'):
-            item['title'] = unescape(info['headline'])
-        elif info.get('title'):
-            item['title'] = unescape(info['title'])
-        elif info.get('name'):
-            item['title'] = unescape(info['name'])
+    if 'podcasts' in paths:
+        audio_player = soup.find('audio-player-wc')
+        if audio_player:
+            item = {}
+            item['id'] = url
+            item['url'] = url
+            el = audio_player.find(id='title')
+            if el:
+                item['title'] = el.string.encode('iso-8859-1').decode('utf-8')
+            el = audio_player.find(id='date')
+            if el:
+                # Oct 14, 2022
+                dt = datetime.strptime(el.string.strip(), '%b %d, %Y')
+                item['date_published'] = dt.isoformat()
+                item['_timestamp'] = dt.timestamp()
+                item['_display_date'] = utils.format_display_date(dt, False)
+            el = audio_player.find(id='author')
+            if el:
+                item['author'] = {}
+                item['author']['name'] = el.string
+                item['author']['url'] = 'https://www.cnn.com' + el['href']
+            el = audio_player.find('picture')
+            if el:
+                it = el.find('source')
+                if it:
+                    item['_image'] = 'https://www.cnn.com' + it['srcset']
+            el = audio_player.find(id='description')
+            if el:
+                item['summary'] = el.string.encode('iso-8859-1').decode('utf-8')
+            item['_audio'] = utils.get_redirect_url(audio_player['src'])
+            attachment = {}
+            attachment['url'] = item['_audio']
+            attachment['mime_type'] = 'audio/mpeg'
+            item['attachments'] = []
+            item['attachments'].append(attachment)
+            poster = '{}/image?url={}&width=160&overlay=audio'.format(config.server, quote_plus(item['_image']))
+            item['content_html'] = '<div style="display:flex; flex-wrap:wrap;">'
+            item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><a href="{}"><img style="width:128px;" src="{}"/></a></div>'.format(item['_audio'], poster)
+            item['content_html'] += '<div style="flex:2; min-width:256px; margin:auto;">'
+            item['content_html'] += '<div style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+            item['content_html'] += '<div><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
+            item['content_html'] += '<div style="font-size:0.8em;">{}&nbsp;&bull;&nbsp;'.format(item['_display_date'])
+            el = audio_player.find(id='duration')
+            if el:
+                item['content_html'] += el.get_text().strip()
+            item['content_html'] += '</div></div></div>'
+            if 'embed' not in args:
+                item['content_html'] += '<p>{}</p>'.format(item['summary'])
+            return item
+    elif 'videos' in paths:
+        article_json = next((it for it in ld_json if it['@type'] == 'VideoObject'), None)
+    else:
+        article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
+    if article_json:
+        item = {}
+        item['id'] = article_json['url']
+        item['url'] = article_json['url']
+        if article_json.get('headline'):
+            item['title'] = article_json['headline']
+        elif article_json.get('name'):
+            item['title'] = article_json['name']
 
-        dt_pub = None
-        if info.get('datePublished'):
-            dt_pub = datetime.fromisoformat(info['datePublished'].replace('Z', '+00:00'))
-        elif info.get('uploadDate'):
-            dt_pub = datetime.fromisoformat(info['uploadDate'].replace('Z', '+00:00'))
-        if dt_pub:
-            item['date_published'] = dt_pub.isoformat()
-            item['_timestamp'] = dt_pub.timestamp()
-            item['_display_date'] = '{}. {}, {}'.format(dt_pub.strftime('%b'), dt_pub.day, dt_pub.year)
-
-        if info.get('dateModified'):
-            dt_mod = datetime.fromisoformat(info['dateModified'].replace('Z', '+00:00'))
-            item['date_modified'] = dt_mod.isoformat()
+        if article_json.get('datePublished'):
+            dt = datetime.fromisoformat(article_json['datePublished'].replace('Z', '+00:00'))
+        elif article_json.get('uploadDate'):
+            dt = datetime.fromisoformat(article_json['uploadDate'].replace('Z', '+00:00'))
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        if article_json.get('dateModified'):
+            dt = datetime.fromisoformat(article_json['dateModified'].replace('Z', '+00:00'))
+            item['date_modified'] = dt.isoformat()
 
         item['author'] = {}
-        if info.get('author'):
-            item['author']['name'] = re.sub(r', CNN.*$', '', info['author']['name'])
-        else:
+        if article_json.get('author'):
+            authors = []
+            if isinstance(article_json['author'], list):
+                for it in article_json['author']:
+                    authors.append(it['name'])
+                if authors:
+                    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            else:
+                item['author']['name'] = re.sub(r'^By\s', '', article_json['author']['name'])
+        if not item.get('author') and article_json.get('publisher'):
+            item['author']['name'] = article_json['publisher']['name']
+        if not item.get('author'):
             item['author']['name'] = 'CNN'
 
-        if info.get('image'):
-            if isinstance(info['image'], dict):
-                item['_image'] = info['image']['url']
+        if article_json.get('articleSection'):
+            if isinstance(article_json['articleSection'], list):
+                item['tags'] = article_json['articleSection'].copy()
+
+        if article_json.get('image'):
+            image = article_json['image']
+        elif article_json.get('thumbnail'):
+            image = article_json['thumbnail']
+        elif article_json.get('thumbnailUrl'):
+            image = article_json['thumbnailUrl']
+        if isinstance(image, list):
+            image = image[0]
+        if isinstance(image, dict):
+            item['_image'] = image['url']
+        else:
+            item['_image'] = image
+
+        if article_json.get('description'):
+            desc = article_json['description'].replace('&lt;', '<').replace('&gt;', '>')
+            item['summary'] = BeautifulSoup('<p>{}</p>'.format(desc), 'html.parser').get_text()
+
+        if article_json.get('@type') == 'VideoObject':
+            if article_json['contentUrl'].endswith('.cnn'):
+                # https://www.cnn.com/videos/cnn10/2023/02/16/ten-0217orig.cnn
+                m = re.search(r'https://www\.cnn\.com/videos/(.*)', article_json['contentUrl'])
+                if m:
+                    video_json = get_video_info_json(m.group(1), True)
+                    if video_json:
+                        video = next((it for it in video_json['files'] if (it.get('fileUri') and it['fileUri'].endswith('.mp4'))), None)
+                        if video:
+                            item['_video'] = video['fileUri']
             else:
-                item['_image'] = info['image']
+                item['_video'] = article_json['contentUrl']
+            item['content_html'] = ''
+            if item.get('_video'):
+                item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], 'Watch: ' + item['title'])
+            else:
+                logger.warning('unknown video content in ' + item['url'])
+            if 'embed' in args:
+                return item
+            item['content_html'] += '<p>{}</p>'.format(item['summary'])
+            return item
+    else:
+        el = soup.find('script', string=re.compile(r'window\.__INITIAL_STATE__'))
+        if el:
+            m = re.search(r'__INITIAL_STATE__ = (.*?);\n', el.string.strip())
+            initial_state = json.loads(m.group(1))
+            if save_debug:
+                utils.write_file(initial_state, './debug/initial.json')
+            article_json = initial_state[split_url.path]
+        else:
+            article_json = utils.get_url_json(utils.clean_url(url) + ':*.json')
+        if article_json:
+            utils.write_file(article_json, './debug/debug.json')
+            item = {}
+            item['id'] = article_json['canonicalUrl']
+            item['url'] = article_json['canonicalUrl']
+            item['title'] = article_json['title']
 
-        if info.get('description'):
-            item['summary'] = unescape(info['description'])
+            dt = datetime.fromisoformat(article_json['firstPublishDate'].replace('Z', '+00:00'))
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+            if article_json.get('lastPublishDate'):
+                dt = datetime.fromisoformat(article_json['lastPublishDate'].replace('Z', '+00:00'))
+                item['date_modified'] = dt.isoformat()
 
-        if info.get('@type') == 'VideoObject':
-            item['content_html'] = unescape(info['description'])
-            m = re.search(r'\"videoId\":"([^\"]+)\"', article_html)
-            if m:
-                video_info = get_video_info_json(m.group(1), save_debug)
-                if video_info:
-                    video_src = ''
-                    for vid in video_info['files']:
-                        if 'mp4' in vid['bitrate']:
-                            video_src = vid['fileUri']
-                            video_type = 'video/mp4'
-                            break
-                    if video_src:
-                        if video_src.startswith('/'):
-                            video_src = 'https://ht.cdn.turner.com/cnn/big' + video_src
-                        caption = ''
-                        if video_info.get('headline'):
-                            caption += video_info['headline'].strip()
-                        if video_info.get('description'):
-                            if caption and not caption.endswith('.'):
-                                caption += '. '
-                            caption += video_info['description'].strip()
-                        for img in reversed(video_info['images']):
-                            poster = img['uri']
-                            if img['name'] == '640x360':
-                                break
-                        item['content_html'] = utils.add_video(video_src, video_type, poster)
-                        item['content_html'] += '<p>{}</p>'.format(caption)
-                        return item
-
-    # Fallbacks
-    if not item.get('title'):
-        it = soup.find('meta', attrs={"property": "og:title"})
-        if it:
-            item['title'] = unescape(it['content'])
-
-    if not item.get('date_published'):
-        it = soup.find('meta', attrs={"name": "article:published_time"})
-        if it:
-            dt_pub = datetime.fromisoformat(it['content'].replace('Z', '+00:00'))
-            item['date_published'] = dt_pub.isoformat()
-            item['_timestamp'] = dt_pub.timestamp()
-            item['_display_date'] = dt_pub.strftime('%b %-d, %Y')
-
-    if not item.get('date_modified'):
-        it = soup.find('meta', attrs={"name": "article:modified_time"})
-        if it:
-            dt_mod = datetime.fromisoformat(it['content'].replace('Z', '+00:00'))
-            item['date_modified'] = dt_mod.isoformat()
-
-    if not item.get('author'):
-        it = soup.find('meta', attrs={"name": "author"})
-        if it:
             item['author'] = {}
-            item['author']['name'] = it['content'].replace('By ', '')
+            if article_json.get('bylineProfiles'):
+                if isinstance(article_json['bylineProfiles'], list):
+                    byline = article_json['bylineProfiles']
+                else:
+                    byline = article_json['bylineProfiles'][article_json['bylineProfiles']['type']]
+                if len(byline) > 0:
+                    authors = []
+                    for it in byline:
+                        authors.append(it['name'])
+                    if authors:
+                        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                    else:
+                        item['author']['name'] = 'CNN'
+            elif article_json.get('bylineText'):
+                item['author']['name'] = re.sub(r', CNN.*$', '', article_json['bylineText'])
+            else:
+                item['author']['name'] = 'CNN'
 
-    if not item.get('image'):
-        it = soup.find('meta', attrs={"property": "og:image"})
-        if it:
-            item['_image'] = it['content']
+            if article_json.get('sectionName'):
+                item['tags'] = []
+                item['tags'].append(article_json['sectionName'])
 
-    if not item.get('summary'):
-        it = soup.find('meta', attrs={"name": "description"})
-        if it:
-            item['summary'] = it['content']
+            if article_json.get('metaImage'):
+                item['image'] = 'https:' + article_json['metaImage']
 
-    article_body = soup.find(attrs={"itemprop": "articleBody"})
-    if article_body:
+            if article_json.get('description'):
+                item['summary'] = article_json['description']
+
+            if article_json.get('pageContents'):
+                item['content_html'] = format_page_contents(article_json['pageContents'], item)
+
+            if initial_state and 'gallery' in paths:
+                item['content_html'] = ''
+                if item.get('summary'):
+                    item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+                gallery = next((it for it in initial_state.values() if it.get('contentType') and it['contentType'] == 'gallery-full'), None)
+                if gallery:
+                    item['content_html'] += process_element(gallery)
+
+            item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+            return item
+        else:
+            meta = {}
+            for el in soup.find_all('meta'):
+                if el.get('property'):
+                    key = el['property']
+                elif el.get('name'):
+                    key = el['name']
+                else:
+                    continue
+                if meta.get(key):
+                    if isinstance(meta[key], str):
+                        if meta[key] != el['content']:
+                            val = meta[key]
+                            meta[key] = []
+                            meta[key].append(val)
+                    if el['content'] not in meta[key]:
+                        meta[key].append(el['content'])
+                else:
+                    meta[key] = el['content']
+            if save_debug:
+                utils.write_file(meta, './debug/meta.json')
+
+            item = {}
+            item['id'] = meta['og:url']
+            item['url'] = meta['og:url']
+            item['title'] = meta['og:title']
+
+            dt = datetime.fromisoformat(meta['pubdate'].replace('Z', '+00:00'))
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+            if meta.get('lastmod'):
+                dt = datetime.fromisoformat(meta['lastmod'].replace('Z', '+00:00'))
+                item['date_modified'] = dt.isoformat()
+
+            item['author'] = {}
+            if meta.get('author'):
+                item['author']['name'] = meta['author']
+            elif meta.get('og:site_name'):
+                item['author']['name'] = meta['og:site_name']
+
+            if meta.get('section'):
+                item['tags'] = []
+                item['tags'].append(meta['section'])
+
+            if meta.get('og:image'):
+                item['_image'] = meta['og:image']
+
+            if meta.get('description'):
+                item['summary'] = meta['description']
+
+    if 'embed' in args:
+        if item.get('_image'):
+            item['content_html'] = utils.add_image(item['_image'], '<a href="{}">{}</a>'.format(item['url'], item['title']), link=item['url'])
+            return item
+
+    if 'gallery' in paths:
+        item['content_html'] = ''
+        el = soup.find(class_='gallery-inline_unfurled__head')
+        if el:
+            image = el.find(class_='image')
+            if image:
+                captions = []
+                it = el.find(class_='gallery-inline_unfurled__top--credit')
+                if it:
+                    captions.append(it.get_text().strip())
+                    it.decompose()
+                it = el.find(class_='gallery-inline_unfurled__top--caption')
+                if it:
+                    captions.insert(0, it.get_text().strip())
+                item['content_html'] += utils.add_image(resize_image(image['data-url']), ' | '.join(captions))
+        el = soup.find(class_='gallery-inline_unfurled__description')
+        if el:
+            item['content_html'] += el.decode_contents()
+        el = soup.find(class_='gallery-inline_unfurled__slides-unfurled')
+        if el:
+            for image in el.find_all(class_='image'):
+                it = image.find(class_='image__credit')
+                if it:
+                    caption = it.get_text().strip()
+                else:
+                    caption = ''
+                it = image.find(attrs={"data-editable": "metaCaption"})
+                if it:
+                    it.name = 'p'
+                    desc = str(it)
+                else:
+                    desc = ''
+                item['content_html'] += utils.add_image(image['data-url'], caption, desc=desc)
+        return item
+
+    gallery = None
+    content = soup.find(class_='article__content')
+    if content:
+        lede = ''
         el = soup.find(class_='image__lede')
         if el:
-            article_body.insert(0, el)
-        elif item.get('_image'):
-            new_el = BeautifulSoup(utils.add_image(item['_image']), 'html.parser')
-            article_body.insert(0, new_el)
-
-        el = article_body.find(class_='source')
-        if el:
-            el.find_next_sibling('p').insert(0, el.strong)
-
-        for el in article_body.find_all(class_="image"):
-            img = el.find('img')
-            caption = ''
-            img_caption = el.find(attrs={"itemprop": "caption"})
-            if img_caption and img_caption.string:
-                caption += img_caption.string
-            img_credit = el.find(class_='image__credit')
-            if img_credit and img_credit.string:
-                if caption:
-                    caption += ' '
-                caption += '[{}]'.format(img_credit.string)
-            new_el = BeautifulSoup(utils.add_image(img['src'], caption), 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-
-        item['content_html'] = str(article_body)
+            div = el.find(class_='video-resource')
+            if div:
+                if article_json.get('video'):
+                    video = next((it for it in article_json['video'] if re.search(div['data-video-id'], it['url'])), None)
+                    if video:
+                        image = json.loads(html.unescape(div['data-fave-thumbnails']))
+                        captions = []
+                        if div.get('data-headline'):
+                            captions.append(html.unescape(div['data-headline']))
+                        if div.get('data-source-html'):
+                            source = BeautifulSoup(html.unescape(div['data-source-html']),
+                                                   'html.parser').get_text().strip()
+                            captions.append(re.sub(r'^-\s*', '', source))
+                        lede += utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
+            if not lede:
+                div = el.find(class_='interactive-video')
+                if div:
+                    video = div.find('video')
+                    if video:
+                        lede += utils.add_video(video.source['src'], video.source['type'], video.get('poster'))
+            if not lede:
+                gallery = el.find(class_='gallery-inline')
+                if gallery:
+                    div = el.find(class_='image_gallery-image')
+                    if div:
+                        captions = []
+                        it = div.find(class_='image_gallery-image__credit')
+                        if it and it.get_text().strip():
+                            captions.append(it.get_text().strip())
+                            it.decompose()
+                        it = div.find(class_='image_gallery-image__caption')
+                        if it and it.get_text().strip():
+                            captions.insert(0, it.get_text().strip())
+                        if gallery.get('data-headline'):
+                            caption = '<b>{}</b> (gallery below)<br/>'.format(gallery['data-headline'])
+                        else:
+                            caption = '<b>Photo gallery</b> (below)<br/>'
+                        caption += ' | '.join(captions)
+                        lede += utils.add_image(div['data-url'], caption)
+            if not lede:
+                div = el.find(class_='image')
+                if div:
+                    captions = []
+                    it = el.find(class_='image__credit')
+                    if it and it.get_text().strip():
+                        captions.append(it.get_text().strip())
+                        it.decompose()
+                    it = el.find(class_='image__caption')
+                    if it and it.get_text().strip():
+                        captions.insert(0, it.get_text().strip())
+                    lede += utils.add_image(div['data-url'], ' | '.join(captions))
+        item['content_html'] = lede
+        source = ''
+        for el in content.find_all(recursive=False):
+            new_html = ''
+            if 'paragraph' in el['class'] or 'subheader' in el['class']:
+                el.attrs = {}
+                if source:
+                    el.insert(0, BeautifulSoup(source, 'html.parser'))
+                    source = ''
+                continue
+            elif 'image' in el['class'] or 'image_inline-small' in el['class']:
+                captions = []
+                it = el.find(class_=re.compile(r'^image_.*_credit$'))
+                if it and it.get_text().strip():
+                    captions.append(it.get_text().strip())
+                    it.decompose()
+                it = el.find(attrs={"itemprop": "caption"})
+                if it and it.get_text().strip():
+                    captions.insert(0, it.get_text().strip())
+                new_html = utils.add_image(resize_image(el['data-url']), ' | '.join(captions))
+            elif 'image-slider' in el['class']:
+                captions = []
+                it = el.find(class_=re.compile(r'^image_.*_credit$'))
+                if it and it.get_text().strip():
+                    captions.append(it.get_text().strip())
+                    it.decompose()
+                it = el.find(attrs={"itemprop": "caption"})
+                if it and it.get_text().strip():
+                    captions.insert(0, it.get_text().strip())
+                new_html = '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap;">'
+                for it in el.find_all(class_='image'):
+                    new_html += '<div style="flex:1; min-width:360px;"><img src="{}" style="width:100%;" /></div>'.format(resize_image(it['data-url']))
+                new_html += '</div>'
+                if captions:
+                    new_html += '<figcaption><small>{}</small></figcaption>'.format(' | '.join(captions))
+                new_html += '</figure>'
+            elif 'gallery-inline' in el['class']:
+                gallery = copy.copy(el)
+                div = el.find(class_='image_gallery-image')
+                if div:
+                    captions = []
+                    it = div.find(class_='image_gallery-image__credit')
+                    if it and it.get_text().strip():
+                        captions.append(it.get_text().strip())
+                        it.decompose()
+                    it = div.find(class_='image_gallery-image__caption')
+                    if it and it.get_text().strip():
+                        captions.insert(0, it.get_text().strip())
+                    if el.get('data-headline'):
+                        caption = '<b>{}</b> (gallery below)<br/>'.format(el['data-headline'])
+                    else:
+                        caption = '<b>Photo gallery</b> (below)<br/>'
+                    caption += ' | '.join(captions)
+                    new_html = utils.add_image(div['data-url'], caption)
+            elif 'interactive-video' in el['class']:
+                video = el.find('video')
+                if video:
+                    new_html = utils.add_video(video.source['src'], video.source['type'], video.get('poster'))
+            elif 'video-resource' in el['class']:
+                video = next((it for it in article_json['video'] if re.search(el['data-video-id'], it['url'])), None)
+                if video:
+                    image = json.loads(html.unescape(el['data-fave-thumbnails']))
+                    captions = []
+                    if el.get('data-headline'):
+                        captions.append(html.unescape(el['data-headline']))
+                    if el.get('data-source-html'):
+                        source = BeautifulSoup(html.unescape(el['data-source-html']), 'html.parser').get_text().strip()
+                        captions.append(re.sub(r'^-\s*', '', source))
+                        source = ''
+                    new_html = utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
+            elif 'youtube' in el['class']:
+                it = el.find(class_='youtube__content')
+                if it:
+                    new_html = utils.add_embed('https://www.youtube.com/embed/' + it['data-video-id'])
+            elif 'twitter' in el['class']:
+                links = el.find_all('a')
+                new_html = utils.add_embed(links[-1]['href'])
+            elif 'instagram' in el['class']:
+                it = el.find(attrs={"data-instgrm-permalink": True})
+                if it:
+                    new_html = utils.add_embed(it['data-instgrm-permalink'])
+            elif 'map' in el['class']:
+                new_html = utils.add_image('{}/screenshot?url={}&locator={}'.format(config.server, quote_plus(item['url']), quote_plus('[data-id="{}"]'.format(el['data-id']))))
+            elif 'html-embed' in el['class']:
+                it = el.find('iframe')
+                if it:
+                    new_html = utils.add_embed(it['src'])
+                else:
+                    it = el.find(attrs={"data-type": "dailygraphics"})
+                    if it:
+                        new_html = utils.add_image('{}/screenshot?url={}&locator=%23root'.format(config.server, quote_plus(it['data-url'])), link=it['data-url'])
+                    else:
+                        it = el.find(class_='cnn-pcl-embed')
+                        if it:
+                            new_item = None
+                            if it.get('data-href'):
+                                new_item = get_content(it['data-href'], ['embed'], site_json, False)
+                            elif it.get('data-click-through'):
+                                new_item = get_content(it['data-click-through'], ['embed'], site_json, False)
+                            if new_item:
+                                new_html = new_item['content_html']
+                if not new_html:
+                    div = el.find(class_=re.compile(r'^m-infographic'))
+                    if div:
+                        if el.style and not next((it for it in div.contents if it != '\n'), None):
+                            m = re.findall(r'background-image:\s*url\(([^\)]+)\)', el.style.string)
+                            if m:
+                                img_src = m[-1]
+                                if img_src.startswith('//'):
+                                    img_src = 'https:' + img_src
+                                elif img_src.startswith('/'):
+                                    img_src = 'https://www.cnn.com' + img_src
+                                h = re.search(r'height:([^;]+);', el.style.string)
+                                if h:
+                                    new_html = '<div style="width:100%; text-align:center;"><img src="{}" style="width:{};" /></div>'.format(img_src, h.group(1))
+                                else:
+                                    new_html = utils.add_image(img_src)
+                        elif div.get('id') and div['id'] == 'ck-st-video-wt':
+                            video = div.find('video', class_='ck-vid-desk')
+                            if video:
+                                caption = ''
+                                if el:
+                                    caption = '<b>Interactive content:</b> '
+                                    m = re.search(r'document\.location\.href\s?=\s?"([^"]+)"', el.script.string)
+                                    if m:
+                                        link = m.group(1)
+                                    else:
+                                        link = ''
+                                    m = re.search(r'interaction:\s?"([^"]+)"', el.script.string)
+                                    if m:
+                                        if link:
+                                            caption += '<a href="{}">{}</a>'.format(link, m.group(1))
+                                        else:
+                                            caption += m.group(1)
+                                new_html = utils.add_video(video.source['src'], video.source['type'], video['poster'], caption)
+                        elif div.find(class_='cnnix-tout'):
+                            link = div.find('a')
+                            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                            it = div.find('img')
+                            if it:
+                                new_html += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><a href="{}"><img style="width:100%;" src="{}"/></a></div>'.format(link['href'], it['src'])
+                            it = div.find('p')
+                            if it:
+                                new_html += '<div style="flex:2; min-width:256px; margin:auto; font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link['href'], it.get_text())
+                            new_html += '</div>'
+                        elif div.find(class_='v-photo-container'):
+                            new_html = '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                            for it in div.find_all(class_='v-photo-container'):
+                                image = it.find('img')
+                                if image:
+                                    new_html += '<div style="flex:1; min-width:256px;"><img style="width:100%;" src="{}"/>'.format(image['src'])
+                                    caption = it.find(class_='v-photo-caption')
+                                    if caption:
+                                        new_html += '<div><small>{}</small></div>'.format(caption.get_text().strip())
+                                    new_html += '</div>'
+                            new_html += '</div></figure>'
+                        else:
+                            it = div.find(id=True)
+                            if it and div.script:
+                                m = re.search(r'pym\.Parent\("{}","([^"]+)"'.format(it['id']), div.script.string)
+                                if m:
+                                    new_item = get_content('https:' + m.group(1), args, site_json, False)
+                                    if new_item:
+                                        new_html = new_item['content_html']
+            elif 'source' in el['class']:
+                source = '<b>'
+                it = el.find(class_='source__location')
+                if it and it.get_text().strip():
+                    source += '{} '.format(it.get_text().strip())
+                it = el.find(class_='source__text')
+                if it and it.get_text().strip():
+                    source += '({}) — '.format(it.get_text().strip())
+                source += '</b>'
+                el.decompose()
+                continue
+            elif 'list' in el['class']:
+                el.unwrap()
+                continue
+            elif 'highlights' in el['class']:
+                new_html = utils.add_blockquote(el.decode_contents())
+            elif 'editor-note' in el['class'] or 'correction' in el['class']:
+                el.attrs = {}
+                el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px; font-style:italic;'
+                continue
+            elif 'footnote' in el['class']:
+                el.attrs = {}
+                el['style'] = 'font-style:italic;'
+                continue
+            elif 'factbox_inline-small' in el['class']:
+                it = el.find(attrs={"data-editable": "title"})
+                if it:
+                    if re.search(r'^Latest|^More on|newsletter', it.get_text().strip(), flags=re.I):
+                        el.decompose()
+                        continue
+                    else:
+                        new_html = utils.add_blockquote(el.decode_contents())
+            elif 'related-content' in el['class'] or 'related-content_without-image' in el['class']:
+                el.decompose()
+                continue
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled content element {} in {}'.format(el['class'], item['url']))
     else:
-        logger.warning('unable to parse content in ' + url)
-        item['content_html'] = ''
-        if item.get('_image'):
-            item['content_html'] += utils.add_image(item['_image'])
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
-    return item
+        content = soup.find(class_=['Article__body', 'BasicArticle__main', 'SpecialArticle__body'])
+        if content:
+            item['content_html'] = ''
+            el = soup.find(class_='SpecialArticle__headDescription')
+            if el:
+                item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text().strip())
 
+            el = soup.find(class_=['Hero__imageWrapper', 'BasicArticle__hero', 'SpecialArticle__hero'])
+            if el:
+                it = el.find('img', class_='Image__image')
+                if it:
+                    img_src = resize_image(it['src'])
+                else:
+                    img_src = ''
+                captions = []
+                it = el.find(class_=re.compile(r'__heroCredit'))
+                if it and it.get_text().strip():
+                    captions.append(it.get_text().strip())
+                    it.decompose()
+                it = el.find(class_=re.compile('__heroCaption'))
+                if it and it.get_text().strip():
+                    captions.insert(0, it.get_text().strip())
+                if img_src:
+                    item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
 
-def get_content_from_initial_state(url, args, site_json, save_debug=False):
-    article_html = utils.get_url_html(url)
-    if not article_html:
-        return None
-    if save_debug:
-        with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-            f.write(article_html)
-
-    m = re.search(r'<script>\s*window\.__INITIAL_STATE__ = (.+);\s+window.', article_html)
-    if m:
-        try:
-            initial_state = json.loads(m.group(1))
-        except:
-            logger.warning('Error loading initial_state data from ' + url)
+            for el in content.find_all(class_=False, recursive=False):
+                # This seems to be malformed html
+                el.unwrap()
+            for el in content.find_all(recursive=False):
+                new_html = ''
+                if re.search(r'Paragraph__|__paragraph', ' '.join(el['class'])):
+                    # TODO: __isDropCap
+                    it = el.find('cite')
+                    if it:
+                        it.name = 'strong'
+                    it = el.find('span', recursive=False)
+                    if it:
+                        it.unwrap()
+                    el.name = 'p'
+                    if 'Paragraph__isEditorialNote' in el['class']:
+                        el.attrs = {}
+                        el['style'] = 'border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px; font-style:italic;'
+                        el.insert(0, BeautifulSoup('<b>Editor\'s note: </b>', 'html.parser'))
+                    else:
+                        el.attrs = {}
+                    continue
+                elif 'EditorialNote__component' in el['class']:
+                    el.attrs = {}
+                    el['style'] = 'border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px; font-style:italic;'
+                    continue
+                elif 'BasicArticle__image' in el['class'] or 'CaptionedImage__component' in el['class'] or ('SpecialArticle__padLarge' in el['class'] and el.find('img', class_='Image__image')):
+                    it = el.find('img', class_='Image__image')
+                    img_src = resize_image(it['src'])
+                    captions = []
+                    credit = ''
+                    for it in el.find_all(class_=re.compile(r'__credit')):
+                        credit += it.get_text()
+                        it.decompose()
+                    if credit.strip():
+                        captions.append(credit.strip())
+                    it = el.find(class_=re.compile(r'__caption'))
+                    if it and it.get_text().strip():
+                        captions.insert(0, it.get_text().strip())
+                    if img_src:
+                        new_html = utils.add_image(img_src, ' | '.join(captions))
+                elif re.search(r'__pullquote', ' '.join(el['class'])):
+                    it = el.find(class_=re.compile(r'__pullquoteText'))
+                    if it and it.get_text().strip():
+                        quote = it.get_text().strip()
+                    else:
+                        quote = ''
+                    it = el.find(class_=re.compile(r'__pullquoteAuthor'))
+                    if it and it.get_text().strip():
+                        author = it.get_text().strip()
+                    else:
+                        author = ''
+                    if quote:
+                        new_html = utils.add_pullquote(quote, author)
+                elif re.search(r'Ad__|__ad|RelatedArticle|__related|SocialBar|Authors__component', ' '.join(el['class'])):
+                    el.decompose()
+                    continue
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    logger.warning('unhandled content element {} in {}'.format(el['class'], item['url']))
+        else:
+            logger.warning('unknown article content in ' + item['url'])
             return None
 
-    if save_debug:
-        with open('./debug/debug.json', 'w') as file:
-            json.dump(initial_state, file, indent=4)
+    item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', content.decode_contents())
 
-    slug = urlsplit(url).path
-    item = get_item_info(initial_state[slug])
-
-    first_element = True
-    item['content_html'] = ''
-    region = initial_state[slug]['regions']
-    region_key = region[region['type']]
-    for rc in initial_state[region_key]['regionContents']:
-        rc_key = rc[rc['type']]
-        for zone in initial_state[rc_key]['zones']:
-            zone_key = zone[zone['type']]
-            for zc in initial_state[zone_key]['zoneContents']:
-                zc_key = zc[zc['type']]
-                if not initial_state[zc_key].get('type'):
-                    logger.warning('skipping zoneContents {} in {}'.format(zc_key, url))
-                    continue
-                zc_type = initial_state[zc_key]['type']
-                if zc_type == 'element':
-                    # Remove the feed image if there's a lead photo/video
-                    if first_element:
-                        if re.search(r'^(gallery|image|video)', initial_state[zc_key]['contentType']):
-                            item['_image'] = item['image']
-                            del item['image']
-                    item['content_html'] += process_element(initial_state[zc_key], url, save_debug)
-                    first_element = False
-                elif zc_type == 'string':
-                    str_contents = initial_state[zc_key]['stringContents']
-                    if isinstance(str_contents[str_contents['type']], dict):
-                        for txt in str_contents[str_contents['type']]['formattedText']:
-                            item['content_html'] += '<p>{}</p>'.format(txt)
-                    else:
-                        logger.warning('string is a list {} in {}'.format(str(str_contents[str_contents['type']]), url))
+    if gallery:
+        if gallery.get('data-headline'):
+            item['content_html'] += '<h3>{}</h3>'.format(gallery['data-headline'])
+        else:
+            item['content_html'] += '<h3>Image gallery</h3>'
+        for el in gallery.find_all(class_='image_gallery-image'):
+            captions = []
+            it = el.find(class_='image_gallery-image__credit')
+            if it and it.get_text().strip():
+                captions.append(it.get_text().strip())
+                it.decompose()
+            it = el.find(class_='image_gallery-image__caption')
+            if it and it.get_text().strip():
+                captions.insert(0, it.get_text().strip())
+            item['content_html'] += utils.add_image(el['data-url'], ' | '.join(captions)) + '<div>&nbsp;</div>'
+        gallery.decompose()
     return item
 
 
@@ -464,85 +1002,50 @@ def get_live_news_content(url, args, site_json, save_debug=False):
     return None
 
 
-def get_content(url, args, site_json, save_debug=False):
-    if '/live-news/' in url:
-        return None
-    if re.search(r'\/(style|travel)\/', url):
-        return get_content_from_initial_state(url, args, site_json, save_debug)
-    if re.search(r'\/(cnn-underscored|videos)\/', url):
-        return get_content_from_html(url, args, site_json, save_debug)
-
-    split_url = urlsplit(url)
-    json_url = 'https://www.cnn.com{}:*.json'.format(split_url.path)
-    article_json = utils.get_url_json(json_url)
-    if not article_json:
-        return get_content_from_html(url, args, site_json, save_debug)
-    if save_debug:
-        with open('./debug/debug.json', 'w') as file:
-            json.dump(article_json, file, indent=4)
-
-    item = get_item_info(article_json)
-
-    first_element = True
-    content_html = ''
-    for pages in article_json['pageContents']:
-        for page in pages:
-            if page:
-                for zone in page['zoneContents']:
-                    if isinstance(zone, list):
-                        if len(zone) >= 1 and zone[0]:
-                            content_html += '<p>'
-                            for z in zone:
-                                content_html += z
-                            content_html += '</p>'
-                        continue
-                    if zone.get('type'):
-                        # Note: "containers" seem to be ads, related articles, etc.
-                        if zone['type'] == 'element':
-                            # Remove the feed image if there's a lead photo/video
-                            if first_element:
-                                if re.search(r'^(gallery|image|video)', zone['contentType']):
-                                    item['_image'] = item['image']
-                                    del item['image']
-                            else:
-                                if item.get('image'):
-                                    content_html += utils.add_image(item['image'])
-                                    item['_image'] = item['image']
-                                    del item['image']
-                            content_html += process_element(zone, json_url, save_debug)
-                            first_element = False
-                    else:
-                        if zone.get('formattedText'):
-                            for text in zone['formattedText']:
-                                content_html += '<p>{}</p>'.format(text)
-    item['content_html'] = content_html
-
-    return item
-
-
 def get_feed(url, args, site_json, save_debug=False):
-    n = 0
-    items = []
-    feed = rss.get_feed(url, args, site_json, save_debug)
-    for feed_item in feed['items']:
-        # Skip non- cnn.com urls
-        # Skip coupons/deals
-        # Skip podcasts - they have their own rss feeds
-        if not 'cnn.com' in feed_item['url'] or re.search(r'coupons\.cnn\.com|\/podcasts\/|\/specials\/',
-                                                          feed_item['url']):
-            if save_debug:
-                logger.debug('skipping ' + feed_item['url'])
-            continue
+    if url.endswith('.rss'):
+        # https://www.cnn.com/services/rss/
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+
+    soup = BeautifulSoup(page_html, 'lxml')
+
+    feed_urls = []
+    for el in soup.find_all('a', class_='container__link'):
+        if el['href'] not in feed_urls:
+            feed_urls.append(el['href'])
+
+    if not feed_urls:
+        for el in soup.find_all(class_='cd__headline'):
+            if el.a['href'] not in feed_urls:
+                feed_urls.append(el.a['href'])
+
+    if not feed_urls:
+        for el in soup.find_all('link', href=re.compile(r'coverageContainer')):
+            container_html = utils.get_url_html('https://www.cnn.com' + el['href'])
+            if container_html:
+                container_soup = BeautifulSoup(container_html, 'html.parser')
+                for it in container_soup.find_all('a'):
+                    if it['href'] not in feed_urls:
+                        feed_urls.append(it['href'])
+
+    n = 0
+    feed_items = []
+    for article_url in feed_urls:
         if save_debug:
-            logger.debug('getting content for ' + feed_item['url'])
-        item = get_content(feed_item['url'], args, site_json, save_debug)
+            logger.debug('getting content for https://www.cnn.com' + article_url)
+        item = get_content('https://www.cnn.com' + article_url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
-                items.append(item)
+                feed_items.append(item)
                 n += 1
                 if 'max' in args:
                     if n == int(args['max']):
                         break
-    feed['items'] = items.copy()
+    feed = utils.init_jsonfeed(args)
+    #feed['title'] = soup.title.get_text()
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

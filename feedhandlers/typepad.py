@@ -119,6 +119,9 @@ def get_content(url, args, site_json, save_debug=False):
         el.insert_after(new_el)
         el.decompose()
 
+    for el in soup.find_all('script'):
+        el.decompose()
+
     item['content_html'] = str(soup)
     return item
 

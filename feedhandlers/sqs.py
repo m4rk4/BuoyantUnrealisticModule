@@ -124,8 +124,7 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-video' in block['class']:
             if block.get('data-block-json'):
                 data_json = json.loads(block['data-block-json'])
-                if save_debug:
-                    utils.write_file(data_json, './debug/video.json')
+                #utils.write_file(data_json, './debug/video.json')
                 if data_json['providerName'] == 'YouTube' or data_json['providerName'] == 'Vimeo':
                     item['content_html'] += utils.add_embed(data_json['url'])
                 else:
@@ -136,9 +135,16 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-embed' in block['class']:
             if block.get('data-block-json'):
                 data_json = json.loads(block['data-block-json'])
-                if data_json['html'] and re.search(r'disqus', data_json['html'], flags=re.I):
-                    continue
-            logger.warning('unhandled sqs-block-video in ' + item['url'])
+                #utils.write_file(data_json, './debug/sqs.json')
+                if data_json.get('html'):
+                    if re.search(r'disqus', data_json['html'], flags=re.I):
+                        continue
+                    elif re.search(r'iframe', data_json['html']):
+                        embed_soup = BeautifulSoup(data_json['html'], 'html.parser')
+                        it = embed_soup.find('iframe')
+                        item['content_html'] += utils.add_embed(it['src'])
+                        continue
+            logger.warning('unhandled sqs-block-embed in ' + item['url'])
 
         elif 'sqs-block-horizontalrule' in block['class']:
             item['content_html'] += '<hr/>'
@@ -158,7 +164,16 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-quote in ' + item['url'])
 
         elif 'sqs-block-code' in block['class']:
-            if block['data-block-type'] == "23":
+            if block.find(class_='adsbygoogle'):
+                continue
+            elif block.find('iframe'):
+                it = block.find('iframe')
+                if re.search(r'amazon-adsystem', it['src']):
+                    continue
+                else:
+                    item['content_html'] += utils.add_embed(it['src'])
+                    continue
+            elif block['data-block-type'] == "23":
                 el = block.find('a')
                 if el:
                     it = el.find('img')
@@ -170,8 +185,8 @@ def get_content(url, args, site_json, save_debug=False):
                         img_src = utils.get_redirect_url(img_src)
                         img_src = re.sub(r'_SL\d+_', '_SL500_', img_src)
                         item['content_html'] += utils.add_image(img_src, link=utils.get_redirect_url(el['href']))
-            else:
-                logger.warning('unhandled sqs-block-code in ' + item['url'])
+                        continue
+            logger.warning('unhandled sqs-block-code in ' + item['url'])
 
         elif 'sqs-block-summary-v2' in block['class']:
             #utils.write_file(str(el), './debug/debug.html')

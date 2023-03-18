@@ -40,7 +40,9 @@ https://www.nbcphiladelphia.com/wp-json/wp/v2/posts
 https://www.nbcnewyork.com/wp-json/wp/v2/posts
 https://www.wivb.com/wp-json/wp/v2/posts
 https://www.wowktv.com/wp-json/wp/v2/posts
-https://www.popsci.com/wp-json/wp/v2/posts
+https://www.wdtn.com/wp-json/wp/v2/posts
+https://www.denverpost.com/wp-json/wp/v2/posts/5565640
+
 https://www.popphoto.com/wp-json/wp/v2/posts
 https://www.outdoorlife.com/wp-json/wp/v2/posts
 https://www.fieldandstream.com/wp-json/wp/v2/posts
@@ -122,6 +124,8 @@ https://symantec-enterprise-blogs.security.com/blogs/api/v1/content-item/by-alia
 
 https://www.apollographql.com/blog/page-data/announcement/platform/apollo-federation-and-graphos-add-support-for-entity-interfaces-to-streamline-collaboration/page-data.json
 
+Sveltejs
+https://www.codingwithjesse.com/api/article/deploying-a-static-site-to-cloudflare-pages.json
 
 ???
 https://www.treehugger.com/legend-christmas-spiders-4868322
@@ -147,6 +151,13 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://therecord.media/_next/data/d9-Z9zybsjCnrXtAE4t-r/section-702-fisa-senate-hearing-warner.json
+https://www.macstadium.com/_next/data/WdBY43r9CUIwBp8shDpX4/blog/first-look-mac-mini-with-m2-pro.json
+https://www.cmswire.com/_next/data/A086zS44XbE-O7fsLasWW/web-cms/salesforce-joins-the-battle-for-smart-crm-dominance-with-launch-of-einstein-gpt.json
+https://www.healthline.com/
+https://www.medicalnewstoday.com/
+https://greatist.com/
+https://psychcentral.com/
 https://healeycodes.com/_next/data/_Y80jRUyFti1fGejohSRI/my-own-python-web-framework.json
 https://clutchpoints.com/_next/data/vw2yRwsg-eaPoGVQcFkmX/en/ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans.json?slug=ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
@@ -255,6 +266,8 @@ https://palant.info/
 https://pradyunsg.me/blog/
 https://matthewc.dev/
 https://notes.ghed.in/
+https://foosel.net/
+https://ahelwer.ca/
 
 https://m.arenaev.com/reallife_test_reveals_how_much_range_evs_and_phevs_lose_during_winter-news-1308.php
 https://m.gsmarena.com/
@@ -300,3 +313,8 @@ https://www.kctofel.com/im-tired-of-managing-contacts-you-do-it/
 https://freddydumont.com/blog/gatsby-source-json-images
 https://www.gatsbyjs.com/blog/gatsby-is-joining-netlify/
 https://www.apollographql.com/blog/announcement/platform/apollo-federation-and-graphos-add-support-for-entity-interfaces-to-streamline-collaboration/
+
+Micro.blog
+https://blog.joshledgard.com/
+
+https://webcache.googleusercontent.com/search?q=cache:<url>

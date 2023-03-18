@@ -62,5 +62,6 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
     return item
 
+
 def get_feed(url, args, site_json, save_debug=False):
     return None

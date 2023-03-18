@@ -11,17 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    content = utils.get_url_html(url)
-    if not content:
+    page_html = utils.get_url_html(url)
+    if not page_html:
         return None
 
     if save_debug:
-        utils.write_file(content, './debug/debug.html')
+        utils.write_file(page_html, './debug/debug.html')
 
-    m = re.search(r'window\.__DW_SVELTE_PROPS__ = JSON\.parse\((.*?)\);\n', content)
-    if not m:
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', string=re.compile(r'__DW_SVELTE_PROPS__'))
+    if not el:
         logger.warning('unable to find __DW_SVELTE_PROPS__ in ' + url)
-        soup = BeautifulSoup(content, 'html.parser')
         el = soup.find('meta', attrs={"http-equiv": "REFRESH"})
         if el:
             m = re.search(r'url=([^;]+)', el['content'])
@@ -30,6 +30,7 @@ def get_content(url, args, site_json, save_debug=False):
                 return get_content(m.group(1), args, site_json, save_debug)
         return None
 
+    m = re.search(r'JSON\.parse\((.*?)\);\n', el.string)
     content_json = json.loads(json.loads(m.group(1)))
     if save_debug:
         utils.write_file(content_json, './debug/debug.json')
@@ -44,7 +45,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = chart_json['publicId']
-    item['url'] = url
+    if chart_json.get('publicUrl'):
+        item['url'] = chart_json['publicUrl']
+    else:
+        item['url'] = url
     item['title'] = BeautifulSoup(chart_json['title'], 'html.parser').get_text()
 
     dt = datetime.fromisoformat(chart_json['createdAt'].replace('Z', '+00:00'))
@@ -60,22 +64,33 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         item['author']['name'] = chart_json['organizationId']
 
-    item['_image'] = 'https://datawrapper.dwcdn.net/{}/plain-s.png?v=1'.format(item['id'])
+    el = soup.find('meta', attrs={"property": "og:image"})
+    if el:
+        item['_image'] = el['content']
+    else:
+        el = soup.find('meta', attrs={"property": "twitter:image"})
+        if el:
+            item['_image'] = el['content']
+        else:
+            item['_image'] = 'https://datawrapper.dwcdn.net/{}/plain-s.png?v=1'.format(item['id'])
     if not utils.url_exists(item['_image']):
-        item['_image'] = '{}/screenshot?url={}&locator=.dw-chart&width=800&height=800'.format(config.server, quote_plus(url))
+        item['_image'] = '{}/screenshot?url={}&width=800&height=800&locator=.dw-chart'.format(config.server, quote_plus(url))
 
     captions = []
-    item['content_html'] = '<h3>{}</h3>'.format(chart_json['title'])
+    item['content_html'] = '<div style="font-size:1.2em; font-weight:bold;">{}</div>'.format(chart_json['title'])
+    if chart_json['metadata'].get('describe') and chart_json['metadata']['describe'].get('intro'):
+        item['content_html'] += '<div>{}</div>'.format(chart_json['metadata']['describe']['intro'])
+
+    if chart_json['metadata'].get('annotate'):
+        if chart_json['metadata']['annotate'].get('notes'):
+            captions.append(chart_json['metadata']['annotate']['notes'])
     if chart_json['metadata'].get('describe'):
-        if chart_json['metadata']['describe'].get('intro'):
-            #item['content_html'] += '<p>{}</p>'.format(chart_json['metadata']['describe']['intro'])
-            captions.append(BeautifulSoup(chart_json['metadata']['describe']['intro'], 'html.parser').get_text())
-        if chart_json['metadata']['describe'].get('byline'):
-            captions.append(chart_json['metadata']['describe']['byline'])
         if chart_json['metadata']['describe'].get('source-name'):
-            captions.append(chart_json['metadata']['describe']['source-name'])
-    captions.append('<a href="{}">View chart</a>'.format(item['url']))
-    item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions), link=url)
+            captions.append('Source: ' + chart_json['metadata']['describe']['source-name'])
+        if chart_json['metadata']['describe'].get('byline'):
+            captions.append('Graphic: ' + chart_json['metadata']['describe']['byline'])
+    caption = '<br/>'.join(captions) + '<br/><a href="{}">View chart</a>'.format(item['url'])
+    item['content_html'] += utils.add_image(item['_image'], caption, link=url)
     return item
 
 

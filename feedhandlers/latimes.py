@@ -109,6 +109,7 @@ def add_media(media_el, width=1000):
 
     return media_html
 
+
 def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
@@ -184,6 +185,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in body.find_all(class_='enhancement'):
         if el.find(class_='google-dfp-ad-wrapper') or el.find('ps-nativo-module') or el.find('ps-promo') or el.find('ps-newsletter-module'):
+            el.decompose()
+        elif el.find(class_='infobox-title', string=re.compile(r'subscribers', flags=re.I)):
             el.decompose()
         elif el.find('a', href=re.compile('https://www\.latimes\.com/subscriptions/newsletters\.html')):
             # Subscription signup
