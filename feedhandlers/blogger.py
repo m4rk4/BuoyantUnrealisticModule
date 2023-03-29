@@ -11,6 +11,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
+    if img_src.startswith('//'):
+        img_src = 'https:' + img_src
     if not img_src.startswith('https://blogger.googleusercontent.com/img/'):
         return img_src
     # https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEhwtLj_nuoLbKbXR7DByAzp84su69-e32KGUm3OErdFCg0Aw1taNBqlS1-9tjrQyZlNQLsCiyT5RFbbR1SP4ckWz0pXsvXGqoVzhQRPs8LdPDeJQpwoBrr0zQ13kuwf3KAh3HzbzBmvx9FTdS82T0e7GCj_cZ1ujeOhhT1gUJDPMIrckJnODRs/s523/Screenshot%202023-03-17%209.30.31%20AM.png
@@ -137,7 +139,26 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             else:
                 logger.warning('unhandled blockquote class {} in {}'.format(el['class'], item['url']))
         else:
-            el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+            it = el.find('span', attrs={"style": re.compile(r'font-size:\s?x-small;')})
+            if it:
+                i = it.find('i')
+                if i:
+                    author = i.decode_contents()
+                else:
+                    author = it.decode_contents()
+                author = re.sub(r'[\-]{2,}', '', author).strip()
+                it.decompose()
+                it = el.find('b')
+                if it:
+                    quote = it.decode_contents()
+                else:
+                    quote = el.decode_contents()
+                new_html = utils.add_pullquote(quote, author)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
 
     item['content_html'] = content.decode_contents()
     return item

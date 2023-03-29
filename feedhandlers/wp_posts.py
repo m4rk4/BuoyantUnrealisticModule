@@ -416,7 +416,8 @@ def get_post_content(post, args, site_json, save_debug=False):
                         if not captions and link_json.get('caption'):
                             soup = BeautifulSoup(link_json['caption']['rendered'], 'html.parser')
                             if not soup.find(class_=True):
-                                caption = soup.get_text().strip()
+                                #caption = soup.get_text().strip()
+                                caption = re.sub(r'^<p>(.*?)</p>$', r'\1', link_json['caption']['rendered'])
                                 if caption:
                                     captions.append(caption)
                         if not captions and link_json.get('title'):
@@ -444,7 +445,8 @@ def get_post_content(post, args, site_json, save_debug=False):
                                 if not captions and it.get('caption'):
                                     soup = BeautifulSoup(it['caption']['rendered'], 'html.parser')
                                     if not soup.find(class_=True):
-                                        caption = soup.get_text().strip()
+                                        #caption = soup.get_text().strip()
+                                        caption = re.sub(r'^<p>(.*?)</p>$', r'\1', it['caption']['rendered'])
                                         if caption:
                                             captions.append(caption)
                                 if not captions and it.get('title'):
@@ -1253,6 +1255,19 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled epyt-video-wrapper in ' + item['url'])
 
+    for el in soup.find_all(class_='elementor-element'):
+        new_html = ''
+        if 'elementor-widget-video' in el['class']:
+            data_json = json.loads(el['data-settings'])
+            if data_json['video_type'] == 'youtube':
+                new_html = utils.add_embed(data_json['youtube_url'])
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled elementor-element in ' + item['url'])
+
     for el in soup.find_all(class_='sketchfab-embed-wrapper'):
         new_html = ''
         it = el.find('iframe')
@@ -1854,6 +1869,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         el.name = 'blockquote'
         el.attrs = {}
         el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+
+    for el in soup.find_all(class_='is-content-justification-center'):
+        el.attrs = {}
+        el['style'] = 'text-align:center;'
 
     for el in soup.find_all('a', href=re.compile(r'^/')):
         el['href'] = base_url + el['href']

@@ -172,6 +172,9 @@ def get_content(url, args, site_json, save_debug=False):
                 pass
             else:
                 media_html += utils.add_image(it['src'], link=el['href']) + '<br/>'
+    if not media_html:
+        for el in soup.body.find_all('img', class_='img', attrs={"data-src": True}):
+            media_html += utils.add_image(el['data-src']) + '<br/>'
     if media_html:
         item['content_html'] += '<tr><td colspan="2" style="padding:0.3em;">' + media_html[:-5] + '</td></tr>'
 

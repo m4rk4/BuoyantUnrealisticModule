@@ -152,10 +152,10 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled custom_embed iframe')
-        elif element['subtype'] == 'magnet' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
             pass
         else:
-            logger.warning('unhandled custom_embed')
+            logger.warning('unhandled custom_embed ' + element['subtype'])
 
     elif element['type'] == 'divider':
         element_html += '<hr />'
@@ -281,16 +281,27 @@ def process_content_element(element, url, site_json, save_debug):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 video_json = api_json[0]
+        elif not element.get('streams'):
+            api_url = '{}video-by-id?query=%7B%22id%22%3A%22{}%22%7D&d={}&_website={}'.format(site_json['api_url'], element['_id'], site_json['deployment'], site_json['arc_site'])
+            api_json = utils.get_url_json(api_url)
+            if api_json:
+                video_json = api_json
         else:
             video_json = element
         #utils.write_file(video_json, './debug/video.json')
         streams_mp4 = []
         streams_ts = []
         for stream in video_json['streams']:
-            if stream['stream_type'] == 'mp4':
-                streams_mp4.append(stream)
-            elif stream['stream_type'] == 'ts':
-                streams_ts.append(stream)
+            if stream.get('stream_type'):
+                if stream['stream_type'] == 'mp4':
+                    streams_mp4.append(stream)
+                elif stream['stream_type'] == 'ts':
+                    streams_ts.append(stream)
+            else:
+                if re.search(r'\.mp4', stream['url']):
+                    streams_mp4.append(stream)
+                elif re.search(r'\.m3u8', stream['url']):
+                    streams_ts.append(stream)
         stream = None
         if streams_mp4:
             if streams_mp4[0].get('height'):
@@ -320,10 +331,10 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += utils.add_embed(links[-1]['href'])
 
     elif element['type'] == 'reference':
-        if element['referent']['type'] == 'facebook-post':
+        if element.get('referent') and element['referent']['type'] == 'facebook-post':
             element_html += utils.add_embed(element['referent']['id'])
         else:
-            logger.warning('unhandled reference type ' + element['referent']['type'])
+            logger.warning('unhandled reference element')
 
     elif element['type'] == 'story':
         # This may be Wapo specific
@@ -615,7 +626,7 @@ def get_feed(url, args, site_json, save_debug=False):
         if len(paths) == 0:
             source = site_json['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
-        elif re.search(r'about|author|people|staff', paths[0]):
+        elif re.search(r'about|author|people|staff|team', paths[0]):
             if paths[0] == 'about':
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
                 author = paths[-1]

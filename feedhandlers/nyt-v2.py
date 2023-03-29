@@ -559,7 +559,7 @@ def get_live_feed(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     feed = None
-    if args['url'].endswith('.xml'):
+    if args['url'].endswith('.xml') or args['url'].endswith('/feed/'):
         feed = rss.get_feed(url, args, site_json, save_debug, get_content)
         m = re.search(r'publish/https://www\.nytimes\.com/(.*)/rss\.xml', args['url'])
         if m:

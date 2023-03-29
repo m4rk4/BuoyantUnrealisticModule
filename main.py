@@ -299,7 +299,7 @@ def screenshot():
     # Make sure playwright browsers are installed
     #   playwright install
     # Or from script:
-    # impoty install_playwright
+    # import install_playwright
     # from playwright.sync_api import sync_playwright
     # with sync_playwright() as p:
     #     install_playwright.install(p.webkit)

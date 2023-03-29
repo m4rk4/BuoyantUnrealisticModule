@@ -1,3 +1,4 @@
+Blogger - image captions: https://www.ubuntubuzz.com/2023/03/librepcb-free-electronic-design-automation-software.html
 
 RSS feed: https://www.popularmechanics.com/contenttype/news/
 
@@ -151,6 +152,7 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://beta.darkreading.com/_next/data/MRQZLrLBZoMyPCirkHNfy/risk/employees-feeding-sensitive-business-data-chatgpt-raising-security-fears.json
 https://therecord.media/_next/data/d9-Z9zybsjCnrXtAE4t-r/section-702-fisa-senate-hearing-warner.json
 https://www.macstadium.com/_next/data/WdBY43r9CUIwBp8shDpX4/blog/first-look-mac-mini-with-m2-pro.json
 https://www.cmswire.com/_next/data/A086zS44XbE-O7fsLasWW/web-cms/salesforce-joins-the-battle-for-smart-crm-dominance-with-launch-of-einstein-gpt.json
@@ -228,6 +230,10 @@ https://www.sportingnews.com/us/jsonapi/node/article?filter[drupal_internal__nid
 https://www.sportingnews.com/us/jsonapi/node/article/8c15c8ce-d55f-440c-88e3-269be88a552f
 https://www.rokuguide.com/
 https://www.mcgill.ca/oss/article/health-and-nutrition-history/vinyl-chloride-and-ohio-train-derailment
+https://www.soundonsound.com/
+https://www.hifinews.com/
+https://www.soundandvision.com/
+https://www.acsh.org/
 
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
