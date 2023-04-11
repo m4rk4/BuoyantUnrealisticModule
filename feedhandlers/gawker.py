@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss
+from feedhandlers import rss, youtube
 
 import logging
 
@@ -314,6 +314,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['content_html'] = re.sub(r'</blockquote><blockquote [^>]+>', '<br/><br/>', item['content_html'])
     item['content_html'] = re.sub(r'</[ou]l><[ou]l>', '', item['content_html'])
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

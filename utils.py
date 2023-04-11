@@ -27,43 +27,51 @@ def get_site_json(url):
   #   domain = urlsplit(url).path.split('/')[1].lower()
   else:
     domain = tld.domain
+
   site_json = None
   sites_json = read_json_file('./sites.json')
   if sites_json.get(domain):
-    site_json = sites_json[domain]
-  elif domain in sites_json['wp-posts']['sites']:
-    site_json = {
-        "module": "wp_posts",
-        "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
-        "posts_path": "/wp/v2/posts",
-        "feeds": [
-          "{}://{}/feed".format(split_url.scheme, split_url.netloc)
-        ]
-    }
-  elif url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
-    site_json = {
-        "module": "wp_posts",
-        "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
-        "posts_path": "/wp/v2/posts",
-        "feeds": [
-          "{}://{}/feed".format(split_url.scheme, split_url.netloc)
-        ]
-    }
-    logger.debug('adding site ' + tld.domain)
-    sites_json[tld.domain] = site_json
-    utils.write_file(sites_json, './sites.json')
-  elif url_exists('{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, datetime.utcnow().strftime('%Y/%B/%d/'))):
-    page_html = get_url_html('{}://{}'.format(split_url.scheme, split_url.netloc))
-    if page_html:
-      m = re.search(r'"siteCode":"([^"]+)"', page_html)
-      if m:
-        site_json = {
-            "module": "gannett",
-            "site_code": m.group(1)
-        }
-        logger.debug('adding site ' + tld.domain)
-        sites_json[tld.domain] = site_json
-        utils.write_file(sites_json, './sites.json')
+    if isinstance(sites_json[domain], dict):
+      site_json = sites_json[domain]
+    elif isinstance(sites_json[domain], list):
+      for it in sites_json[domain]:
+        if it.get(split_url.netloc):
+          site_json = it[split_url.netloc]
+
+  if not site_json:
+    if domain in sites_json['wp-posts']['sites']:
+      site_json = {
+          "module": "wp_posts",
+          "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
+          "posts_path": "/wp/v2/posts",
+          "feeds": [
+            "{}://{}/feed".format(split_url.scheme, split_url.netloc)
+          ]
+      }
+    elif url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
+      site_json = {
+          "module": "wp_posts",
+          "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
+          "posts_path": "/wp/v2/posts",
+          "feeds": [
+            "{}://{}/feed".format(split_url.scheme, split_url.netloc)
+          ]
+      }
+      logger.debug('adding site ' + tld.domain)
+      sites_json[tld.domain] = site_json
+      utils.write_file(sites_json, './sites.json')
+    elif url_exists('{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, datetime.utcnow().strftime('%Y/%B/%d/'))):
+      page_html = get_url_html('{}://{}'.format(split_url.scheme, split_url.netloc))
+      if page_html:
+        m = re.search(r'"siteCode":"([^"]+)"', page_html)
+        if m:
+          site_json = {
+              "module": "gannett",
+              "site_code": m.group(1)
+          }
+          logger.debug('adding site ' + tld.domain)
+          sites_json[tld.domain] = site_json
+          utils.write_file(sites_json, './sites.json')
   return site_json
 
 def update_sites(url, site_json):
@@ -102,7 +110,7 @@ def requests_retry_session(retries=4):
     read=retries,
     connect=retries,
     backoff_factor=1,
-    status_forcelist=[404, 429, 500, 502, 503, 504],
+    status_forcelist=[404, 429, 502, 503, 504],
     method_whitelist=["HEAD", "GET", "OPTIONS"]
   )
   adapter = HTTPAdapter(max_retries=retry)
@@ -135,7 +143,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
     r.raise_for_status()
   except Exception as e:
     if r != None:
-      if r.status_code == 402:
+      if r.status_code == 402 or r.status_code == 500:
         return r
       else:
         status_code = ' status code {}'.format(r.status_code)
@@ -172,7 +180,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
     return get_browser_request(url, get_json=True)
 
   r = get_request(url, user_agent, headers, retries, allow_redirects)
-  if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404):
+  if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404 or r.status_code == 500):
     try:
       return r.json()
     except:
@@ -695,28 +703,22 @@ def get_youtube_id(ytstr):
   # - embed playlist, e.g. https://www.youtube.com/embed/videoseries?list=PLPDkqknt-rAi5yTQ2-UgtuTvMbV84M9ci
   # - video + playlist, e.g. https://www.youtube.com/watch?v=YxkPuEmIX4U&list=PL0vZL9uwyfOFezIOiBjkdW3TTdn0Q_AKL
   # - also from www.youtube-nocookie.com
-  yt_list_id = ''
-  if 'list=' in ytstr:
-    m = re.search(r'list=([a-zA-Z0-9_-]+)', ytstr)
-    if m:
-      yt_list_id = m.group(1)
-    else:
-      logger.warning('unable to determine Youtube playlist id in ' + ytstr)
-
-  m = None
   yt_video_id = ''
-  if '/watch?' in ytstr:
-    m = re.search(r'v=([a-zA-Z0-9_-]{11})', ytstr)
-  elif '/embed/' in ytstr:
-    m = re.search(r'/embed//?([a-zA-Z0-9_-]{11})', ytstr)
-  elif 'youtu.be' in ytstr:
-    m = re.search(r'youtu\.be/([a-zA-Z0-9_-]{11})', ytstr)
-  if m and m.group(1) != 'videoseries':
-    yt_video_id = m.group(1)
+  yt_list_id = ''
+  split_url = urlsplit(ytstr)
+  if not split_url.netloc and len(ytstr) == 11:
+    yt_video_id = ytstr
   else:
-    # id only
-    if len(ytstr) == 11:
-      yt_video_id = ytstr
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    query = parse_qs(split_url.query)
+    if split_url.netloc == 'yout.be':
+      yt_video_id = paths[0]
+    elif 'embed' in paths:
+      yt_video_id = paths[1]
+    elif 'watch' in paths and query.get('v'):
+      yt_video_id = query['v'][0]
+    if query.get('list'):
+      yt_list_id = query['list'][0]
 
   if yt_list_id and not yt_video_id:
     yt_html = get_url_html('https://www.youtube.com/embed/videoseries?list={}'.format(yt_list_id))

@@ -7,6 +7,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://19thnews.org/wp-json"
     },
+    "2daygeek": {
+        "feeds": [
+            "https://www.2daygeek.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.2daygeek.com/wp-json"
+    },
     "500ish": {
         "feeds": [
             "https://500ish.com/rss"
@@ -228,6 +236,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://acrlog.org/wp-json"
     },
+    "activestate": {
+        "feeds": [
+            "https://www.activestate.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.activestate.com/wp-json"
+    },
     "adafruit": {
         "feeds": [
             "https://blogadafruit.com/feed"
@@ -351,6 +367,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.ajournalofmusicalthings.com/wp-json"
+    },
+    "akron": {
+        "feeds": [
+            "https://www.akron.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/oht_article",
+        "wpjson_path": "https://www.akron.com/wp-json"
     },
     "al": {
         "api_url": "https://www.al.com/pf/api/v3/content/fetch/",
@@ -484,12 +508,6 @@
         ],
         "module": "blogger"
     },
-    "ubuntubuzz": {
-        "feeds": [
-            "https://www.ubuntubuzz.com/feeds/posts/default"
-        ],
-        "module": "blogger"
-    },
     "apnews": {
         "module": "apnews"
     },
@@ -507,6 +525,14 @@
     },
     "appleinsider": {
         "module": "appleinsider"
+    },
+    "apptrigger": {
+        "feeds": [
+            "https://apptrigger.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://apptrigger.com/wp-json"
     },
     "architecturaldigest": {
         "feeds": [
@@ -572,6 +598,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.asiamarkets.com/wp-json"
+    },
+    "attackofthefanboy": {
+        "feeds": [
+            "https://attackofthefanboy.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://attackofthefanboy.com/wp-json"
     },
     "audacy": {
         "module": "audacy"
@@ -897,7 +931,8 @@
             "https://googlemapsmania.blogspot.com/feeds/posts/default",
             "https://image-sensors-world.blogspot.com/feeds/posts/default",
             "https://mybeerbuzz.blogspot.com/feeds/posts/default",
-            "https://pyfound.blogspot.com/feeds/posts/default"
+            "https://pyfound.blogspot.com/feeds/posts/default",
+            "https://richg42.blogspot.com/feeds/posts/default"
         ],
         "module": "blogger"
     },
@@ -1096,6 +1131,14 @@
         ],
         "module": "nine"
     },
+    "broadbandtechreport": {
+        "feeds": [
+            "https://www.broadbandtechreport.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_btr"
+    },
     "brothers-brick": {
         "feeds": [
             "https://www.brothers-brick.com/feed"
@@ -1111,6 +1154,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.brownszone.com/wp-json"
+    },
+    "brulosophy": {
+        "feeds": [
+            "https://brulosophy.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://brulosophy.com/wp-json"
     },
     "buckeyextra": {
         "module": "gannett",
@@ -1263,6 +1314,14 @@
         ],
         "module": "wp_public",
         "site_id": 40542035
+    },
+    "cablinginstall": {
+        "feeds": [
+            "https://www.cablinginstall.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_cim"
     },
     "canyouactually": {
         "feeds": [
@@ -2064,6 +2123,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://consequence.net/wp-json"
     },
+    "controldesign": {
+        "feeds": [
+            "https://www.controldesign.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://scorpia.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_controldesign"
+    },
     "coolinfographics": {
         "feeds": [
             "https://www.coolinfographics.com/reports?format=rss"
@@ -2188,6 +2255,17 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.cringely.com/wp-json"
     },
+    "criticalhit": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://www.criticalhit.net/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.criticalhit.net/wp-json"
+    },
     "crosstalksolutions": {
         "feeds": [
             "https://www.crosstalksolutions.com/feed"
@@ -2284,6 +2362,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://cubiclenate.com/wp-json"
+    },
+    "culturedvultures": {
+        "feeds": [
+            "https://culturedvultures.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://culturedvultures.com/wp-json"
     },
     "curbed": {
         "module": "nymag"
@@ -2521,6 +2607,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.darkhorizons.com/wp-json"
+    },
+    "datacenterfrontier": {
+        "feeds": [
+            "https://www.datacenterfrontier.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://scorpia.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_datacenterfrontier"
     },
     "datanami": {
         "feeds": [
@@ -3063,6 +3157,22 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://electrek.co/wp-json"
     },
+    "electronicdesign": {
+        "feeds": [
+            "https://www.electronicdesign.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_electronicdesign"
+    },
+    "electronicsweekly": {
+        "feeds": [
+            "https://www.electronicsweekly.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.electronicsweekly.com/wp-json"
+    },
     "elle": {
         "module": "hearstmags"
     },
@@ -3072,6 +3182,14 @@
     },
     "empireonline": {
         "module": "empire"
+    },
+    "energytech": {
+        "feeds": [
+            "https://www.energytech.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_energytech"
     },
     "engadget": {
         "feeds": [
@@ -3227,6 +3345,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.factcheck.org/wp-json"
+    },
+    "fanbyte": {
+        "feeds": [
+            "https://www.fanbyte.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.fanbyte.com/wp-json"
     },
     "fandom": {
         "feeds": [
@@ -3389,6 +3515,14 @@
         ],
         "module": "rebelmouse"
     },
+    "firehouse": {
+        "feeds": [
+            "https://www.firehouse.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "cygnus_fhc"
+    },
     "fireside": {
         "module": "fireside"
     },
@@ -3529,6 +3663,15 @@
     "freep": {
         "module": "gannett",
         "site_code": "PDTF"
+    },
+    "freethoughtblogs": {
+        "feeds": [
+            "https://freethoughtblogs.com/atrivialknot/feed",
+            "https://freethoughtblogs.com/pharyngula/feed",
+            "https://freethoughtblogs.com/seymour/feed"
+        ],
+        "module": "freethoughtblogs",
+        "posts_path": "/wp/v2/posts"
     },
     "freightwaves": {
         "feeds": [
@@ -3804,6 +3947,19 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.ghacks.net/wp-json"
     },
+    "ghost": [
+        {
+            "one-from-nippon.ghost.io": {
+                "data-api": "https://one-from-nippon.ghost.io/ghost/api/content/",
+                "data-key": "af494116630700701236e52663",
+                "feeds": [
+                    "https://one-from-nippon.ghost.io/rss/"
+                ],
+                "module": "ghost",
+                "post_filters": []
+            }
+        }
+    ],
     "ghostinfluence": {
         "feeds": [
             "https://ghostinfluence.com/feed"
@@ -4048,6 +4204,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://haydenjames.io/wp-json"
     },
+    "hcinnovationgroup": {
+        "feeds": [
+            "https://www.hcinnovationgroup.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_hci"
+    },
     "healthday": {
         "feeds": [
             "https://consumer.healthday.com/feeds/feed.rss"
@@ -4167,6 +4331,14 @@
     },
     "houstonchronicle": {
         "module": "hearstnews"
+    },
+    "hpnonline": {
+        "feeds": [
+            "https://www.hpnonline.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_hpn"
     },
     "hr-brew": {
         "buildId": "VqvC4s6lx9O6jLFpvu-av",
@@ -4423,6 +4595,30 @@
         "blogid": "6a010535fde333970c010535fde342970c",
         "module": "typepad"
     },
+    "isemag": {
+        "feeds": [
+            "https://www.isemag.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_isemag"
+    },
+    "issues": {
+        "decompose": [
+            {
+                "attrs": {
+                    "id": "podcast-subscribe-button--1"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://issues.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://issues.org/wp-json"
+    },
     "itbrew": {
         "buildId": "VqvC4s6lx9O6jLFpvu-av",
         "module": "morningbrew"
@@ -4482,6 +4678,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.nakedcapitalism.com/wp-json"
     },
+    "jeremykun": {
+        "feeds": [
+            "https://jeremykun.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://jeremykun.com/wp-json"
+    },
     "jezebel": {
         "feeds": [
             "https://jezebel.com/rss"
@@ -4520,6 +4724,9 @@
     "jwplayer": {
         "module": "jwplayer"
     },
+    "kavin": {
+        "module": "piped"
+    },
     "kctofel": {
         "feeds": [
             "https://www.kctofel.com/rss.xml"
@@ -4527,6 +4734,23 @@
         "image_url": "https://www.kctofel.com",
         "module": "gatsby",
         "page_data_prefix": ""
+    },
+    "kentwired": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "author": {
+            "attrs": {
+                "class": "storybyline"
+            },
+            "tag": "span"
+        },
+        "feeds": [
+            "https://kentwired.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://kentwired.com/wp-json"
     },
     "kerrang": {
         "buildId": "LnDSbSxopOym9D-E5OtEf",
@@ -4674,6 +4898,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://larrybrownsports.com/wp-json"
     },
+    "laserfocusworld": {
+        "feeds": [
+            "https://www.laserfocusworld.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_lfw"
+    },
     "latimes": {
         "feeds": [
             "https://www.latimes.com/index.rss",
@@ -4681,6 +4913,21 @@
             "https://www.latimes.com/sports.rss"
         ],
         "module": "latimes"
+    },
+    "lefsetz": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "authors": {
+            "1": "Bob Lefsetz",
+            "default": "Lefsetz.com"
+        },
+        "feeds": [
+            "https://lefsetz.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://lefsetz.com/wordpress/wp-json"
     },
     "legitreviews": {
         "feeds": [
@@ -4762,11 +5009,28 @@
         "module": "ghost",
         "post_filters": []
     },
+    "libsyn": {
+        "module": "libsyn"
+    },
     "lifehacker": {
         "feeds": [
             "https://lifehacker.com/rss"
         ],
         "module": "gawker"
+    },
+    "lightwaveonline": {
+        "feeds": [
+            "https://www.lightwaveonline.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_lw"
+    },
+    "likeagirl": {
+        "feeds": [
+            "https://code.likeagirl.io/rss"
+        ],
+        "module": "medium"
     },
     "liliputing": {
         "feeds": [
@@ -4784,6 +5048,14 @@
     },
     "linkedin": {
         "module": "linkedin"
+    },
+    "linuxbabe": {
+        "feeds": [
+            "https://www.linuxbabe.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.linuxbabe.com/wp-json"
     },
     "linuxgizmos": {
         "decompose": [
@@ -4899,6 +5171,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.logicmatters.net/wp-json"
     },
+    "lon": {
+        "feeds": [
+            "https://blog.lon.tv/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://blog.lon.tv/wp-json"
+    },
     "loudersound": {
         "feeds": [
             "https://www.loudersound.com/feeds/all"
@@ -4921,6 +5201,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ma.tt/wp-json"
+    },
+    "machinedesign": {
+        "feeds": [
+            "https://www.machinedesign.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_machinedesign"
     },
     "macobserver": {
         "feeds": [
@@ -5134,6 +5422,14 @@
             "source": "tag-feed-api"
         }
     },
+    "masstransitmag": {
+        "feeds": [
+            "https://www.masstransitmag.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "cygnus_mass"
+    },
     "matthewcassinelli": {
         "feeds": [
             "https://matthewcassinelli.com/feed"
@@ -5256,12 +5552,36 @@
     "mic": {
         "module": "bustle"
     },
+    "microgridknowledge": {
+        "feeds": [
+            "https://www.microgridknowledge.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://scorpia.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_microgridknowledge"
+    },
     "miguendes": {
         "buildId": "LeQIIqHpVNgtpiDuNLbCK",
         "feeds": [
             "https://miguendes.me/rss.xml"
         ],
         "module": "hashnode"
+    },
+    "miketendo64": {
+        "feeds": [
+            "https://miketendo64.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://miketendo64.com/wp-json"
+    },
+    "militaryaerospace": {
+        "feeds": [
+            "https://www.militaryaerospace.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_mae"
     },
     "mindmatters": {
         "feeds": [
@@ -5349,6 +5669,14 @@
             "source": "tag-feed-api"
         }
     },
+    "mlo-online": {
+        "feeds": [
+            "https://www.mlo-online.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_mlo"
+    },
     "mobilesyrup": {
         "feeds": [
             "https://mobilesyrup.com/feed"
@@ -5356,6 +5684,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://mobilesyrup.com/wp-json"
+    },
+    "moderntiredealer": {
+        "feeds": [
+            "https://www.moderntiredealer.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://scorpia.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_moderntiredealer"
     },
     "moms": {
         "feeds": [
@@ -5459,6 +5795,14 @@
         "module": "wp_public",
         "site_id": 142615557
     },
+    "mswmanagement": {
+        "feeds": [
+            "https://www.mswmanagement.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_msw"
+    },
     "musically": {
         "args": {
             "skip_wp_user": true
@@ -5494,6 +5838,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://musictech.com/wp-json"
+    },
+    "mwrf": {
+        "feeds": [
+            "https://www.mwrf.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_mwrf"
     },
     "mynintendonews": {
         "feeds": [
@@ -5993,11 +6345,27 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.northeastohioparent.com/wp-json"
     },
+    "noshelfrequired": {
+        "feeds": [
+            "http://www.noshelfrequired.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "http://www.noshelfrequired.com/wp-json"
+    },
     "notboring": {
         "feeds": [
             "https://www.notboring.co/feed"
         ],
         "module": "substack"
+    },
+    "novacrystallis": {
+        "feeds": [
+            "https://novacrystallis.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://novacrystallis.com/wp-json"
     },
     "nowthisnews": {
         "module": "pinnacle"
@@ -6123,6 +6491,30 @@
     "nytimes": {
         "module": "nyt-v2"
     },
+    "officer": {
+        "feeds": [
+            "https://www.officer.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://picon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "cygnus_ofcr"
+    },
+    "offshore-mag": {
+        "feeds": [
+            "https://www.offshore-mag.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_os"
+    },
+    "ogj": {
+        "feeds": [
+            "https://www.ogj.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_ogj"
+    },
     "ohiocapitaljournal": {
         "decompose": [
             {
@@ -6163,6 +6555,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://om.co/wp-json"
+    },
+    "omglinux": {
+        "feeds": [
+            "https://www.omglinux.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.omglinux.com/wp-json"
     },
     "omgubuntu": {
         "feeds": [
@@ -6282,7 +6682,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 890,
+        "deployment": 1026,
         "homepage_feed": {
             "query": {
                 "arc-site": "oregonlive"
@@ -6377,6 +6777,17 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.outsideonline.com/wp-json"
+    },
+    "oxgadgets": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://www.oxgadgets.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.oxgadgets.com/wp-json"
     },
     "pagesix": {
         "feeds": [
@@ -6591,6 +7002,9 @@
         ],
         "module": "wp"
     },
+    "piped": {
+        "module": "piped"
+    },
     "pitchfork": {
         "feeds": [
             "https://www.pitchfork.com/feed/rss"
@@ -6637,6 +7051,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.playstationlifestyle.net/wp-json"
+    },
+    "pleasekillme": {
+        "feeds": [
+            "https://pleasekillme.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://pleasekillme.com/wp-json"
     },
     "pluralistic": {
         "feeds": [
@@ -6726,6 +7148,14 @@
         ],
         "module": "pg"
     },
+    "powermotiontech": {
+        "feeds": [
+            "https://www.powermotiontech.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_hydraulicspneumatics"
+    },
     "poynter": {
         "feeds": [
             "https://www.poynter.org/feed"
@@ -6756,6 +7186,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://primeaudio.org/wp-json"
+    },
+    "profgalloway": {
+        "feeds": [
+            "https://www.profgalloway.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.profgalloway.com/wp-json"
     },
     "protos": {
         "decompose": [
@@ -6806,6 +7244,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.publicbooks.org/wp-json"
     },
+    "publicdomainreview": {
+        "feeds": [
+            "https://publicdomainreview.org/rss.xml"
+        ],
+        "image_url": "https://publicdomainreview.org",
+        "module": "gatsby",
+        "page_data_prefix": ""
+    },
     "publicintegrity": {
         "decompose": [
             {
@@ -6841,6 +7287,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://publiclibrariesonline.org/wp-json"
+    },
+    "publicola": {
+        "feeds": [
+            "https://publicola.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://publicola.com/wp-json"
     },
     "pugetsystems": {
         "args": {
@@ -6887,6 +7341,25 @@
         },
         "wpjson_path": "https://www.pugetsystems.com/wp-json"
     },
+    "pythonforbeginners": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "wp-block-ht-block-toc"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://www.pythonforbeginners.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.pythonforbeginners.com/wp-json"
+    },
     "pythonforengineers": {
         "data-api": "https://python-for-engineers.ghost.io/ghost/api/content/",
         "data-key": "7d3566ae4bffdc2371c78f119e",
@@ -6895,6 +7368,21 @@
         ],
         "module": "ghost",
         "post_filters": []
+    },
+    "pythonislove": {
+        "buildId": "1qbrJnJ3Bm14DtrhJ_hYp",
+        "feeds": [
+            "https://pythonislove.com/rss.xml"
+        ],
+        "module": "hashnode"
+    },
+    "pythonlibrary": {
+        "feeds": [
+            "https://www.blog.pythonlibrary.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.blog.pythonlibrary.org/wp-json"
     },
     "qz": {
         "module": "qz"
@@ -7122,6 +7610,12 @@
             "source": "articles-by-topic-v1"
         }
     },
+    "righto": {
+        "feeds": [
+            "https://www.righto.com/feeds/posts/default"
+        ],
+        "module": "blogger"
+    },
     "riverfronttimes": {
         "feeds": [
             "https://www.riverfronttimes.com/stlouis/Rss.xml"
@@ -7148,6 +7642,14 @@
     },
     "rubbernews": {
         "module": "crains"
+    },
+    "rubberworld": {
+        "feeds": [
+            "https://rubberworld.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://rubberworld.com/wp-json"
     },
     "runnersworld": {
         "module": "hearstmags"
@@ -7807,6 +8309,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.stereogum.com/wp-json"
     },
+    "steveblank": {
+        "feeds": [
+            "https://steveblank.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://steveblank.com/wp-json"
+    },
     "stevivor": {
         "feeds": [
             "https://stevivor.com/feed"
@@ -7852,6 +8362,7 @@
     "substack": {
         "feeds": [
             "https://annehelen.substack.com/feed",
+            "https://antonhowes.substack.com/feed",
             "https://arbesman.substack.com/feed",
             "https://armoxon.substack.com/feed",
             "https://astralcodexten.substack.com/feed",
@@ -7872,6 +8383,7 @@
             "https://joycevance.substack.com/feed",
             "https://heathercoxrichardson.substack.com/feed",
             "https://helenlewis.substack.com/feed",
+            "https://hermitian.substack.com/feed",
             "https://humanpursuits.substack.com/feed",
             "https://kareem.substack.com/feed",
             "https://lunduke.substack.com/feed",
@@ -7880,9 +8392,11 @@
             "https://noahpinion.substack.com/feed",
             "https://oneusefulthing.substack.com/feed",
             "https://planetwavesfm.substack.com/feed",
+            "https://robotic.substack.com/archive",
             "https://shityoushouldcareabout.substack.com/feed",
             "https://statuskuo.substack.com/feed",
             "https://stephaniesutton.substack.com/feed",
+            "https://systemsapproach.substack.com/feed",
             "https://tedgioia.substack.com/feed",
             "https://themagnet.substack.com/feed",
             "https://theoptionist.substack.com/feed",
@@ -7940,6 +8454,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.superherohype.com/wp-json"
+    },
+    "supplychainconnect": {
+        "feeds": [
+            "https://www.supplychainconnect.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_sourcetoday"
     },
     "sustainableplastics": {
         "module": "crains"
@@ -8088,6 +8610,14 @@
     },
     "tasteofcountry": {
         "module": "townsquare"
+    },
+    "tdworld": {
+        "feeds": [
+            "https://www.energytech.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://gemenon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_energytech"
     },
     "techadvisor": {
         "feeds": [
@@ -8629,6 +9159,14 @@
         ],
         "module": "wp"
     },
+    "thehardtimes": {
+        "feeds": [
+            "https://thehardtimes.net/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://thehardtimes.net/wp-json"
+    },
     "thehill": {
         "feeds": [
             "https://thehill.com/feed",
@@ -8645,6 +9183,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://thehollywoodhandle.co/wp-json"
+    },
+    "theideviceblog": {
+        "feeds": [
+            "https://theideviceblog.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://theideviceblog.com/wp-json"
     },
     "theilluminerdi": {
         "feeds": [
@@ -9354,6 +9900,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ubuntu.com/blog/wp-json"
     },
+    "ubuntubuzz": {
+        "feeds": [
+            "https://www.ubuntubuzz.com/feeds/posts/default"
+        ],
+        "module": "blogger"
+    },
     "ubuntuhandbook": {
         "feeds": [
             "https://ubuntuhandbook.org/feed"
@@ -9458,6 +10010,14 @@
     "usnews": {
         "module": "usnews"
     },
+    "utilityanalytics": {
+        "feeds": [
+            "https://utilityanalytics.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://utilityanalytics.com/wp-json"
+    },
     "vanityfair": {
         "module": "vanityfair"
     },
@@ -9552,6 +10112,14 @@
             "tag": "div"
         },
         "module": "wp"
+    },
+    "vision-systems": {
+        "feeds": [
+            "https://www.vision-systems.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        ],
+        "graphql_url": "https://aerilon.graphql.aspire-ebm.com/",
+        "module": "ebm",
+        "x-tenant-key": "ebm_vsd"
     },
     "visualcapitalist": {
         "feeds": [
@@ -9721,6 +10289,17 @@
             "https://www.watoday.com.au/rss/feed.xml"
         ],
         "module": "nine"
+    },
+    "waxy": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://waxy.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://waxy.org/wp-json"
     },
     "wbrc": {
         "api_url": "https://www.wbrc.com/pf/api/v3/content/fetch/",
@@ -9940,7 +10519,6 @@
         "sites": [
             "pocketables",
             "poynter",
-            "publicola",
             "psu",
             "reviewjournal",
             "robbreport",
@@ -10085,6 +10663,55 @@
             "source": "0PB_ContentStoryCard"
         }
     },
+    "wtap": {
+        "api_url": "https://www.wtap.com/pf/api/v3/content/fetch/",
+        "arc_site": "woio",
+        "author_feed": {
+            "query": {
+                "arc-site": "woio",
+                "feedOffset": "0",
+                "feedSize": "10",
+                "id": "AUTHOR",
+                "limitToStationOriginals": "false",
+                "related_content_offset": "0",
+                "related_content_size": "1",
+                "uri": "PATH/"
+            },
+            "source": "author-services-author"
+        },
+        "content": {
+            "query": {
+                "arc-site": "wtap",
+                "published": "true",
+                "uri": "PATH/",
+                "website_url": "PATH/"
+            },
+            "source": "content-api"
+        },
+        "deployment": 325,
+        "homepage_feed": {
+            "query": {
+                "arc-site": "wtap",
+                "collectionAlias": "homepage",
+                "feedSize": 10,
+                "section": "/homepage"
+            },
+            "source": "site-service-collections-feed"
+        },
+        "module": "fusion",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "resizer_url": "https://www.wtap.com/resizer/",
+        "section_feed": {
+            "query": {
+                "arc-site": "wtap",
+                "feedSize": 10,
+                "includedTypes": "article",
+                "section": "PATH",
+                "uri": "PATH/"
+            },
+            "source": "site-service-content-feed"
+        }
+    },
     "wtkr": {
         "feeds": [
             "https://www.wtkr.com/index.rss"
@@ -10129,13 +10756,13 @@
         "wpjson_path": "https://yourtestdriver.com/wp-json"
     },
     "youtu.be": {
-        "module": "youtube"
+        "module": "piped"
     },
     "youtube": {
-        "module": "youtube"
+        "module": "piped"
     },
     "youtube-nocookie": {
-        "module": "youtube"
+        "module": "piped"
     },
     "zatznotfunny": {
         "feeds": [

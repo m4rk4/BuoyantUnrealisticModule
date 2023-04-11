@@ -110,6 +110,13 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         it = el.find_parent(class_='separator')
         if it:
             el_parent = it
+        if el_parent.parent and el_parent.parent.name == 'p':
+            el_parent = el_parent.parent
+        if not caption:
+            it = el_parent.find(class_='cite')
+            if it and it.get('class') and 'cite' in it['class']:
+                caption = it.decode_contents()
+                it.decompose()
         new_html = utils.add_image(img_src, caption, link=link)
         new_el = BeautifulSoup(new_html, 'html.parser')
         el_parent.insert_after(new_el)
@@ -159,6 +166,13 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 el.decompose()
             else:
                 el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+
+    for el in content.find_all('pre', class_='microcode'):
+        el.attrs = {}
+        el['style'] = 'margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;'
+
+    for el in content.find_all(['script', 'style']):
+        el.decompose()
 
     item['content_html'] = content.decode_contents()
     return item

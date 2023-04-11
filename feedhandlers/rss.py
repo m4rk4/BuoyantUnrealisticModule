@@ -48,7 +48,8 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
     else:
       entry_link = entry.link
 
-    if not 'youtube' in entry_link:
+    #if not 'youtube' in entry_link:
+    if site_json['module'] != 'youtube' and site_json['module'] != 'piped':
       if len(urlsplit(entry_link).path) > 1:
         entry_link = utils.clean_url(entry_link)
 

@@ -16,6 +16,7 @@ def resize_image(img_src, width=1200):
         return 'https://clutchpoints.com/_next/image?url={}&w={}&q=75'.format(quote_plus(img_src), width)
     return img_src
 
+
 def get_next_data(url, site_json):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))

@@ -51,10 +51,11 @@ def add_image(el, el_parent, base_url, caption=True, decompose=True, gallery=Fal
     if not el_parent:
         el_parent = el
         for it in reversed(el.find_parents()):
+            #print('Parent: ' + it.name)
             if it.name == 'p':
                 has_str = False
                 for c in it.contents:
-                    if isinstance(c, bs4.element.NavigableString):
+                    if isinstance(c, bs4.element.NavigableString) or (isinstance(c, bs4.element.Tag) and c.name in ['b', 'em', 'i', 'strong']):
                         has_str = True
                 if not has_str:
                     el_parent = it
@@ -295,7 +296,7 @@ def get_post_content(post, args, site_json, save_debug=False):
                     for author in it['author']:
                         if author.get('name'):
                             authors.append(author['name'])
-                elif isinstance(it['author'], dict):
+                elif isinstance(it['author'], dict) and it['author'].get('name'):
                     authors.append(it['author']['name'])
                 elif isinstance(it['author'], str):
                     authors.append(it['author'])
@@ -732,6 +733,12 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     # Use site-specific elements when possible
     # for el in soup.find_all(class_=re.compile(r'ad-aligncenter|c-message_kit__gutter|daily_email_signup||figma-framed|inline-auto-newsletter|patreon-campaign-banner|patreon-text-under-button|sailthru_shortcode|simpletoc-|staticendofarticle|steps-shortcut-wrapper|yoast-table-of-contents|wp-polls')):
     #     el.decompose()
+
+    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|injected-related-story|link-related|related_links|related-stories|sharedaddy|wp-block-bigbite-multi-title|wp-block-product-widget-block')):
+        el.decompose()
+
+    for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
+        el.decompose()
 
     for el in soup.find_all('section', class_=re.compile('wp-block-newsletterglue')):
         el.decompose()
@@ -1202,7 +1209,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
 
     for el in soup.find_all(class_='jetpack-video-wrapper'):
         new_html = ''
-        if el.find(class_='embed-vimeo'):
+        if el.find(class_=['embed-vimeo', 'embed-youtube']):
             it = el.find('iframe')
             if it:
                 new_html = utils.add_embed(it['src'])
@@ -1661,9 +1668,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             src = ''
         if src:
-            new_el = BeautifulSoup(utils.add_embed(src), 'html.parser')
-            el_parent.insert_after(new_el)
-            el_parent.decompose()
+            if not re.search(r'amazon-adsystem\.com', src):
+                new_el = BeautifulSoup(utils.add_embed(src), 'html.parser')
+                el_parent.insert_after(new_el)
+                el_parent.decompose()
         else:
             logger.warning('unknown iframe src in ' + item['url'])
 
@@ -1741,6 +1749,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         if el.get('class'):
             if 'instagram-media' in el['class']:
                 new_html = utils.add_embed(el['data-instgrm-permalink'])
+            elif el.find('code'):
+                el.attrs = {}
+                el.name = 'pre'
+                continue
             elif 'wp-block-quote' in el['class'] or 'wp-block-pullquote' in el['class'] or 'puget-blockquote' in el['class']:
                 it = el.find('cite')
                 if it:
@@ -1891,12 +1903,6 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(class_='wp-block-product-widget-block'):
         if el.find(id='mentioned-in-this-article'):
             el.decompose()
-
-    for el in soup.find_all(class_=re.compile(r'^ad_|\bad\b|injected-related-story|link-related|related_links|related-stories|sharedaddy|wp-block-bigbite-multi-title|wp-block-product-widget-block')):
-        el.decompose()
-
-    for el in soup.find_all(id=re.compile(r'^ad_|\bad\b|related')):
-        el.decompose()
 
     for el in soup.find_all(['aside', 'ins', 'script', 'style']):
         el.decompose()

@@ -12,12 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    tld = tldextract.extract(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1].split('.')[0]
-    sites_json = utils.read_json_file('./sites.json')
-    site_json = sites_json[tld.domain]
     ghost_url = '{}posts/slug/{}/?key={}&slug={}&include=authors%2Ctags'.format(site_json['data-api'], slug, site_json['data-key'], slug)
     ghost_json = utils.get_url_json(ghost_url)
     if not ghost_json:

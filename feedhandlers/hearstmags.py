@@ -476,8 +476,26 @@ def get_content(url, args, site_json, save_debug=False):
                 captions.append(media['title'])
             if media.get('credit'):
                 captions.append(media['credit'])
-            source = utils.closest_dict(media['transcodings'], 'height', 480)
-            item['content_html'] += utils.add_video(source['full_url'], 'video/mp4', media['croppedPreviewImage'])
+            video_src = ''
+            sources = []
+            for it in media['transcodings']:
+                if it.get('full_url'):
+                    video_src = it['full_url']
+                    if it.get('height'):
+                        sources.append(it)
+                    elif it.get('mapped_preset_name'):
+                        m = re.search(r'_(\d+)p_(sd|hd)', it['mapped_preset_name'])
+                        if m:
+                            source = {}
+                            source['full_url'] = it['full_url']
+                            source['height'] = int(m.group(1))
+            if sources:
+                source = utils.closest_dict(sources, 'height', 480)
+                video_src = source['full_url']
+            if video_src:
+                item['content_html'] += utils.add_video(video_src, 'video/mp4', media['croppedPreviewImage'], ' | '.join(captions))
+            else:
+                logger.warning('unknown video source in ' + item['url'])
 
     if next_data['props']['pageProps'].get('introductionDom'):
         for block in next_data['props']['pageProps']['introductionDom']['children']:

@@ -24,7 +24,9 @@ reviewBox: https://www.playstationlifestyle.net/2022/12/06/crisis-core-final-fan
 https://www.seeedstudio.com/blog/2022/12/31/year-in-review-seeed-in-2022/
 https://dongknows.com/synologys-new-ds723-nas-server-review/
 https://www.motorcycle.com/products/mo-tested-tcx-infinity-3-gtx-boots-review
-
+https://culturedvultures.com/meet-your-maker-ps5-review/
+    lets-info-up-wrap
+    lets-review-block__conclusion__wrap
 
 Podcast
 https://www.brewersjournal.info/91-new-beginnings/
@@ -43,6 +45,7 @@ https://www.wivb.com/wp-json/wp/v2/posts
 https://www.wowktv.com/wp-json/wp/v2/posts
 https://www.wdtn.com/wp-json/wp/v2/posts
 https://www.denverpost.com/wp-json/wp/v2/posts/5565640
+https://www.pressherald.com/wp-json/wp/v2/posts
 
 https://www.popphoto.com/wp-json/wp/v2/posts
 https://www.outdoorlife.com/wp-json/wp/v2/posts
@@ -152,6 +155,7 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://www.tabletmag.com/_next/data/bYfls3elTEDCGiyPa9Yk7/sections/news/articles/wild-things-you-make-my-heart-sing.json?sectionSlug=news&slug=wild-things-you-make-my-heart-sing
 https://beta.darkreading.com/_next/data/MRQZLrLBZoMyPCirkHNfy/risk/employees-feeding-sensitive-business-data-chatgpt-raising-security-fears.json
 https://therecord.media/_next/data/d9-Z9zybsjCnrXtAE4t-r/section-702-fisa-senate-hearing-warner.json
 https://www.macstadium.com/_next/data/WdBY43r9CUIwBp8shDpX4/blog/first-look-mac-mini-with-m2-pro.json
@@ -161,13 +165,14 @@ https://www.medicalnewstoday.com/
 https://greatist.com/
 https://psychcentral.com/
 https://healeycodes.com/_next/data/_Y80jRUyFti1fGejohSRI/my-own-python-web-framework.json
-https://clutchpoints.com/_next/data/vw2yRwsg-eaPoGVQcFkmX/en/ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans.json?slug=ravens-news-john-harbaugh-response-to-tyler-huntley-injury-reveals-baltimore-lamar-jackson-plans
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
 https://www.drive.com.au/_next/data/d67eec33886c2abb9d746c9f1915820374216679/news/2024-volkswagen-id-4-id-5-australia-new-details.json
 https://sfstandard.com/
+https://www.theartnewspaper.com/_next/data/Z0WwbO3VouWFnMdn-DULa/2023/04/04/global-art-market-grew-just-3-in-2022-according-to-latest-art-basel/ubs-report.json
 
 https://thesportsrush.com/_next/data/ga_EJdLvwrcW-wAJYJUVG/nba-news-this-is-why-malika-andrews-aint-no-rachel-nichols-jimmy-butlers-moment-with-former-espn-host-could-hilariously-be-undoing-of-successor.json
 https://thesportsrush.com/_next/data/C0bI8h5P6uM-55T7KzA5j/nba-news-its-all-luka-doncic-all-the-time-charles-barkley-reveals-why-mavericks-will-never-win-a-championship.json
+https://www.maxcountryman.com/_next/data/VOboyk2m1OV4QC4JmHtgU/articles.json
 
 https://www.today.com/shop/haus-labs-foundation-lady-gaga-review-t269129
 
@@ -274,6 +279,7 @@ https://matthewc.dev/
 https://notes.ghed.in/
 https://foosel.net/
 https://ahelwer.ca/
+https://rubenerd.com/
 
 https://m.arenaev.com/reallife_test_reveals_how_much_range_evs_and_phevs_lose_during_winter-news-1308.php
 https://m.gsmarena.com/

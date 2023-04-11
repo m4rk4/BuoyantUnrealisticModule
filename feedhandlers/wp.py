@@ -252,7 +252,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             # Split & remove whitespace: https://stackoverflow.com/questions/4071396/split-by-comma-and-strip-whitespace-in-python
             item['tags'] = list(map(str.strip, article_json['keywords'].split(',')))
     elif meta and meta.get('article:tag'):
-        item['tags'] = meta['article:tag'].copy()
+        if isinstance(meta['article:tag'], list):
+            item['tags'] = meta['article:tag'].copy()
+        elif isinstance(meta['article:tag'], str):
+            item['tags'] = list(map(str.strip, meta['article:tag'].split(',')))
     elif meta and meta.get('parsely-tags'):
         item['tags'] = list(map(str.strip, meta['parsely-tags'].split(',')))
     elif meta and meta.get('keywords'):
