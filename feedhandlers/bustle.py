@@ -22,8 +22,8 @@ def add_image(image, caption=''):
     if image['url'].endswith('gif'):
         return add_video(image, caption)
     img_src = resize_image(image['url'])
-    if 'localhost' in config.server:
-        img_src = '{}/image?url={}'.format(config.server, quote_plus(img_src))
+    #if 'localhost' in config.server:
+    #    img_src = '{}/image?url={}'.format(config.server, quote_plus(img_src))
     return utils.add_image(img_src, caption)
 
 

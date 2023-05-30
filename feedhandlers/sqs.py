@@ -64,6 +64,16 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         soup = BeautifulSoup(post_json['body'], 'html.parser')
 
+    if site_json.get('decompose'):
+        for it in site_json['decompose']:
+            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+                el.decompose()
+
+    if site_json.get('unwrap'):
+        for it in site_json['unwrap']:
+            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+                el.unwrap()
+
     for el in soup.find_all(['h2', 'h3', 'h4', 'p', 'ol', 'ul']):
         el.attrs = {}
 
@@ -206,11 +216,15 @@ def get_content(url, args, site_json, save_debug=False):
                 el['style'] = style
                 if el.a:
                     href = el.a['href']
-                    el.a.attrs = {}
-                    el.a['href'] = href
-                    el.a['style'] = 'text-decoration:none; color:white;'
-                    el['onclick'] = "location.href='{}'".format(href)
-                item['content_html'] += str(el)
+                    # https://www.aboveavalon.com/notes/2023/5/19/youtube-gaining-tv-momentum-value-of-ad-supported-tiers-in-paid-video-streaming-apple-tv-and-ads
+                    if not re.search(r'https://app\.moonclerk\.com/pay/', href):
+                        el.a.attrs = {}
+                        el.a['href'] = href
+                        el.a['style'] = 'text-decoration:none; color:white;'
+                        el['onclick'] = "location.href='{}'".format(href)
+                        item['content_html'] += str(el)
+                else:
+                    item['content_html'] += str(el)
             else:
                 logger.warning('unhandled sqs-block-button in ' + item['url'])
 

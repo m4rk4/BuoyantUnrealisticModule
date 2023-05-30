@@ -162,6 +162,9 @@ def render_block(block, full_header=False, headline_url=''):
         if block.get('mediaRefs'):
             for blk in block['mediaRefs']:
                 block_html += render_block(blk)
+        elif block['dataType'] == 'ExperimentalBlock_DocPromo':
+            data_json = json.loads(block['data'])
+            block_html += utils.add_blockquote('<a href="https://www.nytimes.com/{}"><b>{}</b></a><br/>{}'.format(data_json['documentData']['publishPath'], data_json['documentData']['name'], data_json['documentData']['description']))
         else:
             logger.warning('unhandled UnstructuredBlock')
 
@@ -482,7 +485,7 @@ def get_collection(path):
         },
         "extensions": {
             "persistedQuery": {
-                "version":1,"sha256Hash":"71fe6f6f3fd53c6b195144ae8bc8c9ee91d4a998181bad7d11aab8aa4cdb37f8"
+                "version": 1, "sha256Hash": "5bf74f1861a95e95479325803a93c290404da1a1b61929256077b42f290e0a05"
             }
         }
     }
@@ -493,7 +496,7 @@ def get_collection(path):
         "nyt-app-type": "project-vi",
         "nyt-app-version": "0.0.5",
         "nyt-token": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs+/oUCTBmD/cLdmcecrnBMHiU/pxQCn2DDyaPKUOXxi4p0uUSZQzsuq1pJ1m5z1i0YGPd1U1OeGHAChWtqoxC7bFMCXcwnE1oyui9G1uobgpm1GdhtwkR7ta7akVTcsF8zxiXx7DNXIPd2nIJFH83rmkZueKrC4JVaNzjvD+Z03piLn5bHWU6+w+rA+kyJtGgZNTXKyPh6EC6o5N+rknNMG5+CdTq35p8f99WjFawSvYgP9V64kgckbTbtdJ6YhVP58TnuYgr12urtwnIqWP9KSJ1e5vmgf3tunMqWNm6+AnsqNj8mCLdCuc5cEB74CwUeQcP2HQQmbCddBy2y0mEwIDAQAB",
-        "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"103\", \"Chromium\";v=\"103\"",
+        "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"112\", \"Chromium\";v=\"112\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",

@@ -89,6 +89,20 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             logger.warning('unable to determine post content in ' + item['url'])
             return item
 
+    if site_json and site_json.get('decompose'):
+        for it in site_json['decompose']:
+            for el in content.find_all(it['tag'], attrs=it['attrs']):
+                el.decompose()
+
+    if site_json and site_json.get('unwrap'):
+        for it in site_json['unwrap']:
+            for el in content.find_all(it['tag'], attrs=it['attrs']):
+                el.unwrap()
+
+    it = content.find(id=re.compile(r'docs-internal-guid'))
+    if it:
+        it.unwrap()
+
     for el in content.find_all('img'):
         img_src = resize_image(el['src'])
         el_parent = el
@@ -112,21 +126,42 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             el_parent = it
         if el_parent.parent and el_parent.parent.name == 'p':
             el_parent = el_parent.parent
+        if el_parent.parent and el_parent.parent.name == 'center':
+            el_parent = el_parent.parent
         if not caption:
             it = el_parent.find(class_='cite')
             if it and it.get('class') and 'cite' in it['class']:
                 caption = it.decode_contents()
                 it.decompose()
+        if not caption:
+            for el_next in el_parent.find_next_siblings():
+                if el_next.name == 'br':
+                    el_next.decompose()
+                elif el_next.name == 'p' and el_next.find('br') and el_next.get_text().strip() == '':
+                    el_next.decompose()
+                else:
+                    break
+            it = el_next.find(attrs={"style": re.compile(r'font-size:\s?9pt;')})
+            if it:
+                caption = it.decode_contents()
+                it.decompose()
         new_html = utils.add_image(img_src, caption, link=link)
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el_parent.insert_after(new_el)
-        el_parent.decompose()
+        el_parent.insert_before(new_el)
+        if len(el_parent.find_all('img')) > 1:
+            el.decompose()
+        else:
+            el_parent.decompose()
 
     for el in content.find_all('iframe'):
         new_html = utils.add_embed(el['src'])
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        if el.parent and el.parent.name == 'center':
+            el.parent.insert_after(new_el)
+            el.parent.decompose()
+        else:
+            el.insert_after(new_el)
+            el.decompose()
 
     for el in content.find_all('blockquote'):
         if el.get('class'):
@@ -170,6 +205,17 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     for el in content.find_all('pre', class_='microcode'):
         el.attrs = {}
         el['style'] = 'margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;'
+
+    for el in content.find_all('p', attrs={"dir": "ltr"}):
+        el.attrs = {}
+
+    for el in content.find_all('span', attrs={"face": True}):
+        el.unwrap()
+
+    for el in content.find_all('br'):
+        it = el.find_parent('p')
+        if it and it.get_text().strip() == '':
+            it.decompose()
 
     for el in content.find_all(['script', 'style']):
         el.decompose()

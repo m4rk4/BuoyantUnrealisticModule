@@ -16,8 +16,7 @@ def resize_image(img_src, width=1000):
     if m:
         img_src = img_src.replace(m.group(1), '/width={}/'.format(width))
     elif img_src.startswith('https://cdn.theathletic.com/app/uploads/'):
-        img_src = img_src.replace('https://cdn.theathletic.com/',
-                                  'https://cdn.theathletic.com/cdn-cgi/image/width={}/'.format(width))
+        img_src = img_src.replace('https://cdn.theathletic.com/', 'https://cdn.theathletic.com/cdn-cgi/image/width={}/'.format(width))
     return img_src
 
 
@@ -198,7 +197,7 @@ def get_podcast_clip(url, args, site_json, save_debug):
         audio_url = post_json['audio_url']
     else:
         audio_url = ep_url
-    item['content_html'] = '<table><tr><td><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a><br/>{}</small></td></tr></table'.format(audio_url, poster, ep_url, item['title'], show_url, item['author']['name'], item['summary'])
+    item['content_html'] = '<table><tr><td><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a><br/>{}</small></td></tr></table>'.format(audio_url, poster, ep_url, item['title'], show_url, item['author']['name'], item['summary'])
     return item
 
 
@@ -277,7 +276,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = article_json['image_uri']
         item['content_html'] += utils.add_image(item['_image'], article_json['image_caption'])
 
-    item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item)
+    item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item, site_json)
     item['content_html'] = item['content_html'].replace(' class="ath_autolink"', '')
     item['content_html'] = item['content_html'].replace('<span class="Apple-converted-space">\u00a0</span>', '&nbsp;')
     return item

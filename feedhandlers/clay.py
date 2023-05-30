@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 
 def get_content_html(content_uri):
     # Skip these
-    if re.search(
-            r'\/_components\/(future-tense-kicker|in-article-recirc|magazine-issue-|newsletter-|partner-branding|related|single-related-story|slate-kicker-promo|social-share)',
-            content_uri):
+    if re.search(r'\/_components\/(future-tense-kicker|in-article-recirc|magazine-issue-|newsletter-|partner-branding|related|single-related-story|slate-kicker-promo|social-share)', content_uri):
         return ''
 
     # Handle these without loading the content_uri
@@ -174,8 +172,13 @@ def get_content_html(content_uri):
             content_html += get_content_html(desc['_ref'])
         content_html += '<ul>'
         for merch in content_json['agora']['merchants']:
-            content_html += '<li><a href="{}">{}</a>: ${}</li>'.format(utils.get_redirect_url(merch['buyUrl']),
-                                                                       merch['name'], merch['price'])
+            content_html += '<li><a href="{}">{}</a>: ${}</li>'.format(utils.get_redirect_url(merch['buyUrl']), merch['name'], merch['price'])
+        content_html += '</ul>'
+
+    elif '/package-list/' in content_uri:
+        content_html = '<h3>{}</h3><ul>'.format(content_json['title'])
+        for it in content_json['articles']:
+            content_html += '<li><a href="{}">{}</a></li>'.format(it['canonicalUrl'], it['primaryHeadline'])
         content_html += '</ul>'
 
     else:
@@ -223,6 +226,8 @@ def get_content(url, args, site_json, save_debug=False, page_uri=''):
         item['title'] = article_json['pageTitle']
     elif article_json.get('kilnTitle'):
         item['title'] = article_json['kilnTitle']
+    if re.search(r'</', item['title']):
+        item['title'] = BeautifulSoup(item['title'], 'html.parser').get_text()
 
     dt = datetime.fromisoformat(article_json['date']).astimezone(timezone.utc)
     item['date_published'] = dt.isoformat()

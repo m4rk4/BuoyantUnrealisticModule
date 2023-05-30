@@ -307,8 +307,10 @@ def get_item(entry_json, args, site_json, save_debug):
     if not item.get('tags'):
         del item['tags']
 
-    if entry_json.get('leadImage'):
+    if entry_json.get('leadImage') and entry_json['leadImage'].get('variantUrl'):
         item['_image'] = entry_json['leadImage']['variantUrl']
+    elif entry_json.get('leadImage') and entry_json['leadImage'].get('defaultImageUrl'):
+        item['_image'] = entry_json['leadImage']['defaultImageUrl']
     elif entry_json.get('promoImage'):
         item['_image'] = entry_json['promoImage']['variantUrl']
     elif entry_json.get('socialImage'):
@@ -323,7 +325,10 @@ def get_item(entry_json, args, site_json, save_debug):
 
     item['content_html'] = ''
     if entry_json.get('dek'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(entry_json['dek']['html'])
+        if entry_json['dek'].get('html'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(entry_json['dek']['html'])
+        elif entry_json['dek'].get('plaintext'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(entry_json['dek']['plaintext'])
 
     if entry_json.get('leadComponent'):
         item['content_html'] += render_body_component(entry_json['leadComponent'])
@@ -340,14 +345,20 @@ def get_item(entry_json, args, site_json, save_debug):
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
+
 def get_content(url, args, site_json, save_debug):
     next_data = get_next_data(url)
     if not next_data:
         return None
     if save_debug:
-        utils.write_file(next_data, './debug/debug.json')
-
-    entry_json = next((it['data']['entity'] for it in next_data['props']['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
+        utils.write_file(next_data, './debug/next.json')
+    if next_data['props']['pageProps'].get('entityProps'):
+        entry_json = next_data['props']['pageProps']['entityProps']['hydration']['responses'][0]['data']['entryRevision']
+    elif next_data['props']['pageProps'].get('hydration'):
+        entry_json = next((it['data']['entity'] for it in next_data['props']['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
+    else:
+        logger.warning('unable to determine entry data in ' + url)
+        return None
     return get_item(entry_json, args, site_json, save_debug)
 
 

@@ -37,7 +37,7 @@ def add_image(image, attribs=None, gallery=False):
         captions.append(image['source']['title'])
 
     if image.get('metadata') and image['metadata'].get('custom_tag'):
-        heading = image['metadata']['custom_tag'].upper()
+        heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(image['metadata']['custom_tag'].upper())
     else:
         heading = ''
 
@@ -343,7 +343,11 @@ def get_gallery_content(soup, url, args, site_json, save_debug):
 
     for media in gallery_json:
         if media['data']['type'] == 'image':
-            item['content_html'] += utils.add_image(resize_img_src(media['data']['media']['src']), media['data'].get('credit'),heading=media['data'].get('headline'), desc=media['data'].get('dek'))
+            if media['data'].get('headline'):
+                heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(media['data']['headline'])
+            else:
+                heading = ''
+            item['content_html'] += utils.add_image(resize_img_src(media['data']['media']['src']), media['data'].get('credit'), heading=heading, desc=media['data'].get('dek'))
         elif media['data']['type'] == 'embed':
             if media['data']['media'].get('headline'):
                 item['content_html'] += '<div style="text-align:center; font-size:1.1em; font-weight:bold">{}</div>'.format(media['data']['media']['headline'])

@@ -29,18 +29,12 @@ def resize_image(img_src, images, width=900):
 
 def get_content(url, args, site_json, save_debug=False):
     # https://www.typepad.com/services/apidocs
-    tld = tldextract.extract(url)
-    if tld.domain == 'typepad' or tld.domain == 'blogs':
-        blogid = site_json['blogids'][tld.subdomain]
-    else:
-        blogid = site_json['blogid']
-
     m = re.search(r'/(\d{4})/(\d{2})/([^\.]+)\.html', url)
     if not m:
         logger.warning('unhandled url ' + url)
         return None
 
-    api_url = 'https://api.typepad.com/blogs/{}/post-assets/@by-filename/{}:{}:{}.json'.format(blogid, m.group(1), m.group(2), m.group(3))
+    api_url = 'https://api.typepad.com/blogs/{}/post-assets/@by-filename/{}:{}:{}.json'.format(site_json['blogid'], m.group(1), m.group(2), m.group(3))
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None

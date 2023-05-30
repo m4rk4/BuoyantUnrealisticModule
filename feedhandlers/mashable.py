@@ -60,10 +60,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = url
     item['title'] = article_json['post']['title']
 
-    dt_pub = datetime.fromisoformat(article_json['post']['post_date'])
-    item['date_published'] = dt_pub.isoformat()
-    item['_timestamp'] = dt_pub.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    dt = datetime.fromisoformat(article_json['post']['post_date'])
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
 
     item['author'] = {}
     item['author']['name'] = article_json['post']['author']

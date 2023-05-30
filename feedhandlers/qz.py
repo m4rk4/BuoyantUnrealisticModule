@@ -81,10 +81,11 @@ def get_item(post_json, args, site_json, save_debug=False):
     if not item.get('tags'):
         del item['tags']
 
+    item['content_html'] = ''
+
     if post_json.get('excerpt'):
         item['summary'] = post_json['excerpt']
-
-    item['content_html'] = ''
+        item['content_html'] += '<p><em>{}</em></p>'.format(post_json['excerpt'])
 
     if post_json.get('video') and post_json['video']['type'] == 'vimeo':
         item['content_html'] += utils.add_embed('https://player.vimeo.com/video/' + post_json['video']['id'])
@@ -318,7 +319,7 @@ def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) > 0:
-        if paths[-1] == 'feed':
+        if paths[-1] == 'feed' or paths[-1] == 'rss':
             return rss.get_feed(url, args, site_json, save_debug, get_content)
         if paths[0] == 'discover':
             del paths[0]

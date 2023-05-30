@@ -6,24 +6,29 @@ authors = ["m4rk4 <<>>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-Flask = "^2.0.1"
-flask-cors = "^3.0.10"
-av = "^10.0.0"
-bs4 = "^0.0.1"
-feedparser = "^6.0.10"
-install-playwright = "^0.0.0"
+Flask = "^2"
+flask-cors = "^3"
+av = "^10"
+bs4 = "^0"
+feedparser = "^6"
+install-playwright = "^0"
+# https://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml
 lxml = [
     {file = "packages/lxml-4.9.0-cp311-cp311-win_amd64.whl", markers = "sys_platform == 'win32'"},
     {version = "=4.9.0", markers = "sys_platform == 'linux'"}
 ]
-markdown2 = "^2.4.6"
-Pillow = "^9.3.0"
-pycryptodome = "^3.16.0"
-pytest-playwright = "^0.3.0"
-pytz = "^2022.6"
-requests = "^2.28.0"
-snscrape = "^0.5"
-tldextract = "^3.4.0"
+markdown2 = "^2"
+Pillow = "^9"
+pycryptodome = "^3"
+pytest-playwright = "^0"
+python-dateutil = "^2"
+pytz = "*"
+requests = "^2"
+snscrape = "*"
+tldextract = "^3"
+tweety-ns = "^0"
+# https://github.com/psf/requests/issues/6443
+urllib3 = "^1.26"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

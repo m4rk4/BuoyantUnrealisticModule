@@ -288,7 +288,7 @@ def get_content(url, args, site_json, save_debug=False):
 
             else:
                 logger.warning('unhandled event_odds type {} in {}'.format(component['content']['odds_type'], item['url']))
-        elif component['content_type'] == 'credible':
+        elif component['content_type'] == 'credible' or component['content_type'] == 'favorite':
             pass
         else:
             logger.warning('unhandled content type {} in {}'.format(component['content_type'], item['url']))

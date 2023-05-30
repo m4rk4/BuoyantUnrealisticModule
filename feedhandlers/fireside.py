@@ -1,7 +1,5 @@
-import re
+import math
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import quote_plus
 
 import config, utils
 
@@ -19,6 +17,7 @@ def calc_duration(sec):
   return duration
 
 def get_content(url, args, site_json, save_debug=False):
+    # TODO: incomplete
     # https://player.fireside.fm/v2/B6ASng9o+cA6r1-uy?theme=dark
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))

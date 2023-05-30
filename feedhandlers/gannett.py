@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss, usatoday_sportswire
+from feedhandlers import rss, usatoday_sportswire, wp_posts
 
 import logging
 
@@ -59,7 +59,6 @@ def get_image(el):
     if it:
         if it['data-c-credit']:
             caption.append(it['data-c-credit'])
-
     return img_src, ' | '.join(caption)
 
 
@@ -100,10 +99,16 @@ def get_gallery_content(gallery_id, site_code):
 
 def get_content(url, args, site_json, save_debug=False, article_json=None):
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(url)
 
-    if '/storytelling/' in split_url.path:
+    if 'restricted' in paths:
+        # https://www.beaconjournal.com/restricted/?return=https%3A%2F%2Fwww.beaconjournal.com%2Fstory%2Fsports%2Fhigh-school%2Ftrack-field%2F2023%2F05%2F20%2Fohsaa-track-and-field-hudson-ohio-high-school-nordonia-district%2F70226336007%2F
+        query = parse_qs(split_url.query)
+        return get_content(query['return'][0], args, site_json, save_debug, article_json)
+
+    if 'storytelling' in paths:
         logger.warning('unhandled storytelling content ' + url)
         return None
     elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
@@ -218,6 +223,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             new_el = None
             if el.name == 'figure':
                 img_src, caption = get_image(el)
+                if img_src.startswith(':'):
+                    img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
                 new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
             elif el.name == 'aside':
                 if el.button and el.button.has_attr('data-c-vpdata'):
@@ -238,6 +245,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         # Images
         for el in article.find_all('figure', class_='gnt_em_img'):
             img_src, caption = get_image(el)
+            if img_src.startswith(':'):
+                img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
             new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
             el.insert_after(new_el)
             el.decompose()
@@ -248,6 +257,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             new_html = '<h3><a href="{}">{}</a></h3>'.format(gallery_url, el['aria-label'])
             img_src, caption = get_image(el)
             if img_src:
+                if img_src.startswith(':'):
+                    img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
                 new_html += utils.add_image(img_src, caption, link=gallery_url)
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)

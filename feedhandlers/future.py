@@ -111,7 +111,7 @@ def get_content(url, args, site_json, save_debug=False):
         if save_debug:
             utils.write_file(ld_json, './debug/debug.json')
 
-        item['id'] = ld_json['mainEntityOfPage']['@id']
+        item['id'] = ld_json['url']
         item['url'] = ld_json['url']
         item['title'] = ld_json['headline']
 
@@ -546,6 +546,15 @@ def get_content(url, args, site_json, save_debug=False):
                     el.decompose()
             else:
                 logger.warning('unhandled fancy-box in ' + item['url'])
+
+        for el in body.find_all('iframe'):
+            if el.get('src'):
+                new_html = utils.add_embed(el['src'])
+            elif el.get('data-lazy-src'):
+                new_html = utils.add_embed(el['data-lazy-src'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
 
         item['content_html'] += body.decode_contents()
 

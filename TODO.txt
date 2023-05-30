@@ -1,26 +1,38 @@
+Instagram GraphSidecar media without ig_data in https://www.instagram.com/p/CsCJ9LbJKfX/
+
+Twitter
+Unified card: https://twitter.com/WEURO/status/1653368030037004288
+
+https://www.chronicle.com/article/as-bizarre-as-it-sounds-at-ohio-state-trustees-will-do-the-presidents-job
+ArticlePage-articleBody contentBody
+
 Blogger - image captions: https://www.ubuntubuzz.com/2023/03/librepcb-free-electronic-design-automation-software.html
 
 RSS feed: https://www.popularmechanics.com/contenttype/news/
 
-Embed: https://video.wordpress.com/embed/IfZpygzD?cover=1&posterUrl=https%3A%2F%2Fvideos.files.wordpress.com%2FIfZpygzD%2Fabraham_lincoln_seriously_mp4_std.original.jpg&preloadContent=metadata&useAverageColor=1&hd=1
+Fix formatting:
+https://www.cnn.com/cnn-underscored/home/underscored-editors-favorite-products-january-2023
+https://www.cnn.com/cnn-underscored/deals/wayfair-outdoor-sale-2023-05-09
 
-FIX: https://www.cnn.com/cnn-underscored/home/underscored-editors-favorite-products-january-2023
+review_box from html
+https://wegotthiscovered.com/reviews/review-warhammer-40k-boltgun-fundamentally-misunderstands-the-genre/
 
-need to convert sites to use netloc
-https://thetriad.thebulwark.com/p/the-memphis-police-affirmative-action
-https://screentime.thebulwark.com/p/netflix-cuts-off-cheapskates ==> substack
-https://presspass.thebulwark.com/p/the-house-covid-subcommittee-has
+Rating from html
+https://www.larsenonfilm.com/guardians-of-the-galaxy-vol-3
+
+c-review-summary from html
+https://www.nextgenbase.com/dead-island-2-review/
 
 Mastodon embeds
 https://matthewcassinelli.com/shortcuts-mac-menu-bar-progress-meter/
 https://mastodon.social/@matthewcassinelli/109638714164145222/embed
-
+https://mastodon.social/api/v1/statuses/110219654387750565
+https://mastodon.social/api/v1/statuses/110219654387750565/context
+https://mastodon.social/api/v1/timelines/tag/caturday
+https://blog.medium.com/now-you-can-embed-mastodon-posts-in-medium-stories-99b11d0baa7f
 
 Fix formatting
 js-wpv-view-layout https://bestmvno.com/daily-deals/cell-phone-plan-deals/
-lets-review-block__wrap https://primeaudio.org/smsl-c100-dac-review/
-review layout: https://fossbytes.com/sony-wh-1000xm5-headphones-review/
-reviewBox: https://www.playstationlifestyle.net/2022/12/06/crisis-core-final-fantasy-7-reunion-review-ps5/
 https://www.seeedstudio.com/blog/2022/12/31/year-in-review-seeed-in-2022/
 https://dongknows.com/synologys-new-ds723-nas-server-review/
 https://www.motorcycle.com/products/mo-tested-tcx-infinity-3-gtx-boots-review
@@ -35,18 +47,19 @@ Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
 WP
+https://www.kitguru.net/reviews/
+https://www.nexstar.tv/stations/
+
 https://bookriot.com/interesting-buildings-that-are-now-libraries-and-bookstores/
 https://musicindustryblog.wordpress.com/
 https://devblogs.microsoft.com/commandline/wp-json/wp/v2/posts/8371
 https://www.dailycartoonist.com/ - no wp-json, no meta
 https://www.nbcphiladelphia.com/wp-json/wp/v2/posts
 https://www.nbcnewyork.com/wp-json/wp/v2/posts
-https://www.wivb.com/wp-json/wp/v2/posts
-https://www.wowktv.com/wp-json/wp/v2/posts
-https://www.wdtn.com/wp-json/wp/v2/posts
 https://www.denverpost.com/wp-json/wp/v2/posts/5565640
 https://www.pressherald.com/wp-json/wp/v2/posts
 
+https://wraltechwire.com/2023/04/24/red-hat-cutting-hundreds-of-jobs-ceo-says-in-letter-to-employees/
 https://www.popphoto.com/wp-json/wp/v2/posts
 https://www.outdoorlife.com/wp-json/wp/v2/posts
 https://www.fieldandstream.com/wp-json/wp/v2/posts
@@ -155,6 +168,9 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://www.scmagazine.com/news/ransomware/esxi-ransomware-babuk-code-increased-2023
+https://www.dailywire.com/_next/data/FbdFZl04V8AY_tDlsIZRw/news/senator-sinema-blasts-karine-jean-pierre-for-claiming-border-is-secure-factually-not-true.json
+https://www.scmagazine.com/_next/data/Vr8RIAYeXhYGyGsppUe6f/news/privacy/ftc-facebook-broke-terms-5b-data-privacy-settlement.json
 https://www.tabletmag.com/_next/data/bYfls3elTEDCGiyPa9Yk7/sections/news/articles/wild-things-you-make-my-heart-sing.json?sectionSlug=news&slug=wild-things-you-make-my-heart-sing
 https://beta.darkreading.com/_next/data/MRQZLrLBZoMyPCirkHNfy/risk/employees-feeding-sensitive-business-data-chatgpt-raising-security-fears.json
 https://therecord.media/_next/data/d9-Z9zybsjCnrXtAE4t-r/section-702-fisa-senate-hearing-warner.json
@@ -167,7 +183,7 @@ https://psychcentral.com/
 https://healeycodes.com/_next/data/_Y80jRUyFti1fGejohSRI/my-own-python-web-framework.json
 https://www.maxinomics.com/_next/data/eVbJHNNKIKmVs6wGC0aw_/blog/why-is-tipping-everywhere-you-checkout.json
 https://www.drive.com.au/_next/data/d67eec33886c2abb9d746c9f1915820374216679/news/2024-volkswagen-id-4-id-5-australia-new-details.json
-https://sfstandard.com/
+https://sfstandard.com/_next/data/ImDegyfre4g2Ji0Fyrj-x/en-US/business/nordstrom-to-shutter-both-san-francisco-downtown-stores-citing-deteriorating-conditions-report.json
 https://www.theartnewspaper.com/_next/data/Z0WwbO3VouWFnMdn-DULa/2023/04/04/global-art-market-grew-just-3-in-2022-according-to-latest-art-basel/ubs-report.json
 
 https://thesportsrush.com/_next/data/ga_EJdLvwrcW-wAJYJUVG/nba-news-this-is-why-malika-andrews-aint-no-rachel-nichols-jimmy-butlers-moment-with-former-espn-host-could-hilariously-be-undoing-of-successor.json
@@ -175,6 +191,9 @@ https://thesportsrush.com/_next/data/C0bI8h5P6uM-55T7KzA5j/nba-news-its-all-luka
 https://www.maxcountryman.com/_next/data/VOboyk2m1OV4QC4JmHtgU/articles.json
 
 https://www.today.com/shop/haus-labs-foundation-lady-gaga-review-t269129
+
+GraphQL
+https://www.pga.com/story/whaley-receives-walter-hagen-award-hosts-special-junior-golf-clinic
 
 
 https://compactmag.com/article/before-fauci-there-was-comte?_data=routes/article/$slug
@@ -225,20 +244,20 @@ https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott
 view-source:https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
 
 DRUPAL
+https://www.gameinformer.com/
 https://www.jeffgeerling.com/blog
 https://beerconnoisseur.com/
-https://www.technobuffalo.com/jackery-explorer-1500-solar-generator-review
 https://statetechmagazine.com/h
-https://www.sportingnews.com/us/nba/news/warriors-starting-closing-lineup-projecting-2022-23-season/pbak8jf2b6shpsvf5qfry4oa
-view-source:https://www.sportingnews.com/us/nba/news/warriors-starting-closing-lineup-projecting-2022-23-season/pbak8jf2b6shpsvf5qfry4oa
-https://www.sportingnews.com/us/jsonapi/node/article?filter[drupal_internal__nid][value]=699421
-https://www.sportingnews.com/us/jsonapi/node/article/8c15c8ce-d55f-440c-88e3-269be88a552f
 https://www.rokuguide.com/
 https://www.mcgill.ca/oss/article/health-and-nutrition-history/vinyl-chloride-and-ohio-train-derailment
 https://www.soundonsound.com/
 https://www.hifinews.com/
 https://www.soundandvision.com/
 https://www.acsh.org/
+https://circuitdigest.com/
+
+Fusion
+Unknown content-api: https://en.as.com/racing/verstappen-wins-f1-australian-grand-prix-as-hamilton-makes-history-n/
 
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
@@ -280,6 +299,7 @@ https://notes.ghed.in/
 https://foosel.net/
 https://ahelwer.ca/
 https://rubenerd.com/
+https://justingarrison.com/blog/
 
 https://m.arenaev.com/reallife_test_reveals_how_much_range_evs_and_phevs_lose_during_winter-news-1308.php
 https://m.gsmarena.com/
@@ -330,3 +350,6 @@ Micro.blog
 https://blog.joshledgard.com/
 
 https://webcache.googleusercontent.com/search?q=cache:<url>
+
+Beehiiv?
+https://www.artisana.ai/articles/politicians-may-get-free-pass-under-metas-ai-generated-image-rules

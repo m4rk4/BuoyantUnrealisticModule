@@ -48,7 +48,8 @@ def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url, site_json)
     if not next_data:
         return None
-    utils.write_file(next_data, './debug/next.json')
+    if save_debug:
+        utils.write_file(next_data, './debug/next.json')
 
     post_json = next_data['pageProps']['post']
     if save_debug:

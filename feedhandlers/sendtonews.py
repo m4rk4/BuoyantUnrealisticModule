@@ -13,11 +13,17 @@ def get_content(url, args, site_json, save_debug=False):
     # https://embed.sendtonews.com/player4/embedcode.js?SC=i3p78nKk7p-2460057-6761&floatwidth=300&floatposition=bottom-right
     split_url = urlsplit(url)
     query = parse_qs(split_url.query)
-    if not query.get('SC'):
+    video_json = None
+    item = {}
+    if query.get('SC'):
+        item['id'] = query['SC'][0]
+        video_json = utils.get_url_json('https://embed.sendtonews.com/player4/data_read.php?cmd=loadInitial&SC={}&type=SINGLE'.format(query['SC'][0]))
+    elif query.get('ESG_key'):
+        item['id'] = query['ESG_key'][0]
+        video_json = utils.get_url_json('https://embed.sendtonews.com/player4/data_read.php?cmd=loadInitial&ESG_key={}'.format(query['ESG_key'][0]))
+    else:
         logger.warning('unhandled url ' + url)
-        return None
 
-    video_json = utils.get_url_json('https://embed.sendtonews.com/player4/data_read.php?cmd=loadInitial&SC={}&type=SINGLE'.format(query['SC'][0]))
     if not video_json:
         return None
     if save_debug:
@@ -25,8 +31,6 @@ def get_content(url, args, site_json, save_debug=False):
 
     video = video_json['playlistData'][0][0]
 
-    item = {}
-    item['id'] = query['SC'][0]
     item['url'] = url
     item['title'] = video['S_headLine']
 

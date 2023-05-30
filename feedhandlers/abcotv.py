@@ -174,8 +174,17 @@ def render_body(body):
                 soup = BeautifulSoup(unquote_plus(body['content']['props']['markup']), 'html.parser')
                 links = soup.find_all('a')
                 body_html += utils.add_embed(links[-1]['href'])
+            elif body['content']['props']['network'] == 'story-promo-external':
+                # https://abc7news.com/sports/no-better-feeling-how-draymond-green-klay-thompson-rescued-a-wa/13190040/
+                soup = BeautifulSoup(unquote_plus(body['content']['props']['markup']), 'html.parser')
+                links = soup.find_all('a')
+                if re.search(r'https://www\.espn\.com/video/clip', links[0]['href']):
+                    body_html += utils.add_embed(links[0]['href'])
+                logger.warning('unhandled SocialEmbed story-promo-external')
             else:
                 logger.warning('unhandled SocialEmbed network ' + body['content']['props']['network'])
+        elif body['content']['name'] == 'SectionHeader':
+            body_html += unquote_plus(body['content']['props']['innerHtml'])
         else:
             logger.warning('unhandled inline content ' + body['content']['name'])
     else:
@@ -200,7 +209,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = data_json['id']
-    item['url'] = data_json['link']['canonical']
+    #item['url'] = data_json['link']['canonical']
+    item['url'] = data_json['link']['url']
     item['title'] = data_json['title']
 
     dt = datetime.fromtimestamp(data_json['firstPublished']).replace(tzinfo=timezone.utc)
@@ -233,7 +243,8 @@ def get_content(url, args, site_json, save_debug=False):
             for it in val:
                 item['tags'].append(it['displayName'])
     if data_json.get('meta') and data_json['meta'].get('keywords'):
-        item['tags'] += data_json['meta']['keywords'].split(', ')
+        #item['tags'] += data_json['meta']['keywords'].split(', ')
+        item['tags'] += list(map(str.strip, data_json['meta']['keywords'].split(',')))
 
     if data_json.get('description'):
         item['summary'] = data_json['description']
@@ -243,8 +254,11 @@ def get_content(url, args, site_json, save_debug=False):
         if data_json['featuredMediaType'] == 'video':
             item['_image'] = data_json['featuredMedia']['featuredMedia']['img']
             item['content_html'] += utils.add_video(data_json['featuredMedia']['featuredMedia']['source']['url'], 'application/x-mpegURL', data_json['featuredMedia']['featuredMedia']['img'], 'Watch: ' + data_json['featuredMedia']['featuredMedia']['caption'])
-        elif data_json['featuredMediaType'] == 'image':
-            item['_image'] = data_json['featuredMedia']['featuredMedia']['src']
+        elif data_json['featuredMediaType'] == 'image' or (data_json['featuredMediaType'] == 'external' and data_json['featuredMedia']['featuredMedia'].get('img')):
+            if data_json['featuredMedia']['featuredMedia'].get('src'):
+                item['_image'] = data_json['featuredMedia']['featuredMedia']['src']
+            elif data_json['featuredMedia']['featuredMedia'].get('img'):
+                item['_image'] = data_json['featuredMedia']['featuredMedia']['img']
             captions = []
             if data_json['featuredMedia']['featuredMedia'].get('caption'):
                 captions.append(data_json['featuredMedia']['featuredMedia']['caption'])
@@ -255,7 +269,7 @@ def get_content(url, args, site_json, save_debug=False):
                     captions.append(data_json['featuredMedia']['featuredMedia']['owner']['source'])
                 elif data_json['featuredMedia']['featuredMedia']['owner'].get('origin'):
                     captions.append(data_json['featuredMedia']['featuredMedia']['owner']['origin'])
-            item['content_html'] += utils.add_image(data_json['featuredMedia']['featuredMedia']['src'], ' | '.join(captions))
+            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
         else:
             logger.warning('unhandled featuredMediaType {} in {}'.format(data_json['featuredMediaType'], item['url']))
 

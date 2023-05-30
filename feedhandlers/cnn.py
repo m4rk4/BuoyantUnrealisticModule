@@ -312,6 +312,8 @@ def get_content(url, args, site_json, save_debug=False):
     if not ld_json:
         logger.warning('unable to find ld+json data in ' + url)
         return None
+    if isinstance(ld_json, list) and isinstance(ld_json[0], list):
+        ld_json = ld_json[0]
     if save_debug:
         utils.write_file(ld_json, './debug/debug.json')
 
@@ -370,8 +372,14 @@ def get_content(url, args, site_json, save_debug=False):
         article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
     if article_json:
         item = {}
-        item['id'] = article_json['url']
-        item['url'] = article_json['url']
+        if article_json.get('url'):
+            item['url'] = article_json['url']
+        elif article_json.get('mainEntityOfPage') and article_json['mainEntityOfPage'].get('url'):
+            item['url'] = article_json['mainEntityOfPage']['url']
+        else:
+            item['url'] = url
+        item['id'] = item['url']
+
         if article_json.get('headline'):
             item['title'] = article_json['headline']
         elif article_json.get('name'):
@@ -416,7 +424,10 @@ def get_content(url, args, site_json, save_debug=False):
         if isinstance(image, list):
             image = image[0]
         if isinstance(image, dict):
-            item['_image'] = image['url']
+            if image.get('url'):
+                item['_image'] = image['url']
+            elif image.get('contentUrl'):
+                item['_image'] = image['contentUrl']
         else:
             item['_image'] = image
 

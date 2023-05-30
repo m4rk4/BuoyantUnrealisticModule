@@ -1,9 +1,9 @@
 import json, re
 from bs4 import BeautifulSoup
-from datetime import datetime
-from urllib.parse import urlsplit
+from datetime import datetime, timezone
+from urllib.parse import urlsplit, quote_plus
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -11,39 +11,56 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_image_src(image_ref, aspect='orig', size='lg'):
+def get_image_src(image_ref, image_netloc, aspect='o', size='lg'):
     # aspect can be 4by3, 16by9, 1by1
     # orig is invalid but seems to defaults to the original image dimensions
     # size = xs, sm, md, lg, xl
+    if aspect == 'auto':
+        aspect = 'o'
     m = re.search(r'^([^_]+)_([^_]+)_(\d{4})(\d\d)(\d\d)_([0-9a-f]+)', image_ref.split(':')[-1])
     if not m:
         return ''
-    return 'https://imagez.tmz.com/{}/{}/{}/{}/{}/{}/{}_{}.{}'.format(m.group(1), m.group(6)[0:2], aspect, m.group(3), m.group(4), m.group(5), m.group(6), size, m.group(2))
+    return 'https://{}/{}/{}/{}/{}/{}/{}/{}_{}.{}'.format(image_netloc, m.group(1), m.group(6)[0:2], aspect, m.group(3), m.group(4), m.group(5), m.group(6), size, m.group(2))
 
 
-def add_gallery(gallery_ref):
-    gallery_json = utils.get_url_json('https://www.tmz.com/_/gallery/{}/images/'.format(gallery_ref.split(':')[-1]))
+def add_gallery(gallery_ref, image_netloc, link_preview=True):
+    ref_split = gallery_ref.split(':')
+    gallery_url = 'https://www.{}.com/_/gallery/{}/images'.format(ref_split[0], ref_split[-1])
+    if ref_split[0] == 'toofab':
+        gallery_url += '/1'
+    gallery_json = utils.get_url_json(gallery_url)
     if not gallery_json:
         return ''
-    gallery_html = '<h3>Gallery</h3>'
+    if link_preview:
+        for key, val in gallery_json['derefs'].items():
+            key_split = key.split(':')
+            if 'gallery' in key_split:
+                gallery_link = 'https://www.{}.com/photos/{}'.format(key_split[0], val['slug'])
+                heading = '<div style="font-size:1.2em; font-weight:bold;">Photos: <a href="{}">{}</a></div>'.format(gallery_link, val['title'])
+                link = '{}/content?read&url={}'.format(config.server, quote_plus(gallery_link))
+                return utils.add_image(get_image_src(val['image_ref'], image_netloc), '', link=link, heading=heading)
+        logger.warning('unhandled gallery preview')
+
+    gallery_html = ''
     for image in gallery_json['message']['nodes']:
         captions = []
         if image.get('description'):
             captions.append(image['description'])
         if image.get('credit'):
             captions.append(image['credit'])
-        gallery_html += utils.add_image(get_image_src(image['_id']), ' | '.join(captions)) + '<br/>'
+        gallery_html += utils.add_image(get_image_src(image['_id'], image_netloc), ' | '.join(captions))
     return gallery_html
 
 
-def add_video(video_ref):
-    video_json = utils.get_url_json('https://www.tmz.com/_/video/{}/'.format(video_ref.split(':')[-1]))
+def add_video(video_ref, image_netloc):
+    ref_split = video_ref.split(':')
+    video_json = utils.get_url_json('https://www.{}.com/_/video/{}/'.format(ref_split[0], ref_split[-1]))
     if not video_json:
         return ''
     if video_json['message'].get('kaltura_mp4_url'):
-        return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], '16by9'), video_json['message']['title'])
+        return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
     elif video_json['message'].get('mezzanine_url'):
-        return utils.add_video(video_json['message']['mezzanine_url'], 'application/x-mpegURL', get_image_src(video_json['message']['image_ref'], '16by9'), video_json['message']['title'])
+        return utils.add_video(video_json['message']['mezzanine_url'], 'application/x-mpegURL', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
     else:
         logger.warning('unsupported video ' + video_ref)
         return ''
@@ -51,7 +68,14 @@ def add_video(video_ref):
 
 def get_content(url, args, site_json, save_debug):
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
     page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+
     m = re.search(r'node: ({.+?}),\n', page_html)
     if not m:
         logger.warning('unable to find node content in ' + url)
@@ -63,7 +87,11 @@ def get_content(url, args, site_json, save_debug):
 
     item = {}
     item['id'] = node['_id']
-    item['url'] = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, node['slug'])
+
+    if ':gallery:' in node['_schema']:
+        item['url'] = '{}://{}/photos/{}'.format(split_url.scheme, split_url.netloc, node['slug'])
+    else:
+        item['url'] = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, node['slug'])
     item['title'] = node['title']
 
     dt = datetime.fromisoformat(node['published_at'].replace('Z', '+00:00'))
@@ -73,7 +101,11 @@ def get_content(url, args, site_json, save_debug):
     dt = datetime.fromisoformat(node['order_date'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {"name": "TMZ"}
+    el = soup.find('span', class_='article__author')
+    if el:
+        item['author'] = {"name": re.sub(r'^By ', '', el.get_text(), flags=re.I)}
+    else:
+        item['author'] = {"name": site_json['author']}
 
     item['tags'] = []
     m = re.search(r'derefs: ({.+?}),\n', page_html)
@@ -90,10 +122,16 @@ def get_content(url, args, site_json, save_debug):
     if not item.get('tags'):
         del item['tags']
 
-    item['_image'] = get_image_src(node['image_ref'])
-    item['summary'] = node['meta_description']
+    item['_image'] = get_image_src(node['image_ref'], site_json['image_netloc'])
+
+    if node.get('meta_description'):
+        item['summary'] = node['meta_description']
 
     item['content_html'] = ''
+    if ':gallery:' in node['_schema']:
+        schema_split = node['_schema'].split(':')
+        item['content_html'] = add_gallery('{}:gallery:{}'.format(schema_split[1], node['_id']), site_json['image_netloc'], False)
+
     if node.get('hf'):
         for i, hf in enumerate(node['hf']):
             if node['hf_styles'][i] == 'uppercase':
@@ -109,39 +147,61 @@ def get_content(url, args, site_json, save_debug):
                 hf_text = hf
             item['content_html'] += '<h{0}>{1}</h{0}>'.format(node['hf_sizes'][i], hf_text)
 
-    for block in node['blocks']:
-        if 'block:text-block' in block['_schema']:
-            item['content_html'] += block['text']
-        elif 'block:image-block' in block['_schema']:
-            item['content_html'] += utils.add_image(get_image_src(block['node_ref']))
-        elif 'block:gallery-block' in block['_schema']:
-            item['content_html'] += add_gallery(block['node_ref'])
-        elif 'block:video-block' in block['_schema']:
-            item['content_html'] += add_video(block['node_ref'])
-        elif 'block:youtube-video-block' in block['_schema']:
-            item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v={}'.format(block['id']))
-        elif 'block:twitter-tweet-block' in block['_schema']:
-            twitter_url = utils.get_twitter_url(block['tweet_id'])
-            if twitter_url:
-                item['content_html'] += utils.add_embed(twitter_url)
+    if node.get('blocks'):
+        for block in node['blocks']:
+            if 'block:text-block' in block['_schema']:
+                item['content_html'] += block['text']
+            elif 'block:heading-block' in block['_schema']:
+                item['content_html'] += '<h3>{}</h3>'.format(block['text'])
+            elif 'block:image-block' in block['_schema']:
+                item['content_html'] += utils.add_image(get_image_src(block['node_ref'], site_json['image_netloc'], block['aspect_ratio']))
+            elif 'block:gallery-block' in block['_schema']:
+                item['content_html'] += add_gallery(block['node_ref'], site_json['image_netloc'])
+            elif 'block:video-block' in block['_schema']:
+                item['content_html'] += add_video(block['node_ref'], site_json['image_netloc'])
+            elif 'block:youtube-video-block' in block['_schema']:
+                item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v={}'.format(block['id']))
+            elif 'block:twitter-tweet-block' in block['_schema']:
+                twitter_url = utils.get_twitter_url(block['tweet_id'])
+                if twitter_url:
+                    item['content_html'] += utils.add_embed(twitter_url)
+                else:
+                    item['content_html'] += '<blockquote>{}</blockquote>'.format(block['tweet_text'])
+            elif 'block:instagram-media-block' in block['_schema']:
+                item['content_html'] += utils.add_embed('https://www.instagram.com/p/{}/'.format(block['id']))
+            elif 'block:facebook-post-block' in block['_schema']:
+                item['content_html'] += utils.add_embed(block['href'])
+            elif 'block:code-block' in block['_schema']:
+                code = BeautifulSoup(block['code'], 'html.parser')
+                if code.iframe:
+                    item['content_html'] += utils.add_embed(code.iframe['src'])
+                else:
+                    logger.warning('unhandled block {} in {}'.format(block['_schema'], item['url']))
+            elif 'block:iframe-block' in block['_schema']:
+                if not re.search(r'minigames\.versusgame\.com', block['src']):
+                    item['content_html'] += utils.add_embed(block['src'])
+            elif 'block:article-block' in block['_schema']:
+                # Related articles
+                continue
             else:
-                item['content_html'] += '<blockquote>{}</blockquote>'.format(block['tweet_text'])
-        elif 'block:instagram-media-block' in block['_schema']:
-            item['content_html'] += utils.add_embed('https://www.instagram.com/p/{}/'.format(block['id']))
-        else:
-            logger.warning('unhandled block {} in {}'.format(block['_schema'], item['url']))
+                logger.warning('unhandled block {} in {}'.format(block['_schema'], item['url']))
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    if 'rss' in args['url']:
+    if 'rss' in url:
         return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     articles = None
     page_html = utils.get_url_html(args['url'])
     if not page_html:
         return None
-    soup = BeautifulSoup(page_html, 'html.parser')
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+
     el = soup.find('script', string=re.compile(r'"pbj:tmz:news:node:article:1-0-1"'))
     if el:
         m = re.search(r'\s+({"tmz:article:.+?})\n', el.string)
@@ -182,10 +242,3 @@ def get_feed(url, args, site_json, save_debug=False):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
-
-
-def test_handler():
-    feeds = ['https://www.tmz.com/rss.xml',
-             'https://www.tmz.com/sports']
-    for url in feeds:
-        get_feed({"url": url}, True)

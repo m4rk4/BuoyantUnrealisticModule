@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(img_src, secret_key, width=1092):
+    # search secretKey
     split_url = urlsplit(img_src)
     m = re.search('/\d{4}/\d\d/\d\d/.*', split_url.path)
     if not m:
@@ -40,9 +41,8 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1]
     tld = tldextract.extract(url)
-    sites_json = utils.read_json_file('./sites.json')
-    api_key = sites_json[tld.domain]['apiKey']
-    secret_key = sites_json[tld.domain]['secretKey']
+    api_key = site_json['apiKey']
+    secret_key = site_json['secretKey']
     if '/pictures/' in split_url.path:
         api_url = 'https://cmg-prod.apigee.net/v1/xapi/galleries/{}/{}/web?apiKey={}&componentName=gallery&componentDisplayName=Gallery&componentType=Gallery'.format(tld.domain, slug, api_key)
     elif re.search(r'/videos?/', split_url.path):
@@ -55,6 +55,19 @@ def get_content(url, args, site_json, save_debug=False):
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
+    if api_json.get('fault'):
+        if api_json['fault']['faultstring'] == 'Invalid ApiKey' and not args.get('fault'):
+            page_html = utils.get_url_html(url)
+            m = re.search(r'apiKey=([^&]+)', page_html)
+            if m:
+                site_json['apiKey'] = m.group(1)
+                utils.update_sites(url, site_json)
+                retry_args = args.copy()
+                retry_args['fault'] = True
+                return get_content(url, retry_args, site_json, save_debug)
+        else:
+            logger.warning('{} getting content from {}'.format(api_json['fault']['faultstring'], url))
+            return None
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
 

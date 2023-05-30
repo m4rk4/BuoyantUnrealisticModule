@@ -1,10 +1,9 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from datetime import datetime
 
 import utils
-from feedhandlers import rss, wp_posts
+from feedhandlers import rss
 
 import logging
 
@@ -108,6 +107,15 @@ def get_content(url, args, site_json, save_debug=False):
             if it and re.search(r'^More on', it.get_text().strip(), flags=re.I):
                 el.decompose()
                 continue
+            else:
+                it = el.find(class_=re.compile(r's2nPlayer-'))
+                if it:
+                    m = re.search(r's2nPlayer-(\w+)', ' '.join(it['class']))
+                    if m:
+                        new_html = utils.add_embed('https://embed.sendtonews.com/player4/embedcode.js?ESG_key=' + m.group(1))
+                elif len(el.contents) == 0:
+                    el.decompose()
+                    continue
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_before(new_el)

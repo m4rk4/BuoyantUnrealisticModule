@@ -55,6 +55,8 @@ def get_item(post_json, args, site_json, save_debug):
     if post_json.get('html'):
         content_html = post_json['html'].replace('<!--kg-card-begin: html-->', '<div class="kg-card-begin">').replace('<!--kg-card-end: html-->', '</div>')
         soup = BeautifulSoup(content_html, 'html.parser')
+        if save_debug:
+            utils.write_file(str(soup), './debug/debug.html')
     else:
         soup = None
 
@@ -81,20 +83,29 @@ def get_item(post_json, args, site_json, save_debug):
             el['style'] = 'margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;'
 
         for el in soup.find_all(class_=['kg-card', 'kg-card-begin']):
+            if el.name == None:
+                continue
             new_html = ''
             if 'kg-image-card' in el['class'] or ('kg-card-begin' in el['class'] and el.next_element.name == 'figure'):
-                img = el.find('img')
-                if img:
-                    if img.get('srcset'):
-                        img_src = utils.image_from_srcset(img['srcset'], 1000)
+                it = el.find('figcaption')
+                if it:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                it = el.find('img')
+                if it:
+                    if it.get('srcset'):
+                        img_src = utils.image_from_srcset(it['srcset'], 1000)
                     else:
-                        img_src = img['src']
-                    it = el.find('figcaption')
-                    if it:
-                        caption = it.decode_contents()
-                    else:
-                        caption = ''
+                        img_src = it['src']
                     new_html = utils.add_image(img_src, caption)
+                else:
+                    it = el.find('iframe')
+                    if it:
+                        if caption:
+                            new_html = utils.add_embed(it['src'], {"caption": caption})
+                        else:
+                            new_html = utils.add_embed(it['src'])
             elif 'kg-gallery-card' in el['class']:
                 new_html = ''
                 images = el.find_all(class_='kg-gallery-image')
@@ -115,6 +126,20 @@ def get_item(post_json, args, site_json, save_debug):
                         else:
                             caption = ''
                         new_html = utils.add_image(img_src, caption)
+            elif 'kg-video-card' in el['class']:
+                it = el.find('video')
+                if it:
+                    poster = it.get('poster')
+                    if it.get('style'):
+                        m = re.search(r'background:[^;]*?url\(\'([^\']+)\'\)', it['style'])
+                        if m:
+                            poster = m.group(1)
+                    figcap = el.find('figcaption')
+                    if figcap:
+                        caption = figcap.decode_contents()
+                    else:
+                        caption = ''
+                    new_html = utils.add_video(it['src'], 'video/mp4', poster, caption)
             elif 'kg-embed-card' in el['class']:
                 if el.find(class_='twitter-tweet'):
                     links = el.find_all('a')
@@ -251,6 +276,7 @@ def get_item(post_json, args, site_json, save_debug):
                 el.decompose()
             else:
                 logger.warning('unhandled kg-card in ' + item['url'])
+                print(str(el))
 
         item['content_html'] += str(soup)
         item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])

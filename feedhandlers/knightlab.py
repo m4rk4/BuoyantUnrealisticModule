@@ -33,6 +33,8 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = '<table style="width:100%;"><tr>'
     for image in jux_json['images']:
         captions = []
+        if 'caption' in args:
+            captions.append(args['caption'])
         if image.get('label'):
             captions.append(image['label'])
         if image.get('credit'):

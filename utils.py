@@ -35,8 +35,13 @@ def get_site_json(url):
       site_json = sites_json[domain]
     elif isinstance(sites_json[domain], list):
       for it in sites_json[domain]:
+        default_site = None
         if it.get(split_url.netloc):
           site_json = it[split_url.netloc]
+        elif it.get('default'):
+          site_json = it['default']
+        if not site_json and default_site:
+          site_json = default_site
 
   if not site_json:
     if domain in sites_json['wp-posts']['sites']:
@@ -57,21 +62,45 @@ def get_site_json(url):
             "{}://{}/feed".format(split_url.scheme, split_url.netloc)
           ]
       }
+      if url_exists('{}://{}/wp-content/themes/nexstar-wv/client/build/js/article.bundle.min.js'.format(split_url.scheme, split_url.netloc)):
+        site_json['args'] = {"skip_wp_user": True}
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
       utils.write_file(sites_json, './sites.json')
-    elif url_exists('{}://{}/sitemap/{}'.format(split_url.scheme, split_url.netloc, datetime.utcnow().strftime('%Y/%B/%d/'))):
-      page_html = get_url_html('{}://{}'.format(split_url.scheme, split_url.netloc))
-      if page_html:
-        m = re.search(r'"siteCode":"([^"]+)"', page_html)
-        if m:
-          site_json = {
-              "module": "gannett",
-              "site_code": m.group(1)
-          }
-          logger.debug('adding site ' + tld.domain)
-          sites_json[tld.domain] = site_json
-          utils.write_file(sites_json, './sites.json')
+    elif url_exists('{}://{}/tncms/webservice/'.format(split_url.scheme, split_url.netloc)):
+      site_json = {
+        "feeds": [
+          "{}://{}/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc".format(split_url.scheme, split_url.netloc)
+        ],
+        "module": "tncms"
+      }
+      logger.debug('adding site ' + tld.domain)
+      sites_json[tld.domain] = site_json
+      utils.write_file(sites_json, './sites.json')
+    elif url_exists('{}://{}/rest/carbon/filter/main/'.format(split_url.scheme, split_url.netloc)):
+      site_json = {
+        "feeds": [
+          "{}://{}/feed".format(split_url.scheme, split_url.netloc)
+        ],
+        "module": "townsquare"
+      }
+      logger.debug('adding site ' + tld.domain)
+      sites_json[tld.domain] = site_json
+      utils.write_file(sites_json, './sites.json')
+    else:
+      dt = datetime.utcnow()
+      if url_exists('{}://{}/sitemap/{}/{}/{}/'.format(split_url.scheme, split_url.netloc, dt.year, dt.strftime('%B').lower(), dt.day)):
+        page_html = get_url_html('{}://{}'.format(split_url.scheme, split_url.netloc))
+        if page_html:
+          m = re.search(r'"siteCode":"([^"]+)"', page_html)
+          if m:
+            site_json = {
+                "module": "gannett",
+                "site_code": m.group(1)
+            }
+            logger.debug('adding site ' + tld.domain)
+            sites_json[tld.domain] = site_json
+            utils.write_file(sites_json, './sites.json')
   return site_json
 
 def update_sites(url, site_json):
@@ -174,8 +203,7 @@ def get_browser_request(url, get_json=False, save_screenshot=False):
     browser.close()
     return content
 
-def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False):
-  site_json = get_site_json(url)
+def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url, get_json=True)
 
@@ -188,8 +216,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
       write_file(r.text, './debug/json.txt')
   return None
 
-def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False):
-  site_json = get_site_json(url)
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
 
@@ -198,8 +225,7 @@ def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redir
     return r.text
   return None
 
-def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_browser=False):
-  site_json = get_site_json(url)
+def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
 
@@ -324,6 +350,8 @@ def post_url(url, data=None, json_data=None, headers=None):
 def url_exists(url):
   try:
     r = requests.head(url, headers=config.default_headers)
+    if r.status_code == 301 and r.headers.get('location'):
+      r = requests.head(r.headers['location'], headers=config.default_headers)
     return r.status_code == requests.codes.ok
   except Exception as e:
     logger.warning('exception error {} getting {}'.format(e.__class__.__name__, url))
@@ -537,15 +565,12 @@ def bs_get_inner_html(soup):
 def add_blockquote(quote, pullquote_check=True):
   quote = quote.strip()
   if quote.startswith('<p>'):
-    quote = quote.replace('<p>', '')
-    quote = quote.replace('</p>', '<br/><br/>')
-    if quote.endswith('<br/><br/>'):
-      quote = quote[:-10]
+    quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
+    quote = re.sub(r'</?p>', '', quote)
   if pullquote_check:
-    m = re.search(r'^["“‘]([^"“‘"”’]+)["”’]$', quote)
-    if m:
-      return add_pullquote(quote)
-  return '<div style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</div>'.format(quote)
+    if re.search(r'^["“‘]', quote) and re.search(r'["”’]$', quote):
+      return add_pullquote(quote[1:-1])
+  return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
 
 def open_pullquote():
   #return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
@@ -608,7 +633,8 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     fig_html += 'style="margin:0; padding:0;">'
 
   if heading:
-    fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
+    fig_html += heading
+    #fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
 
   if link:
     fig_html += '<a href="{}">'.format(link)
@@ -643,7 +669,7 @@ def add_audio(audio_src, title='', poster='', desc='', link=''):
     audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style=''):
+def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc=''):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
@@ -691,7 +717,8 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       poster += '&height=720'
     poster += '&overlay=video'
 
-  return add_image(poster, caption, '', '', video_src, img_style=img_style, fig_style=fig_style)
+  #def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc=''):
+  return add_image(poster, caption, '', '', video_src, img_style, fig_style, heading, desc)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -711,9 +738,9 @@ def get_youtube_id(ytstr):
   else:
     paths = list(filter(None, split_url.path[1:].split('/')))
     query = parse_qs(split_url.query)
-    if split_url.netloc == 'yout.be':
+    if split_url.netloc == 'youtu.be':
       yt_video_id = paths[0]
-    elif 'embed' in paths:
+    elif 'embed' in paths and paths[1] != 'videoseries':
       yt_video_id = paths[1]
     elif 'watch' in paths and query.get('v'):
       yt_video_id = query['v'][0]
@@ -721,12 +748,10 @@ def get_youtube_id(ytstr):
       yt_list_id = query['list'][0]
 
   if yt_list_id and not yt_video_id:
-    yt_html = get_url_html('https://www.youtube.com/embed/videoseries?list={}'.format(yt_list_id))
-    if yt_html:
-      # Use the first videoId found
-      m = re.search(r'"videoId\\":\\"([a-zA-Z0-9_-]{11})\\"', yt_html)
-      if m:
-        yt_video_id = m.group(1)
+    list_json = utils.get_url_json('https://pipedapi.kavin.rocks/playlists/' + yt_list_id, user_agent='googlebot')
+    if list_json:
+      yt_video_id, yt_list_id = get_youtube_id('https://www.youtube.com{}&list={}'.format(list_json['relatedStreams'][0]['url'], yt_list_id))
+
   if not yt_video_id:
     logger.warning('unable to determine Youtube video id in ' + ytstr)
   return yt_video_id, yt_list_id
@@ -883,7 +908,19 @@ def add_embed(url, args={}, save_debug=False):
           title = el.get_text().strip()
         else:
           title = embed_url
-      embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div><small>{3}</small></td></tr></table>'.format(embed_url, img_src, title, urlsplit(embed_url).netloc)
+      el = soup.find('meta', attrs={"property": "og:description"})
+      if el:
+        desc = el['content'].strip()
+      else:
+        el = soup.find('meta', attrs={"name": "description"})
+        if el:
+          desc = el['content'].strip()
+        else:
+          desc = ''
+      embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div>'.format(embed_url, img_src, title)
+      if desc:
+        embed_html += '<div>{}</div>'.format(desc)
+      embed_html += '<small>{}</small></td></tr></table>'.format(urlsplit(embed_url).netloc)
       return embed_html
 
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)

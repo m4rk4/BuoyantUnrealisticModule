@@ -41,7 +41,11 @@ def format_content(model):
           end_tag = '</i>' + end_tag
         else:
           logger.warning('unhandled attribute {}')
-      content_html += start_tag + block['model']['text'] + end_tag
+      if re.search(r'[\u0080-\uffef]', block['model']['text']):
+        text = block['model']['text'].encode('iso-8859-1').decode('utf-8')
+      else:
+        text = block['model']['text']
+      content_html += start_tag + text + end_tag
 
     elif block['type'] == 'urlLink':
       content_html += '<a href="{}">{}</a>'.format(block['model']['locator'], format_content(block['model']))
@@ -55,19 +59,20 @@ def format_content(model):
         captions.append(block['model']['image']['copyright'])
       content_html += utils.add_image(img_src, ' | '.join(captions))
 
-    elif block['type'] == 'media':
+    elif block['type'] == 'media' or block['type'] == 'video':
       if block['model']['media']['__typename'] == 'ElementsMediaPlayer':
         video_src, caption = bbc.get_video_src(block['model']['media']['items'][0]['id'])
         poster = block['model']['media']['items'][0]['holdingImageUrl'].replace('$recipe', '976x549')
         if video_src:
           if block['model'].get('caption'):
-            caption = block['model']['caption']
+            caption = format_content(block['model']['caption']['model'])
+            caption = re.sub(r'<p>(.*)</p>', r'\1', caption)
           content_html += utils.add_video(video_src, 'application/x-mpegURL', poster, caption)
         else:
           poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(poster))
           content_html += utils.add_image(poster, caption)
       else:
-        logger.warning('unhandled media type ' + block['media']['__typename'])
+        logger.warning('unhandled {} type {}'.format(block['type'], block['media']['__typename']))
 
     elif block['type'] == 'socialEmbed':
       if re.search(r'instagram|twitter|youtube', block['model']['source']):
@@ -80,6 +85,12 @@ def format_content(model):
         content_html += '<blockquote><b>Embedded content from <a href="https://news.files.bbci.co.uk/{0}">https://news.files.bbci.co.uk/{0}</a></b></blockquote>'.format(block['model']['href'])
       else:
         logger.warning('unhandled include type ' + block['model']['type'])
+
+    elif block['type'] == 'links' and block['model'].get('isAfterContent'):
+      pass
+
+    elif block['type'] == 'topicList' or block['type'] == 'byline':
+      pass
 
     else:
       logger.warning('unhandled block type ' + block['type'])
@@ -125,4 +136,5 @@ def get_content(url, args, site_json, save_debug=False):
   item['summary'] = article_json['data']['metadata']['description']
 
   item['content_html'] = format_content(article_json['data']['content']['model'])
+  item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
   return item

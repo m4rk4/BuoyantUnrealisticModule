@@ -162,7 +162,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['title'] = oembed_json['title']
         elif article_json and article_json.get('name'):
             item['title'] = article_json['name']
-    if item.get('title') and re.search(r'#\d+', item['title']):
+    item['title'] = item['title'].replace('&amp;', '&')
+    if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
         item['title'] = html.unescape(item['title'])
 
     date = ''
@@ -177,7 +178,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         el = soup.find('time', attrs={"datetime": True})
         if el:
             date = el['datetime']
-            if '+' not in date:
+            if not re.search(r'[+\-]\d{2}:?\d{2}', date):
                 dt_loc = datetime.fromisoformat(date)
                 tz_loc = pytz.timezone(site_json['timezone'])
                 dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
@@ -206,34 +207,34 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             if el.name == 'a':
                 authors.append(el.get_text())
             else:
-                for it in el.find_all('a', href=re.compile(r'author')):
+                for it in el.find_all('a', href=re.compile(r'author|staff')):
                     authors.append(it.get_text())
             if authors:
                 break
     elif article_json and article_json.get('author'):
         if isinstance(article_json['author'], dict):
             if article_json['author'].get('name'):
-                authors.append(article_json['author']['name'])
+                authors.append(article_json['author']['name'].replace(',', '&#44;'))
         elif isinstance(article_json['author'], list):
             for it in article_json['author']:
                 if it.get('name'):
-                    authors.append(it['name'])
-    if not authors:
-        if ld_json:
-            for it in ld_json:
-                if it.get('@type') and ((isinstance(it['@type'], str) and it['@type'] == 'Person') or (isinstance(it['@type'], list) and 'Person' in it['@type'])):
-                    authors.append(it['name'])
-        if meta and meta.get('author'):
-            authors.append(meta['author'])
-        elif meta and meta.get('citation_author'):
-            authors.append(meta['citation_author'])
-        elif meta and meta.get('parsely-author'):
-            authors.append(meta['parsely-author'])
-        elif oembed_json and oembed_json.get('author_name'):
-            authors.append(oembed_json['author_name'])
+                    authors.append(it['name'].replace(',', '&#44;'))
+    if not authors and ld_json:
+        for it in ld_json:
+            if it.get('@type') and ((isinstance(it['@type'], str) and it['@type'] == 'Person') or (isinstance(it['@type'], list) and 'Person' in it['@type'])):
+                authors.append(it['name'].replace(',', '&#44;'))
+    if not authors and meta:
+        if meta.get('author'):
+            authors.append(meta['author'].replace(',', '&#44;'))
+        elif meta.get('citation_author'):
+            authors.append(meta['citation_author'].replace(',', '&#44;'))
+        elif meta.get('parsely-author'):
+            authors.append(meta['parsely-author'].replace(',', '&#44;'))
+    if not authors and oembed_json and oembed_json.get('author_name'):
+            authors.append(oembed_json['author_name'].replace(',', '&#44;'))
     if authors:
         item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
     elif site_json.get('authors'):
         item['author'] = {"name": site_json['authors']['default']}
 
@@ -334,6 +335,13 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                                 if m:
                                     item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
                                     lede = True
+                    else:
+                        it = el.find(class_='video-wrapper')
+                        if it and it.get('data-type') and it['data-type'] == 'youtube':
+                            item['content_html'] += utils.add_embed(it['data-src'])
+                            lede = True
+                        else:
+                            logger.warning('unhandled lede video wrapper in ' + item['url'])
         if not lede and site_json.get('lede_img'):
             el = soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
             if el:

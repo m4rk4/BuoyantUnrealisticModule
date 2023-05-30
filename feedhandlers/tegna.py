@@ -29,8 +29,18 @@ def get_content(url, args, site_json, save_debug=False):
         el = soup.find('meta', attrs={"itemprop": "datePublished"})
         if el:
             # 9:42 AM EDT September 27, 2022
-            dt_loc = datetime.strptime(el['content'].replace('EST', 'EDT'), '%I:%M %p EDT %B %d, %Y')
-            tz_loc = pytz.timezone('US/Eastern')
+            if re.search(r'EST|EDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('EST', 'EDT'), '%I:%M %p EDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Eastern')
+            elif re.search(r'CST|CDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('CST', 'CDT'), '%I:%M %p CDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Central')
+            elif re.search(r'MST|MDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('MST', 'MDT'), '%I:%M %p MDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Mountain')
+            elif re.search(r'PST|PDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('PST', 'PDT'), '%I:%M %p PDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Mountain')
             dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
@@ -38,7 +48,18 @@ def get_content(url, args, site_json, save_debug=False):
 
         el = soup.find('meta', attrs={"itemprop": "dateModified"})
         if el:
-            dt_loc = datetime.strptime(el['content'].replace('EST', 'EDT'), '%I:%M %p EDT %B %d, %Y')
+            if re.search(r'EST|EDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('EST', 'EDT'), '%I:%M %p EDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Eastern')
+            elif re.search(r'CST|CDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('CST', 'CDT'), '%I:%M %p CDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Central')
+            elif re.search(r'MST|MDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('MST', 'MDT'), '%I:%M %p MDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Mountain')
+            elif re.search(r'PST|PDT', el['content']):
+                dt_loc = datetime.strptime(el['content'].replace('PST', 'PDT'), '%I:%M %p PDT %B %d, %Y')
+                tz_loc = pytz.timezone('US/Mountain')
             dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
             item['date_modified'] = dt.isoformat()
 
@@ -82,13 +103,17 @@ def get_content(url, args, site_json, save_debug=False):
         if article_body:
             for el in article_body.children:
                 if el.name == 'div':
-                    if 'article__section_type_text' in el['class']:
+                    if not el.get('class'):
+                        el.decompose()
+
+                    elif 'article__section_type_text' in el['class']:
                         if el.find(class_='cms__embed-related-story'):
                             el.decompose()
                         elif re.search(r'<p><strong>(MORE HEADLINES|RELATED|SUBSCRIBE):', el.decode_contents()):
                             el.decompose()
                         else:
                             el.unwrap()
+
                     elif 'article__section_type_photo' in el['class']:
                         captions = []
                         it = el.find(class_='photo__caption')
@@ -157,8 +182,10 @@ def get_content(url, args, site_json, save_debug=False):
                             el.decompose()
                         else:
                             logger.warning('unhandled article section embed in ' + item['url'])
+
                     elif 'article__section_type_ad' in el['class'] or 'related-stories' in el['class']:
                             el.decompose()
+
                     else:
                         logger.warning('unhandled article section {} in {}'.format(el['class'], item['url']))
 

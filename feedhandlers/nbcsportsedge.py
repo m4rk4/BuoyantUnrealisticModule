@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import parse_qs, urlsplit
 
 import utils
-from feedhandlers import drupal, rss
+from feedhandlers import drupal_json, rss
 
 import logging
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    return drupal.get_content(url, args, site_json, save_debug)
+    return drupal_json.get_content(url, args, site_json, save_debug)
 
 
 def get_item(news_json, args, site_json, save_debug):
@@ -33,10 +33,10 @@ def get_item(news_json, args, site_json, save_debug):
     item['date_modified'] = dt.isoformat()
 
     if news_json['relationships'].get('player') and news_json['relationships']['player'].get('data'):
-        api_json = drupal.get_api_json('https://www.nbcsportsedge.com/api/', news_json['relationships']['player']['data']['type'], news_json['relationships']['player']['data']['id'])
+        api_json = drupal_json.get_api_json('https://www.nbcsportsedge.com/api/', news_json['relationships']['player']['data']['type'], news_json['relationships']['player']['data']['id'])
         if api_json:
             if api_json['data']['relationships'].get('image') and api_json['data']['relationships']['image'].get('data'):
-                item['_image'] = drupal.get_field_data(api_json['data']['relationships']['image']['data'], 'https://www.nbcsportsedge.com/api/', 'www.nbcsportsedge.com', None, None)
+                item['_image'] = drupal_json.get_field_data(api_json['data']['relationships']['image']['data'], 'https://www.nbcsportsedge.com/api/', 'www.nbcsportsedge.com', None, None)
 
     if news_json['attributes'].get('analysis'):
         item['content_html'] = '<strong>{}</strong>'.format(news_json['attributes']['news']['processed'])
@@ -48,6 +48,7 @@ def get_item(news_json, args, site_json, save_debug):
         if not item.get('_image') and source_item.get('_image'):
             item['_image'] = source_item['_image']
     return item
+
 
 def get_feed(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(args['url'])
@@ -91,7 +92,7 @@ def get_feed(url, args, site_json, save_debug=False):
             url = 'https://www.nbcsportsedge.com' + data['attributes']['path']['alias']
             if save_debug:
                 logger.debug('getting content for ' + url)
-            item = drupal.get_content(url, args, site_json, save_debug)
+            item = drupal_json.get_content(url, args, site_json, save_debug)
         elif data['type'] == 'player_news':
             item = get_item(data, args, site_json, save_debug)
         else:

@@ -1,7 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
 import utils
 
@@ -143,7 +143,11 @@ def get_item(content_json, content_id, args, site_json, save_debug):
     item['content_html'] = ''
 
     if '/video/' in item['url']:
-        item['content_html'] = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], embed=False, save_debug=save_debug)
+        if 'embed' in args:
+            embed = True
+        else:
+            embed = False
+        item['content_html'] = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], embed=embed, save_debug=save_debug)
         return item
 
     if item_content['abcn:contentType'] == 'imagemaster':
@@ -233,7 +237,7 @@ def get_content(url, args, site_json, save_debug):
     if '/widgets/' in url:
         return None
 
-    m = re.search(r'id=(\d+)|-(\d+)/image-|-(\d+)$', url)
+    m = re.search(r'id=(\d+)|-(\d+)/image-|-(\d+)$|/embed/(\d+)', url)
     if not m:
         logger.warning('unable to parse id from ' + url)
         return None
@@ -264,8 +268,7 @@ def get_feed(url, args, site_json, save_debug):
         if channel['subType'] == 'BANNER_AD':
             continue
         for content in channel['items']:
-            if '/Live/video/' in content['link'] or '/widgets/' in content['link'] or 'story' in content[
-                'link'] or 'Story' in content['link']:
+            if '/Live/video/' in content['link'] or '/widgets/' in content['link'] or 'story' in content['link'] or 'Story' in content['link']:
                 logger.debug('skipping ' + content['link'])
                 continue
             if save_debug:

@@ -374,18 +374,39 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                 it.insert_after(new_el)
                 it.decompose()
 
-            for el in body_soup.find_all('blockquote', class_='twitter-tweet'):
-                links = el.find_all('a')
-                new_html = utils.add_embed(links[-1]['href'])
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
+            for el in body_soup.find_all('picture'):
+                it = el.find('source')
+                if it and it.get('srcset'):
+                    img_src = utils.image_from_srcset(it['srcset'], 1000)
+                    it = el.next_sibling
+                    if it.get('class') and 'article-img-meta' in it['class']:
+                        caption = it.get_text()
+                        it.decompose()
+                    else:
+                        caption = ''
+                    new_html = utils.add_image(img_src, caption)
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    logger.warning('unhandled picture in ' + item['url'])
 
-            for el in body_soup.find_all('blockquote', class_='instagram-media'):
-                new_html = utils.add_embed(el['data-instgrm-permalink'])
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
+            for el in body_soup.find_all('blockquote'):
+                new_html = ''
+                if el.get('class'):
+                    if 'twitter-tweet' in el['class']:
+                        links = el.find_all('a')
+                        new_html = utils.add_embed(links[-1]['href'])
+                    elif 'instagram-media' in el['class']:
+                        new_html = utils.add_embed(el['data-instgrm-permalink'])
+                else:
+                    links = el.find_all('a')
+                    if links and re.search(r'https://twitter\.com/[^/]+/status/\d+', links[-1]['href']):
+                        new_html = utils.add_embed(links[-1]['href'])
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
 
             for el in body_soup.find_all('iframe'):
                 new_html = utils.add_embed(el['src'])

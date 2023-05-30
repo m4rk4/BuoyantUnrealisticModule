@@ -127,7 +127,7 @@ def get_search_feed(url, args, site_json, save_debug=False):
     queryly = utils.get_url_html('https://api.queryly.com/v4/search.aspx?queryly_key={}&initialized=1&&query={}&endindex=0&batchsize=20&callback=&extendeddatafields=&timezoneoffset=300&uiversion=1'.format(m_js['querylyKey'], query))
     m = re.search(r'results = JSON\.parse\(\'(.+?)\'\);\s', queryly)
     if not m:
-        debugg.warning('no queryly results found for ' + args['url'])
+        logger.warning('no queryly results found for ' + args['url'])
         return None
 
     queryly_results = json.loads(m.group(1))

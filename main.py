@@ -30,6 +30,8 @@ logging.getLogger('PIL').setLevel(logging.WARNING)
 logging.getLogger('snscrape').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 logging.getLogger('websockets').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
 #logging.getLogger('flask_cors').setLevel(logging.DEBUG)
 
 

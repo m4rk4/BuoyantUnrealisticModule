@@ -18,6 +18,8 @@ def add_image(image, heading='', desc=''):
         captions.append(image['caption'])
     if image.get('credit'):
         captions.append(image['credit'])
+    if heading:
+        heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
     return utils.add_image(img_src, ' | '.join(captions), heading=heading, desc=desc)
 
 

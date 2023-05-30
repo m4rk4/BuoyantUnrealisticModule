@@ -224,7 +224,7 @@ def get_content(url, args, site_json, save_debug=False):
 def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(args['url'])
     if split_url.netloc == 'www.nationalgeographic.co.uk':
-        return natgeo_uk.get_feed(url, args, site_json, save_debug)
+        return gatsby.get_feed(url, args, site_json, save_debug)
 
     natgeo_json = get_natgeo_json(args['url'])
     page_json = natgeo_json['page']

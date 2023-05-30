@@ -1,4 +1,4 @@
-import math
+import math, random
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -10,12 +10,24 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
+    # Seems like instances are rate limited, so choose one at random
+    # https://github.com/TeamPiped/Piped/wiki/Instances
+    piped_instances = [
+        "https://pipedapi.kavin.rocks/",
+        "https://piped-api.hostux.net/",
+        "https://pipedapi-libre.kavin.rocks/",
+        "https://pipedapi.leptons.xyz/",
+    ]
+
     yt_video_id, yt_list_id = utils.get_youtube_id(url)
     if not yt_video_id and not yt_list_id:
         return None
 
     if yt_list_id:
-        piped_json = utils.get_url_json('https://pipedapi.kavin.rocks/playlists/' + yt_list_id, user_agent='googlebot')
+        for piped_instance in piped_instances:
+            piped_json = utils.get_url_json('{}playlists/{}'.format(piped_instance, yt_list_id), user_agent='googlebot', retries=2)
+            if piped_json:
+                break
         if not piped_json:
             return None
         if save_debug:
@@ -32,7 +44,9 @@ def get_content(url, args, site_json, save_debug=False):
             # TODO: clean attachments
             item['content_html'] = ''
         item['content_html'] += '<h3>Playlist</h3>'
-        for it in piped_json['relatedStreams']:
+        for i, it in enumerate(piped_json['relatedStreams']):
+            if 'embed' in args and i > 2:
+                break
             s = float(it['duration'])
             h = math.floor(s / 3600)
             s = s - h * 3600
@@ -49,10 +63,13 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com' + it['url']))
                 poster = '{}/image?height=128&url={}&overlay=video'.format(config.server, quote_plus(it['thumbnail']))
-            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp;{}</small></div>'.format(it['url'], it['title'], it['uploaderUrl'], it['uploaderName'], duration, utils.format_display_date(dt, False))
+            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp;Uploaded {}</small></div>'.format(it['url'], it['title'], it['uploaderUrl'], it['uploaderName'], duration, utils.format_display_date(dt, False))
             item['content_html'] += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
     else:
-        piped_json = utils.get_url_json('https://pipedapi.kavin.rocks/streams/' + yt_video_id, user_agent='googlebot')
+        for piped_instance in piped_instances:
+            piped_json = utils.get_url_json('{}streams/{}'.format(piped_instance, yt_video_id), user_agent='googlebot', retries=2)
+            if piped_json:
+                break
         if not piped_json:
             return None
         if save_debug:
@@ -126,12 +143,17 @@ def get_content(url, args, site_json, save_debug=False):
                 duration = '{:0.0f}:{:02.0f}'.format(m, s)
             play_url = '{}/audio?url={}'.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + item['id']))
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp;{}</small></div>'.format(item['url'], item['title'], piped_json['uploaderUrl'], piped_json['uploader'], duration, item['_display_date'])
-            item['content_html'] += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
+            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp; Uploaded {}</small></div>'.format(item['url'], item['title'], piped_json['uploaderUrl'], piped_json['uploader'], duration, item['_display_date'])
+            item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
         elif video_stream:
-            caption = '<a href="https://piped.video{0}">{1}</a> &ndash; <a href="https://piped.video/watch?v={3}">{2}</a> | <a href="https://piped.video/embed/{3}">Watch on Piped</a> | <a href="https://www.youtube-nocookie.com/embed/{3}">Watch on YouTube</a>'.format(piped_json['uploaderUrl'], piped_json['uploader'], item['title'], item['id'])
+            if piped_json.get('uploaderAvatar'):
+                avatar = '{}/image?url={}&height=24&mask=ellipse'.format(config.server, quote_plus(piped_json['uploaderAvatar']))
+            else:
+                avatar = '{}/image?height=24&width=24&mask=ellipse'.format(config.server)
+            heading = '<div style="display:flex; align-items:center; margin:8px; gap:8px;"><img src="{}"/><div style="font-weight:bold;"><a href="https://piped.video{}">{}</div></div>'.format(avatar, piped_json['uploaderUrl'], piped_json['uploader'])
+            caption = '<a href="https://piped.video/watch?v={0}">{1}</a> | <a href="https://piped.video/embed/{0}">Watch on Piped</a> | <a href="https://www.youtube-nocookie.com/embed/{0}">Watch on YouTube</a>'.format(item['id'], item['title'])
             play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + item['id']))
-            item['content_html'] = utils.add_video(play_url, video_stream['mimeType'], item['_image'], caption)
+            item['content_html'] = utils.add_video(play_url, video_stream['mimeType'], item['_image'], caption, heading=heading)
         if item.get('summary') and 'embed' not in args:
             item['content_html'] += utils.add_blockquote(item['summary'])
     return item
@@ -139,4 +161,3 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-

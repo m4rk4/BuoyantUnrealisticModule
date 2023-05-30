@@ -1,6 +1,7 @@
 import pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from feedhandlers import rss
 import utils
@@ -15,70 +16,88 @@ def resize_image(img_src, width=1000):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    clean_url = utils.clean_url(url)
-    m = re.search(r'-(\d+)\/?$', clean_url)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    m = re.search(r'-(\d+)$', paths[-1])
     if not m:
         logger.warning('unable to parse post id from ' + url)
         return None
 
-    api_url = 'https://www.rollingstone.com/wp-json/mobile-apps/v1/article/' + m.group(1)
-    post_json = utils.get_url_json(api_url)
-    if not post_json:
+    post_url = '{}{}/{}'.format(site_json['wpjson_path'], site_json['posts_path'], m.group(1))
+    post_json = utils.get_url_json(post_url)
+    if post_json and save_debug:
+        utils.write_file(post_json, './debug/post.json')
+
+    article_url = '{}/mobile-apps/v1/article/{}'.format(site_json['wpjson_path'], m.group(1))
+    article_json = utils.get_url_json(article_url)
+    if not article_json:
         return None
     if save_debug:
-        utils.write_file(post_json, './debug/debug.json')
+        utils.write_file(article_json, './debug/debug.json')
 
     item = {}
-    item['id'] = post_json['post-id']
-    item['url'] = post_json['permalink']
-    item['title'] = post_json['headline']
+    item['id'] = article_json['post-id']
+    item['url'] = article_json['permalink']
+    item['title'] = article_json['headline']
 
     tz_est = pytz.timezone('US/Eastern')
-    dt_loc = datetime.fromisoformat(post_json['published-at'])
+    dt_loc = datetime.fromisoformat(article_json['published-at'])
     dt_utc = tz_est.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt_utc.isoformat()
     item['_timestamp'] = dt_utc.timestamp()
     item['_display_date'] = '{}. {}, {}'.format(dt_utc.strftime('%b'), dt_utc.day, dt_utc.year)
 
-    dt_loc = datetime.fromisoformat(post_json['updated-at'])
+    dt_loc = datetime.fromisoformat(article_json['updated-at'])
     dt_utc = tz_est.localize(dt_loc).astimezone(pytz.utc)
     item['date_modified'] = dt_utc.isoformat()
 
     item['author'] = {}
-    item['author']['name'] = post_json['byline']
+    if article_json.get('byline'):
+        item['author']['name'] = article_json['byline']
+    elif post_json and post_json['_links'].get('author'):
+        authors = []
+        for link in post_json['_links']['author']:
+            link_json = utils.get_url_json(link['href'])
+            if link_json:
+                authors.append(link_json['name'])
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     item['tags'] = []
-    for tag in post_json['tags']:
+    for tag in article_json['tags']:
         item['tags'].append(tag['name'])
 
-    item['summary'] = post_json['body-preview']
+    item['summary'] = article_json['body-preview']
 
     lede = ''
-    if post_json.get('featured-video'):
-        lede += utils.add_embed(post_json['featured-video'])
+    if article_json.get('featured-video'):
+        lede += utils.add_embed(article_json['featured-video'])
 
-    if post_json.get('featured-image'):
-        for img in post_json['featured-image']['crops']:
+    if article_json.get('featured-image'):
+        for img in article_json['featured-image']['crops']:
             if img['name'] == 'full':
                 item['_image'] = img['url']
                 if not lede:
                     caption = []
-                    if img.get('caption'):
+                    if article_json['featured-image'].get('caption'):
+                        caption.append(article_json['featured-image']['caption'])
+                    elif img.get('caption'):
                         caption.append(img['caption'])
-                    if img.get('credit'):
+                    if article_json['featured-image'].get('credit'):
+                        caption.append(article_json['featured-image']['credit'])
+                    elif img.get('credit'):
                         caption.append(img['credit'])
                     lede += utils.add_image(resize_image(img['url']), ' | '.join(caption))
                 break
 
-    if post_json.get('tagline'):
-        lede = '<p><i>{}</i></p>'.format(post_json['tagline']) + lede
+    if article_json.get('tagline'):
+        lede = '<p><i>{}</i></p>'.format(article_json['tagline']) + lede
 
-    if post_json.get('review_meta') and post_json['review_meta'].get('rating'):
+    if article_json.get('review_meta') and article_json['review_meta'].get('rating'):
         lede += '<h3>{}<br/>{}<br/><span style="font-size:1.5em;">{} / {}</span></h3>'.format(
-            post_json['review_meta']['title'], post_json['review_meta']['artist'], post_json['review_meta']['rating'],
-            post_json['review_meta']['rating_out_of'])
+            article_json['review_meta']['title'], article_json['review_meta']['artist'], article_json['review_meta']['rating'],
+            article_json['review_meta']['rating_out_of'])
 
-    soup = BeautifulSoup(post_json['body'], 'html.parser')
+    soup = BeautifulSoup(article_json['body'], 'html.parser')
 
     for el in soup.find_all(class_='lrv-u-text-transform-uppercase'):
         el.string = el.string.upper()

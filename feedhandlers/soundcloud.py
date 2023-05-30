@@ -101,7 +101,7 @@ def get_track_content(track_id, client_id, secret_token, save_debug):
 
 
 def get_playlist_content(playlist_id, client_id, secret_token, save_debug):
-    json_url = 'https://api-v2.soundcloud.com/playlists/{}?client_id={}'.format(track_id, client_id)
+    json_url = 'https://api-v2.soundcloud.com/playlists/{}?client_id={}'.format(playlist_id, client_id)
     if secret_token:
         json_url += '&secret_token=' + secret_token
     playlist_json = utils.get_url_json(json_url)

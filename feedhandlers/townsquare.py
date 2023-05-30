@@ -182,16 +182,3 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://loudwire.com/feed',
-             'https://loudwire.com/tags/pearl-jam/feed',
-             'https://loudwire.com/tags/foo-fighters/feed',
-             'https://loudwire.com/category/lists/feed',
-             'https://popcrush.com/feed',
-             'https://screencrush.com/feed',
-             'https://ultimateclassicrock.com/feed',
-             'https://xxlmag.com/feed']
-    for url in feeds:
-        get_feed({"url": url}, True)

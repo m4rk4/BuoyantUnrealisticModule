@@ -151,6 +151,9 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'MediaShortcodeInstagram' in el['class']:
             it = el.find('blockquote', class_='instagram-media')
             new_html = utils.add_embed(it['data-instgrm-permalink'])
+        elif 'MediaShortcodeIframe' in el['class']:
+            it = el.find('iframe')
+            new_html = utils.add_embed(it['src'])
         else:
             logger.warning('unhandled MediaShortcode' + str(el['class']))
         if new_html:

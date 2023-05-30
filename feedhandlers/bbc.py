@@ -25,9 +25,11 @@ def get_initial_data(url):
 def get_video_src(vpid):
   video_src = ''
   caption = ''
-  media_js = utils.get_url_html('https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/{}/format/json/jsfunc/JS_callbacks0'.format(vpid))
-  if media_js:
-    media_json = json.loads(media_js[19:-2])
+  #media_js = utils.get_url_html('https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/{}/format/json/jsfunc/JS_callbacks0'.format(vpid))
+  #if media_js:
+  #  media_json = json.loads(media_js[19:-2])
+  media_json = utils.get_url_json('https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/{}/format/json/jsfunc'.format(vpid))
+  if media_json:
     if media_json.get('media'):
       for media in media_json['media']:
         if media['kind'] == 'video':
@@ -38,7 +40,7 @@ def get_video_src(vpid):
       if media_json['result'] == 'geolocation':
         caption = 'This content is not available in your location'
   else:
-    logger.warning('unable to ElementsMediaPlayer info for vid ' + vpid)
+    logger.warning('unable to get media info for vid ' + vpid)
     caption = 'Unable to get video info'
   return video_src, caption
 

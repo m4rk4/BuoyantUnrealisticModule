@@ -394,7 +394,11 @@ def get_content(url, args, site_json, save_debug=False):
                                                     else:
                                                         captions.append(it['json']['credit'])
                                                 if i == 0:
-                                                    new_html += utils.add_image(it['json']['media'], ' | '.join(captions), heading=group_caption)
+                                                    if group_caption:
+                                                        heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(group_caption)
+                                                    else:
+                                                        heading = ''
+                                                    new_html += utils.add_image(it['json']['media'], ' | '.join(captions), heading=heading)
                                                 else:
                                                     new_html += utils.add_image(it['json']['media'], ' | '.join(captions))
 
@@ -415,7 +419,11 @@ def get_content(url, args, site_json, save_debug=False):
                                                 captions.append(it.get_text().strip())
                                             it = img.find('img')
                                             if it:
-                                                new_html += utils.add_image(it['src'], ' | '.join(captions), heading=group_caption)
+                                                if group_caption:
+                                                    heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(group_caption)
+                                                else:
+                                                    heading = ''
+                                                new_html += utils.add_image(it['src'], ' | '.join(captions), heading=heading)
                                                 group_caption = ''
                                     if not new_html:
                                         logger.debug('unhandled dynamic-inset-iframe origami in ' + iframe_url)

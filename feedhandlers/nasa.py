@@ -4,7 +4,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 import utils
-from feedhandlers import drupal, rss
+from feedhandlers import drupal_json, rss
 
 import logging
 
