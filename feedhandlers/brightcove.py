@@ -23,7 +23,7 @@ def get_content(url, args, site_json, save_debug=False):
         pk = m.group(1)
     headers = {
         "accept-language": "en-US,en;q=0.9,de;q=0.8",
-        "sec-ch-ua": "\"Chromium\";v=\"104\", \" Not A;Brand\";v=\"99\", \"Microsoft Edge\";v=\"104\"",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
@@ -53,11 +53,21 @@ def get_content(url, args, site_json, save_debug=False):
 
     if r.status_code == 403:
         video_json = r.json()
-        item['content_html'] = ''
+        msg = ''
         if video_json[0].get('error_code'):
-            item['content_html'] += '<h3>{}</h3>'.format(video_json[0]['error_code'])
+            msg += '<strong>{}</strong>'.format(video_json[0]['error_code'])
         if video_json[0].get('message'):
-            item['content_html'] += '<p>{}</p>'.format(video_json[0]['message'])
+            if msg:
+                msg += ': '
+            msg += video_json[0]['message']
+        if args.get('poster'):
+            if args.get('title'):
+                if msg:
+                    msg += ' | '
+                msg += args['title']
+            item['content_html'] = utils.add_image(args['poster'], msg)
+        else:
+            item['content_html'] = '<blockquote>{}</blockquote>'.format(msg)
         return item
     elif r.status_code != 200:
         return None

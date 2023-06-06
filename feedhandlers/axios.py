@@ -231,7 +231,57 @@ def get_item(content_json, args, site_json, save_debug):
     return item
 
 
+def get_next_data(url, site_json):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    if len(paths) == 0:
+        path = '/index'
+    elif split_url.path.endswith('/'):
+        path = split_url.path[:-1]
+    else:
+        path = split_url.path
+    query = ''
+    if 'local' in paths:
+        if len(paths) == 6:
+            query = '?audienceSlug={}&yearOrSection={}&month={}&day={}&slug={}'.format(paths[1], paths[2], paths[3], paths[4], paths[5])
+        else:
+            query = '?audienceSlug={}'.format(paths[1])
+    elif len(paths) == 4:
+        query = '?year={}&month={}&day={}&slug={}'.format(paths[0], paths[1], paths[2], paths[3])
+    path += '.json'
+    next_url = '{}://{}/_next/data/{}{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, query)
+    next_data = utils.get_url_json(next_url, retries=1)
+    if not next_data:
+        page_html = utils.get_url_html(url)
+        m = re.search(r'"buildId":"([^"]+)"', page_html)
+        if m and m.group(1) != site_json['buildId']:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
+            site_json['buildId'] = m.group(1)
+            utils.update_sites(url, site_json)
+            next_url = '{}://{}/_next/data/{}/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, query)
+            next_data = utils.get_url_json(next_url)
+            if not next_data:
+                return None
+    return next_data
+
+
 def get_content(url, args, site_json, save_debug=False):
+    next_data = get_next_data(url, site_json)
+    if not next_data:
+        return None
+    if save_debug:
+        utils.write_file(next_data, './debug/debug.json')
+    if next_data['pageProps']['pageType'] == 'story':
+        if next_data['pageProps'].get('audience'):
+            return get_item(next_data['pageProps']['data']['story'], args, site_json, save_debug)
+        else:
+            return get_item(next_data['pageProps']['pageProps']['data']['story'], args, site_json, save_debug)
+    elif next_data['pageProps']['pageType'] == 'newsletter':
+        return get_item(next_data['pageProps']['data']['newsletter'], args, site_json, save_debug)
+    else:
+        logger.warning('unknown pageType {} for {}'.format(next_data['pageProps']['pageType'], url))
+        return None
+
     split_url = urlsplit(url)
     content_id = ''
     m = re.search(r'([a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+-[a-f0-9]+)\.html', split_url.path)
@@ -269,96 +319,73 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+
     # Author feed: https://api.axios.com/api/render/stream/content/?author_username=mikeallen
     # Topic feed: https://api.axios.com/api/render/stream/content/?topic_slug=technology
     # All newsletters for the month: https://api.axios.com/api/render/newsletters/?audience_slug=national&year=2022&month=02
-    if 'api.axios.com/feed' in args['url']:
-        # https://api.axios.com/feed/
-        # https://api.axios.com/feed/technology/
+    if split_url.netloc == 'api.axios.com' and 'feed' in paths:
         return rss.get_feed(url, args, site_json, save_debug, get_content)
 
-    feed = utils.init_jsonfeed(args)
-    feed_items = []
+    next_data = get_next_data(url, site_json)
+    if not next_data:
+        return None
+    if save_debug:
+        utils.write_file(next_data, './debug/feed.json')
 
-    api_url = ''
-    split_url = urlsplit(args['url'])
-    paths = list(filter(None, split_url.path[1:].split('/')))
-    if len(paths) == 0:
-        api_url = 'https://api.axios.com/api/render/stream/content/?audience_slug=national&page_size=10'
-
-    elif paths[0] == 'local':
-        # Works for https://www.axios.com/local/columbus but not charlotte
-        api_url = 'https://api.axios.com/api/render/stream/content/?audience_slug={}&page_size=10'.format(paths[1])
-
-    elif paths[0] == 'authors':
-        api_url = 'https://api.axios.com/api/render/stream/content/?author_username={}&page_size=10'.format(paths[1])
-
-    elif paths[0] == 'newsletters':
-        page_html = utils.get_url_html(args['url'])
-        soup = BeautifulSoup(page_html, 'html.parser')
-        if len(paths) > 1:
-            # Only gets the most recent newsletter
-            if save_debug:
-                logger.debug('getting content for ' + args['url'])
-            item = get_content(args['url'], args, site_json, save_debug)
-            if item:
-                if utils.filter_item(item, args) == True:
-                    feed_items.append(item)
+    stories = []
+    if next_data['pageProps'].get('pageType'):
+        if next_data['pageProps']['pageType'] == 'homepage':
+            for key, val in next_data['pageProps']['data']['homepageData'].items():
+                if isinstance(val, list):
+                    stories += val.copy()
+        elif next_data['pageProps']['pageType'] == 'topic':
+            stories = next_data['pageProps']['data']['topicStories']
+        elif next_data['pageProps']['pageType'] == 'subtopic':
+            stories = next_data['pageProps']['data']['subtopicStories']
+        elif next_data['pageProps']['pageType'] == 'section':
+            for key, val in next_data['pageProps']['data']['initialStreamContent']['storyMap'].items():
+                stories.append(val)
+        elif next_data['pageProps']['pageType'] == 'author':
+            for key, val in next_data['pageProps']['data']['initialStoryStreamContent']['storyMap'].items():
+                stories.append(val)
+        elif next_data['pageProps']['pageType'] == 'newsletter':
+            for author in next_data['pageProps']['data']['subscription']['primary_contributors']:
+                newsletters = utils.get_url_json('https://api.axios.com/api/render/stream/newsletters/?page=1&page_size=10&author_id={}'.format(author['id']))
+                if newsletters:
+                    for it in newsletters['results']:
+                        story = utils.get_url_json('https://api.axios.com/api/render/newsletters/{}'.format(it))
+                        if story['subscription']['slug'] == next_data['pageProps']['data']['subscription']['slug']:
+                            stories.append(story)
+            if not stories:
+                stories.append(next_data['pageProps']['data']['newsletter'])
         else:
-            for el in soup.find_all('a', class_=re.compile('link--newsletter')):
-                if save_debug:
-                    logger.debug('getting content for ' + el['href'])
-                item = get_content(el['href'], args, site_json, save_debug)
-                if item:
-                    if utils.filter_item(item, args) == True:
-                        feed_items.append(item)
-        feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
-        return feed
-
-        # No longer works
-        # render_type = 'newsletters'
-        # if len(paths) > 1:
-        #     newsletter = paths[1]
-        # dt = datetime.utcnow()
-        # api_url = 'https://api.axios.com/api/render/newsletters/?audience_slug=national&year={}&month={}'.format(dt.year, dt.month)
-        # print(api_url)
-        # api_json = utils.get_url_json(api_url)
-        # if not api_json:
-        #     return None
-        # content_ids = []
-        # for it in api_json:
-        #     # Check age
-        #     if 'age' in args:
-        #         dt = datetime.fromisoformat(it['published_date'].replace('Z', '+00:00'))
-        #         item = {}
-        #         item['_timestamp'] = dt.timestamp()
-        #         if not utils.check_age(item, args):
-        #             continue
-        #     content_ids.append(it['id'])
-
-    else:
-        if len(paths) == 1:
-            api_url = 'https://api.axios.com/api/render/stream/content/?topic_slug={}&page_size=10'.format(paths[0])
-        elif len(paths) == 2:
-            api_url = 'https://api.axios.com/api/render/stream/content/?subtopic_slug={}&page_size=10'.format(paths[1])
-
-    if not api_url:
-        logger.warning('unhandled feed url ' + args['url'])
-        return None
-    api_json = utils.get_url_json(api_url)
-    if not api_json:
-        return None
+            logger.warning('unhandled pageType {} for {}'.format(next_data['pageProps']['pageType'], url))
+            return None
+    elif next_data['pageProps'].get('audience'):
+        if next_data['pageProps']['data']['pageType'] == 'homepage':
+            for key, val in next_data['pageProps']['data'].items():
+                if isinstance(val, dict):
+                    if val.get('content'):
+                        stories += val['content'].copy()
+                elif isinstance(val, list):
+                    for it in val:
+                        if it.get('content'):
+                            stories += it['content'].copy()
 
     n = 0
     feed_items = []
-    for id in api_json['results']:
-        content_json = utils.get_url_json('https://api.axios.com/api/render/content/{}/'.format(id))
-        if not content_json:
-            logger.warning('unable to get content for {} in {}'.format(id, args['url']))
-            continue
+    for story in stories:
+        if 'local' in paths:
+            if not re.search(r'/{}/'.format(paths[1]), story['permalink']):
+                continue
         if save_debug:
-            logger.debug('getting content for ' + content_json['permalink'])
-        item = get_item(content_json, args, site_json, save_debug)
+            logger.debug('getting content for ' + story['permalink'])
+        if story.get('blocks'):
+            item = get_item(story, args, site_json, save_debug)
+        else:
+            item = get_content(story['permalink'], args, site_json, save_debug)
         if item:
           if utils.filter_item(item, args) == True:
             feed_items.append(item)
@@ -366,5 +393,6 @@ def get_feed(url, args, site_json, save_debug=False):
             if 'max' in args:
                 if n == int(args['max']):
                     break
+    feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

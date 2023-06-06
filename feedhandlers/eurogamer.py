@@ -1,10 +1,10 @@
-import html, json, pytz, re
+import json, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from datetime import datetime
+from urllib.parse import urlsplit
 
-import config, utils
-from feedhandlers import rss, wp_posts
+import utils
+from feedhandlers import rss
 
 import logging
 

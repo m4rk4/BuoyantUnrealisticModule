@@ -623,7 +623,15 @@ def get_content(url, args, site_json, save_debug=False):
             div = el.find(class_='video-resource')
             if div:
                 if article_json.get('video'):
-                    video = next((it for it in article_json['video'] if re.search(div['data-video-id'], it['url'])), None)
+                    video = None
+                    for it in article_json['video']:
+                        if it.get('url') and re.search(div['data-video-id'], it['url']):
+                            video = it
+                            break
+                        elif it.get('embedUrl') and re.search(div['data-video-id'], it['embedUrl']):
+                            video = it
+                            break
+                    #video = next((it for it in article_json['video'] if re.search(div['data-video-id'], it['url'])), None)
                     if video:
                         image = json.loads(html.unescape(div['data-fave-thumbnails']))
                         captions = []
@@ -730,7 +738,15 @@ def get_content(url, args, site_json, save_debug=False):
                 if video:
                     new_html = utils.add_video(video.source['src'], video.source['type'], video.get('poster'))
             elif 'video-resource' in el['class']:
-                video = next((it for it in article_json['video'] if re.search(el['data-video-id'], it['url'])), None)
+                video = None
+                for it in article_json['video']:
+                    if it.get('url') and re.search(el['data-video-id'], it['url']):
+                        video = it
+                        break
+                    elif it.get('embedUrl') and re.search(el['data-video-id'], it['embedUrl']):
+                        video = it
+                        break
+                #video = next((it for it in article_json['video'] if re.search(el['data-video-id'], it['url'])), None)
                 if video:
                     image = json.loads(html.unescape(el['data-fave-thumbnails']))
                     captions = []

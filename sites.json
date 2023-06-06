@@ -763,6 +763,11 @@
         "wpjson_path": "https://awfulannouncing.com/wp-json"
     },
     "axios": {
+        "buildId": "P5qNqGtjQ4_c9_r0ygVBM",
+        "feeds": [
+            "https://api.axios.com/feed/",
+            "https://api.axios.com/feed/technology/"
+        ],
         "module": "axios"
     },
     "ayjay": {
@@ -897,6 +902,12 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://beforesandafters.com/wp-json"
+    },
+    "behindthesteelcurtain": {
+        "feeds": [
+            "https://www.behindthesteelcurtain.com/rss/index.xml"
+        ],
+        "module": "vox"
     },
     "bellingcat": {
         "content": {
@@ -1763,12 +1774,6 @@
         ],
         "module": "future"
     },
-    "cyclingnews": {
-        "feeds": [
-            "https://www.cyclingnews.com/feeds/all"
-        ],
-        "module": "future"
-    },
     "citybeat": {
         "feeds": [
             "https://www.citybeat.com/cincinati/Rss.xml"
@@ -2517,6 +2522,12 @@
             "source": "story-feed-sections"
         }
     },
+    "coveringthecorner": {
+        "feeds": [
+            "https://www.coveringthecorner.com/rss/index.xml"
+        ],
+        "module": "vox"
+    },
     "craftbeer": {
         "feeds": [
             "https://www.craftbeer.com/feed"
@@ -2766,6 +2777,12 @@
             "source": "story-feed-tag-v4"
         }
     },
+    "cyclingnews": {
+        "feeds": [
+            "https://www.cyclingnews.com/feeds/all"
+        ],
+        "module": "future"
+    },
     "daily-jeff": {
         "feeds": [
             "https://www.daily-jeff.com/"
@@ -2811,8 +2828,10 @@
             "skip_wp_user": true
         },
         "author": {
-            "tag": "address",
-            "attrs": {"class": "author"}
+            "attrs": {
+                "class": "author"
+            },
+            "tag": "address"
         },
         "authors": {
             "1": "Justin Weinberg"
@@ -2976,6 +2995,12 @@
             "https://blog.datawrapper.de/feed"
         ],
         "module": "wp"
+    },
+    "dawgsbynature": {
+        "feeds": [
+            "https://www.dawgsbynature.com/rss/index.xml"
+        ],
+        "module": "vox"
     },
     "dcnewsnow": {
         "args": {
@@ -3372,6 +3397,12 @@
             "https://rss.beehiiv.com/feeds/C8g1hSvrGA.xml"
         ],
         "module": "dirt"
+    },
+    "disconnect": {
+        "module": "substack",
+        "feeds": [
+            "https://www.disconnect.blog/feed"
+        ]
     },
     "discovermagazine": {
         "buildId": "my-build-id",
@@ -3774,30 +3805,6 @@
     "eurogamer": {
         "feeds": [
             "https://www.eurogamer.net/feed"
-        ],
-        "module": "eurogamer"
-    },
-    "gamesindustry": {
-        "feeds": [
-            "https://www.gamesindustry.biz/feed"
-        ],
-        "module": "eurogamer"
-    },
-    "rockpapershotgun": {
-        "feeds": [
-            "https://www.rockpapershotgun.com/feed"
-        ],
-        "module": "eurogamer"
-    },
-    "thepopverse": {
-        "feeds": [
-            "https://www.thepopverse.com/feed"
-        ],
-        "module": "eurogamer"
-    },
-    "vg247": {
-        "feeds": [
-            "https://www.vg247.com/feed"
         ],
         "module": "eurogamer"
     },
@@ -4402,6 +4409,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.gameshub.com/wp-json"
     },
+    "gamesindustry": {
+        "feeds": [
+            "https://www.gamesindustry.biz/feed"
+        ],
+        "module": "eurogamer"
+    },
     "gamespew": {
         "feeds": [
             "https://www.gamespew.com/feed"
@@ -4422,6 +4435,13 @@
             "https://www.gamesradar.com/totalfilm"
         ],
         "module": "future"
+    },
+    "gamingbible": {
+        "channel": "gamingbible",
+        "feeds": [
+            "https://www.gamingbible.com"
+        ],
+        "module": "ladbible"
     },
     "gamingbolt": {
         "feeds": [
@@ -4827,6 +4847,14 @@
     "grubstreet": {
         "module": "nymag"
     },
+    "guidingtech": {
+        "feeds": [
+            "https://www.guidingtech.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.guidingtech.com/wp-json"
+    },
     "guitar": {
         "feeds": [
             "https://guitar.com/feed"
@@ -5158,6 +5186,12 @@
     },
     "houstonchronicle": {
         "module": "hearstnews"
+    },
+    "howstuffworks": {
+        "feeds": [
+            "https://syndication.howstuffworks.com/rss/HSW"
+        ],
+        "module": "hsw"
     },
     "howwedrive": {
         "args": {
@@ -5789,6 +5823,9 @@
     "khou": {
         "module": "tegna"
     },
+    "kickstarter": {
+        "module": "kickstarter"
+    },
     "king5": {
         "module": "tegna"
     },
@@ -5989,6 +6026,13 @@
         ],
         "module": "scripps"
     },
+    "ladbible": {
+        "channel": "ladbible",
+        "feeds": [
+            "https://www.ladbible.com"
+        ],
+        "module": "ladbible"
+    },
     "lakersdaily": {
         "feeds": [
             "https://lakersdaily.com/feed"
@@ -6017,6 +6061,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://larrybrownsports.com/wp-json"
+    },
+    "larrytalkstech": {
+        "feeds": [
+            "https://larrytalkstech.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://larrytalkstech.com/wp-json"
     },
     "larsenonfilm": {
         "feeds": [
@@ -6784,6 +6836,42 @@
         "module": "ebm",
         "x-tenant-key": "ebm_mae"
     },
+    "militarytimes": {
+        "api_url": "https://www.militarytimes.com/pf/api/v3/content/fetch/",
+        "arc_site": "military-times",
+        "content": {
+            "query": {
+                "arc-site": "military-times",
+                "uri": "PATH/",
+                "website_url": "PATH/"
+            },
+            "source": "mco-content-api"
+        },
+        "deployment": 110,
+        "feeds": [
+            "https://www.militarytimes.com/arc/outboundfeeds/rss/?outputType=xml",
+            "https://www.militarytimes.com/arc/outboundfeeds/rss/category/flashpoints/?outputType=xml"
+        ],
+        "homepage_feed": {
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "includeSections": "/home"
+            },
+            "source": "story-feed-sections"
+        },
+        "module": "fusion",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "resizer_url": "https://www.militarytimes.com/resizer/",
+        "section_feed": {
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "includeSections": "PATH"
+            },
+            "source": "story-feed-sections"
+        }
+    },
     "mindmatters": {
         "feeds": [
             "https://mindmatters.ai/feed"
@@ -7093,6 +7181,9 @@
         "module": "nasa"
     },
     "nascar": {
+        "exclude_slugs": [
+            "news-media"
+        ],
         "feeds": [
             "https://www.nascar.com/feed"
         ],
@@ -8129,6 +8220,9 @@
         ],
         "module": "foundation"
     },
+    "ourmidland": {
+        "module": "hearstnews"
+    },
     "outkick": {
         "feeds": [
             "https://www.outkick.com/feed"
@@ -8435,6 +8529,14 @@
         ],
         "module": "pitchfork"
     },
+    "pittsburghhockeynow": {
+        "feeds": [
+            "https://pittsburghhockeynow.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://pittsburghhockeynow.com/wp-json"
+    },
     "pittsburghmagazine": {
         "feeds": [
             "https://www.pittsburghmagazine.com/feed"
@@ -8592,6 +8694,13 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.politicususa.com/wp-json"
+    },
+    "polygon": {
+        "feed": [
+            "https://www.polygon.com/rss/index.xml",
+            "https://www.polygon.com/rss/reviews/index.xml"
+        ],
+        "module": "vox"
     },
     "popcrush": {
         "feeds": [
@@ -9246,6 +9355,12 @@
         "module": "wp_public",
         "site_id": 21794330
     },
+    "rockpapershotgun": {
+        "feeds": [
+            "https://www.rockpapershotgun.com/feed"
+        ],
+        "module": "eurogamer"
+    },
     "rocksound": {
         "feeds": [
             "https://rocksound.tv/feed"
@@ -9357,6 +9472,12 @@
     "savannahnow": {
         "module": "gannett",
         "site_code": "NSMN"
+    },
+    "sbnation": {
+        "feed": [
+            "https://www.sbnation.com/rss/index.xml"
+        ],
+        "module": "vox"
     },
     "scalzi": {
         "feeds": [
@@ -9930,6 +10051,13 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://sporks.space/wp-json"
     },
+    "sportbible": {
+        "channel": "sportbible",
+        "feeds": [
+            "https://www.sportbible.com"
+        ],
+        "module": "ladbible"
+    },
     "sportico": {
         "module": "rollingstone",
         "posts_path": "/wp/v2/posts",
@@ -9941,6 +10069,17 @@
             "https://www.sportingnews.com/us/rss"
         ],
         "module": "drupal_json"
+    },
+    "sportshandle": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://sportshandle.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://sportshandle.com/wp-json"
     },
     "sportsmap": {
         "feeds": [
@@ -9958,6 +10097,22 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://sprudge.com/wp-json"
+    },
+    "spy": {
+        "feeds": [
+            "https://spy.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://spy.com/wp-json"
+    },
+    "staceyoniot": {
+        "feeds": [
+            "https://staceyoniot.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://staceyoniot.com/wp-json"
     },
     "stackoverflow": {
         "feeds": [
@@ -10013,6 +10168,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.statnews.com/wp-json"
+    },
+    "steelersnow": {
+        "feeds": [
+            "https://steelersnow.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://steelersnow.com/wp-json"
     },
     "stereogum": {
         "feeds": [
@@ -11339,6 +11502,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://thepointsguy.com/wp-json"
     },
+    "thepopverse": {
+        "feeds": [
+            "https://www.thepopverse.com/feed"
+        ],
+        "module": "eurogamer"
+    },
     "theportager": {
         "feeds": [
             "https://theportager.com/feed"
@@ -11346,6 +11515,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://theportager.com/wp-json"
+    },
+    "theregister": {
+        "feeds": [
+            "https://www.theregister.com/headlines.atom",
+            "https://www.theregister.com/on_prem/personal_tech/headlines.atom",
+            "https://feed.theregister.com/atom?q=Linux"
+        ],
+        "module": "theregister"
     },
     "therobotreport": {
         "args": {
@@ -11459,6 +11636,13 @@
         ],
         "wpjson_path": "http://www.thesmarthomehookup.com/wp-json"
     },
+    "thestar": {
+        "feeds": [
+            "http://www.thestar.com/content/thestar/feed.RSSManagerServlet.articlestopstories.rss",
+            "http://www.thestar.com/content/thestar/feed.RSSManagerServlet.articles.news.canada.rss"
+        ],
+        "module": "torontostar"
+    },
     "thestreamingadvisor": {
         "args": {
             "skip_wp_user": true
@@ -11480,6 +11664,23 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.thesun.co.uk/wp-json"
+    },
+    "thesweetsetup": {
+        "content": {
+            "attrs": {
+                "class": "article"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "johnsonbox"
+                },
+                "tag": "div"
+            }
+        ],
+        "module": "wp"
     },
     "thetakeout": {
         "feeds": [
@@ -11967,6 +12168,13 @@
     "twitter": {
         "module": "twitter-v2"
     },
+    "tyla": {
+        "channel": "tyla",
+        "feeds": [
+            "https://www.tyla.com"
+        ],
+        "module": "ladbible"
+    },
     "typepad": [
         {
             "futurelawyer.typepad.com": {
@@ -12070,6 +12278,13 @@
             }
         ],
         "wpjson_path": "https://undark.org/wp-json"
+    },
+    "unilad": {
+        "channel": "unilad",
+        "feeds": [
+            "https://www.unilad.com"
+        ],
+        "module": "ladbible"
     },
     "universetoday": {
         "feeds": [
@@ -12228,6 +12443,12 @@
         },
         "module": "wp"
     },
+    "vg247": {
+        "feeds": [
+            "https://www.vg247.com/feed"
+        ],
+        "module": "eurogamer"
+    },
     "vibe": {
         "args": {
             "add_subtitle": true
@@ -12326,6 +12547,13 @@
             "https://www.vogue.com/feed/rss"
         ],
         "module": "cne"
+    },
+    "vox": {
+        "feed": [
+            "https://www.vox.com/rss/index.xml",
+            "https://www.vox.com/rss/explainers/index.xml"
+        ],
+        "module": "vox"
     },
     "vpnoverview": {
         "feeds": [
@@ -12900,12 +13128,9 @@
             "servethehome",
             "snopes",
             "sportsvideo",
-            "spy",
             "themintmagazine",
-            "thesun",
             "truthorfiction",
             "usmagazine",
-            "variety",
             "washingtonian"
         ]
     },
@@ -13291,40 +13516,5 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ztgd.com/wp-json"
-    },
-    "gamingbible": {
-        "module": "ladbible",
-        "channel": "gamingbible",
-        "feeds": [
-            "https://www.gamingbible.com"
-        ]
-    },
-    "ladbible": {
-        "module": "ladbible",
-        "channel": "ladbible",
-        "feeds": [
-            "https://www.ladbible.com"
-        ]
-    },
-    "sportbible": {
-        "module": "ladbible",
-        "channel": "sportbible",
-        "feeds": [
-            "https://www.sportbible.com"
-        ]
-    },
-    "tyla": {
-        "module": "ladbible",
-        "channel": "tyla",
-        "feeds": [
-            "https://www.tyla.com"
-        ]
-    },
-    "unilad": {
-        "module": "ladbible",
-        "channel": "unilad",
-        "feeds": [
-            "https://www.unilad.com"
-        ]
     }
 }

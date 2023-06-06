@@ -87,6 +87,16 @@ def get_site_json(url):
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
       utils.write_file(sites_json, './sites.json')
+    elif url_exists('https://concertads-configs.vox-cdn.com/sbn/sbn/{}/config.json'.format(tld.domain)):
+      site_json = {
+        "feeds": [
+          "{}://{}/rss/index.xml".format(split_url.scheme, split_url.netloc)
+        ],
+        "module": "vox"
+      }
+      logger.debug('adding site ' + tld.domain)
+      sites_json[tld.domain] = site_json
+      utils.write_file(sites_json, './sites.json')
     else:
       dt = datetime.utcnow()
       if url_exists('{}://{}/sitemap/{}/{}/{}/'.format(split_url.scheme, split_url.netloc, dt.year, dt.strftime('%B').lower(), dt.day)):
@@ -255,6 +265,11 @@ def find_redirect_url(url):
       return query['url'][0]
     elif split_url.netloc == 'www.kqzyfj.com' and query.get('url'):
       return query['url'][0]
+    elif split_url.netloc == 'shareasale.com' and query.get('urllink'):
+      if query['urllink'][0].startswith('http'):
+        return query['urllink'][0]
+      else:
+        return 'https://' + query['urllink'][0]
     elif split_url.netloc == 'shopping.yahoo.com' and query.get('itemId'):
       m = re.search(r'amazon_(.*)', query['itemId'][0])
       if m:

@@ -985,6 +985,49 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
 
+    for el in soup.find_all(class_='product-card'):
+        # https://spy.com/articles/lifestyle/food-drink/best-mushroom-coffees-1202954039/
+        new_html = '<hr/><div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
+        it = el.find(class_='product-card-image-wrapper')
+        if it:
+            new_html += '<div style="flex:1; min-width:256px;">{}</div>'.format(add_image(it, None, base_url).replace('width:100%;', 'width:auto; max-height:300px;'))
+        new_html += '<div style="flex:1; min-width:256px;">'
+        it = el.find(class_='article-kicker')
+        if it:
+            new_html += '<div style="margin-top:0.5em; margin-bottom:0.5em; text-align:center;"><span style="padding:0.4em; font-weight:bold; color:white; background-color:#153969;">{}</span></div>'.format(it.get_text().strip())
+        it = el.find(class_='c-title')
+        if it:
+            new_html += '<div style="font-size:1.2em; font-weight:bold; text-align:center;">{}</div>'.format(it.get_text().strip())
+        it = el.find(class_='buy-now-buttons')
+        if it:
+            if it.p:
+                new_html += '<div style="font-size:1.1em; font-weight:bold; text-align:center;">{}</div>'.format(it.p.span.get_text())
+            new_html += '<div style="margin-top:0.5em; margin-bottom:0.5em; text-align:center;"><span style="padding:0.4em; font-weight:bold; background-color:rgb(255,213,53);"><a href="{}">{}</a></span></div>'.format(it.a['href'], it.a.get_text().strip())
+        it = el.find(class_='c-dek')
+        if it:
+            it.attrs = {}
+            new_html += str(it)
+        new_html += '</div></div><div>&nbsp;</div>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
+    for el in soup.find_all(class_='spy__buy-now-wrapper'):
+        # https://spy.com/articles/gadgets/electronics/bluetti-power-system-release-1202949586/
+        new_html = ''
+        it = el.find(class_='spy__link')
+        if it:
+            link = utils.get_redirect_url(it['href'])
+            data_json = json.loads(it['custom-ga-data'])
+            new_html += '<div>&nbsp;</div><div style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link, data_json['product']['name'])
+            new_html += '<div style="font-size:1.1em; font-weight:bold;">${}</div>'.format(data_json['product']['price'])
+            new_html += '<div style="margin-top:0.5em; margin-bottom:0.5em;"><span style="padding:0.4em; font-weight:bold; background-color:rgb(255,213,53);"><a href="{}">Buy Now</a></span></div><div>&nbsp;</div>'.format(link)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled spy__buy-now-wrapper in ' + item['url'])
+
     for el in soup.find_all(class_='wp-block-columns'):
         # https://jamesachambers.com/radxa-zero-debian-ssd-boot-guide/
         new_html = '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
@@ -2235,7 +2278,7 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     if paths[-1] == 'embed':
         del paths[-1]
-        args['embed'] == True
+        args['embed'] = True
 
     if isinstance(site_json['posts_path'], str):
         posts_path = site_json['posts_path']

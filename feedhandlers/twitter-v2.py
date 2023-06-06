@@ -285,31 +285,56 @@ def get_tweet(tweet_result, tweet=None, user=None, is_thread=False, is_retweet=F
             item['content_html'] = '<tr><td colspan="2"><small>&#128257; <a href="https://twitter.com/{}">{}</a> Retweeted</small></td></tr>'.format(user['screen_name'], user['name']) + rt_item['content_html']
             return item
 
+    note_tweet_entities = None
     if tweet_result and tweet_result.get('note_tweet'):
         body = tweet_result['note_tweet']['note_tweet_results']['result']['text']
+        if tweet_result['note_tweet']['note_tweet_results']['result'].get('entity_set'):
+            note_tweet_entities = tweet_result['note_tweet']['note_tweet_results']['result']['entity_set']
     else:
         body = tweet['full_text']
 
     body = body.replace('\n', '<br/>')
     item['tags'] = []
-    for it in tweet['entities']['hashtags']:
-        #body = body.replace('#{}'.format(it['text']), '<a href="https://twitter.com/hashtag/{0}">#{0}</a>'.format(it['text']))
-        body = re.sub(r'#{}\b'.format(it['text']), '<a href="https://twitter.com/hashtag/{0}">#{0}</a>'.format(it['text']), body, flags=re.I)
-        item['tags'].append('#{}'.format(it['text']))
-    for it in tweet['entities']['symbols']:
-        #body = body.replace('${}'.format(it['text']), 'https://twitter.com/search?q=%24{0}&src=cashtag_click">${0}</a>'.format(it['text']))
-        body = re.sub(r'\${}\b'.format(it['text']), 'https://twitter.com/search?q=%24{0}&src=cashtag_click">${0}</a>'.format(it['text']), body, flags=re.I)
-        item['tags'].append('${}'.format(it['text']))
-    for it in tweet['entities']['user_mentions']:
-        #body = body.replace('@{}'.format(it['screen_name']), '<a href="https://twitter.com/{0}">@{0}</a>'.format(it['screen_name']))
-        body = re.sub(r'@{}\b'.format(it['screen_name']), '<a href="https://twitter.com/{0}">@{0}</a>'.format(it['screen_name']), body, flags=re.I)
-        item['tags'].append('@{}'.format(it['screen_name']))
-    for it in tweet['entities']['urls']:
-        if tweet_result and tweet_result.get('card'):
-            if it['url'] == tweet_result['card']['rest_id']:
-                continue
-        #body = body.replace('{}'.format(it['url']), '<a href="{}">{}</a>'.format(it['expanded_url'], it['display_url']))
-        body = re.sub(r'\b{}\b'.format(it['url']), '<a href="{}">{}</a>'.format(it['expanded_url'], it['display_url']), body, flags=re.I)
+    if tweet['entities'].get('hashtags'):
+        for it in tweet['entities']['hashtags']:
+            body = re.sub(r'#{}\b'.format(it['text']), '<a href="https://twitter.com/hashtag/{0}">#{0}</a>'.format(it['text']), body, flags=re.I)
+            item['tags'].append('#{}'.format(it['text']))
+    elif note_tweet_entities and note_tweet_entities.get('hashtags'):
+        for it in note_tweet_entities['hashtags']:
+            body = re.sub(r'#{}\b'.format(it['text']), '<a href="https://twitter.com/hashtag/{0}">#{0}</a>'.format(it['text']), body, flags=re.I)
+            item['tags'].append('#{}'.format(it['text']))
+
+    if tweet['entities'].get('symbols'):
+        for it in tweet['entities']['symbols']:
+            body = re.sub(r'\${}\b'.format(it['text']), 'https://twitter.com/search?q=%24{0}&src=cashtag_click">${0}</a>'.format(it['text']), body, flags=re.I)
+            item['tags'].append('${}'.format(it['text']))
+    elif note_tweet_entities and note_tweet_entities.get('symbols'):
+        for it in note_tweet_entities['symbols']:
+            body = re.sub(r'\${}\b'.format(it['text']), 'https://twitter.com/search?q=%24{0}&src=cashtag_click">${0}</a>'.format(it['text']), body, flags=re.I)
+            item['tags'].append('${}'.format(it['text']))
+
+    if tweet['entities'].get('user_mentions'):
+        for it in tweet['entities']['user_mentions']:
+            body = re.sub(r'@{}\b'.format(it['screen_name']), '<a href="https://twitter.com/{0}">@{0}</a>'.format(it['screen_name']), body, flags=re.I)
+            item['tags'].append('@{}'.format(it['screen_name']))
+    elif note_tweet_entities and note_tweet_entities.get('user_mentions'):
+        for it in note_tweet_entities['user_mentions']:
+            body = re.sub(r'@{}\b'.format(it['screen_name']), '<a href="https://twitter.com/{0}">@{0}</a>'.format(it['screen_name']), body, flags=re.I)
+            item['tags'].append('@{}'.format(it['screen_name']))
+
+    if tweet['entities'].get('urls'):
+        for it in tweet['entities']['urls']:
+            if tweet_result and tweet_result.get('card'):
+                if it['url'] == tweet_result['card']['rest_id']:
+                    continue
+            body = re.sub(r'\b{}\b'.format(it['url']), '<a href="{}">{}</a>'.format(it['expanded_url'], it['display_url']), body, flags=re.I)
+    elif note_tweet_entities and note_tweet_entities.get('urls'):
+        for it in note_tweet_entities['urls']:
+            if tweet_result and tweet_result.get('card'):
+                if it['url'] == tweet_result['card']['rest_id']:
+                    continue
+            body = re.sub(r'\b{}\b'.format(it['url']), '<a href="{}">{}</a>'.format(it['expanded_url'], it['display_url']), body, flags=re.I)
+
     if not item.get('tags'):
         del item['tags']
 

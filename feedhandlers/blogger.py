@@ -145,6 +145,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             if it:
                 caption = it.decode_contents()
                 it.decompose()
+        if not caption:
+            caption = el_parent.get_text().strip()
         new_html = utils.add_image(img_src, caption, link=link)
         new_el = BeautifulSoup(new_html, 'html.parser')
         el_parent.insert_before(new_el)
