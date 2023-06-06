@@ -3399,10 +3399,10 @@
         "module": "dirt"
     },
     "disconnect": {
-        "module": "substack",
         "feeds": [
             "https://www.disconnect.blog/feed"
-        ]
+        ],
+        "module": "substack"
     },
     "discovermagazine": {
         "buildId": "my-build-id",
@@ -6324,6 +6324,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://linuxtechlab.com/wp-json"
+    },
+    "literaryreview": {
+        "feeds": [
+            "https://literaryreview.co.uk/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://literaryreview.co.uk/wp-json"
     },
     "lithub": {
         "feeds": [
@@ -9325,6 +9333,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://reverttosaved.com/wp-json"
     },
+    "reviewjournal": {
+        "feeds": [
+            "https://www.reviewjournal.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.reviewjournal.com/wp-json"
+    },
     "righto": {
         "feeds": [
             "https://www.righto.com/feeds/posts/default"
@@ -9478,6 +9494,22 @@
             "https://www.sbnation.com/rss/index.xml"
         ],
         "module": "vox"
+    },
+    "scalawagmagazine": {
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "wp-block-newspack-blocks-homepage-articles"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://scalawagmagazine.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://scalawagmagazine.org/wp-json"
     },
     "scalzi": {
         "feeds": [
@@ -13123,14 +13155,10 @@
             "pocketables",
             "poynter",
             "psu",
-            "reviewjournal",
-            "scalawagmagazine",
             "servethehome",
             "snopes",
             "sportsvideo",
-            "themintmagazine",
             "truthorfiction",
-            "usmagazine",
             "washingtonian"
         ]
     },

@@ -170,7 +170,7 @@ def add_image(el, el_parent, base_url, caption=True, decompose=True, gallery=Fal
                 if it and it.get_text().strip():
                     captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it.decode_contents().strip()))
             if not captions:
-                it = elm.find(class_=re.compile(r'caption-text|image-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption'))
+                it = elm.find(class_=re.compile(r'caption-text|image-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption'))
                 if it and it.get_text().strip():
                     captions.append(it.get_text())
             if not captions:
@@ -313,6 +313,8 @@ def get_post_content(post, args, site_json, save_debug=False):
                         authors.append(it.get_text())
                 if not authors:
                     authors.append(re.sub(r'^By ', '', el.get_text().strip(), flags=re.I))
+    if not authors and post.get('rj_fields') and post['rj_fields'].get('_rj_field_byline_author') and post['rj_fields']['_rj_field_byline_author'].get('authors'):
+        authors = post['rj_fields']['_rj_field_byline_author']['authors'].copy()
     if not authors and post.get('authors'):
         for it in post['authors']:
             if isinstance(it, dict):
@@ -627,6 +629,11 @@ def get_post_content(post, args, site_json, save_debug=False):
                     if it['@type'] == 'VideoObject':
                         video_lede = utils.add_video(it['contentUrl'], 'application/x-mpegURL', it['thumbnailUrl'], it['name'])
                         break
+        elif post.get('rj_fields') and post['rj_fields'].get('rj_field_vdo'):
+            for it in post['rj_fields']['rj_field_vdo']:
+                m = re.search(r'id="([^"]+)"', it)
+                if m:
+                    video_lede += utils.add_embed('https://embed.sendtonews.com/player3/embedcode.js?SC={}'.format(m.group(1)))
         elif site_json.get('lede_video'):
             if not page_soup:
                 page_html = utils.get_url_html(item['url'])
@@ -900,6 +907,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(['h5', 'h6']):
         # too small
         el.name = 'h4'
+
+    for el in soup.find_all('span', class_='neFMT_Subhead_WithinText'):
+        el['style'] = 'font-size:1.2em; font-weight:bold;'
 
     for el in soup.find_all('table', attrs={"width": True}):
         el.attrs = {}
@@ -1921,6 +1931,20 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled video-container in ' + item['url'])
 
+    for el in soup.find_all(class_='jwplayer_placeholder'):
+        new_html = ''
+        it = el.find(id=re.compile(r'jwplayer_'))
+        if it:
+            m = re.search(r'jwplayer_([^_]+)_([^_]+)', it['id'])
+            if m:
+                new_html = utils.add_embed('https://cdn.jwplayer.com/players/{}-{}.js'.format(m.group(1), m.group(2)))
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled video-container in ' + item['url'])
+
     for el in soup.find_all(class_='dtvideos-container'):
         if el.get('data-provider') and el['data-provider'] == 'youtube':
             it = el.find(class_='h-embedded-video')
@@ -2139,6 +2163,16 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()
+
+    for el in soup.find_all(class_='wp-block-file'):
+        # https://scalawagmagazine.org/2023/06/new-orleans-musicians-clinic/
+        if el.object:
+            new_html = '<p style="line-height:2em;"><span style="font-size:1.5em; vertical-align:middle;">🗎</span>&nbsp;<span style="vertical-align:middle;"><a href="{}">{}</a></span></p>'.format(el.object['data'], el.object['aria-label'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled wp-block-file in ' + item['url'])
 
     for el in soup.find_all(class_='wp-block-prc-block-collapsible'):
         new_html = ''

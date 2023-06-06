@@ -183,7 +183,7 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
 
             elif el['data-transform'] == 'slideshow':
-                slideshow = get_slideshow_content(el['data-slug'], {}, save_debug)
+                slideshow = get_slideshow_content(el['data-slug'], {}, site_json, save_debug)
                 if slideshow:
                     el_html = '<h3 class="slideshow">Slideshow: <a href="{}">{}</a></h3>'.format(slideshow['url'], slideshow['title'])
                     el_html += utils.add_image(slideshow['_image'], link=slideshow['url']) + '<br/>'
@@ -279,11 +279,11 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += '<li>Platforms: {}</li>'.format(', '.join(platforms))
                 item['tags'] += platforms
 
-            if object['releases'][0].get('timeframeYear'):
-                item['content_html'] += '<li>Release date: {}</li>'.format(object['releases'][0]['timeframeYear'])
-            elif object['releases'][0].get('date'):
-                dt = get_datetime(object['releases'][0]['date'])
-                item['content_html'] += '<li>Release date: {}</li>'.format(utils.format_display_date(dt, False))
+                if object['releases'][0].get('timeframeYear'):
+                    item['content_html'] += '<li>Release date: {}</li>'.format(object['releases'][0]['timeframeYear'])
+                elif object['releases'][0].get('date'):
+                    dt = get_datetime(object['releases'][0]['date'])
+                    item['content_html'] += '<li>Release date: {}</li>'.format(utils.format_display_date(dt, False))
 
         for key, val in page_json['object'].items():
             if isinstance(val, list):
