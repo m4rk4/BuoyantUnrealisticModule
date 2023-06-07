@@ -658,9 +658,12 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   if width:
     fig_html += ' width:{};'.format(width)
   else:
-    fig_html += ' width:100%;'
+    fig_html += ' width:auto; max-width:100%;'
+    #fig_html += ' width:100%;'
   if height:
     fig_html += ' height:{};'.format(height)
+  else:
+    fig_html += ' max-height:800px;'
   if img_style:
     fig_html += ' {}'.format(img_style)
   fig_html += '"/>'
