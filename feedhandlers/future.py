@@ -343,7 +343,7 @@ def get_content(url, args, site_json, save_debug=False):
             new_html = ''
             m = re.search(r'-(imageGallery-\d+)', el['id'])
             if m:
-                it = body.find('script', id='vanilla-slice-{}-hydrate'.format(m.group(1)))
+                it = body.find('script', id=re.compile(r'-{}-hydrate'.format(m.group(1))))
                 if it:
                     m = re.search('var data = (\{.*?\});\n', it.string)
                     if m:

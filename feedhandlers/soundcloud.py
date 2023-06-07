@@ -241,9 +241,12 @@ def get_content(url, args, site_json, save_debug=False):
         logger.warning('unable to find the api url in ' + url)
         return None
 
-    sites_json = utils.read_json_file('./sites.json')
+    #sites_json = utils.read_json_file('./sites.json')
 
-    widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), sites_json['soundcloud']['client_id'], sites_json['soundcloud']['app_version'])
+    widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), site_json['client_id'], site_json['app_version'])
+    query = parse_qs(urlsplit(api_url).query)
+    if query.get('secret_token'):
+        widget_url += '&secret_token={}'.format(query['secret_token'][0])
     api_json = utils.get_url_json(widget_url)
     if not api_json:
         return None
@@ -296,7 +299,12 @@ def get_content(url, args, site_json, save_debug=False):
         if not media:
             media = next((it for it in api_json['media']['transcodings'] if (it['format']['protocol'] == 'hls' and it['preset'].startswith('mp3'))), None)
         if media:
-            audio_json = utils.get_url_json(media['url'] + '?client_id=' + sites_json['soundcloud']['client_id'])
+            media_url = media['url']
+            if urlsplit(media_url).query:
+                media_url += '&client_id=' + site_json['client_id']
+            else:
+                media_url += '?client_id=' + site_json['client_id']
+            audio_json = utils.get_url_json(media_url)
             if audio_json:
                 item['_audio'] = audio_json['url']
 
@@ -331,14 +339,14 @@ def get_content(url, args, site_json, save_debug=False):
                 track_json = track
             else:
                 api_url = 'https://api.soundcloud.com/tracks/{}'.format(track['id'])
-                widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), sites_json['soundcloud']['client_id'],sites_json['soundcloud']['app_version'])
+                widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), site_json['client_id'], site_json['app_version'])
                 track_json = utils.get_url_json(widget_url)
             item['content_html'] += '<tr><td style="width:1em;">{}.</td><td style="width:1em;">'.format(i+1)
             media = next((it for it in track_json['media']['transcodings'] if it['format']['protocol'] == 'progressive'), None)
             if not media:
                 media = next((it for it in track_json['media']['transcodings'] if (it['format']['protocol'] == 'hls' and it['preset'].startswith('mp3'))), None)
             if media:
-                audio_json = utils.get_url_json(media['url'] + '?client_id=' + sites_json['soundcloud']['client_id'])
+                audio_json = utils.get_url_json(media['url'] + '?client_id=' + site_json['client_id'])
                 if audio_json:
                     item['content_html'] += '<a href="{}/openplayer?url={}&content_type=audio&poster={}" style="text-decoration:none;">'.format(config.server, quote_plus(track_json['uri']), quote_plus(track_json['artwork_url'].replace('large', 't500x500')))
                     if media['snipped']:

@@ -103,7 +103,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(url)
 
-    if 'restricted' in paths:
+    if 'restricted' in paths or 'offers-reg' in paths:
         # https://www.beaconjournal.com/restricted/?return=https%3A%2F%2Fwww.beaconjournal.com%2Fstory%2Fsports%2Fhigh-school%2Ftrack-field%2F2023%2F05%2F20%2Fohsaa-track-and-field-hudson-ohio-high-school-nordonia-district%2F70226336007%2F
         query = parse_qs(split_url.query)
         return get_content(query['return'][0], args, site_json, save_debug, article_json)
@@ -307,7 +307,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all(re.compile(r'\b(h\d|li|ol|p|span|ul)\b'), class_=True):
             el.attrs = {}
 
-        item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', str(article))
+        item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
 
     if not item.get('_image'):
         el = soup.find('meta', attrs={"property": "og:image"})

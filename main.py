@@ -234,7 +234,7 @@ def openplayer():
     args = request.args
     player_args = args.copy()
     if player_args.get('url'):
-        item = utils.get_content(player_args['url'], {}, {}, False)
+        item = utils.get_content(player_args['url'], {}, False)
         if not item:
             return 'Unable to get url content'
         if player_args.get('content_type'):

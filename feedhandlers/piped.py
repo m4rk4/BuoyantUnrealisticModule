@@ -147,10 +147,11 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
         elif video_stream:
             if piped_json.get('uploaderAvatar'):
-                avatar = '{}/image?url={}&height=24&mask=ellipse'.format(config.server, quote_plus(piped_json['uploaderAvatar']))
+                avatar = '{}/image?url={}&height=32&mask=ellipse'.format(config.server, quote_plus(piped_json['uploaderAvatar']))
             else:
-                avatar = '{}/image?height=24&width=24&mask=ellipse'.format(config.server)
-            heading = '<div style="display:flex; align-items:center; margin:8px; gap:8px;"><img src="{}"/><div style="font-weight:bold;"><a href="https://piped.video{}">{}</div></div>'.format(avatar, piped_json['uploaderUrl'], piped_json['uploader'])
+                avatar = '{}/image?height=32&width=32&mask=ellipse'.format(config.server)
+            #heading = '<div style="display:flex; align-items:center; margin:8px; gap:8px;"><img src="{}"/><div style="font-weight:bold;"><a href="https://piped.video{}">{}</div></div>'.format(avatar, piped_json['uploaderUrl'], piped_json['uploader'])
+            heading = '<table><tr><td style="verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(avatar, piped_json['uploaderUrl'], piped_json['uploader'])
             caption = '<a href="https://piped.video/watch?v={0}">{1}</a> | <a href="https://piped.video/embed/{0}">Watch on Piped</a> | <a href="https://www.youtube-nocookie.com/embed/{0}">Watch on YouTube</a>'.format(item['id'], item['title'])
             play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + item['id']))
             item['content_html'] = utils.add_video(play_url, video_stream['mimeType'], item['_image'], caption, heading=heading)

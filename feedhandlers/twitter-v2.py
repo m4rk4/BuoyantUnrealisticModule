@@ -205,7 +205,7 @@ def get_content(url, args, site_json, save_debug=False):
     for instruction in tweet_json['data']['threaded_conversation_with_injections_v2']['instructions']:
         if instruction['type'] == 'TimelineAddEntries':
             for entry in instruction['entries']:
-                if entry['entryId'].startswith('tweet'):
+                if entry['entryId'].startswith('tweet-'):
                     tweet_result = entry['content']['itemContent']['tweet_results']['result']
                     if not parent_id:
                         if tweet_result.get('rest_id'):
@@ -218,7 +218,7 @@ def get_content(url, args, site_json, save_debug=False):
                         it = get_tweet(tweet_result, is_thread=True, is_retweet=is_retweet)
                         if it:
                             parents += it['content_html']
-                elif entry['entryId'].startswith('conversationthread'):
+                elif entry['entryId'].startswith('conversationthread-'):
                     for content_item in entry['content']['items']:
                         if content_item['item']['itemContent']['__typename'] == 'TimelineTweet':
                             tweet_result = content_item['item']['itemContent']['tweet_results']['result']
