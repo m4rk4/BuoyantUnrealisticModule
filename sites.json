@@ -9269,7 +9269,7 @@
             },
             "source": "article-by-id-or-url-v1"
         },
-        "deployment": 123,
+        "deployment": 144,
         "homepage_feed": {
             "query": {
                 "arc-site": "reuters",
@@ -9401,7 +9401,9 @@
         "wpjson_path": "https://www.roku.com/blog/api"
     },
     "rollingstone": {
-        "module": "rollingstone"
+        "module": "rollingstone",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.rollingstone.com/wp-json"
     },
     "rubbernews": {
         "module": "crains"
@@ -10041,7 +10043,7 @@
         "wpjson_path": "https://sonoff.tech/wp-json"
     },
     "soundcloud": {
-        "app_version": "1661164069",
+        "app_version": "1685610697",
         "client_id": "LBCcHmRB8XSStWL6wKH2HPACspQlXg2P",
         "module": "soundcloud"
     },
