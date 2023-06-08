@@ -259,24 +259,9 @@ def render_body(body, body_zones=None):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    if 'bustle' in split_url.netloc:
-        site = 'Bustle'
-    elif 'inputmag' in split_url.netloc:
-        site = 'Input'
-    elif 'inverse' in split_url.netloc:
-        site = 'Inverse'
-    elif 'mic.com' in split_url.netloc:
-        site = 'Mic'
-    else:
-        logger.warning('unhandled url for bustle module: ' + url)
-        return None
-
-    #graph_url = 'https://graph.bustle.com/?variables=%7B%22includeRelated%22%3Atrue%2C%22path%22%3A%22{}%22%2C%22site%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%223e1601b4aeed246b45902b5bc9c26249ddfb5471ce9a8fd118c0d2689c644655%22%7D%7D&_client=Inverse&_version=f488527'.format(quote_plus(split_url.path), site)
-    graph_url = 'https://graph.bustle.com/?variables=%7B%22includeRelated%22%3Atrue%2C%22path%22%3A%22{}%22%2C%22site%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%222294ef249af56ec3b6ccee35bd1e0cf830a689171fb8e5c17da46c3540b4c992%22%7D%7D&_client={}&_version=3519ceb'.format(quote_plus(split_url.path), site.upper(), site)
+    graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22mosaicCardFeedLimit%22%3A8%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22a30f582ff45b31cdc13289410e3f43389417573d3911861db93b05aebe2a62f4%22%7D%7D&_client={}&_version=78ec64f'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
     graph_json = utils.get_url_json(graph_url)
-    if graph_json:
-        article_json = graph_json['data']['site']['contentByPath']
-    else:
+    if not graph_json:
         logger.debug('graphql unsuccessful, extracting data from ' + url)
         article_html = utils.get_url_html(url)
         if not article_html:
@@ -287,8 +272,8 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unable to find __INITIAL_STATE__ in ' + url)
             return None
         graph_json = json.loads(el.string)
-        article_json = graph_json['site']['contentByPath']
 
+    article_json = graph_json['data']['site']['contentByPath']
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
         #utils.write_file(graph_json, './debug/content.json')

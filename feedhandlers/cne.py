@@ -145,6 +145,12 @@ def format_body(body_json):
             return '<table style="width:100%"><tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;"><a href="https://www.pitchfork.com{}">{}</a></h4><small>{}</small><br/><br/><a href="https://www.pitchfork.com{}">{}</a></td></tr></table>'.format(body_json[1]['props']['image']['sources']['sm']['url'], body_json[1]['props']['url'], body_json[1]['props']['dangerousHed'], body_json[1]['props']['artistName'], body_json[1]['props']['url'], body_json[1]['props']['buttonTextContent'])
         elif body_json[1]['type'] == 'justwatch':
             return utils.add_embed(body_json[1]['props']['url'])
+        elif body_json[1]['type'] == 'pullquoteContent':
+            start_tag = ''
+            end_tag = ''
+        elif body_json[1]['type'] == 'callout:button-group':
+            start_tag = ''
+            end_tag = ''
         elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
             # skip these but process the children
             start_tag = ''
@@ -179,6 +185,10 @@ def format_body(body_json):
                     if 'lead-in-text-callout' in val:
                         lead_in = True
                         continue
+                elif key == 'attributes':
+                    for k, v in val.items():
+                        attrs.append('{}="{}"'.format(k, v))
+                    continue
                 attrs.append('{}="{}"'.format(key, val))
             if attrs:
                 content_html = content_html[:-1] + ' ' + ' '.join(attrs) + '>'
@@ -195,8 +205,20 @@ def format_body(body_json):
 
     content_html += end_tag
 
-    if body_json[0] == 'inline-embed' and body_json[1]['type'] == 'callout:pullquote':
-        content_html = utils.add_pullquote(content_html)
+    if body_json[0] == 'inline-embed':
+        if body_json[1]['type'] == 'callout:pullquote':
+            content_html = utils.add_pullquote(content_html)
+        elif body_json[1]['type'] == 'callout:button-group':
+            soup = BeautifulSoup(content_html, 'html.parser')
+            el = soup.find('a')
+            if el:
+                if el.get('data-offer-url'):
+                    link = el['data-offer-url']
+                else:
+                    link = el['href']
+                content_html = '<div><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; text-transform:uppercase; border:1px solid rgb(5, 125, 188);">{}</span></a></div>'.format(link, el.get_text())
+            else:
+                logger.warning('unhandled callout:button-group')
 
     return content_html
 

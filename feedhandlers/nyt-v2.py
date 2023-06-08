@@ -333,10 +333,12 @@ def get_video_json(video_id, save_debug):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    if re.search('/(live|interactive)/', url):
-        logger.warning('unsupported url ' + url)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if site_json.get('exclude_paths') and list(set(paths) & set(site_json['exclude_paths'])):
+        logger.debug('skipping ' + url)
         return None
-    elif '/wirecutter/' in url:
+    elif 'wirecutter' in paths:
         return wirecutter.get_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
@@ -481,27 +483,31 @@ def get_collection(path):
             "highlightsListUri": "nyt://per/personalized-list/__null__",
             "highlightsListFirst": 0,
             "hasHighlightsList": False,
-            "cursor": "YXJyYXljb25uZWN0aW9uOjA="
+            "cursor": "YXJyYXljb25uZWN0aW9uOjk="
         },
         "extensions": {
             "persistedQuery": {
-                "version": 1, "sha256Hash": "5bf74f1861a95e95479325803a93c290404da1a1b61929256077b42f290e0a05"
+                "version": 1,
+                "sha256Hash": "eeabf55d7b6f254a92ede1a14c07826358f567426521c51b0d60949031db6482"
             }
         }
     }
     headers = {
         "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9,de;q=0.8",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
         "content-type": "application/json",
         "nyt-app-type": "project-vi",
         "nyt-app-version": "0.0.5",
         "nyt-token": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs+/oUCTBmD/cLdmcecrnBMHiU/pxQCn2DDyaPKUOXxi4p0uUSZQzsuq1pJ1m5z1i0YGPd1U1OeGHAChWtqoxC7bFMCXcwnE1oyui9G1uobgpm1GdhtwkR7ta7akVTcsF8zxiXx7DNXIPd2nIJFH83rmkZueKrC4JVaNzjvD+Z03piLn5bHWU6+w+rA+kyJtGgZNTXKyPh6EC6o5N+rknNMG5+CdTq35p8f99WjFawSvYgP9V64kgckbTbtdJ6YhVP58TnuYgr12urtwnIqWP9KSJ1e5vmgf3tunMqWNm6+AnsqNj8mCLdCuc5cEB74CwUeQcP2HQQmbCddBy2y0mEwIDAQAB",
-        "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"112\", \"Chromium\";v=\"112\"",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"114\", \"Microsoft Edge\";v=\"114\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site"
+        "sec-fetch-site": "same-site",
+        "x-nyt-internal-meter-override": "undefined"
     }
     gql_json = utils.post_url('https://samizdat-graphql.nytimes.com/graphql/v2', json_data=data, headers=headers)
     if not gql_json:
@@ -561,36 +567,46 @@ def get_live_feed(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    if '/live/' in args['url']:
+        collection = get_live_feed(url, args, site_json, save_debug)
+        if save_debug:
+            utils.write_file(collection, './debug/feed.json')
+        return None
+
     feed = None
     if args['url'].endswith('.xml') or args['url'].endswith('/feed/'):
         feed = rss.get_feed(url, args, site_json, save_debug, get_content)
         m = re.search(r'publish/https://www\.nytimes\.com/(.*)/rss\.xml', args['url'])
         if m:
-            collection = get_collection(m.group(1))
-            if collection:
-                if save_debug:
-                    utils.write_file(collection, './debug/feed.json')
-                highlights = collection['data']['legacyCollection']['highlights']['edges']
-                streams = collection['data']['legacyCollection']['collectionsPage']['stream']['edges']
-                for edge in highlights+streams:
-                    if edge['node'].get('url'):
-                        url = edge['node']['url']
-                    elif edge['node'].get('targetUrl'):
-                        url = edge['node']['targetUrl']
-                    else:
-                        continue
-                    if not next((it for it in feed['items'] if it['url'] == url), None):
-                        if save_debug:
-                            logger.debug('getting content for ' + url)
-                        item = get_content(url, args, site_json, save_debug)
-                        if item:
-                            if utils.filter_item(item, args) == True:
-                                feed['items'].append(item)
-            feed['items'] = sorted(feed['items'], key=lambda i: i['_timestamp'], reverse=True)
+            path = m.group(1)
+        else:
+            path = ''
+    else:
+        split_url = urlsplit(url)
+        path = split_url.path
+        feed = utils.init_jsonfeed(args)
 
-    elif '/live/' in args['url']:
-        collection = get_live_feed(url, args, site_json, save_debug)
-        if save_debug:
-            utils.write_file(collection, './debug/feed.json')
+    if path:
+        collection = get_collection(path)
+        if collection:
+            if save_debug:
+                utils.write_file(collection, './debug/feed.json')
+            highlights = collection['data']['legacyCollection']['highlights']['edges']
+            streams = collection['data']['legacyCollection']['collectionsPage']['stream']['edges']
+            for edge in highlights + streams:
+                if edge['node'].get('url'):
+                    url = edge['node']['url']
+                elif edge['node'].get('targetUrl'):
+                    url = edge['node']['targetUrl']
+                else:
+                    continue
+                if not next((it for it in feed['items'] if it['url'] == url), None):
+                    if save_debug:
+                        logger.debug('getting content for ' + url)
+                    item = get_content(url, args, site_json, save_debug)
+                    if item:
+                        if utils.filter_item(item, args) == True:
+                            feed['items'].append(item)
+        feed['items'] = sorted(feed['items'], key=lambda i: i['_timestamp'], reverse=True)
 
     return feed

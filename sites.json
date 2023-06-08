@@ -1458,7 +1458,8 @@
         }
     },
     "bustle": {
-        "module": "bustle"
+        "module": "bustle",
+        "site": "Bustle"
     },
     "buzzfeed": {
         "module": "buzzfeed"
@@ -5361,7 +5362,8 @@
         "wpjson_path": "https://www.innovations-report.com/wp-json"
     },
     "inputmag": {
-        "module": "bustle"
+        "module": "bustle",
+        "site": "Input"
     },
     "inquirer": {
         "api_url": "https://www.inquirer.com/pf/api/v3/content/fetch/",
@@ -5482,7 +5484,8 @@
         "wpjson_path": "https://www.interviewmagazine.com/wp-json"
     },
     "inverse": {
-        "module": "bustle"
+        "module": "bustle",
+        "site": "Inverse"
     },
     "invertedpassion": {
         "decompose": [
@@ -6811,7 +6814,8 @@
         "module": "foundation"
     },
     "mic": {
-        "module": "bustle"
+        "module": "bustle",
+        "site": "Mic"
     },
     "microgridknowledge": {
         "feeds": [
@@ -7911,7 +7915,12 @@
         "module": "nypost"
     },
     "nytimes": {
-        "module": "nyt-v2"
+        "module": "nyt-v2",
+        "exclude_paths": [
+            "espanol",
+            "interactive",
+            "live"
+        ]
     },
     "observer": {
         "feeds": [
@@ -8016,7 +8025,7 @@
         "wpjson_path": "https://www.omgubuntu.co.uk/wp-json"
     },
     "omny": {
-        "buildId": "PL1ijeMIEy5rH-uYE1pNA",
+        "buildId": "TOn2TCqRwisU-iFXKNdRa",
         "module": "omnyfm"
     },
     "omnycontent": {
