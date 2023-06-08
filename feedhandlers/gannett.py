@@ -1,4 +1,4 @@
-import json, math, re, tldextract
+import base64, json, math, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -99,6 +99,8 @@ def get_gallery_content(gallery_id, site_code):
 
 def get_content(url, args, site_json, save_debug=False, article_json=None):
     split_url = urlsplit(url)
+    if split_url.netloc == 'data.usatoday.com':
+        return None
     paths = list(filter(None, split_url.path[1:].split('/')))
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(url)
@@ -271,7 +273,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             el.decompose()
 
         for el in article.find_all('aside'):
-            if el.has_attr('data-gl-method'):
+            if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
+                el.decompose()
+                continue
+            elif el.has_attr('data-gl-method'):
                 new_html = ''
                 if el['data-gl-method'] == 'loadTwitter':
                     new_html = utils.add_embed(utils.get_twitter_url(el['data-v-id']))
@@ -281,17 +286,24 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                     new_html = utils.add_embed(el['data-v-src'])
                 elif el['data-gl-method'] == 'loadOmny':
                     new_html = utils.add_embed(el['data-v-src'])
-                elif el['data-gl-method'] == 'loadAnc':
-                    pass
-                elif el['data-gl-method'] == 'loadHb64' and el.get('aria-label') and re.search(r'subscribe', el['aria-label'], flags=re.I):
-                    pass
-                else:
-                    logger.warning('unhandled aside data-gl-method {} in {}'.format(el['data-gl-method'], item['url']))
+                elif el['data-gl-method'] == 'loadHb64' and el.get('data-gl-hb64'):
+                    data = base64.b64decode(el['data-gl-hb64']).decode('utf-8')
+                    data_soup = BeautifulSoup(data, 'html.parser')
+                    if data_soup.iframe:
+                        new_html = utils.add_embed(data_soup.iframe['src'])
+                elif el['data-gl-method'] == 'loadAnc' or el['data-gl-method'] == 'flp':
+                    el.decompose()
+                    continue
                 if new_html:
                     new_el = BeautifulSoup(new_html, 'html.parser')
                     el.insert_after(new_el)
-            # Remove these because they are usually ads if not Twitter
-            el.decompose()
+                    el.decompose()
+                else:
+                    logger.warning('unhandled aside data-gl-method {} in {}'.format(el['data-gl-method'], item['url']))
+                    el.decompose()
+            else:
+                logger.warning('unhandled aside in ' + item['url'])
+                el.decompose()
 
         # Fix local href links
         for el in article.find_all('a'):
