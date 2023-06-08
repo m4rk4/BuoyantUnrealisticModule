@@ -14,8 +14,8 @@ feedparser = "^6"
 install-playwright = "^0"
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml
 lxml = [
-    {markers = "sys_platform == 'win32'", file = "lib/lxml-4.9.0-cp311-cp311-win_amd64.whl"},
-    {markers = "sys_platform == 'linux'", version = "=4.9.0"}
+    {version = "=4.9.0",  markers = "sys_platform != 'win32'"},
+    {path = "lib/lxml-4.9.0-cp311-cp311-win_amd64.whl",  markers = "sys_platform == 'win32'"}
 ]
 markdown2 = "^2"
 Pillow = "^9"
