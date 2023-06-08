@@ -596,7 +596,7 @@
     },
     "apple": {
         "module": "apple",
-        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjc0Njg0MDcyLCJleHAiOjE2ODA5MDQ4NzIsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.GcY5FzbDXflzicAfcAU6CsU3pm38REXlTJRPH4nXE3VuFkg1kaOwDk9XONoAS-qqNrkXPOTBx_5YNnzEChEl-g"
+        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjg0MzYxNDk3LCJleHAiOjE2OTA1ODIyOTcsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.czek4x0Y9YFMg1qlczzmPYO06bbDuulu21aSao4IkTHF3uuYr0zWS4DnSG22ybRJzmrmVhrFXUOEAb9u24AvCg"
     },
     "appleinsider": {
         "module": "appleinsider"
@@ -1811,7 +1811,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1009,
+        "deployment": 1060,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -4884,7 +4884,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "8XvUwliFILfwFfAJeOs9u",
+        "buildId": "RpynHATmSDc3A_RkletEb",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
