@@ -331,7 +331,7 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += utils.add_embed(links[-1]['href'])
 
     elif element['type'] == 'reference':
-        if element.get('referent') and element['referent']['type'] == 'facebook-post':
+        if element.get('referent') and element['referent'].get('id'):
             element_html += utils.add_embed(element['referent']['id'])
         else:
             logger.warning('unhandled reference element')
@@ -608,19 +608,19 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    # https://www.baltimoresun.com/rss/
-    # https://www.baltimoresun.com/arcio/rss/
-    # https://feeds.washingtonpost.com/rss/business/technology/
-
-    if '/rss/' in args['url']:
-        return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-    split_url = urlsplit(args['url'])
+    split_url = urlsplit(url)
     if split_url.path.endswith('/'):
         path = split_url.path[:-1]
     else:
         path = split_url.path
     paths = list(filter(None, path.split('/')))
+
+    # https://www.baltimoresun.com/rss/
+    # https://www.baltimoresun.com/arcio/rss/
+    # https://feeds.washingtonpost.com/rss/business/technology/
+    # https://www.washingtonpost.com/news/powerpost/feed/
+    if 'rss' in paths or 'feed' in paths:
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     for n in range(2):
         if len(paths) == 0:
