@@ -360,7 +360,7 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         bootstrap_path = '/res/bootstrap/data.js?site_id={}&resource_id={}&path_params={}&warehouse10x=1&override_device=desktop&post_id={}'.format(bootstrap_data['site']['id'], bootstrap_data['resourceId'], quote_plus(json.dumps(bootstrap_data['pathParams'])), bootstrap_data['post']['id'])
     bootstrap_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, bootstrap_path)
-    print(bootstrap_url)
+    #print(bootstrap_url)
     bootstrap_json = utils.get_url_json(bootstrap_url)
 
     post_json = bootstrap_json['post']
@@ -370,7 +370,10 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     item['id'] = post_json['id']
     item['url'] = post_json['post_url']
-    item['title'] = post_json['headline']
+    if post_json.get('og_title'):
+        item['title'] = post_json['og_title']
+    else:
+        item['title'] = BeautifulSoup(post_json['headline'], 'html.parser').get_text()
 
     dt = datetime.fromtimestamp(post_json['created_ts']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()

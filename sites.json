@@ -351,6 +351,12 @@
             "source": "story-feed-sections-w-descr"
         }
     },
+    "advocate": {
+        "feeds": [
+            "https://www.advocate.com/feeds/feed.rss"
+        ],
+        "module": "rebelmouse"
+    },
     "aeon": {
         "buildId": "6Kj19emHtFInmFuRs5c9X",
         "feeds": [

@@ -32,7 +32,10 @@ def add_image(el, gallery=False, width=1000):
             caption = ''
     else:
         caption = ''
-    return utils.add_image(resize_image(it['data-img-url']), caption)
+    image_html = utils.add_image(resize_image(it['data-img-url']), caption)
+    if el.find_parent('li'):
+        image_html = '<div>&nbsp;</div>' + image_html + '<div>&nbsp;</div>'
+    return image_html
 
 
 def add_play_store_app(el):
@@ -207,6 +210,10 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='note')
                 if it:
                     new_html = utils.add_blockquote('<b>Note:</b>' + it.decode_contents())
+            elif 'emaki-custom-tip' in el['class']:
+                new_html = utils.add_blockquote('<b>Tip:</b>' + el.decode_contents())
+            elif 'emaki-custom-warning' in el['class']:
+                new_html = utils.add_blockquote('<span style="font-weight:bold; color:red;">Warning:</span>' + el.decode_contents(), border_color='red')
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -419,12 +426,16 @@ def get_content(url, args, site_json, save_debug=False):
         for el in body.find_all(class_='gallery-lightbox'):
             el.decompose()
 
+        for el in body.find_all('link', attrs={"rel": "stylesheet"}):
+            el.decompose()
+
         for el in body.find_all('a', href=re.compile(r'^/')):
             el['href'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, el['href'])
 
         item['content_html'] += body.decode_contents()
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+    item['content_html'] = re.sub(r'<div>(&nbsp;|\s)</div>\s*<div>(&nbsp;|\s)</div>', '<div>&nbsp;</div>', item['content_html'])
     return item
 
 

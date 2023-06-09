@@ -577,7 +577,7 @@ def bs_get_inner_html(soup):
   # Also strips \n
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
-def add_blockquote(quote, pullquote_check=True):
+def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
   quote = quote.strip()
   if quote.startswith('<p>'):
     quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
@@ -585,7 +585,7 @@ def add_blockquote(quote, pullquote_check=True):
   if pullquote_check:
     if re.search(r'^["“‘]', quote) and re.search(r'["”’]$', quote):
       return add_pullquote(quote[1:-1])
-  return '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;">{}</blockquote>'.format(quote)
+  return '<blockquote style="border-left:3px solid {}; margin:1.5em 10px; padding:0.5em 10px;">{}</blockquote>'.format(border_color, quote)
 
 def open_pullquote():
   #return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
