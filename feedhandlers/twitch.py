@@ -143,6 +143,7 @@ def get_content(url, args, site_json, save_debug=False):
             #utils.write_file(token_json, './debug/twitch.json')
             acbm = base64.b64encode('{}'.encode()).decode('utf-8')
             p = math.floor(9999999 * random.uniform(0, 1))
+            # TODO: play_session_id
             vod_url = 'https://usher.ttvnw.net/vod/{}.m3u8?acmb={}&allow_source=true&p={}&play_session_id=&player_backend=mediaplayer&playlist_include_framerate=true&reassignments_supported=true&sig={}&supported_codecs=avc1&token={}&transcode_mode=cbr_v1&cdm=wv&player_version=1.20.0'.format(video_id, quote(acbm), p, token_json['data']['videoPlaybackAccessToken']['signature'], quote(token_json['data']['videoPlaybackAccessToken']['value']))
             # TODO: this doesn't work because of CORS policy. Works with VLC.
             item['content_html'] = utils.add_video(vod_url, 'application/x-mpegURL', item['_image'], caption)
@@ -229,6 +230,7 @@ def get_content(url, args, site_json, save_debug=False):
             token_json = r.json()
             acbm = base64.b64encode('{}'.encode()).decode('utf-8')
             p = math.floor(9999999 * random.uniform(0, 1))
+            # TODO: play_session_id
             vod_url = 'https://usher.ttvnw.net/api/channel/hls/{}.m3u8?acmb={}&allow_source=true&fast_bread=true&p={}&play_session_id=&player_backend=mediaplayer&playlist_include_framerate=true&reassignments_supported=true&sig={}&supported_codecs=avc1&token={}&transcode_mode=cbr_v1&cdm=wv&player_version=1.20.0'.format(channel_id, quote(acbm), p, token_json['data']['streamPlaybackAccessToken']['signature'], quote(token_json['data']['streamPlaybackAccessToken']['value']))
             # TODO: this doesn't work because of CORS policy. Works with VLC.
             item['content_html'] = utils.add_video(vod_url, 'application/x-mpegURL', item['_image'], caption)

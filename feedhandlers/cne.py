@@ -158,6 +158,9 @@ def format_body(body_json):
         elif re.search(r'callout:(anchor|inset-left|inset-right|sidebar)', body_json[1]['type']) or body_json[1]['type'] == 'cneinterlude':
             # skip these entirely
             return ''
+        elif body_json[1]['type'] == 'article':
+            # skip related articles
+            return ''
         else:
             logger.warning('unhandled inline-embed type ' + body_json[1]['type'])
 

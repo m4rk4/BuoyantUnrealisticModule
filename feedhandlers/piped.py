@@ -121,6 +121,8 @@ def get_content(url, args, site_json, save_debug=False):
 
         if piped_json.get('videoStreams'):
             video_stream = next((it for it in piped_json['videoStreams'] if (it['format'] == 'MPEG_4' and it['quality'] == '720p' and it['videoOnly'] == False)), None)
+            if not video_stream:
+                video_stream = next((it for it in piped_json['videoStreams'] if (it['format'] == 'MPEG_4' and it['videoOnly'] == False)), None)
             if video_stream:
                 item['_video'] = video_stream['url']
                 attachment = {}
