@@ -250,7 +250,12 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find('a')
                 new_html = utils.add_embed(it['href'])
             elif 'w-twitch' in el['class']:
-                new_html = utils.add_embed('https://player.twitch.tv/?video=' + el['id'])
+                it = soup.find('script', string=re.compile(r'window\.arrayOfEmbeds\["{}"\]'.format(el['id'])))
+                if it:
+                    m = re.search(r'src=\\"([^"]+)\\"', html.unescape(it.string))
+                    if m:
+                        #new_html = utils.add_embed('https://player.twitch.tv/?video=' + el['id'])
+                        new_html = utils.add_embed(m.group(1).replace('\\/', '/'))
             elif 'w-play_store_app' in el['class']:
                 new_html = add_play_store_app(el)
 

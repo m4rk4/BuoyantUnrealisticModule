@@ -34,9 +34,6 @@ def get_img_src(el, img_class=''):
 
 
 def add_image(el, img_class=''):
-    img_src = get_img_src(el, img_class)
-    if not img_src:
-        return ''
     captions = []
     it = el.find(class_='caption-text')
     if it and it.get_text().strip():
@@ -44,6 +41,12 @@ def add_image(el, img_class=''):
     it = el.find(class_='credit')
     if it and it.get_text().strip():
         captions.append(re.sub(r'^\((.*)\)$', r'\1', it.get_text().strip()))
+    img_src = get_img_src(el, img_class)
+    if not img_src:
+        if captions:
+            img_src = '{}/image?width=1000&height=560'.format(config.server)
+        else:
+            return ''
     return utils.add_image(img_src, ' | '.join(captions))
 
 
@@ -89,6 +92,8 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
 
     soup = BeautifulSoup(page_html, 'lxml')
 

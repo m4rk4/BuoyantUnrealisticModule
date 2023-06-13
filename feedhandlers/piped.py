@@ -14,6 +14,8 @@ def get_content(url, args, site_json, save_debug=False):
     # https://github.com/TeamPiped/Piped/wiki/Instances
     piped_instances = [
         "https://pipedapi.kavin.rocks/",
+        "https://pipedapi.tokhmi.xyz/"
+        "https://api-piped.mha.fi/",
         "https://piped-api.hostux.net/",
         "https://pipedapi-libre.kavin.rocks/",
         "https://pipedapi.leptons.xyz/",
@@ -25,7 +27,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     if yt_list_id:
         for piped_instance in piped_instances:
-            piped_json = utils.get_url_json('{}playlists/{}'.format(piped_instance, yt_list_id), user_agent='googlebot', retries=2)
+            piped_json = utils.get_url_json('{}playlists/{}'.format(piped_instance, yt_list_id), user_agent='googlebot', retries=1)
             if piped_json:
                 break
         if not piped_json:

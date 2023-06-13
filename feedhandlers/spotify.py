@@ -130,13 +130,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;"><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:128px;"/></a></td><td style="vertical-align:top;"><b><a href="{}">{}</a></b><br/>by {}</td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], byline)
         if 'max' in args and content_type == 'playlist':
             i_max = int(args['max'])
+        elif 'embed' in args and content_type == 'playlist':
+            i_max = 10
         else:
-            i_max = -1
+            i_max = -100
         for i, track_item in enumerate(playlist_json['tracks']['items']):
             if content_type == 'playlist':
                 track = track_item['track']
             else:
                 track = track_item
+            if not track:
+                i_max = i_max + 1
+                continue
             if i == i_max:
                 item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
                 break

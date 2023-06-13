@@ -151,7 +151,7 @@ def format_body(body_json):
         elif body_json[1]['type'] == 'callout:button-group':
             start_tag = ''
             end_tag = ''
-        elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
+        elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|lead-in-text|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
             # skip these but process the children
             start_tag = ''
             end_tag = ''

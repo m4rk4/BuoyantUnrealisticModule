@@ -26,8 +26,8 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     api_url = ''
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
     if split_url.netloc == 'megaphone.link':
-        paths = list(filter(None, split_url.path[1:].split('/')))
         item['id'] = paths[0]
         api_url = 'https://player.megaphone.fm/playlist/episode/' + item['id']
     elif split_url.netloc == 'playlist.megaphone.fm':
@@ -38,6 +38,9 @@ def get_content(url, args, site_json, save_debug=False):
         elif query.get('e'):
             item['id'] = query['e'][0]
             api_url = 'https://player.megaphone.fm/playlist/episode/' + item['id']
+    elif split_url.netloc == 'player.megaphone.fm' and len(paths) == 1:
+        item['id'] = paths[0]
+        api_url = 'https://player.megaphone.fm/playlist/episode/' + item['id']
 
     if not api_url:
         logger.warning('unhandled url ' + url)

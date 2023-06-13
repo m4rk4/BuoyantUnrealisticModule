@@ -457,6 +457,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
             return item
     else:
+        initial_state = None
         el = soup.find('script', string=re.compile(r'window\.__INITIAL_STATE__'))
         if el:
             m = re.search(r'__INITIAL_STATE__ = (.*?);\n', el.string.strip())
