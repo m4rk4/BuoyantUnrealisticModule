@@ -4891,7 +4891,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "FxAS-NbTXXKU4GI2gz65x",
+        "buildId": "UCH8ZYOxWyncMDZBMuybO",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -7921,12 +7921,12 @@
         "module": "nypost"
     },
     "nytimes": {
-        "module": "nyt-v2",
         "exclude_paths": [
             "espanol",
             "interactive",
             "live"
-        ]
+        ],
+        "module": "nyt-v2"
     },
     "observer": {
         "feeds": [
