@@ -4733,8 +4733,13 @@
     },
     "google": [
         {
+            "drive.google.com": {
+                "module": "google"
+            }
+        },
+        {
             "trends.google.com": {
-                "module": "google_trends"
+                "module": "google"
             }
         }
     ],

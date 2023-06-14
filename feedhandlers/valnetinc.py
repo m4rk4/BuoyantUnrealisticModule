@@ -334,25 +334,28 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '</ul></div>'
                 new_html += '</div>'
             else:
-                new_html = '<table style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><tr>'
+                #new_html = '<table style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><tr>'
+                new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
                 it = el.find(class_='display-card-badge')
                 if it:
-                    new_html += '<td colspan="2"><span style="color:red; font-weight:bold;">{}</span></td><tr>'.format(it.get_text().strip())
+                    #new_html += '<td colspan="2"><span style="color:red; font-weight:bold;">{}</span></td><tr>'.format(it.get_text().strip())
+                    new_html += '<div style="flex:0 0 100%;"><span style="color:red; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
                 img_src = ''
-                img_width = 128
+                img_width = 256
                 it = el.find('img')
                 if it:
                     if it.get('src'):
-                        img_src = resize_image(it['src'], 128)
+                        img_src = resize_image(it['src'], 800)
                     elif it.get('data-img-url'):
-                        img_src = resize_image(it['data-img-url'], 128)
+                        img_src = resize_image(it['data-img-url'], 800)
                     else:
                         logger.warning('unhandled display-card image in ' + item['url'])
                 if not img_src:
-                    img_src = '{}/image?width=24&height=24&color=none'.format(config.server)
-                    img_width = 24
-                new_html += '<td style="vertical-align:top;"><img src="{}" style="width:{}px;"/></td>'.format(img_src, img_width)
-                new_html += '<td style="vertical-align:top;">'
+                    img_src = '{}/image?width=800&height=400&color=none'.format(config.server)
+                #new_html += '<td style="vertical-align:top;"><img src="{}" style="width:{}px;"/></td>'.format(img_src, img_width)
+                new_html += '<div style="flex:1; min-width:256px; margin:auto;"><img src="{}" style="width:100%" /></div>'.format(img_src)
+                #new_html += '<td style="vertical-align:top;">'
+                new_html += '<div style="flex:2; min-width:256px; margin:auto;">'
                 it = el.find(class_='display-card-title')
                 if it:
                     if it.a:
@@ -372,7 +375,8 @@ def get_content(url, args, site_json, save_debug=False):
                 if it:
                     for link in it.find_all('a'):
                         new_html += '<br/><a href="{}">{}</a>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
-                new_html += '</td></tr></table>'
+                #new_html += '</td></tr></table>'
+                new_html += '</div></div><div>&nbsp;</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()

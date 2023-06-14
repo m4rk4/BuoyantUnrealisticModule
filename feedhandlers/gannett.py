@@ -62,6 +62,20 @@ def get_image(el):
     return img_src, ' | '.join(caption)
 
 
+def add_video(el_button, base_url, site_json):
+    video_html = ''
+    if el_button.get('data-c-vpdata'):
+        video_json = json.loads(el_button['data-c-vpdata'])
+        if video_json:
+            video_url = video_json['url']
+            if video_url.startswith('/'):
+                video_url = base_url + video_url
+            video_item = get_content(video_url, {}, site_json, False)
+            if video_item:
+                video_html = utils.add_video(video_item['_video'], 'video/mp4', video_item['_image'], video_item['summary'])
+    return video_html
+
+
 def get_gallery_content_old(gallery_soup):
     gallery_html = ''
     for slide in gallery_soup.find_all('slide'):
@@ -230,14 +244,11 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                 new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
             elif el.name == 'aside':
                 if el.button and el.button.has_attr('data-c-vpdata'):
-                    video_json = json.loads(el.button['data-c-vpdata'])
-                    if video_json:
-                        video_url = video_json['url']
-                        if video_url.startswith('/'):
-                            video_url = base_url + video_url
-                        video = get_content(video_url, {}, site_json, save_debug)
-                        if video:
-                            new_el = BeautifulSoup(utils.add_video(video['_video'], 'video/mp4', video['_image'], video['summary']), 'html.parser')
+                    new_html = add_video(el.button, base_url, site_json)
+                    if new_html:
+                        new_el = BeautifulSoup(new_html, 'html.parser')
+                    else:
+                        logger.warning('unhandled lede video in ' + item['url'])
                 elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
                     new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
             if new_el:
@@ -255,16 +266,29 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
 
         # Gallery
         for el in article.find_all('a', class_='gnt_em_gl'):
+            caption = ''
+            it = el.find('img', class_='ar-lead-image')
+            if it:
+                img_src = resize_image('{}://{}{}'.format(split_url.scheme, split_url.netloc, it['src']))
+            else:
+                img_src, caption = get_image(el)
+            if not caption:
+                it = el.find('div', class_='gnt_em_t', attrs={"aria-label": True})
+                if it:
+                    caption = it['aria-label']
+            if caption:
+                caption += '<br/>'
             gallery_url = '{}/content?read&url={}'.format(config.server, quote_plus(base_url + el['href']))
-            new_html = '<h3><a href="{}">{}</a></h3>'.format(gallery_url, el['aria-label'])
-            img_src, caption = get_image(el)
+            caption += '<a href="{}">{}</a>'.format(gallery_url, el['aria-label'])
             if img_src:
                 if img_src.startswith(':'):
                     img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
-                new_html += utils.add_image(img_src, caption, link=gallery_url)
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+                new_html = utils.add_image(img_src, caption, link=gallery_url)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unknown gallery image src in ' + item['src'])
 
         # Pullquote
         for el in article.find_all(class_='gnt_em_pq'):
@@ -273,11 +297,18 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             el.decompose()
 
         for el in article.find_all('aside'):
+            new_html = ''
             if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
                 el.decompose()
                 continue
+            elif 'gnt_em_vp__tp' in el['class']:
+                if el.button and el.button.get('data-c-vpdata'):
+                    new_html = add_video(el.button, base_url, site_json)
+            elif 'gnt_em_pdf' in el['class']:
+                it = el.find(attrs={"data-v-pdfurl": True})
+                if it:
+                    new_html = utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(it['data-v-pdfurl']))
             elif el.has_attr('data-gl-method'):
-                new_html = ''
                 if el['data-gl-method'] == 'loadTwitter':
                     new_html = utils.add_embed(utils.get_twitter_url(el['data-v-id']))
                 elif el['data-gl-method'] == 'loadInstagram':
@@ -294,16 +325,18 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                 elif el['data-gl-method'] == 'loadAnc' or el['data-gl-method'] == 'flp':
                     el.decompose()
                     continue
-                if new_html:
-                    new_el = BeautifulSoup(new_html, 'html.parser')
-                    el.insert_after(new_el)
-                    el.decompose()
-                else:
-                    logger.warning('unhandled aside data-gl-method {} in {}'.format(el['data-gl-method'], item['url']))
-                    el.decompose()
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
             else:
-                logger.warning('unhandled aside in ' + item['url'])
-                el.decompose()
+                logger.warning('unhandled aside class {} in {}'.format(el['class'], item['url']))
+            el.decompose()
+
+        # Related article links
+        for el in article.find_all('a', class_='gnt_ar_b_a', attrs={"data-t-l": re.compile(r'click:')}):
+            it = el.find_parent('p', class_='gnt_ar_b_p')
+            if it and el.find_previous_sibling('strong', class_='gnt_ar_b_al'):
+                it.decompose()
 
         # Fix local href links
         for el in article.find_all('a'):
