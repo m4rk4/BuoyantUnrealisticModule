@@ -251,6 +251,8 @@ def find_redirect_url(url):
     m = re.search(r'"redirect":"([^"]+)"', url_html)
     if m:
       return m.group(1)
+  elif split_url.netloc == 'www.hp.com':
+    return clean_url(url)
   if split_url.query:
     query = parse_qs(split_url.query)
     if split_url.netloc == 'goto.target.com' and query.get('u'):
@@ -269,15 +271,27 @@ def find_redirect_url(url):
       return query['url'][0]
     elif split_url.netloc == 'g-o-media.digidip.net' and query.get('url'):
       return query['url'][0]
+    elif split_url.netloc == 'www.linkprefer.com' and query.get('new'):
+      return query['new'][0]
     elif split_url.netloc == 'shareasale.com' and query.get('urllink'):
       if query['urllink'][0].startswith('http'):
         return query['urllink'][0]
       else:
         return 'https://' + query['urllink'][0]
-    elif split_url.netloc == 'shopping.yahoo.com' and query.get('itemId'):
-      m = re.search(r'amazon_(.*)', query['itemId'][0])
-      if m:
-        return 'https://www.amazon.com/dp/' + m.group(1)
+    elif split_url.netloc == 'shopping.yahoo.com' and query.get('merchantName'):
+      if query['merchantName'][0] == 'Amazon':
+        m = re.search(r'amazon_(.*)', query['itemId'][0])
+        if m:
+          return 'https://www.amazon.com/dp/' + m.group(1)
+      elif query['merchantName'][0] == 'Walmart':
+        return 'https://www.walmart.com/ip/{}/{}'.format(query['itemName'][0], query['itemSourceId'][0])
+    elif split_url.netloc == 'discounthero.org':
+      page_html = get_url_html(url)
+      if page_html:
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('iframe', id='offer')
+        if el:
+          return find_redirect_url(el['src'])
     elif split_url.netloc == 'howl.me':
       pass
     else:
