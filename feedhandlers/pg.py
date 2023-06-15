@@ -96,14 +96,20 @@ def get_content(url, args, site_json, save_debug=False):
     el.insert_after(new_el)
     el.decompose()
 
-  for el in soup.find_all('blockquote', class_='twitter-tweet'):
-    tweet_url = el.find_all('a')
-    m = re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url[-1]['href'])
-    if m:
-      new_html = utils.add_embed(m.group(0))
+  for el in soup.find_all('blockquote'):
+    new_html = ''
+    if el.get('class'):
+      if 'twitter-tweet' in el['class']:
+        links = el.find_all('a')
+        new_html = utils.add_embed(links['-1']['href'])
+      elif 'instagram-media' in el['class']:
+        new_html = utils.add_embed(el['data-instgrm-permalink'])
+    if new_html:
       new_el = BeautifulSoup(new_html, 'html.parser')
       el.insert_after(new_el)
       el.decompose()
+    else:
+      logger.warning('unhandled blockquote in ' + item['url'])
 
   for el in soup.find_all(attrs={"data-ps-embed-type": "slideshow"}):
     slideshow_html = utils.get_url_html('https://post-gazette.photoshelter.com/embed?type=slideshow&G_ID=' + el['data-ps-embed-gid'])
