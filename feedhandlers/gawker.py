@@ -102,6 +102,8 @@ def render_content(content):
         value = ''
         for it in content['value']:
             value += render_content(it)
+        if re.search(r'^<b>(Read|Watch) more:</b>', value, flags=re.I):
+            return ''
         if content.get('containers'):
             content_html += value
         else:
@@ -181,12 +183,12 @@ def render_content(content):
             content_html += utils.add_embed(content['source'])
 
     elif content['type'] == 'ReviewBox':
-        content_html += '<div style="margin: 1.5em 10px; padding: 0.5em 10px;"><center>'
+        content_html += '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
         if content.get('editorsChoice'):
-            content_html += '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
-        content_html += '<span style="font-size:1.2em;"><b>{}</b></span>'.format(content['title'])
+            content_html += '<div style="text-align:center;"><span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span></div>'
+        content_html += '<div style="text-align:center;"><span style="font-size:1.2em;"><b>{}</b></span></div>'.format(content['title'])
         if content.get('stars'):
-            content_html += '<br/><span style="font-size:1.5em; color:gold;">'
+            content_html += '<div style="text-align:center;"><span style="font-size:1.5em; color:gold;">'
             stars = float(content['stars'])
             for i in range(math.floor(stars)):
                 content_html += '&#9733;'
@@ -195,20 +197,15 @@ def render_content(content):
                 content_html += '&#x00BD;'
             #for i in range(5 - math.ceil(stars)):
             #    content_html += '&#9734;'
-            content_html += '</span>'
-        content_html += '</center>'
-        desc = ''
+            content_html += '</span></div>'
         if content.get('description'):
-            desc = content['description'] + '<br/><br/>'
-        if content.get('cta'):
-            desc += '<a href="{}">{}</a><br/><br/>'.format(content['cta']['reference'], content['cta']['value'])
+            content_html += '<p>{}</p>'.format(content['description'])
         if content.get('image'):
-            img_src = get_image_src(content['image']['id'], content['image']['format'], None, 128)
-            content_html += '<div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(img_src, desc)
-        else:
-            content_html += desc
+            content_html += utils.add_image(get_image_src(content['image']['id'], content['image']['format']))
         for text in content['text']:
-            content_html += '<b>{}</b><br />{}<br/><br/>'.format(text['label'].upper(), text['value'])
+            content_html += '<p><b>{}</b><br />{}</p>'.format(text['label'].upper(), text['value'])
+        if content.get('cta'):
+            content_html += '<div style="margin-top:0.5em; margin-bottom:0.5em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:blue; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(content['cta']['reference']), content['cta']['value'])
         content_html += '</div>'
 
     elif content['type'] == 'CommerceLink':
