@@ -1642,6 +1642,12 @@
     "cbssports": {
         "module": "cbssports"
     },
+    "celebretainment": {
+        "feeds": [
+            "https://www.celebretainment.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
+        ],
+        "module": "tncms"
+    },
     "centredaily": {
         "feeds": [
             "https://feeds.mcclatchy.com/centredaily/stories"
@@ -2580,6 +2586,12 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.crosstalksolutions.com/wp-json"
+    },
+    "crowrivermedia": {
+        "feeds": [
+            "https://www.crowrivermedia.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
+        ],
+        "module": "tncms"
     },
     "crunch": {
         "module": "crunch"
