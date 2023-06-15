@@ -204,7 +204,7 @@ def render_content(content):
             content_html += utils.add_image(get_image_src(content['image']['id'], content['image']['format']))
         for text in content['text']:
             content_html += '<p><b>{}</b><br />{}</p>'.format(text['label'].upper(), text['value'])
-        if content.get('cta'):
+        if content.get('cta') and content['cta'].get('reference'):
             content_html += '<div style="margin-top:0.5em; margin-bottom:0.5em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:blue; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(content['cta']['reference']), content['cta']['value'])
         content_html += '</div>'
 

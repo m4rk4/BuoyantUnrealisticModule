@@ -183,6 +183,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     body = soup.find(id='article-body')
     if body:
+        if save_debug:
+            utils.write_file(str(body), './debug/debug.html')
         for el in body.find_all(class_='emaki-custom-update'):
             new_html = ''
             for it in el.find_all(class_='update'):
@@ -294,10 +296,21 @@ def get_content(url, args, site_json, save_debug=False):
                 el.insert_after(new_el)
                 el.decompose()
 
+        for el in body.find_all(class_='display-card-quick-links'):
+            el.decompose()
+
         for el in body.find_all(class_='w-display-card-list'):
-            for it in el.find_all('li'):
-                it.unwrap()
-            el.unwrap()
+            if 'specs' in el['class']:
+                it = el.find('table')
+                if it:
+                    el.insert_after(it)
+                    el.decompose()
+                else:
+                    logger.warning('unhandled display-card specs in ' + item['url'])
+            else:
+                for it in el.find_all('li', class_='display-card-element'):
+                    it.unwrap()
+                el.unwrap()
 
         for el in body.find_all(class_='display-card'):
             it = el.find(class_='w-display-card-info')
@@ -335,14 +348,11 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '</ul></div>'
                 new_html += '</div>'
             else:
-                #new_html = '<table style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><tr>'
                 new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
                 it = el.find(class_='display-card-badge')
                 if it:
-                    #new_html += '<td colspan="2"><span style="color:red; font-weight:bold;">{}</span></td><tr>'.format(it.get_text().strip())
-                    new_html += '<div style="flex:0 0 100%;"><span style="color:red; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
+                    new_html += '<div style="flex:0 0 100%;"><span style="color:#e01a4f; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
                 img_src = ''
-                img_width = 256
                 it = el.find('img')
                 if it:
                     if it.get('src'):
@@ -353,37 +363,37 @@ def get_content(url, args, site_json, save_debug=False):
                         logger.warning('unhandled display-card image in ' + item['url'])
                 if not img_src:
                     img_src = '{}/image?width=800&height=400&color=none'.format(config.server)
-                #new_html += '<td style="vertical-align:top;"><img src="{}" style="width:{}px;"/></td>'.format(img_src, img_width)
                 new_html += '<div style="flex:1; min-width:256px; margin:auto;"><img src="{}" style="width:100%" /></div>'.format(img_src)
-                #new_html += '<td style="vertical-align:top;">'
                 new_html += '<div style="flex:2; min-width:256px; margin:auto;">'
                 it = el.find(class_='display-card-title')
                 if it:
                     if it.a:
-                        new_html += '<a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a>'.format(it.a['href'], it.get_text().strip())
+                        new_html += '<div><a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a></div>'.format(it.a['href'], it.get_text().strip())
                     else:
-                        new_html += '<span style="font-size:1.1em; font-weight:bold;">{}</span>'.format(it.get_text().strip())
+                        new_html += '<div><span style="font-size:1.1em; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
                 it = el.find(class_='display-card-subtitle')
                 if it:
-                    new_html += '<br/><i>{}</i>'.format(it.get_text().strip())
+                    new_html += '<div><i>{}</i></div>'.format(it.get_text().strip())
                 it = el.find(class_='display-card-rating')
                 if it:
-                    new_html += '<br/>Rating: {}'.format(it.get_text().strip())
+                    new_html += '<div>Rating: {}</div>'.format(it.get_text().strip())
                 it = el.find(class_=re.compile(r'display-card-description'))
                 if it:
-                    new_html += '<br/><small>{}</small>'.format(it.get_text().strip())
+                    new_html += '<p>{}<p>'.format(it.get_text().strip())
+                it = el.find(class_=re.compile(r'display-card-pros-cons'))
+                if it:
+                    new_html += it.decode_contents()
                 it = el.find(class_=re.compile(r'display-card-link'))
                 if it:
                     for link in it.find_all('a'):
-                        new_html += '<br/><a href="{}">{}</a>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
-                #new_html += '</td></tr></table>'
+                        new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
                 new_html += '</div></div><div>&nbsp;</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
 
         for el in body.find_all(class_='w-review-item'):
-            new_html = '<div>'
+            new_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
             it = el.find(class_='review-item-title')
             if it:
                 new_html += '<div style="text-align:center;"><span style="font-size:1.3em; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
@@ -397,10 +407,8 @@ def get_content(url, args, site_json, save_debug=False):
             for it in el.find_all(class_='review-item-details'):
                 new_html += '<div>{}</div>'.format(it.decode_contents())
             if el.find(class_='item-buy-btn'):
-                new_html += '<div><strong>Buy this product:</strong><ul>'
                 for it in el.find_all(class_='item-buy-btn'):
-                    new_html += '<li><a href="{}">{}</a>'.format(utils.get_redirect_url(it['href']), it.get_text().strip())
-                new_html += '</ul></div>'
+                    new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(it['href']), it.get_text().strip())
             new_html += '</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)

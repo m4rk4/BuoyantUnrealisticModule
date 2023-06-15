@@ -159,6 +159,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     caas_soup = BeautifulSoup(caas_json['items'][0]['markup'], 'html.parser')
     caas_body = caas_soup.find(class_='caas-body')
+    if save_debug:
+        utils.write_file(str(caas_body), './debug/debug.html')
 
     for el in caas_body.find_all('figure'):
         new_html = get_image(el)
@@ -218,32 +220,53 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unhandled instagram-media-wrapper in ' + url)
 
     for el in caas_body.find_all(class_=['pd-list', 'mini-pd']):
+        if 'quick-overview' in el['class']:
+            el.decompose()
+            continue
         new_html = ''
         it = el.find(class_='overview-label')
         if it:
             new_html += '<h3>{}</h3>'.format(it.get_text().strip())
         for it in el.find_all(class_='list-item'):
-            new_html += '<table style="max-width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><tr>'
-            links = it.find_all('a')
-            link = utils.get_redirect_url(links[0]['href'])
-            img = it.find('img')
-            if img:
-                img_src = ''
-                if img.get('data-src'):
-                    img_src = img['data-src']
-                elif img.get('src'):
-                    img_src = img['src']
-                if img_src:
-                    new_html += '<td style="vertical-align:top; width:128px;"><a href="{}"><img style="width:100%;" src="{}"/></td>'.format(link, img_src)
-            new_html += '<td style="vertical-align:top;">'
+            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
+            info = el.find(class_=['edit-label', 'editor-label'])
+            if info:
+                new_html += '<div style="flex:0 0 100%;"><span style="color:#9a58b5;; font-weight:bold;">{}</span></div>'.format(info.get_text().strip())
+            info = it.find(class_='img-container')
+            if info:
+                img = info.find('img')
+                if img:
+                    img_src = ''
+                    if img.get('data-src'):
+                        img_src = img['data-src']
+                    elif img.get('src'):
+                        img_src = img['src']
+                    if img_src:
+                        if info.a:
+                            new_html += '<div style="flex:1; min-width:256px; margin:auto;"><a href="{}"><img src="{}" style="width:100%" /></a></div>'.format(utils.get_redirect_url(info.a['href']), img_src)
+                        else:
+                            new_html += '<div style="flex:1; min-width:256px; margin:auto;"><img src="{}" style="width:100%" /></div>'.format(img_src)
+            new_html += '<div style="flex:2; min-width:256px; margin:auto;">'
             info = it.find(class_=['list-info', 'info-data'])
             if info:
-                new_html += '<a href="{}"><span style="font-size:1.2em; font-weight:bold">{}</span></a>'.format(link, info.h4.get_text())
-            info = it.find(class_='desc')
-            if info:
-                new_html += '<br/><small>{}</small>'.format(info.get_text())
-            new_html += '<br/><a href="{}">{}</a>'.format(link, links[-1].get_text())
-            new_html += '</td></tr></table>'
+                if info.h4.a:
+                    new_html += '<div><a href="{}"><span style="font-size:1.2em; font-weight:bold">{}</span></a></div>'.format(utils.get_redirect_url(info.h4.a['href']), info.h4.get_text())
+                else:
+                    new_html += '<div><span style="font-size:1.2em; font-weight:bold">{}</span></div>'.format(info.h4.get_text())
+            sib = it.find_next_sibling()
+            if sib and sib.get('class') and 'bottom-info' in sib['class']:
+                info = sib.find(class_='desc')
+                if info:
+                    new_html += '<p><small>{}</small></p>'.format(info.get_text())
+                for info in sib.find_all(class_='cta-btn'):
+                    new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#9a58b5; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(info['href']), info.get_text())
+            else:
+                info = it.find(class_='desc')
+                if info:
+                    new_html += '<p><small>{}</small></p>'.format(info.get_text())
+                for info in it.find_all(class_='cta-btn'):
+                    new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#9a58b5; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(info['href']), info.get_text())
+            new_html += '</div></div><div>&nbsp;</div>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()

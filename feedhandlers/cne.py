@@ -102,7 +102,9 @@ def format_body(body_json):
     start_tag = '<{}>'.format(body_json[0])
     end_tag = '</{}>'.format(body_json[0])
 
-    if body_json[0] == 'inline-embed':
+    if body_json[0] == 'blockquote':
+        start_tag = '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">'
+    elif body_json[0] == 'inline-embed':
         if body_json[1]['type'] == 'image':
             return add_image(body_json[1]['props'])
         elif body_json[1]['type'] == 'gallery':
