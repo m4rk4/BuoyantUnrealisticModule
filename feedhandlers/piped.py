@@ -14,7 +14,7 @@ def get_content(url, args, site_json, save_debug=False):
     # https://github.com/TeamPiped/Piped/wiki/Instances
     piped_instances = [
         "https://pipedapi.kavin.rocks/",
-        "https://pipedapi.tokhmi.xyz/"
+        "https://pipedapi.tokhmi.xyz/",
         "https://api-piped.mha.fi/",
         "https://piped-api.hostux.net/",
         "https://pipedapi-libre.kavin.rocks/",
