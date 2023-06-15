@@ -267,6 +267,8 @@ def find_redirect_url(url):
       return query['url'][0]
     elif split_url.netloc == 'shop-links.co' and query.get('url'):
       return query['url'][0]
+    elif split_url.netloc == 'g-o-media.digidip.net' and query.get('url'):
+      return query['url'][0]
     elif split_url.netloc == 'shareasale.com' and query.get('urllink'):
       if query['urllink'][0].startswith('http'):
         return query['urllink'][0]
