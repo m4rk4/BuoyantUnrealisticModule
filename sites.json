@@ -12900,6 +12900,14 @@
         ],
         "module": "future"
     },
+    "whats-on-netflix": {
+        "feeds": [
+            "https://www.whats-on-netflix.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.whats-on-netflix.com/wp-json"
+    },
     "whattowatch": {
         "feeds": [
             "https://www.whattowatch.com/feeds/all"
