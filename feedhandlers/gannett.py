@@ -304,6 +304,12 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             elif 'gnt_em_vp__tp' in el['class']:
                 if el.button and el.button.get('data-c-vpdata'):
                     new_html = add_video(el.button, base_url, site_json)
+            elif 'gnt_em_vp__yt' in el['class']:
+                it = el.find(attrs={"data-c-vpattrs": True})
+                if it:
+                    data_json = json.loads(it['data-c-vpattrs'])
+                    if data_json.get('videoId'):
+                        new_html = utils.add_embed('https://www.youtube.com/watch?v={}'.format(data_json['videoId']))
             elif 'gnt_em_pdf' in el['class']:
                 it = el.find(attrs={"data-v-pdfurl": True})
                 if it:
