@@ -73,9 +73,9 @@ def get_content(url, args, site_json, save_debug=False):
 
   for el in soup.find_all(class_='pg-embedcode-largeimage'):
     new_html = ''
-    title = el.img['src'].split('/')[-1]
+    title = el.img['src'].split('/')[-1].lower()
     for i, image in enumerate(article_images):
-      if image['title'] == title:
+      if title in image['url']:
         new_html = add_image(image)
         del article_images[i]
         break
