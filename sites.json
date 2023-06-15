@@ -5831,6 +5831,14 @@
         "buildId": "LnDSbSxopOym9D-E5OtEf",
         "module": "kerrang"
     },
+    "kguttag": {
+        "feeds": [
+            "https://kguttag.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://kguttag.com/wp-json"
+    },
     "kgw": {
         "module": "tegna"
     },
