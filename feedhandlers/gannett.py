@@ -307,7 +307,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             elif 'gnt_em_pdf' in el['class']:
                 it = el.find(attrs={"data-v-pdfurl": True})
                 if it:
-                    new_html = utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(it['data-v-pdfurl']))
+                    if re.search(r'documentcloud\.org', it['data-v-pdfurl']):
+                        new_html = utils.add_embed(it['data-v-pdfurl'])
+                    else:
+                        new_html = utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(it['data-v-pdfurl']))
             elif el.has_attr('data-gl-method'):
                 if el['data-gl-method'] == 'loadTwitter':
                     new_html = utils.add_embed(utils.get_twitter_url(el['data-v-id']))
