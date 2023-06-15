@@ -4896,7 +4896,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "axQauU6ko7o3uXO6rGc6s",
+        "buildId": "5gDSc7Wfdp5qO1mlOC2MW",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
