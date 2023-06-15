@@ -576,7 +576,7 @@ def get_post_content(post, args, site_json, save_debug=False):
                     logger.warning('unhandled list_type {} in {}'.format(module['list_type'], item['url']))
                 content_html += module['copy']
             elif module['acf_fc_layout'] == 'image_block':
-                content_html += utils.add_image(module['image'], module['caption'])
+                content_html += utils.add_image(resize_image(module['image']), module['caption'])
             elif module['acf_fc_layout'] == 'affiliates_block' or module['acf_fc_layout'] == 'inline_recirculation' or module['acf_fc_layout'] == 'membership_block':
                 pass
             else:
@@ -650,7 +650,7 @@ def get_post_content(post, args, site_json, save_debug=False):
         elif item.get('_image'):
             # Add lede image if it's not in the content or if add_lede_img arg
             if not re.search(urlsplit(item['_image']).path, content_html, flags=re.I) or 'add_lede_img' in args:
-                lede += utils.add_image(item['_image'], caption)
+                lede += utils.add_image(resize_image(item['_image']), caption)
         if post.get('meta') and post['meta'].get('_pmc_featured_video_override_data'):
             lede += utils.add_embed(post['meta']['_pmc_featured_video_override_data'])
 
