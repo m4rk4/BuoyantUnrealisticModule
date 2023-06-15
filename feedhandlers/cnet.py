@@ -341,7 +341,7 @@ def get_content(url, args, site_json, save_debug=False):
       elif el.find('amp-twitter'):
         tweet_url = el.find('amp-twitter').get('data-tweetid')
         if tweet_url:
-          tweet = utils.add_twitter(tweet_url)
+          tweet = utils.add_embed(tweet_url)
           if tweet:
             new_html = tweet
           else:

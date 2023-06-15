@@ -355,11 +355,8 @@ def get_content(url, args, site_json, save_debug=False):
 
         elif el.find('amp-twitter'):
             it = el.find('amp-twitter')
-            tweet = utils.add_twitter(it['data-tweetid'])
-            if tweet:
-                new_html = tweet
-            else:
-                logger.warning('unable to get tweet {} in {}'.format(it['data-tweetid'], clean_url))
+            if it:
+                new_html = utils.add_embed(utils.get_twitter_url(it['data-tweetid']))
 
         elif el.find(class_='dynamic-inset-iframe'):
             new_html = ''

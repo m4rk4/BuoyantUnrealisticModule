@@ -100,7 +100,7 @@ def get_content(url, args, site_json, save_debug=False):
     tweet_url = el.find_all('a')
     m = re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url[-1]['href'])
     if m:
-      new_html = utils.add_twitter(m.group(0))
+      new_html = utils.add_embed(m.group(0))
       new_el = BeautifulSoup(new_html, 'html.parser')
       el.insert_after(new_el)
       el.decompose()

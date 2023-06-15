@@ -194,7 +194,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         elif el.find(class_='twitter-tweet'):
             links = el.find_all('a')
-            new_html = utils.add_twitter(links[-1]['href'])
+            new_html = utils.add_embed(links[-1]['href'])
 
         elif el.find('iframe'):
             new_html = utils.add_embed(el.iframe['src'])

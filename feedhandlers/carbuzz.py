@@ -102,7 +102,7 @@ def get_content(url, args, site_json, save_debug=False):
             # Twitter (only?)
             m = re.findall('https:\/\/twitter\.com\/[^\/]+\/statuse?s?\/\d+', content_block['html'])
             if m:
-                content_html += utils.add_twitter(m[-1])
+                content_html += utils.add_embed(m[-1])
             else:
                 logger.warning('unhandled content block type {} in {}'.format(content_block['blockType'], api_url))
 
