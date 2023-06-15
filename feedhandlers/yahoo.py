@@ -120,12 +120,25 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(caas_json, './debug/debug.json')
 
     article_json = caas_json['items'][0]['schema']['default']
+    data_json = caas_json['items'][0]['data']['partnerData']
+
     item = {}
     item['id'] = post_id
-    if article_json.get('mainEntityOfPage'):
-        item['url'] = article_json['mainEntityOfPage']
-    else:
-        item['url'] = caas_json['items'][0]['data']['partnerData']['url']
+
+    if data_json.get('canonicalUrl'):
+        item['url'] = data_json['canonicalUrl']
+    elif data_json.get('hrefLangs'):
+        link = next((it for it in data_json['hrefLangs'] if it['rel'] == 'canonical'), None)
+        if link:
+            item['url'] = link['href']
+    if not item.get('url'):
+        if article_json.get('mainEntityOfPage'):
+            item['url'] = article_json['mainEntityOfPage']
+        elif data_json.get('url'):
+            item['url'] = data_json['url']
+        else:
+            item['url'] = url
+
     item['title'] = article_json['headline']
 
     dt = datetime.fromisoformat(article_json['datePublished'].replace('Z', '+00:00'))
@@ -210,7 +223,7 @@ def get_content(url, args, site_json, save_debug=False):
         if it:
             new_html += '<h3>{}</h3>'.format(it.get_text().strip())
         for it in el.find_all(class_='list-item'):
-            new_html += '<div>'
+            new_html += '<table style="max-width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><tr>'
             links = it.find_all('a')
             link = utils.get_redirect_url(links[0]['href'])
             img = it.find('img')
@@ -221,8 +234,8 @@ def get_content(url, args, site_json, save_debug=False):
                 elif img.get('src'):
                     img_src = img['src']
                 if img_src:
-                    new_html += '<a href="{}"><img style="float:left; width:128px; margin-right:8px;" src="{}"/>'.format(link, img_src)
-            new_html += '<div>'
+                    new_html += '<td style="vertical-align:top; width:128px;"><a href="{}"><img style="width:100%;" src="{}"/></td>'.format(link, img_src)
+            new_html += '<td style="vertical-align:top;">'
             info = it.find(class_=['list-info', 'info-data'])
             if info:
                 new_html += '<a href="{}"><span style="font-size:1.2em; font-weight:bold">{}</span></a>'.format(link, info.h4.get_text())
@@ -230,7 +243,7 @@ def get_content(url, args, site_json, save_debug=False):
             if info:
                 new_html += '<br/><small>{}</small>'.format(info.get_text())
             new_html += '<br/><a href="{}">{}</a>'.format(link, links[-1].get_text())
-            new_html += '</div><div style="clear:left;">&nbsp;</div></div>'
+            new_html += '</td></tr></table>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()
