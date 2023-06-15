@@ -212,7 +212,8 @@ def get_content(url, args, site_json, save_debug=False):
             el.unwrap()
 
         for el in body.find_all('blockquote', class_=False):
-            new_html = utils.add_pullquote(el.get_text().strip())
+            #new_html = utils.add_pullquote(el.get_text().strip())
+            new_html = utils.add_blockquote(el.get_text().strip())
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
