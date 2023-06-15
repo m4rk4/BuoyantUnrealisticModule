@@ -16,7 +16,7 @@ def resize_image(img_src, width=1200):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    print(url)
+    #print(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     m = re.search(r'([^_]+)_([0-91-f\-]+)\.html?', paths[-1])
@@ -58,7 +58,7 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             n = 5
         search_url = '{}://{}/search/?f=json&t={}&l={}&sort=date&k=&b=&sd=desc&q={}'.format(split_url.scheme, split_url.netloc, article_type, n, quote_plus(title))
-        print(search_url)
+        #print(search_url)
         search_json = utils.get_url_json(search_url)
         if not search_json:
             continue
@@ -132,7 +132,11 @@ def get_content(url, args, site_json, save_debug=False):
             authors.append(it['screen_name'])
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     elif article_json.get('byline'):
-        item['author']['name'] = re.sub(r'^By ', '', article_json['byline'], flags=re.I)
+        if article_json['byline'].startswith('<'):
+            it = BeautifulSoup(article_json['byline'], 'html.parser').get_text().strip()
+        else:
+            it = article_json['byline']
+        item['author']['name'] = re.sub(r'^By ', '', it, flags=re.I)
     elif tn_json and tn_json.get('asset_byline'):
         item['author']['name'] = tn_json['asset_byline']
     elif ld_json and ld_json.get('creator'):
