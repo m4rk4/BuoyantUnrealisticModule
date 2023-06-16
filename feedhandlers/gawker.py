@@ -102,7 +102,7 @@ def render_content(content):
         value = ''
         for it in content['value']:
             value += render_content(it)
-        if re.search(r'^<b>(Read|Watch) more:</b>', value, flags=re.I):
+        if re.search(r'^\s*<b>(Read|Watch) more:?\s?</b>', value, flags=re.I):
             return ''
         if content.get('containers'):
             content_html += value
@@ -222,14 +222,16 @@ def render_content(content):
         logger.warning('unhandled content type ' + content['type'])
 
     if content.get('containers'):
-        for container in content['containers']:
+        for container in reversed(content['containers']):
             if container['type'] == 'BlockQuote':
                 content_html = utils.add_blockquote(content_html)
             elif container['type'] == 'List':
-                value = content_html.replace('<p>', '')
-                value = value.replace('</p>', '<br/><br/>')
-                if value.endswith('<br/><br/>'):
-                    value = value[:-10]
+                #value = content_html.replace('<p>', '')
+                #value = value.replace('</p>', '<br/><br/>')
+                #if value.endswith('<br/><br/>'):
+                #    value = value[:-10]
+                value = re.sub(r'^<p>(.*)</p>$', r'\1', value)
+                value = value.replace('</p><p>', '<br/><br/>')
                 if container['style'] == 'Bullet':
                     content_html = '<ul><li>{}</li></ul>'.format(value)
                 else:
@@ -309,6 +311,7 @@ def get_content(url, args, site_json, save_debug=False):
         for content in article_json['body']:
             item['content_html'] += render_content(content)
 
+    item['content_html'] = re.sub(r'</(ol|ul)></blockquote><blockquote [^>]+><(ol|ul)>', '', item['content_html'])
     item['content_html'] = re.sub(r'</blockquote><blockquote [^>]+>', '<br/><br/>', item['content_html'])
     item['content_html'] = re.sub(r'</[ou]l><[ou]l>', '', item['content_html'])
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
