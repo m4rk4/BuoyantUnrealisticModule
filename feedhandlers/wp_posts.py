@@ -1931,7 +1931,12 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             audio_src = it.source['src']
         else:
             audio_src = ''
-        new_html = '<div><a href="{}"><img src="{}"/></a></div>'.format(audio_src, poster)
+        it = el.find('h4')
+        if it:
+            title = '<h3>{}</h3>'.format(it.get_text())
+        else:
+            title = ''
+        new_html = '<div style="text-align:center;">{}<a href="{}"><img src="{}"/></a></div>'.format(title, audio_src, poster)
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()

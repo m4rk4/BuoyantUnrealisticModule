@@ -13063,7 +13063,9 @@
             "https://www.wired.com/feed/rss",
             "https://www.wired.co.uk/feed/rss"
         ],
-        "module": "cne"
+        "module": "cne",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.wired.com/wp-json"
     },
     "wivb": {
         "args": {
