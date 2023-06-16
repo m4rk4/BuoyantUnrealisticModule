@@ -70,29 +70,43 @@ def add_image(el, el_parent, base_url, caption=True, decompose=True, gallery=Fal
         # if el_parent.parent and re.search(r'^(div|h\d|p)$', el_parent.parent.name):
         #     el_parent = el_parent.parent
 
-    if link and img.get('class') and 'attachment-thumbnail' in img['class']:
-        img_src = link
-        link = ''
-    elif img.get('data-orig-file'):
-        img_src = img['data-orig-file']
-    elif img.get('data-lazy-srcset') and not img['data-lazy-srcset'].startswith('data:image/gif;base64'):
-        img_src = utils.image_from_srcset(img['data-lazy-srcset'], 1000)
-    elif img.get('data-lazy-load-srcset') and not img['data-lazy-load-srcset'].startswith('data:image/gif;base64'):
-        img_src = utils.image_from_srcset(img['data-lazy-load-srcset'], 1000)
-    elif img.get('data-srcset') and not img['data-srcset'].startswith('data:image/gif;base64'):
-        img_src = utils.image_from_srcset(img['data-srcset'], 1000)
-    elif img.get('srcset') and not img['srcset'].startswith('data:image/gif;base64'):
-        img_src = utils.image_from_srcset(img['srcset'], 1000)
-    elif img.get('data-lazy-src') and not img['data-lazy-src'].startswith('data:image/gif;base64'):
-        img_src = img['data-lazy-src']
-    elif img.get('data-lazy-load-src') and not img['data-lazy-load-src'].startswith('data:image/gif;base64'):
-        img_src = img['data-lazy-load-src']
-    elif img.get('data-dt-lazy-src') and not img['data-dt-lazy-src'].startswith('data:image/gif;base64'):
-        img_src = img['data-dt-lazy-src']
-    elif img.get('data-src') and not img['data-src'].startswith('data:image/gif;base64'):
-        img_src = img['data-src']
+    images = []
+    for src in el_parent.find_all('source'):
+        if src.get('srcset') and src.get('media'):
+            if 'min-width' in src['media']:
+                m = re.search(r'(\d+)px', src['media'])
+                if m:
+                    image = {}
+                    image['src'] = src['srcset']
+                    image['width'] = int(m.group(1))
+                    images.append(image)
+    if images:
+        image = utils.closest_dict(images, 'width', 1000)
+        img_src = image['src']
     else:
-        img_src = img['src']
+        if link and img.get('class') and 'attachment-thumbnail' in img['class']:
+            img_src = link
+            link = ''
+        elif img.get('data-orig-file'):
+            img_src = img['data-orig-file']
+        elif img.get('data-lazy-srcset') and not img['data-lazy-srcset'].startswith('data:image/gif;base64'):
+            img_src = utils.image_from_srcset(img['data-lazy-srcset'], 1000)
+        elif img.get('data-lazy-load-srcset') and not img['data-lazy-load-srcset'].startswith('data:image/gif;base64'):
+            img_src = utils.image_from_srcset(img['data-lazy-load-srcset'], 1000)
+        elif img.get('data-srcset') and not img['data-srcset'].startswith('data:image/gif;base64'):
+            img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+        elif img.get('srcset') and not img['srcset'].startswith('data:image/gif;base64'):
+            img_src = utils.image_from_srcset(img['srcset'], 1000)
+        elif img.get('data-lazy-src') and not img['data-lazy-src'].startswith('data:image/gif;base64'):
+            img_src = img['data-lazy-src']
+        elif img.get('data-lazy-load-src') and not img['data-lazy-load-src'].startswith('data:image/gif;base64'):
+            img_src = img['data-lazy-load-src']
+        elif img.get('data-dt-lazy-src') and not img['data-dt-lazy-src'].startswith('data:image/gif;base64'):
+            img_src = img['data-dt-lazy-src']
+        elif img.get('data-src') and not img['data-src'].startswith('data:image/gif;base64'):
+            img_src = img['data-src']
+        else:
+            img_src = img['src']
 
     if img_src.startswith('//'):
         img_src = 'https:' + img_src
@@ -124,6 +138,9 @@ def add_image(el, el_parent, base_url, caption=True, decompose=True, gallery=Fal
                 elm = el_parent
 
             credit = ''
+            it = elm.find('cite')
+            if it and it.get_text().strip():
+                credit = it.get_text().strip()
             it = elm.find(class_='credit')
             if it and it.get_text().strip():
                 credit = it.get_text().strip()
@@ -280,9 +297,13 @@ def get_post_content(post, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = post['guid']['rendered']
+
     item['url'] = post['link']
+    split_url = urlsplit(item['url'])
+    base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
+
     item['title'] = BeautifulSoup('<p>{}</p>'.format(post['title']['rendered']), 'html.parser').get_text()
-    if re.search(r'&\w+;', item['title']):
+    if re.search(r'&[#\w]+;', item['title']):
         item['title'] = html.unescape(item['title'])
 
     dt = datetime.fromisoformat(post['date_gmt']).replace(tzinfo=timezone.utc)
@@ -424,7 +445,7 @@ def get_post_content(post, args, site_json, save_debug=False):
     if not 'skip_wp_terms' in args:
         if 'wp:term' in post['_links']:
             for link in post['_links']['wp:term']:
-                if link.get('taxonomy') and link['taxonomy'] != 'author' and link['taxonomy'] != 'site-layouts':
+                if link.get('taxonomy') and link['taxonomy'] != 'author' and link['taxonomy'] != 'contributor' and link['taxonomy'] != 'site-layouts' and link['taxonomy'] != 'lineup':
                     link_json = utils.get_url_json(link['href'])
                     if link_json:
                         for it in link_json:
@@ -593,10 +614,14 @@ def get_post_content(post, args, site_json, save_debug=False):
     elif post.get('rayos_subtitle'):
         subtitle = post['rayos_subtitle']
     elif post.get('meta'):
-        if post['meta'].get('sub_heading'):
+        if post['meta'].get('sub_title'):
+            lede += '<p><em>{}</em></p>'.format(post['meta']['sub_title'])
+        elif post['meta'].get('sub_heading'):
             lede += '<p><em>{}</em></p>'.format(post['meta']['sub_heading'])
         elif post['meta'].get('subheadline'):
             lede += '<p><em>{}</em></p>'.format(post['meta']['subheadline'])
+        elif post['meta'].get('lux_article_dek_field'):
+            lede += '<p><em>{}</em></p>'.format(post['meta']['lux_article_dek_field'])
         elif post['meta'].get('multi_title'):
             multi_title = json.loads(post['meta']['multi_title'])
             if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
@@ -638,7 +663,7 @@ def get_post_content(post, args, site_json, save_debug=False):
             if not page_soup:
                 page_html = utils.get_url_html(item['url'])
                 if page_html:
-                    soup = BeautifulSoup(page_html, 'lxml')
+                    page_soup = BeautifulSoup(page_html, 'lxml')
             if page_soup:
                 el = page_soup.find(site_json['lede_video']['tag'], attrs=site_json['lede_video']['attrs'])
                 if el:
@@ -651,6 +676,15 @@ def get_post_content(post, args, site_json, save_debug=False):
             # Add lede image if it's not in the content or if add_lede_img arg
             if not re.search(urlsplit(item['_image']).path, content_html, flags=re.I) or 'add_lede_img' in args:
                 lede += utils.add_image(resize_image(item['_image']), caption)
+        elif site_json.get('lede_img'):
+            if not page_soup:
+                page_html = utils.get_url_html(item['url'])
+                if page_html:
+                    page_soup = BeautifulSoup(page_html, 'lxml')
+            if page_soup:
+                el = page_soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
+                if el:
+                    lede += add_image(el, el, base_url)
         if post.get('meta') and post['meta'].get('_pmc_featured_video_override_data'):
             lede += utils.add_embed(post['meta']['_pmc_featured_video_override_data'])
 
