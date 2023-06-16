@@ -149,6 +149,7 @@ def format_blocks(blocks):
             logger.warning('unhandled block type ' + block['type'])
     return content_html
 
+
 def get_item(content_json, args, site_json, save_debug):
     if save_debug:
         utils.write_file(content_json, './debug/debug.json')
@@ -253,6 +254,9 @@ def get_next_data(url, site_json):
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        #utils.write_file(page_html, './debug/debug.html')
         m = re.search(r'"buildId":"([^"]+)"', page_html)
         if m and m.group(1) != site_json['buildId']:
             logger.debug('updating {} buildId'.format(split_url.netloc))
