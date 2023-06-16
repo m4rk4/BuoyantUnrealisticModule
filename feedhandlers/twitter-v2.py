@@ -152,18 +152,22 @@ def get_card(url, card):
         m = re.search(r'^(.{80,}?)\s', description)
         if m:
             description = m.group(1) + '&mldr;'
-        card_html = '<div style="display:flex; flex-wrap:wrap; gap:8px; border:1px solid black; border-radius:10px;">'
+        #card_html = '<div style="display:flex; flex-wrap:wrap; gap:8px; border:1px solid black; border-radius:10px;">'
+        card_html = '<table style="margin:0; padding:0; border:1px solid black; border-radius:10px; border-spacing:0;"><tr>'
         if card['name'] == 'player':
             img_src += '&overlay=video'
             if domain == 'youtube.com':
                 video_url = '{}/video?url={}'.format(config.server, quote_plus(card_url))
             else:
                 video_url = card_url
-            card_html += '<div style="flex:1; min-width:100px; max-width:128px; height:128px; margin:auto;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></div>'.format(video_url, img_src)
+            #card_html += '<div style="flex:1; min-width:100px; max-width:128px; height:128px; margin:auto;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></div>'.format(video_url, img_src)
+            card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></td>'.format(video_url, img_src)
         else:
-            card_html += '<div style="flex:1; min-width:100px; max-width:128px; height:128px; margin:auto;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></div>'.format(card_url, img_src)
-        card_html += '<div style="flex:2; min-width:256px; margin:auto;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div>'.format(domain, card_url, title, description)
-        card_html += '</div>'
+            #card_html += '<div style="flex:1; min-width:100px; max-width:128px; height:128px; margin:auto;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></div>'.format(card_url, img_src)
+            card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></td>'.format(card_url, img_src)
+        #card_html += '<div style="flex:2; min-width:256px; margin:auto;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div>'.format(domain, card_url, title, description)
+        #card_html += '</div>'
+        card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(domain, card_url, title, description)        card_html += '</tr></table>'
     else:
         logger.warning('unhandled card type ' + card['name'])
     return card_html
