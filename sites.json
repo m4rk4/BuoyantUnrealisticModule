@@ -240,6 +240,14 @@
             }
         ]
     },
+    "abovetheline": {
+        "feeds": [
+            "https://abovetheline.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://abovetheline.com/wp-json"
+    },
     "abyssalchronicles": {
         "args": {
             "skip_wp_user": true
@@ -356,6 +364,31 @@
             "https://www.advocate.com/feeds/feed.rss"
         ],
         "module": "rebelmouse"
+    },
+    "adweek": {
+        "args": {
+            "add_lede_img": true
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "section--teaser"
+                },
+                "tag": "section"
+            }
+        ],
+        "feeds": [
+            "https://www.adweek.com/feed"
+        ],
+        "lede_img": {
+            "attrs": {
+                "class": "featured-image"
+            },
+            "tag": "div"
+        },
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.adweek.com/wp-json"
     },
     "aeon": {
         "buildId": "6Kj19emHtFInmFuRs5c9X",
@@ -769,7 +802,7 @@
         "wpjson_path": "https://awfulannouncing.com/wp-json"
     },
     "axios": {
-        "buildId": "P5qNqGtjQ4_c9_r0ygVBM",
+        "buildId": "bW-MipXmMJc6Euu7fxOf9",
         "feeds": [
             "https://api.axios.com/feed/",
             "https://api.axios.com/feed/technology/"
@@ -4908,7 +4941,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "0uzll_gaBYcMVpnfEaxdC",
+        "buildId": "AgExy5-_bxHhfqnWbgSeb",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -6438,6 +6471,20 @@
             "https://www.lovemeow.com/feeds/feed.rss"
         ],
         "module": "rebelmouse"
+    },
+    "lux-magazine": {
+        "author": {
+            "attrs": {
+                "class": "name"
+            },
+            "tag": "span"
+        },
+        "feeds": [
+            "https://lux-magazine.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://lux-magazine.com/wp-json"
     },
     "ma": {
         "feeds": [
@@ -8063,6 +8110,16 @@
         "buildId": "W0H5leqJ_nFP5-Sghfufg",
         "module": "omnyfm"
     },
+    "onetakenews": {
+        "args": {
+            "add_lede_img": true
+        },
+        "feeds": [
+            "https://onetakenews.com/feed"
+        ],
+        "module": "wp_public",
+        "site_id": 195634905
+    },
     "oneusefulthing": {
         "feeds": [
             "https://www.oneusefulthing.org/feed"
@@ -8670,6 +8727,16 @@
             "https://pocketnow.com/feed/"
         ],
         "module": "valnetinc"
+    },
+    "pocketsciencecoffee": {
+        "args": {
+            "add_lede_img": true
+        },
+        "feeds": [
+            "https://pocketsciencecoffee.com/feed"
+        ],
+        "module": "wp_public",
+        "site_id": 203210754
     },
     "podbean": {
         "module": "podbean"
@@ -10203,6 +10270,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://stanforddaily.com/wp-json"
+    },
+    "statecollege": {
+        "feeds": [
+            "https://www.statecollege.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.statecollege.com/wp-json"
     },
     "statescoop": {
         "args": {
