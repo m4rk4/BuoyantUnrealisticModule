@@ -1,9 +1,8 @@
-import av, json, re, tldextract
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
+import html, re
+from datetime import datetime
+from urllib.parse import urlsplit
 
-import config, utils
+import utils
 from feedhandlers import rss, wp_posts
 
 import logging
@@ -27,6 +26,8 @@ def get_content(url, args, site_json, save_debug=False):
     item['id'] = post_json['ID']
     item['url'] = post_json['URL']
     item['title'] = post_json['title']
+    if re.search(r'&[#\w]+;', item['title']):
+        item['title'] = html.unescape(item['title'])
 
     dt = datetime.fromisoformat(post_json['date'])
     item['date_published'] = dt.isoformat()
