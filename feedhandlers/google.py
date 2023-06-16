@@ -1,4 +1,4 @@
-import json
+import json, re
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus, urlsplit
 
@@ -13,21 +13,35 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if split_url.netloc == 'drive.google.com' and 'viewer' in paths:
-        page_html = utils.get_url_html(url)
-        if not page_html:
-            return None
-        soup = BeautifulSoup(page_html, 'lxml')
-        el = soup.find('img', class_='drive-viewer-prerender-thumbnail')
-        if el:
-            item['title'] = soup.title.get_text()
-            item['url'] = url
-            caption = '<a href="{}">View document:</a> {}'.format(item['url'], item['title'])
-            if el['src'].startswith('/'):
-                item['_image'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, el['src'])
-            else:
-                item['_image'] = el['src']
-            item['content_html'] = utils.add_image(item['_image'], caption, link=url)
+    if split_url.netloc == 'drive.google.com':
+        if 'viewer' in paths:
+            page_html = utils.get_url_html(url)
+            if not page_html:
+                return None
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('img', class_='drive-viewer-prerender-thumbnail')
+            if el:
+                item['title'] = soup.title.get_text()
+                item['url'] = url
+                caption = '<a href="{}">View document:</a> {}'.format(item['url'], item['title'])
+                if el['src'].startswith('/'):
+                    item['_image'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, el['src'])
+                else:
+                    item['_image'] = el['src']
+                item['content_html'] = utils.add_image(item['_image'], caption, link=url)
+        elif 'preview' in paths:
+            page_html = utils.get_url_html(url)
+            if not page_html:
+                return None
+            m = re.search(r'https://lh3.googleusercontent.com/drive-viewer/[^"]+', page_html)
+            if m:
+                item['_image'] = m.group(0).encode('utf-8').decode('unicode_escape')
+                soup = BeautifulSoup(page_html, 'lxml')
+                caption = '<a href="{}">View document</a>'.format(url)
+                el = soup.find('meta', attrs={"property": "og:title"})
+                if el:
+                    caption += ': ' + el['content']
+                item['content_html'] = utils.add_image(item['_image'], caption, link=url)
     return item
 
 
