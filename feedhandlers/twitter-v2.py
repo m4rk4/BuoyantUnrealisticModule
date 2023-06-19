@@ -167,7 +167,8 @@ def get_card(url, card):
             card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}"><img style="width:128px; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}"/></a></td>'.format(card_url, img_src)
         #card_html += '<div style="flex:2; min-width:256px; margin:auto;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div>'.format(domain, card_url, title, description)
         #card_html += '</div>'
-        card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(domain, card_url, title, description)        card_html += '</tr></table>'
+        card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(domain, card_url, title, description)
+        card_html += '</tr></table>'
     else:
         logger.warning('unhandled card type ' + card['name'])
     return card_html
