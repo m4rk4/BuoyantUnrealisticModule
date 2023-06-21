@@ -119,6 +119,8 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_image(raw_soup.img['src'])
             elif raw_soup.contents[0].name == 'div' and raw_soup.contents[0].get('data-fallback-image-url'):
                 element_html += utils.add_image(raw_soup.contents[0]['data-fallback-image-url'])
+            elif raw_soup.contents[0].name == 'hl2':
+                element_html += element['content'].replace('hl2', 'h2')
             elif raw_soup.contents[0].name == 'style':
                 # can usually skip these
                 pass
