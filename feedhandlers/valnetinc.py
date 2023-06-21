@@ -336,16 +336,20 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<div>{}</div>'.format(add_image(it))
                 it = el.find(class_=re.compile(r'display-card-description'))
                 if it:
-                    new_html += '<div>{}</div>'.format(it.decode_contents())
+                    new_html += '<p>{}</p>'.format(it.decode_contents())
                 it = el.find(class_=re.compile(r'display-card-info'))
                 if it:
                     new_html += '<div>{}</div>'.format(it.decode_contents())
+                it = el.find(class_=re.compile(r'display-card-pros-cons'))
+                if it:
+                    new_html += str(it)
                 it = el.find(class_=re.compile(r'display-card-link'))
                 if it:
-                    new_html += '<div><ul>'
+                    #new_html += '<div><ul>'
                     for link in it.find_all('a'):
-                        new_html += '<li><a href="{}">{}</a></li>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
-                    new_html += '</ul></div>'
+                        #new_html += '<li><a href="{}">{}</a></li>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                        new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                    #new_html += '</ul></div>'
                 new_html += '</div>'
             else:
                 new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
