@@ -14,11 +14,14 @@ def get_content(url, args, site_json, save_debug=False):
     # https://github.com/TeamPiped/Piped/wiki/Instances
     piped_instances = [
         "https://pipedapi.kavin.rocks/",
-        "https://pipedapi.tokhmi.xyz/",
         "https://api-piped.mha.fi/",
         "https://piped-api.hostux.net/",
         "https://pipedapi-libre.kavin.rocks/",
+        "https://pa.il.ax/",
         "https://pipedapi.leptons.xyz/",
+        "https://pipedapi.adminforge.de/",
+        "https://piped-api.hostux.net/",
+        "https://watchapi.whatever.social/"
     ]
 
     yt_video_id, yt_list_id = utils.get_youtube_id(url)
