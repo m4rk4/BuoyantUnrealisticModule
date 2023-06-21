@@ -1254,6 +1254,59 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.boston.com/wp-json"
     },
+    "boston25news": {
+        "api_url": "https://www.boston25news.com/pf/api/v3/content/fetch/",
+        "arc_site": "cmg-tv-10020",
+        "author_feed": {
+            "query": {
+                "authorSlug": "AUTHOR",
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10
+            },
+            "source": "story-feed-author"
+        },
+        "content": {
+            "query": {
+                "arc-site": "cmg-tv-10020",
+                "uri": "PATH/",
+                "website_url": "PATH/"
+            },
+            "source": "content-api"
+        },
+        "deployment": 722,
+        "feeds": [
+            "https://www.boston25news.com/arc/outboundfeeds/rss/?outputType=xml&size=10"
+        ],
+        "homepage_feed": {
+            "query": {
+                "arcSite": "cmg-tv-10020",
+                "includeSections": "/news,/sports,/entertainment,/news/25-investigates,/news/health,/news/local,/news/politics,/weather,/weather/video-forecast",
+                "size": 20
+            },
+            "source": "content-feed"
+        },
+        "module": "fusion",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "resizer_url": "https://www.boston25news.com/resizer/",
+        "section_feed": {
+            "query": {
+                "arcSite": "cmg-tv-10020",
+                "includeSections": "PATH",
+                "size": 10
+            },
+            "source": "content-feed"
+        },
+        "tag_feed": {
+            "query": {
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10,
+                "tagSlug": "TAG"
+            },
+            "source": "story-feed-tag"
+        }
+    },
     "bostonglobe": {
         "api_url": "https://www.bostonglobe.com/pf/api/v3/content/fetch/",
         "arc_site": "bostonglobe",
@@ -1857,7 +1910,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1066,
+        "deployment": 1063,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -6472,6 +6525,10 @@
         ],
         "module": "rebelmouse"
     },
+    "lura": {
+        "apikey": "3hwbSuqqT690uxjNYBktSQpa5ZrpYYR0Iofx7NcJHyA",
+        "module": "lura"
+    },
     "lux-magazine": {
         "author": {
             "attrs": {
@@ -8452,6 +8509,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.pearljamonline.it/wp-json"
     },
+    "penncapital-star": {
+        "feeds": [
+            "https://www.penncapital-star.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.penncapital-star.com/wp-json"
+    },
     "pennlive": {
         "api_url": "https://www.pennlive.com/pf/api/v3/content/fetch/",
         "arc_site": "pennlive",
@@ -8598,6 +8663,12 @@
             "https://www.pgatour.com/news"
         ],
         "module": "pgatour"
+    },
+    "pghcitypaper": {
+        "feeds": [
+            "https://www.pghcitypaper.com/pittsburgh/Rss.xml"
+        ],
+        "module": "foundation"
     },
     "pimylifeup": {
         "content": {
@@ -11382,6 +11453,12 @@
         "decompose": [
             {
                 "attrs": {
+                    "class": "badbox"
+                },
+                "tag": "div"
+            },
+            {
+                "attrs": {
                     "id": [
                         "hiddenH1",
                         "trim-sidebar"
@@ -13001,6 +13078,14 @@
         ],
         "module": "future"
     },
+    "wheelingit": {
+        "feeds": [
+            "https://www.wheelingit.us/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.wheelingit.us/wp-json"
+    },
     "whittierdailynews": {
         "feeds": [
             "https://www.whittierdailynews.com/feed"
@@ -13291,7 +13376,7 @@
     },
     "wpxi": {
         "api_url": "https://www.wpxi.com/pf/api/v3/content/fetch/",
-        "arc_site": "ajc",
+        "arc_site": "cmg-tv-10080",
         "author_feed": {
             "query": {
                 "authorSlug": "AUTHOR",
