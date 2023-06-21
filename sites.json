@@ -4829,18 +4829,9 @@
     "goodmorningamerica": {
         "module": "abcnews"
     },
-    "google": [
-        {
-            "drive.google.com": {
-                "module": "google"
-            }
-        },
-        {
-            "trends.google.com": {
-                "module": "google"
-            }
-        }
-    ],
+    "google": {
+        "module": "google"
+    },
     "googleblog": {
         "feeds": [
             "https://android-developers.googleblog.com/atom.xml"

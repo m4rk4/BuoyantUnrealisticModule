@@ -310,10 +310,16 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                     data_json = json.loads(it['data-c-vpattrs'])
                     if data_json.get('videoId'):
                         new_html = utils.add_embed('https://www.youtube.com/watch?v={}'.format(data_json['videoId']))
-            elif 'gnt_em_gd' in el['class']:
-                it = el.find(attrs={"data-v-src": True})
-                if it:
-                    new_html = utils.add_embed(it['data-v-src'])
+            elif 'gnt_em_gd' in el['class'] or 'gnt_em_gm' in el['class']:
+                src = ''
+                if el.get('data-v-src'):
+                    src = el['data-v-src']
+                else:
+                    it = el.find(attrs={"data-v-src": True})
+                    if it:
+                        src = it['data-v-src']
+                if src:
+                    new_html = utils.add_embed(src)
             elif 'gnt_em_pdf' in el['class']:
                 it = el.find(attrs={"data-v-pdfurl": True})
                 if it:

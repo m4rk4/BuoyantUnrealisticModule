@@ -4,6 +4,7 @@ from flask import Flask, jsonify, render_template, redirect, request, send_file
 from flask_cors import CORS
 from io import BytesIO
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from staticmap import StaticMap, CircleMarker
 from urllib.parse import quote
 
 import image_utils, utils
@@ -294,6 +295,38 @@ def image():
     if im_io:
         return send_file(im_io, mimetype=mimetype)
     return mimetype
+
+
+@app.route('/map')
+def map():
+    args = request.args
+    if args.get('lat'):
+        lat = float(args['lat'])
+    else:
+        return 'No lat specified'
+    if args.get('lon'):
+        lon = float(args['lon'])
+    else:
+        return 'No lon specified'
+    if args.get('width'):
+        w = int(args['width'])
+    else:
+        w = 800
+    if args.get('height'):
+        h = int(args['height'])
+    else:
+        h = 400
+    map = StaticMap(w, h)
+    marker = CircleMarker((lon, lat), 'blue', 18)
+    map.add_marker(marker)
+    if args.get('zoom'):
+        image = map.render(zoom=int(args['zoom']))
+    else:
+        image = map.render()
+    im_io = BytesIO()
+    image.save(im_io, 'PNG')
+    im_io.seek(0)
+    return send_file(im_io, mimetype='image/png')
 
 
 @app.route('/screenshot')
