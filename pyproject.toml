@@ -29,6 +29,7 @@ tldextract = "^3"
 tweety-ns = "^0"
 # https://github.com/psf/requests/issues/6443
 urllib3 = "^1.26"
+cloudscraper = "^1.2.71"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
