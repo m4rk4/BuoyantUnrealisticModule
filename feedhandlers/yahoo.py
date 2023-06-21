@@ -275,7 +275,10 @@ def get_content(url, args, site_json, save_debug=False):
         href = el.get('href')
         if href:
             el.attrs = {}
-            el['href'] = href
+            if href.startswith('https://shopping.yahoo.com/'):
+                el['href'] = utils.get_redirect_url(href)
+            else:
+                el['href'] = href
 
     for el in caas_body.find_all(class_='caas-readmore'):
         el.decompose()

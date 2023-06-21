@@ -245,6 +245,7 @@ def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_
   return None
 
 def find_redirect_url(url):
+  #print(url)
   split_url = urlsplit(url)
   if 'cloudfront.net' in split_url.netloc:
     url_html = get_url_html(url)
@@ -280,10 +281,13 @@ def find_redirect_url(url):
         return 'https://' + query['urllink'][0]
     elif split_url.netloc == 'shopping.yahoo.com' and query.get('merchantName'):
       if query['merchantName'][0] == 'Amazon':
-        m = re.search(r'amazon_(.*)', query['itemId'][0])
-        if m:
-          return 'https://www.amazon.com/dp/' + m.group(1)
-      elif query['merchantName'][0] == 'Walmart':
+        if query.get('itemId'):
+          m = re.search(r'amazon_(.*)', query['itemId'][0])
+          if m:
+            return 'https://www.amazon.com/dp/' + m.group(1)
+        elif query.get('gcReferrer'):
+          return query['gcReferrer'][0]
+      elif query['merchantName'][0] == 'Walmart' and query.get('itemName') and query.get('itemSourceId'):
         return 'https://www.walmart.com/ip/{}/{}'.format(query['itemName'][0], query['itemSourceId'][0])
     elif split_url.netloc == 'discounthero.org':
       page_html = get_url_html(url)
@@ -349,7 +353,7 @@ def get_url_title_desc(url):
     desc = None
   return title, desc
 
-def post_url(url, data=None, json_data=None, headers=None):
+def post_url(url, data=None, json_data=None, headers=None, r_text=False):
   try:
     if data:
       if headers:
@@ -374,10 +378,13 @@ def post_url(url, data=None, json_data=None, headers=None):
   except requests.exceptions.Timeout:
     logger.warning('Timeout error requesting {}'.format(url))
     return None
-  try:
-    return r.json()
-  except:
-    logger.warning('error converting to json: {}'.format(url))
+  if r_text:
+    return r.text
+  else:
+    try:
+      return r.json()
+    except:
+      logger.warning('error converting to json: {}'.format(url))
   return None
 
 def url_exists(url):
