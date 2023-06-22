@@ -3265,6 +3265,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.denofgeek.com/wp-json"
     },
+    "denvergazette": {
+        "feeds": [
+            "https://denvergazette.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
+        ],
+        "module": "tncms"
+    },
     "denverpost": {
         "args": {
             "skip_wp_user": true
@@ -4297,6 +4303,17 @@
     },
     "fox43": {
         "module": "tegna"
+    },
+    "fox59": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://fox59.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://fox59.com/wp-json"
     },
     "fox5vegas": {
         "api_url": "https://www.fox5vegas.com/pf/api/v3/content/fetch/",
@@ -6221,6 +6238,20 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://lawandcrime.com/wp-json"
+    },
+    "learnlinux": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "authors": {
+            "1": "Jay Lacroix"
+        },
+        "feeds": [
+            "https://www.learnlinux.tv/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.learnlinux.tv/wp-json"
     },
     "lefsetz": {
         "args": {
@@ -11112,6 +11143,12 @@
         ],
         "module": "substack"
     },
+    "thearchaeologist": {
+        "feeds": [
+            "https://www.thearchaeologist.org/blog?format=rss"
+        ],
+        "module": "sqs"
+    },
     "theathletic": {
         "decompose": [
             {
@@ -13225,6 +13262,18 @@
         "module": "rebelmouse"
     },
     "wordpress": [
+        {
+            "advaitsarkar.wordpress.com": {
+                "args": {
+                    "add_lede_img": true
+                },
+                "feeds": [
+                    "https://advaitsarkar.wordpress.com/feed/"
+                ],
+                "module": "wp_public",
+                "site_id": 11613367
+            }
+        },
         {
             "baseballwithr.wordpress.com": {
                 "feeds": [
