@@ -1,6 +1,6 @@
 import json, re
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus, urlsplit, unquote_plus
+from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
 import config, utils
 
@@ -43,29 +43,44 @@ def get_content(url, args, site_json, save_debug=False):
                     caption += ': ' + el['content']
                 item['content_html'] = utils.add_image(item['_image'], caption, link=url)
     elif split_url.netloc == 'maps.google.com' or paths[0] == 'maps':
-        # https://andrewwhitby.com/2014/09/09/google-maps-new-embed-format/
-        # https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d316.0465152882427!2d-81.5512302066608!3d41.09612587494313!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8830d7ae81e95ae5%3A0xb29f75ec4aac5a3c!2sLeeAngelo%E2%80%99s%20(Akron)!5e0!3m2!1sen!2sus!4v1687347021057!5m2!1sen!2sus
-        lat = ''
-        lon = ''
-        m = re.search(r'!2d([\-\.0-9]+)', url)
-        if m:
-            lon = m.group(1)
-        m = re.search(r'!3d([\-\.0-9]+)', url)
-        if m:
-            lat = m.group(1)
-        if not (lat and lon):
-            logger.warning('unable to parse lat & lon in ' + url)
-        item = {}
-        m = re.search(r'!2s([^!]+)', url)
-        if m:
-            item['title'] = unquote_plus(m.group(1))
-            caption = item['title']
-            item['url'] = 'https://www.google.com/maps/search/{}/@{},{},15z'.format(quote_plus(item['title']), lat, lon)
-        else:
-            caption = ''
-            item['url'] = 'https://www.google.com/maps/@{},{},15z'.format(lat, lon)
-        item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
-        item['content_html'] = utils.add_image(item['_image'], caption, link=item['url'])
+        # URL format: https://andrewwhitby.com/2014/09/09/google-maps-new-embed-format/
+        # Staticmap: https://github.com/komoot/staticmap
+        query = parse_qs(split_url.query)
+        if query.get('pb'):
+            # https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d316.0465152882427!2d-81.5512302066608!3d41.09612587494313!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8830d7ae81e95ae5%3A0xb29f75ec4aac5a3c!2sLeeAngelo%E2%80%99s%20(Akron)!5e0!3m2!1sen!2sus!4v1687347021057!5m2!1sen!2sus
+            lat = ''
+            lon = ''
+            m = re.search(r'!2d([\-\.0-9]+)', url)
+            if m:
+                lon = m.group(1)
+            m = re.search(r'!3d([\-\.0-9]+)', url)
+            if m:
+                lat = m.group(1)
+            if not (lat and lon):
+                logger.warning('unable to parse lat & lon in ' + url)
+            item = {}
+            m = re.search(r'!2s([^!]+)', url)
+            if m:
+                item['title'] = unquote_plus(m.group(1))
+                item['url'] = 'https://www.google.com/maps/search/{}/@{},{},15z'.format(quote_plus(item['title']), lat, lon)
+            else:
+                item['title'] = ''
+                item['url'] = 'https://www.google.com/maps/@{},{},15z'.format(lat, lon)
+            item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
+            item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
+        elif 'place' in paths and query.get('q'):
+            # https://www.google.com/maps/embed/v1/place?key=API_KEY&q=Space+Needle,Seattle+WA
+            osm_search = utils.get_url_json('https://nominatim.openstreetmap.org/search?q={}&format=json'.format(quote_plus(query['q'][0])))
+            if not osm_search:
+                logger.warning('unable to find place {} in {}'.format(query['q'][0], url))
+                return None
+            lat = osm_search[0]['lat']
+            lon = osm_search[0]['lon']
+            item = {}
+            item['title'] = osm_search[0]['display_name']
+            item['url'] = 'https://www.google.com/maps/search/{}/@{},{},15z'.format(quote_plus(query['q'][0]), lat, lon)
+            item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
+            item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
     return item
 
 
