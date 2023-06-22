@@ -51,7 +51,12 @@ def get_content(url, args, site_json, save_debug=False):
         item['tags'] += post_json['tags']
 
     if post_json.get('assetUrl'):
-        item['_image'] = post_json['assetUrl']
+        if post_json['assetUrl'].endswith('/'):
+            item['_image'] = utils.get_redirect_url(post_json['assetUrl'])
+            if 'no-image' in item['_image']:
+                del item['_image']
+        else:
+            item['_image'] = post_json['assetUrl']
 
     if post_json.get('excerpt'):
         soup = BeautifulSoup(post_json['excerpt'], 'html.parser')
@@ -78,7 +83,7 @@ def get_content(url, args, site_json, save_debug=False):
         el.attrs = {}
 
     blocks = soup.find_all('div', class_='sqs-block')
-    if 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
+    if item.get('_image') and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
         item['content_html'] += utils.add_image(item['_image'])
 
     for block in blocks:

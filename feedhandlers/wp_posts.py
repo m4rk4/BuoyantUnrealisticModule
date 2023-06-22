@@ -659,6 +659,25 @@ def get_post_content(post, args, site_json, save_debug=False):
                 m = re.search(r'id="([^"]+)"', it)
                 if m:
                     video_lede += utils.add_embed('https://embed.sendtonews.com/player3/embedcode.js?SC={}'.format(m.group(1)))
+        elif post.get('meta') and post['meta'].get('_pmc_featured_video_override_data'):
+            if post['meta']['_pmc_featured_video_override_data'].startswith('http'):
+                video_lede += utils.add_embed(post['meta']['_pmc_featured_video_override_data'])
+            else:
+                m = re.search(r'connatix ([\-0-9a-f]+)', post['meta']['_pmc_featured_video_override_data'])
+                if m:
+                    media_id = m.group(1)
+                    if not page_soup:
+                        page_html = utils.get_url_html(item['url'])
+                        if page_html:
+                            page_soup = BeautifulSoup(page_html, 'lxml')
+                    if page_soup:
+                        el = page_soup.find('script', id='connatix_contextual_player_div_{}'.format(media_id))
+                        if el:
+                            m = re.search(r'playerId:\s?\'([\-0-9a-f]+)\'', el.string)
+                            if m:
+                                video_src = 'https://vid.connatix.com/pid-{}/{}/playlist.m3u8'.format(m.group(1), media_id)
+                                poster = 'https://img.connatix.com/pid-{}/{}/1_th.jpg?width=1000&format=jpeg&quality=60'.format(m.group(1), media_id)
+                                video_lede += utils.add_video(video_src, 'application/x-mpegURL', poster)
         elif site_json.get('lede_video'):
             if not page_soup:
                 page_html = utils.get_url_html(item['url'])
@@ -685,8 +704,6 @@ def get_post_content(post, args, site_json, save_debug=False):
                 el = page_soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
                 if el:
                     lede += add_image(el, el, base_url)
-        if post.get('meta') and post['meta'].get('_pmc_featured_video_override_data'):
-            lede += utils.add_embed(post['meta']['_pmc_featured_video_override_data'])
 
     if post.get('acf') and post['acf'].get('post_hero') and post['acf']['post_hero'].get('number_one_duration'):
         # https://www.stereogum.com/2211784/the-number-ones-chamillionaires-ridin-feat-krayzie-bone/columns/the-number-ones/
@@ -1454,10 +1471,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
                     new_html = utils.add_embed(it['data-src'])
                 else:
                     new_html = utils.add_embed(it['src'])
-            elif el.find(class_='epyt-video-wrapper'):
+            elif el.find(class_='__youtube_prefs__', attrs={"data-facadesrc": True}):
                 it = el.find(class_='__youtube_prefs__')
-                if it:
-                    new_html = utils.add_embed(it['data-facadesrc'])
+                new_html = utils.add_embed(it['data-facadesrc'])
             elif el.find(class_='lyte-wrapper'):
                 # https://hometheaterreview.com/formovie-theater-ust-4k-projector-review/
                 it = el.find('meta', attrs={"itemprop": "embedURL"})

@@ -252,7 +252,7 @@ def find_redirect_url(url):
     m = re.search(r'"redirect":"([^"]+)"', url_html)
     if m:
       return m.group(1)
-  elif split_url.netloc == 'www.hp.com':
+  elif split_url.netloc == 'www.hp.com' or split_url.netloc == 'www.amazon.com' or split_url.netloc == 'www.newegg.com' or 'www.t-mobile.com' in split_url.netloc:
     return clean_url(url)
   if split_url.query:
     query = parse_qs(split_url.query)
@@ -302,7 +302,11 @@ def find_redirect_url(url):
       for key, val in query.items():
         if val[0].startswith('http'):
           return get_redirect_url(val[0])
-    return ''
+  elif split_url.netloc == 'www.anrdoezrs.net':
+    m = re.search(r'/(https://.*)', url)
+    if m:
+      return m.group(1)
+  return ''
 
 def get_redirect_url(url):
   redirect_url = find_redirect_url(url)

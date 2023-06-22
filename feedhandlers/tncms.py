@@ -16,7 +16,7 @@ def resize_image(img_src, width=1200):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    #print(url)
+    print(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     m = re.search(r'([^_]+)_([0-91-f\-]+)\.html?', paths[-1])
@@ -75,36 +75,42 @@ def get_content(url, args, site_json, save_debug=False):
 
         if article_type == 'image' and tn_json:
             item = {}
-            item['id'] = tn_json['asset_id']
-            item['url'] = tn_json['asset_canonical']
-            item['title'] = tn_json['asset_headline']
-            dt = datetime.fromisoformat(tn_json['articlePublishTime']).astimezone(timezone.utc)
+            item['id'] = tn_json['tncms']['asset']['id']
+            item['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, tn_json['tncms']['asset']['ga_page'])
+            item['title'] = tn_json['townnews']['content']['title']
+            dt = datetime.fromisoformat(tn_json['townnews']['content']['published_time'].replace('Z', '+00:00'))
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
-            if tn_json.get('articleUpdateTime'):
-                dt = datetime.fromisoformat(tn_json['articleUpdateTime']).astimezone(timezone.utc)
-                item['date_modified'] = dt.isoformat()
-            item['author'] = {"name": tn_json['asset_byline']}
+            item['author'] = {"name": tn_json['tncms']['asset']['author']}
             el = soup.find(id='asset-content')
             if el:
-                it = el.find('img')
-                if it:
-                    if it.get('data-srcset'):
-                        item['_image'] = utils.image_from_srcset(it['data-srcset'], 1200)
+                if tn_json['tncms']['asset']['type'] == 'image':
+                    it = el.find('img')
+                    if it:
+                        if it.get('data-srcset'):
+                            item['_image'] = utils.image_from_srcset(it['data-srcset'], 1200)
+                        else:
+                            item['_image'] = it['src']
+                        captions = []
+                        it = el.find(class_='caption-text')
+                        if it:
+                            captions.append(re.sub('\s*<p>(.*)</p>\s*$', r'\1', it.decode_contents()))
+                        it = el.find(class_='tnt-byline')
+                        if it:
+                            captions.append(it.decode_contents())
+                        item['content_html'] = utils.add_image(item['_image'], ' | '.join(captions))
                     else:
-                        item['_image'] = it['src']
-                    captions = []
-                    it = el.find(class_='caption-text')
+                        logger.warning('unhandled image asset-content in ' + item['url'])
+                elif tn_json['tncms']['asset']['type'] == 'video' and tn_json['tncms']['asset']['subtype'] == 'youtube':
+                    it = el.find('iframe')
                     if it:
-                        captions.append(re.sub('\s*<p>(.*)</p>\s*$', r'\1', it.decode_contents()))
-                    it = el.find(class_='tnt-byline')
-                    if it:
-                        captions.append(it.decode_contents())
-                    item['content_html'] = utils.add_image(item['_image'], ' | '.join(captions))
-                else:
-                    logger.warning('unhandled asset-content in ' + item['url'])
-                return item
+                        item['content_html'] = utils.add_embed(it['src'])
+                    else:
+                        logger.warning('unhandled youtube asset-content in ' + item['url'])
+            else:
+                logger.warning('unable to find asset-content in ' + item['url'])
+            return item
         else:
             logger.warning('unable to find article for ' + url)
         return None
@@ -163,11 +169,16 @@ def get_content(url, args, site_json, save_debug=False):
                 if el:
                     item['content_html'] += utils.add_embed(el['src'])
                 else:
-                    item['content_html'] += '<blockquote><b>Unknown embedded content in <a href="{0}">{0}</a></b></blockquote>'.format(item['url'])
-                    logger.warning('unhandled html content in ' + item['url'])
+                    el = content.find(class_='twitter-tweet')
+                    if el:
+                        links = el.find_all('a')
+                        item['content_html'] += utils.add_embed(links[-1]['href'])
+                    else:
+                        item['content_html'] += '<blockquote><b>Unknown embedded content in <a href="{0}">{0}</a></b></blockquote>'.format(item['url'])
+                        logger.warning('unhandled html content in ' + item['url'])
 
             if article_json['type'] == 'video':
-                el = soup.find(attrs={"data-asset-uuid": item['id']})
+                el = soup.find(class_='asset-content', attrs={"data-asset-uuid": item['id']})
             else:
                 el = soup.find(id='asset-video-primary')
             if el:
@@ -259,6 +270,12 @@ def get_content(url, args, site_json, save_debug=False):
             elif re.search(r'inline-editorial-article', content):
                 # Generally related articles
                 continue
+        elif content.startswith('<blockquote'):
+            if re.search(r'twitter-tweet', content):
+                m = re.findall(r'href="([^"]+)"', content)
+                if m:
+                    content_html += utils.add_embed(m[-1])
+                    continue
         elif content.startswith('<aside'):
             if re.search(r'tncms-inline-relcontent', content):
                 content_html += utils.add_blockquote(re.sub(r'^<aside [^>]+>(.*)</aside>$', r'\1', content))
