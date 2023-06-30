@@ -1910,7 +1910,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1067,
+        "deployment": 1071,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -5002,7 +5002,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "pvg2xEeiJzDgyYzrsMYZy",
+        "buildId": "45rStvSzzdr3mk58_sIbB",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
