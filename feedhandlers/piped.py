@@ -13,15 +13,15 @@ def get_content(url, args, site_json, save_debug=False):
     # Seems like instances are rate limited, so choose one at random
     # https://github.com/TeamPiped/Piped/wiki/Instances
     piped_instances = [
-        "https://pipedapi.kavin.rocks/",
         "https://api-piped.mha.fi/",
         "https://piped-api.hostux.net/",
-        "https://pipedapi-libre.kavin.rocks/",
         "https://pa.il.ax/",
         "https://pipedapi.leptons.xyz/",
         "https://pipedapi.adminforge.de/",
         "https://piped-api.hostux.net/",
-        "https://watchapi.whatever.social/"
+        "https://watchapi.whatever.social/",
+        "https://pipedapi.kavin.rocks/",
+        "https://pipedapi-libre.kavin.rocks/",
     ]
 
     yt_video_id, yt_list_id = utils.get_youtube_id(url)
@@ -72,8 +72,11 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
     else:
         for piped_instance in piped_instances:
+            logger.debug('trying Piped instance ' + piped_instance)
             piped_json = utils.get_url_json('{}streams/{}'.format(piped_instance, yt_video_id), user_agent='googlebot', retries=2)
             if piped_json:
+                if piped_json.get('error') and piped_json['message'] == 'Initial player response is not valid':
+                    continue
                 break
         if not piped_json:
             return None

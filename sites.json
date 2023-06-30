@@ -365,6 +365,14 @@
         ],
         "module": "rebelmouse"
     },
+    "advpulse": {
+        "feeds": [
+            "https://www.advpulse.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.advpulse.com/wp-json"
+    },
     "adweek": {
         "args": {
             "add_lede_img": true
@@ -1378,6 +1386,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/articles",
         "wpjson_path": "https://www.bostonreview.net/wp-json"
+    },
+    "breachmedia": {
+        "feeds": [
+            "https://breachmedia.ca/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://breachmedia.ca/wp-json"
     },
     "brewersjournal": {
         "feeds": [
@@ -2738,6 +2754,22 @@
         ],
         "module": "beehiiv"
     },
+    "crypto": {
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "cn-block-related-link"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://crypto.news/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://crypto.news/wp-json"
+    },
     "cryptopotato": {
         "args": {
             "add_subtitle": true
@@ -3647,6 +3679,9 @@
     "economist": {
         "module": "economist"
     },
+    "edmunds": {
+        "module": "edmunds"
+    },
     "edscoop": {
         "args": {
             "add_lede_img": true,
@@ -3925,6 +3960,14 @@
     "eurosport": {
         "module": "eurosport",
         "sonicToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJVU0VSSUQ6ZHBsYXk6M2E5ODdjNDQtZGY4MS00MWQ0LWFmYzYtMDNlOTEwZGY1MDdkIiwianRpIjoidG9rZW4tMzkzYjk2NmYtNmU0ZC00MzEwLWEwNjgtMzNmMjJjZTQ4MTE2IiwiYW5vbnltb3VzIjpmYWxzZSwiaWF0IjoxNjc4ODA2NzcxfQ.5mLbuhvMkoyHfjNouM9y7o9AaZRdbOM8jm0UktXYZD8"
+    },
+    "ev-edition": {
+        "feeds": [
+            "https://ev-edition.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://ev-edition.com/wp-json"
     },
     "evanmccann": {
         "feeds": [
@@ -4401,9 +4444,25 @@
         "module": "gatsby",
         "page_data_prefix": ""
     },
+    "freedom-to-tinker": {
+        "feeds": [
+            "https://freedom-to-tinker.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://freedom-to-tinker.com/wp-json"
+    },
     "freep": {
         "module": "gannett",
         "site_code": "PDTF"
+    },
+    "freethink": {
+        "feeds": [
+            "https://www.freethink.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/ftm_article",
+        "wpjson_path": "https://www.freethink.org/wp-json"
     },
     "freethoughtblogs": {
         "feeds": [
@@ -4671,6 +4730,17 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.geekwire.com/wp-json"
+    },
+    "geeky-gadgets": {
+        "args": {
+            "skip_lede_img": true
+        },
+        "feeds": [
+            "https://www.geeky-gadgets.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.geeky-gadgets.com/wp-json"
     },
     "gematsu": {
         "feeds": [
@@ -5009,7 +5079,7 @@
     },
     "hackster": {
         "module": "hackster",
-        "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjItMDMtMjFUMTM6NTk6MDUrMDAwMCIsImV4cCI6IjIwMjItMDMtMjFUMTU6NTk6MDUrMDAwMCIsInJuZCI6IjFmMmRhMzYzN2EwZDU4NmVmODQyMDRiYjU1NTkwNDE1In0.19HJWh5GM_DfXSPzRCwMqgPxG03sref6DRELrfQcBlRy8jHjimCj6QyQgoUBKT_FU3aJBC-Edha1bNmb8tTn7Q"
+        "token": "eyJhbGciOiJIUzUxMiJ9.eyJpc3MiOiJoYWNrc3RlciIsImlhdCI6IjIwMjMtMDYtMjhUMTM6NDk6MjMrMDAwMCIsImV4cCI6IjIwMjMtMDYtMjhUMTU6NDk6MjMrMDAwMCIsInJuZCI6IjdhOTA0NTE4MmY0NzQzMmVlOGJjNjJhMGM0OGQ3YTcwIn0.ZYSaJXtBb9qAJQas-IcZ6nfis3sEIrwvoleVcoZOsGgfZrDr8sk-fpLiiLCcZ9Ho30B5I8KzuM7olNcAGOPyJw"
     },
     "hakaimagazine": {
         "feeds": [
@@ -10680,6 +10750,12 @@
             "source": "tag-feed-api"
         }
     },
+    "systanddeploy": {
+        "feeds": [
+            "https://www.systanddeploy.com/feeds/posts/default"
+        ],
+        "module": "blogger"
+    },
     "systutorials": {
         "feeds": [
             "https://www.systutorials.com/feed"
@@ -13760,13 +13836,13 @@
         "wpjson_path": "https://yourtestdriver.com/wp-json"
     },
     "youtu.be": {
-        "module": "piped"
+        "module": "youtube"
     },
     "youtube": {
-        "module": "piped"
+        "module": "youtube"
     },
     "youtube-nocookie": {
-        "module": "piped"
+        "module": "youtube"
     },
     "zatznotfunny": {
         "feeds": [
