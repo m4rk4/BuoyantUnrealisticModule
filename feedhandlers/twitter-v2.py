@@ -145,8 +145,7 @@ def get_card(url, card):
         card_html = utils.add_image(img_src, caption, link=card_url, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;", desc=desc)
     elif card['name'] == 'player' or card['name'] == 'summary' or (card['name'] == 'summary_large_image' and not img_src):
         if img_src:
-            img_src = '{}/image?url={}&crop={}&width=128'.format(config.server, quote_plus(img_src),
-                        min(val['value']['image_value']['height'], val['value']['image_value']['width']))
+            img_src = '{}/image?url={}&crop=0&width=128'.format(config.server, quote_plus(img_src))
         else:
             img_src = '{}/image?width=128&height=128'.format(config.server)
         m = re.search(r'^(.{80,}?)\s', description)
