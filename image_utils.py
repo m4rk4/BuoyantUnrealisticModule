@@ -70,8 +70,14 @@ def crop(im, crop_args):
         x = (im.width - w) // 2
         y = (im.height - h) // 2
     elif len(crop_args) == 1:
-        # Square
-        w = int(crop_args[0])
+        # Centered square
+        v = int(crop_args[0])
+        if v == 0:
+            w = min(im.width, im.height)
+        elif v <= im.width and v <= im.height:
+            w = v
+        else:
+            w = min(v, im.width, im.height)
         h = w
         x = (im.width - w) // 2
         y = (im.height - h) // 2
