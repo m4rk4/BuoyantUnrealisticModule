@@ -1,4 +1,4 @@
-import av, bs4, html, json, random, re
+import av, bs4, html, json, math, random, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -22,6 +22,13 @@ def resize_image(img_src, width=1000):
         return '{}://{}{}?w={}&ssl=1'.format(split_url.scheme, split_url.netloc, split_url.path, width)
     if query.get('width') or query.get('height'):
         return '{}://{}{}?width={}'.format(split_url.scheme, split_url.netloc, split_url.path, width)
+    if query.get('resize'):
+        m = re.search(r'(\d+),(\d+)', query['resize'][0])
+        if m:
+            w = int(m.group(1))
+            h = int(m.group(2))
+            height = math.floor(h * width / w)
+            return '{}://{}{}?resize={},{}'.format(split_url.scheme, split_url.netloc, split_url.path, width, height)
     return img_src
 
 
