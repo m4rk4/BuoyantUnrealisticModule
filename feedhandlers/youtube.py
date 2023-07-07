@@ -1,6 +1,7 @@
 import json, math, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from pytube.cipher import Cipher
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
@@ -69,9 +70,10 @@ def get_author_info(channel_id):
     return author
 
 
-def get_player_response(video_id, use_html=False):
+def get_player_response(video_id, from_html=False):
     player_response = None
-    if use_html:
+    player_url = ''
+    if from_html:
         page_html = utils.get_url_html('https://www.youtube.com/watch?v={}'.format(video_id))
         if page_html:
             # utils.write_file(page_html, './debug/youtube.html')
@@ -81,6 +83,9 @@ def get_player_response(video_id, use_html=False):
                 i = el.string.find('{')
                 j = el.string.rfind('}') + 1
                 player_response = json.loads(el.string[i:j])
+            m = re.search(r'"(?:PLAYER_JS_URL|jsUrl)"\s*:\s*"([^"]+)"', page_html)
+            if m:
+                player_url = 'https://www.youtube.com' + m.group(1)
     else:
         # https://github.com/user234683/youtube-local/blob/master/youtube/watch.py
         context = {
@@ -106,7 +111,7 @@ def get_player_response(video_id, use_html=False):
             "User-Agent": "Mozilla/5.0 (Linux; Android 7.0; Redmi Note 4 Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Mobile Safari/537.36"
         }
         player_response = utils.post_url(player_url, json_data=data, headers=headers)
-    return player_response
+    return player_response, player_url
 
 
 def format_duration(seconds):
@@ -144,20 +149,30 @@ def get_content(url, args, site_json, save_debug=False):
     video_list = None
     item = {}
     if video_id:
+        item['id'] = video_id
+        item['url'] = 'https://www.youtube.com/watch?v=' + video_id
+
         if 'embed' in args:
             # Use api call, doesn't include the date
-            player_response = get_player_response(video_id, False)
+            player_response, player_url = get_player_response(video_id, False)
         else:
             # Extract from html to get the upload date
-            player_response = get_player_response(video_id, True)
+            player_response, player_url = get_player_response(video_id, True)
         if not player_response:
             return None
         if save_debug:
             utils.write_file(player_response, './debug/youtube.json')
-        video_details = player_response['videoDetails']
+        if not player_response.get('videoDetails'):
+            if player_response['playabilityStatus'].get('messages'):
+                item['title'] = ' '.join(player_response['playabilityStatus']['messages'])
+            else:
+                item['title'] = player_response['playabilityStatus']['status']
+            poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus('https://s.ytimg.com/yts/img/meh7-vflGevej7.png'))
+            caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+            item['content_html'] = utils.add_image(poster, caption)
+            return item
 
-        item['id'] = video_id
-        item['url'] = 'https://www.youtube.com/watch?v=' + video_id
+        video_details = player_response['videoDetails']
         item['title'] = video_details['title']
 
         if player_response.get('microformat') and player_response['microformat'].get('playerMicroformatRenderer'):
@@ -196,19 +211,46 @@ def get_content(url, args, site_json, save_debug=False):
 
         video_stream = utils.closest_dict(player_response['streamingData']['formats'], 'height', 480)
         if video_stream:
-            item['_video'] = video_stream['url']
-            attachment = {}
-            attachment['url'] = video_stream['url']
-            if re.search(r'video/mp4', video_stream['mimeType']):
-                attachment['mime_type'] = 'video/mp4'
-            elif re.search(r'video/webm', video_stream['mimeType']):
-                attachment['mime_type'] = 'video/webm'
+            video_url = ''
+            if video_stream.get('url'):
+                video_url = video_stream['url']
+            elif video_stream.get('signatureCipher'):
+                sc = parse_qs(video_stream['signatureCipher'])
+                if sc.get('url') and sc.get('s'):
+                    if not player_url:
+                        player_resp, player_url = get_player_response(video_id, True)
+                    if player_url:
+                        player_js = utils.get_url_html(player_url)
+                        #utils.write_file(player_js, './debug/player.js')
+                        if player_js:
+                            # https://github.com/pytube/pytube/blob/master/pytube/extract.py#L400
+                            # Need to patch cipher.py according to https://github.com/pytube/pytube/pull/1691
+                            # Test video: https://www.youtube.com/watch?v=kDxPQqkSyL4
+                            try:
+                                cipher = Cipher(js=player_js)
+                                sig = cipher.get_signature(sc['s'][0])
+                                video_url = sc["url"][0] + "&sig=" + sig
+                            except:
+                                logger.warning('error getting decrypting signature cipher in ' + item['url'])
+            if video_url:
+                item['_video'] = video_url
+                attachment = {}
+                attachment['url'] = video_url
+                if re.search(r'video/mp4', video_stream['mimeType']):
+                    attachment['mime_type'] = 'video/mp4'
+                elif re.search(r'video/webm', video_stream['mimeType']):
+                    attachment['mime_type'] = 'video/webm'
+                else:
+                    attachment['mime_type'] = 'application/x-mpegURL'
+                item['attachments'] = []
+                item['attachments'].append(attachment)
+                play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + item['id']))
+                item['content_html'] = utils.add_video(play_url, attachment['mime_type'], item['_image'], caption, heading=heading)
             else:
-                attachment['mime_type'] = 'application/x-mpegURL'
-            item['attachments'] = []
-            item['attachments'].append(attachment)
-            play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com/watch?v=' + item['id']))
-            item['content_html'] = utils.add_video(play_url, attachment['mime_type'], item['_image'], caption, heading=heading)
+                logger.warning('unknown video playback url for ' + item['url'])
+                video_url = 'https://www.youtube-nocookie.com/embed/' + video_id
+                poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, item['_image'])
+                item['content_html'] = utils.add_image(poster, caption, link=video_url)
         else:
             poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, quote_plus(item['_image']))
             item['content_html'] = utils.add_image(poster, caption, link=link, heading=heading)
@@ -392,19 +434,4 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    n = 0
-    items = []
-    feed = rss.get_feed(url, args, site_json, save_debug)
-    for feed_item in feed['items']:
-        if save_debug:
-            logger.debug('getting content for ' + feed_item['url'])
-        item = get_content(feed_item['url'], args, site_json, save_debug)
-        if item:
-            if utils.filter_item(item, args) == True:
-                items.append(item)
-                n += 1
-                if 'max' in args:
-                    if n == int(args['max']):
-                        break
-    feed['items'] = items.copy()
-    return feed
+    return rss.get_feed(url, args, site_json, save_debug, get_content)
