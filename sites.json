@@ -2009,6 +2009,14 @@
             "source": "site-service-content-feed"
         }
     },
+    "clevelandclassical": {
+        "feeds": [
+            "https://clevelandclassical.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://clevelandclassical.com/wp-json"
+    },
     "clevescene": {
         "feeds": [
             "https://www.clevescene.com/cleveland/Rss.xml"
@@ -4683,6 +4691,14 @@
             "https://gazette.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
         ],
         "module": "tncms"
+    },
+    "gazettengr": {
+        "feeds": [
+            "https://gazettengr.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://gazettengr.com/wp-json"
     },
     "gearbrain": {
         "feeds": [
@@ -10410,6 +10426,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://spy.com/wp-json"
     },
+    "sspnet": {
+        "feeds": [
+            "https://scholarlykitchen.sspnet.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://scholarlykitchen.sspnet.org/wp-json"
+    },
     "staceyoniot": {
         "feeds": [
             "https://staceyoniot.com/feed"
@@ -11575,6 +11599,12 @@
                     "class": "note-b"
                 },
                 "tag": "div"
+            },
+            {
+                "attrs": {
+                    "class": "check_two_webinar"
+                },
+                "tag": "section"
             }
         ],
         "feeds": [
@@ -12496,7 +12526,7 @@
         "module": "twitch"
     },
     "twitter": {
-        "module": "twitter-v2"
+        "module": "twitter"
     },
     "tyla": {
         "channel": "tyla",
