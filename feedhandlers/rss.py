@@ -8,12 +8,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
-  if args.get('rss'):
+  if url:
+    rss_url = url
+  elif args.get('url'):
+    rss_url = args['url']
+  elif args.get('rss'):
     rss_url = args['rss']
   elif args.get('fromrss'):
     rss_url = args['fromrss']
-  else:
-    rss_url = args['url']
 
   rss_feed = utils.get_url_html(rss_url)
   if not rss_feed:
