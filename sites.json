@@ -8268,7 +8268,7 @@
         "wpjson_path": "https://www.omgubuntu.co.uk/wp-json"
     },
     "omny": {
-        "buildId": "TOn2TCqRwisU-iFXKNdRa",
+        "buildId": "9sOyDkjNjhGnLjmV7b8ec",
         "module": "omnyfm"
     },
     "omnycontent": {
@@ -10442,6 +10442,20 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://staceyoniot.com/wp-json"
     },
+    "stackdiary": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "decompose": [
+            {"tag": "svg", "attrs": {"class": "w-10"}}
+        ],
+        "feeds": [
+            "https://stackdiary.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://stackdiary.com/wp-json"
+    },
     "stackoverflow": {
         "feeds": [
             "https://stackoverflow.blog/feed"
@@ -10614,6 +10628,7 @@
             "https://bitecode.substack.com/feed",
             "https://bnet.substack.com/feed",
             "https://cintra.substack.com/feed",
+            "https://console.substack.com/feed",
             "https://davekarpf.substack.com/feed",
             "https://dblalock.substack.com/feed",
             "https://deezlinks.substack.com/feed",
@@ -12526,7 +12541,7 @@
         "module": "twitch"
     },
     "twitter": {
-        "module": "twitter"
+        "module": "twitter-v2"
     },
     "tyla": {
         "channel": "tyla",
