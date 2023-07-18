@@ -150,6 +150,9 @@ def format_body(body_json):
         elif body_json[1]['type'] == 'pullquoteContent':
             start_tag = ''
             end_tag = ''
+        elif body_json[1]['type'] == 'pullquoteCredit':
+            start_tag = '<cite>'
+            end_tag = '</cite>'
         elif body_json[1]['type'] == 'callout:button-group':
             start_tag = ''
             end_tag = ''
@@ -215,7 +218,11 @@ def format_body(body_json):
 
     if body_json[0] == 'inline-embed':
         if body_json[1]['type'] == 'callout:pullquote':
-            content_html = utils.add_pullquote(content_html)
+            m = re.search(r'<cite[^>]*>(.*?)</cite>', content_html)
+            if m:
+                content_html = utils.add_pullquote(content_html.replace(m.group(0), ''), m.group(1))
+            else:
+                content_html = utils.add_pullquote(content_html)
         elif body_json[1]['type'] == 'callout:button-group':
             soup = BeautifulSoup(content_html, 'html.parser')
             el = soup.find('a')
