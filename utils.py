@@ -612,7 +612,8 @@ def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
     quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
     quote = re.sub(r'</?p>', '', quote)
   if pullquote_check:
-    if re.search(r'^["“‘]', quote) and re.search(r'["”’]$', quote):
+    #if re.search(r'^["“‘]', quote) and re.search(r'["”’]$', quote):
+    if re.search(r'^["“].*["”]$', quote) and len(re.findall(r'["“"”]', quote)) == 2:
       return add_pullquote(quote[1:-1])
   return '<blockquote style="border-left:3px solid {}; margin:1.5em 10px; padding:0.5em 10px;">{}</blockquote>'.format(border_color, quote)
 
@@ -686,7 +687,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   fig_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
   if width:
     fig_html += ' width:{};'.format(width)
-  else:
+  elif not re.search(r'width:\s?\d+', img_style):
     fig_html += ' width:auto; max-width:100%;'
     #fig_html += ' width:100%;'
   if height:
