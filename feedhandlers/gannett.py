@@ -107,8 +107,8 @@ def get_gallery_content(gallery_id, site_code):
             captions.append(image['asset']['caption'])
         if image['asset'].get('byline'):
             captions.append(image['asset']['byline'])
-        gallery_html += utils.add_image(img_src, ' | '.join(captions)) + '<br/>'
-    return gallery_html
+        gallery_html += utils.add_image(img_src, ' | '.join(captions))
+    return re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', gallery_html)
 
 
 def get_content(url, args, site_json, save_debug=False, article_json=None):
@@ -336,6 +336,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                     new_html = utils.add_embed(el['data-v-src'])
                 elif el['data-gl-method'] == 'loadOmny':
                     new_html = utils.add_embed(el['data-v-src'])
+                elif el['data-gl-method'] == 'loadInfogram':
+                    new_html = utils.add_embed('https://infogram.com/' + el['data-v-id'])
                 elif el['data-gl-method'] == 'loadHb64' and el.get('data-gl-hb64'):
                     data = base64.b64decode(el['data-gl-hb64']).decode('utf-8')
                     data_soup = BeautifulSoup(data, 'html.parser')
