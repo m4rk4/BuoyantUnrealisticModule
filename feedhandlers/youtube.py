@@ -70,47 +70,20 @@ def get_author_info(channel_id):
     return author
 
 
-def get_player_response(video_id, from_html=False):
+def get_player_response(video_id):
     player_response = None
     player_url = ''
-    if from_html:
-        page_html = utils.get_url_html('https://www.youtube.com/watch?v={}'.format(video_id))
-        if page_html:
-            # utils.write_file(page_html, './debug/youtube.html')
-            soup = BeautifulSoup(page_html, 'lxml')
-            el = soup.find('script', string=re.compile(r'var ytInitialPlayerResponse\s?='))
-            if el:
-                i = el.string.find('{')
-                j = el.string.rfind('}') + 1
-                player_response = json.loads(el.string[i:j])
-            m = re.search(r'"(?:PLAYER_JS_URL|jsUrl)"\s*:\s*"([^"]+)"', page_html)
-            if m:
-                player_url = 'https://www.youtube.com' + m.group(1)
-    else:
-        # https://github.com/user234683/youtube-local/blob/master/youtube/watch.py
-        context = {
-            "client": {
-                "hl": "en",
-                "gl": "US",
-                "clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
-                "clientVersion": "2.0",
-            },
-            # https://github.com/yt-dlp/yt-dlp/pull/575#issuecomment-887739287
-            "thirdParty": {
-                "embedUrl": "https://google.com",
-            }
-        }
-        player_url = 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8'
-        data = {
-            "videoId": video_id,
-            "context": context,
-            "params": "8AEB"
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Linux; Android 7.0; Redmi Note 4 Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Mobile Safari/537.36"
-        }
-        player_response = utils.post_url(player_url, json_data=data, headers=headers)
+    page_html = utils.get_url_html('https://www.youtube.com/watch?v={}'.format(video_id))
+    # utils.write_file(page_html, './debug/youtube.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', string=re.compile(r'var ytInitialPlayerResponse\s?='))
+    if el:
+        i = el.string.find('{')
+        j = el.string.rfind('}') + 1
+        player_response = json.loads(el.string[i:j])
+    m = re.search(r'"(?:PLAYER_JS_URL|jsUrl)"\s*:\s*"([^"]+)"', page_html)
+    if m:
+        player_url = 'https://www.youtube.com' + m.group(1)
     return player_response, player_url
 
 
@@ -152,12 +125,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['id'] = video_id
         item['url'] = 'https://www.youtube.com/watch?v=' + video_id
 
-        if 'embed' in args:
-            # Use api call, doesn't include the date
-            player_response, player_url = get_player_response(video_id, False)
-        else:
-            # Extract from html to get the upload date
-            player_response, player_url = get_player_response(video_id, True)
+        player_response, player_url = get_player_response(video_id)
         if not player_response:
             return None
         if save_debug:
@@ -203,7 +171,11 @@ def get_content(url, args, site_json, save_debug=False):
 
         item['_duration'] = format_duration(video_details['lengthSeconds'])
 
-        item['_image'] = 'https://i.ytimg.com/vi/{}/maxresdefault.jpg'.format(video_id)
+        image = utils.closest_dict(video_details['thumbnail']['thumbnails'], 'width', 1200)
+        if image:
+            item['_image'] = image['url']
+        else:
+            item['_image'] = 'https://i.ytimg.com/vi/{}/maxresdefault.jpg'.format(video_id)
 
         heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
