@@ -162,8 +162,9 @@ def get_item(content_data, args, site_json, save_debug=False):
             if not exists and media.get('externalId'):
                 exists = re.search(media['externalId'], item['content_html'])
             if not exists:
-                item['content_html'] += add_media(media) + '<br/>'
+                item['content_html'] += add_media(media)
 
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
