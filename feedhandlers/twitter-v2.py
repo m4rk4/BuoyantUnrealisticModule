@@ -1,4 +1,4 @@
-import dateutil, json, pytz, re
+import dateutil, json, pytz, re, requests
 from bs4 import BeautifulSoup
 from tweety.bot import Twitter
 from tweety.exceptions_ import *
@@ -54,7 +54,7 @@ def get_card(url, card):
             if img_src:
                 #print(caption, description)
                 return utils.add_image(img_src, caption, link=card_url,
-                                        img_style="border-top-left-radius:10px; border-top-right-radius:10px;",
+                                        img_style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;",
                                         fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;",
                                         desc=description)
             else:
@@ -142,7 +142,7 @@ def get_card(url, card):
     if card['name'] == 'summary_large_image' and img_src:
         caption = '<div style="margin-left:8px;">{}</div>'.format(domain)
         desc = '<div style="margin:8px;"><a href="{}"><b>{}</b></a><br/>{}</div>'.format(card_url, title, description)
-        card_html = utils.add_image(img_src, caption, link=card_url, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;", desc=desc)
+        card_html = utils.add_image(img_src, caption, link=card_url, img_style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;", desc=desc)
     elif card['name'] == 'player' or card['name'] == 'summary' or (card['name'] == 'summary_large_image' and not img_src):
         if img_src:
             img_src = '{}/image?url={}&crop=0&width=128'.format(config.server, quote_plus(img_src))
@@ -173,25 +173,219 @@ def get_card(url, card):
     return card_html
 
 
+def get_tokens():
+    tokens = {
+        "access_token": "",
+        "guest_token": ""
+    }
+    access_token = ''
+    guest_token = ''
+    r = requests.post("https://api.twitter.com/oauth2/token", params={"grant_type": "client_credentials"}, auth=("CjulERsDeqhhjSme66ECg", "IQWdVyqFxghAtURHGeGiWAsmCAGmdW3WmbEx6Hck"))
+    if r.status_code != 200:
+        logger.warning('status error {} getting access token'.format(r.status_code))
+        return tokens
+    tokens['access_token'] = r.json()['access_token']
+    headers = {
+        "Authorization": "Bearer {}".format(tokens['access_token']),
+        "x-guest-token": "",
+        "x-twitter-active-user": "yes",
+        "Referer": "https://twitter.com",
+        "user-agent": "",
+    }
+    r = requests.post("https://api.twitter.com/1.1/guest/activate.json", headers=headers)
+    if r.status_code != 200:
+        logger.warning('status error {} getting guest token'.format(r.status_code))
+        return tokens
+    tokens['guest_token'] = r.json()['guest_token']
+    return tokens
+
+
+def get_tweet_detail(tweet_id, tokens=None):
+    # https://github.com/zedeus/nitter/issues/919#issuecomment-1619298877
+    if not tokens:
+        tokens = get_tokens()
+    if not tokens.get('access_token') or not tokens.get('guest_token'):
+        return None
+    headers = {
+        "Authorization": "Bearer {}".format(tokens['access_token']),
+        "x-guest-token": tokens['guest_token'],
+        "x-twitter-active-user": "yes",
+        "Referer": "https://twitter.com",
+        "user-agent": "",
+    }
+
+    # https://github.com/zedeus/nitter/blob/0bc3c153d9b38a3c02f321fb64a375fef6b97e8e/src/consts.nim
+    features = {
+        "android_graphql_skip_api_media_color_palette": False,
+        "blue_business_profile_image_shape_enabled": False,
+        "creator_subscriptions_subscription_count_enabled": False,
+        "creator_subscriptions_tweet_preview_api_enabled": True,
+        "freedom_of_speech_not_reach_fetch_enabled": False,
+        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": False,
+        "hidden_profile_likes_enabled": False,
+        "highlights_tweets_tab_ui_enabled": False,
+        "interactive_text_enabled": False,
+        "longform_notetweets_consumption_enabled": True,
+        "longform_notetweets_inline_media_enabled": False,
+        "longform_notetweets_richtext_consumption_enabled": True,
+        "longform_notetweets_rich_text_read_enabled": False,
+        "responsive_web_edit_tweet_api_enabled": False,
+        "responsive_web_enhance_cards_enabled": False,
+        "responsive_web_graphql_exclude_directive_enabled": True,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "responsive_web_graphql_timeline_navigation_enabled": False,
+        "responsive_web_media_download_video_enabled": False,
+        "responsive_web_text_conversations_enabled": False,
+        "responsive_web_twitter_article_tweet_consumption_enabled": False,
+        "responsive_web_twitter_blue_verified_badge_is_enabled": True,
+        "rweb_lists_timeline_redesign_enabled": True,
+        "spaces_2022_h2_clipping": True,
+        "spaces_2022_h2_spaces_communities": True,
+        "standardized_nudges_misinfo": False,
+        "subscriptions_verification_info_enabled": True,
+        "subscriptions_verification_info_reason_enabled": True,
+        "subscriptions_verification_info_verified_since_enabled": True,
+        "super_follow_badge_privacy_enabled": False,
+        "super_follow_exclusive_tweet_notifications_enabled": False,
+        "super_follow_tweet_api_enabled": False,
+        "super_follow_user_api_enabled": False,
+        "tweet_awards_web_tipping_enabled": False,
+        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
+        "tweetypie_unmention_optimization_enabled": False,
+        "unified_cards_ad_metadata_container_dynamic_card_content_query_enabled": False,
+        "verified_phone_label_enabled": False,
+        "vibe_api_enabled": False,
+        "view_counts_everywhere_api_enabled": False
+    }
+    variables = {
+        "focalTweetId": tweet_id,
+        "with_rux_injections": True,
+        "includePromotedContent": False,
+        "withCommunity": False,
+        "withQuickPromoteEligibilityTweetFields": False,
+        "withBirdwatchNotes": False,
+        "withSuperFollowsUserFields": False,
+        "withDownvotePerspective": False,
+        "withReactionsMetadata": False,
+        "withReactionsPerspective": False,
+        "withSuperFollowsTweetFields": False,
+        "withVoice": True,
+        "withV2Timeline": True
+    }
+    field_toggles = {
+        "withArticleRichContentState": False
+    }
+    r = requests.get("https://api.twitter.com/graphql/XjlydVWHFIDaAUny86oh2g/TweetDetail", headers=headers,
+            params={"features": json.dumps(features), "variables": json.dumps(variables), "fieldToggles": json.dumps(field_toggles)})
+    if r.status_code != 200:
+        logger.warning('status error {} getting TweetDetail'.format(r.status_code))
+        return None
+    return r.json()
+
+
+def get_user_by_screen_name(screen_name, tokens):
+    if not tokens:
+        tokens = get_tokens()
+    if not tokens.get('access_token') or not tokens.get('guest_token'):
+        return None
+    headers = {
+        "Authorization": "Bearer {}".format(tokens['access_token']),
+        "x-guest-token": tokens['guest_token'],
+        "x-twitter-active-user": "yes",
+        "Referer": "https://twitter.com",
+        "user-agent": "",
+    }
+
+    features = {
+        "hidden_profile_likes_enabled": False,
+        "responsive_web_graphql_exclude_directive_enabled": True,
+        "verified_phone_label_enabled": False,
+        "subscriptions_verification_info_verified_since_enabled": True,
+        "highlights_tweets_tab_ui_enabled": True,
+        "creator_subscriptions_tweet_preview_api_enabled": True,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "responsive_web_graphql_timeline_navigation_enabled": True
+    }
+    variables = {
+        "screen_name": screen_name,
+        "withSafetyModeUserFields": True
+    }
+    r = requests.get("https://api.twitter.com/graphql/oUZZZ8Oddwxs8Cd3iW3UEA/UserByScreenName", headers=headers,
+                     params={"features": json.dumps(features), "variables": json.dumps(variables)})
+    if r.status_code != 200:
+        logger.warning('status error {} getting UserByScreenName'.format(r.status_code))
+        return None
+    return r.json()
+
+
+def get_user_tweets_and_replies(user_id, tokens):
+    if not tokens:
+        tokens = get_tokens()
+    if not tokens.get('access_token') or not tokens.get('guest_token'):
+        return None
+    headers = {
+        "Authorization": "Bearer {}".format(tokens['access_token']),
+        "x-guest-token": tokens['guest_token'],
+        "x-twitter-active-user": "yes",
+        "Referer": "https://twitter.com",
+        "user-agent": "",
+    }
+
+    features = {
+        "responsive_web_twitter_blue_verified_badge_is_enabled": True,
+        "responsive_web_graphql_exclude_directive_enabled": True,
+        "verified_phone_label_enabled": False,
+        "responsive_web_graphql_timeline_navigation_enabled": True,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "tweetypie_unmention_optimization_enabled": True,
+        "vibe_api_enabled": True,
+        "responsive_web_edit_tweet_api_enabled": True,
+        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+        "view_counts_everywhere_api_enabled": True,
+        "longform_notetweets_consumption_enabled": True,
+        "tweet_awards_web_tipping_enabled": False,
+        "freedom_of_speech_not_reach_fetch_enabled": False,
+        "standardized_nudges_misinfo": True,
+        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
+        "interactive_text_enabled": True,
+        "responsive_web_text_conversations_enabled": False,
+        "longform_notetweets_richtext_consumption_enabled": False,
+        "responsive_web_enhance_cards_enabled": False
+    }
+    variables = {
+        "userId": user_id,
+        "count": 40,
+        "includePromotedContent": True,
+        "withCommunity": True,
+        "withSuperFollowsUserFields": True,
+        "withDownvotePerspective": False,
+        "withReactionsMetadata": False,
+        "withReactionsPerspective": False,
+        "withSuperFollowsTweetFields": True,
+        "withVoice": True,
+        "withV2Timeline": True
+    }
+    r = requests.get("https://api.twitter.com/graphql/pNl8WjKAvaegIoVH--FuoQ/UserTweetsAndReplies", headers=headers,
+                     params={"features": json.dumps(features), "variables": json.dumps(variables)})
+    if r.status_code != 200:
+        logger.warning('status error {} getting UserTweetsAndReplies'.format(r.status_code))
+        return None
+    return r.json()
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     tweet_id = paths[2]
-    tweet_json = None
-    try:
-        app = Twitter()
-        tweet_json = app.request.get_tweet_detail(tweet_id)
-    except InvalidTweetIdentifier:
-        # InvalidTweetIdentifier: https://twitter.com/CavortingJames/status/889071264576548865
-        logger.debug('tweety exception InvalidTweetIdentifier for ' + url)
-        item = {}
-        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td><div style="line-height:3em;"><a href="{}"><b>Tweet not found or invalid.</b></a></div></td></tr></table>'.format(url)
-        return item
-    except Exception as e:
-        logger.warning('tweety exception error: {}'.format(e))
+
+    tokens = {}
+    if args.get('access_token'):
+        tokens['access_token'] = args['access_token']
+    if args.get('guest_token'):
+        tokens['guest_token'] = args['guest_token']
+    tweet_json = get_tweet_detail(tweet_id, tokens)
     if not tweet_json:
         return None
-    #tweet_json = json.loads(tweet_detail)
     if save_debug:
         if 'embed' in args:
             utils.write_file(tweet_json, './debug/twitter.json')
@@ -361,33 +555,34 @@ def get_tweet(tweet_result, tweet=None, user=None, is_thread=False, is_retweet=F
             avatar, user['screen_name'], user['name'], checkmark, user['screen_name'])
         item['content_html'] += '<tr><td colspan="2"><div>{}</div>'.format(body)
 
+    media_list = []
+    if tweet.get('extended_entities') and tweet['extended_entities'].get('media'):
+        media_list = tweet['extended_entities']['media'].copy()
     if tweet['entities'].get('media'):
         for media in tweet['entities']['media']:
+            if not next((it for it in media_list if it['id_str'] == media['id_str']), None):
+                media_list.append(media)
+    if media_list:
+        for media in media_list:
             item['content_html'] += '<div>&nbsp;</div>'
-            ext_media = None
-            if tweet.get('extended_entities') and tweet['extended_entities']['media']:
-                ext_media = next((it for it in tweet['extended_entities']['media'] if it['id_str'] == media['id_str']), None)
-                if ext_media:
-                    if ext_media['type'] == 'animated_gif' or ext_media['type'] == 'video':
-                        videos = []
-                        for it in ext_media['video_info']['variants']:
-                            if it['content_type'] == 'video/mp4':
-                                videos.append(it)
-                        video = utils.closest_dict(videos, 'bitrate', 1000000)
-                        item['content_html'] += utils.add_video(video['url'], video['content_type'], ext_media['media_url_https'])
-                    elif ext_media['type'] == 'photo':
-                        item['content_html'] += utils.add_image(media['media_url_https'])
-                    else:
-                        logger.warning('unhandled extended media type ' + ext_media['type'])
-            if not ext_media:
-                if media['type'] == 'photo':
-                    item['content_html'] += utils.add_image(media['media_url_https'])
-                elif ext_media['type'] == 'video':
-                    item['content_html'] += utils.add_video(media['streams'][0]['url'],
-                                                            media['streams'][0]['content_type'],
-                                                            media['media_url_https'])
+            if media['type'] == 'photo':
+                item['content_html'] += utils.add_image(media['media_url_https'], img_style="width:100%; border-radius:10px;")
+            elif media['type'] == 'video' or media['type'] == 'animated_gif':
+                video = None
+                if media['video_info'].get('variants'):
+                    videos = []
+                    for it in media['video_info']['variants']:
+                        if it['content_type'] == 'video/mp4':
+                            videos.append(it)
+                    video = utils.closest_dict(videos, 'bitrate', 1000000)
+                elif media.get('streams'):
+                    video = media['streams'][0]
+                if video:
+                    item['content_html'] += utils.add_video(video['url'], video['content_type'], media['media_url_https'], img_style="width:100%; border-radius:10px;")
                 else:
-                    logger.warning('unhandled media type ' + media['type'])
+                    logger.warning('unhandled video media')
+            else:
+                logger.warning('unhandled media type ' + media['type'])
             item['content_html'] = item['content_html'].replace(media['url'], '')
 
     card = None
@@ -434,14 +629,15 @@ def get_feed(url, args, site_json, save_debug=False):
     query = parse_qs(split_url.query)
     if len(paths) == 1 and 'search' not in paths:
         # User tweets
-        app = Twitter(paths[0])
-        user_info = app.get_user_info()
+        tokens = get_tokens()
+        user_info = get_user_by_screen_name(paths[0], tokens)
+        if save_debug:
+            utils.write_file(user_info, './debug/twitter.json')
         if user_info:
-            tweets = app.request.get_tweets(user_info['rest_id'])
-            if tweets:
-                tweets_json = json.loads(tweets.content)
+            tweets_json = get_user_tweets_and_replies(user_info['data']['user']['result']['rest_id'], tokens)
+            if tweets_json:
                 if save_debug:
-                    utils.write_file(tweets_json, './debug/twitter.json')
+                    utils.write_file(tweets_json, './debug/feed.json')
                 instruction = next((it for it in tweets_json['data']['user']['result']['timeline_v2']['timeline']['instructions'] if it['type'] == 'TimelineAddEntries'), None)
                 if instruction:
                     n = 0
@@ -461,7 +657,7 @@ def get_feed(url, args, site_json, save_debug=False):
                                         if n == int(args['max']):
                                             break
                     feed = utils.init_jsonfeed(args)
-                    feed['title'] = '{} | Twitter'.format(user_info['screen_name'])
+                    feed['title'] = '{} | Twitter'.format(user_info['data']['user']['result']['legacy']['screen_name'])
                     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     elif 'hashtag' in paths or 'search' in paths:
         filter_ = None
@@ -492,6 +688,7 @@ def get_feed(url, args, site_json, save_debug=False):
                     user = tweets_json['globalObjects']['users'][tweet['user_id_str']]
                     if save_debug:
                         logger.debug('getting content for tweet ' + tweet['id_str'])
+
                     item = get_tweet(None, tweet, user)
                     if item:
                         item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">' + item['content_html'] + '</table>'

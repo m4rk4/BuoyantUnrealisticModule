@@ -297,30 +297,28 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
     tweet_url = 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_json['id_str'])
 
     if is_parent or is_reply:
+        avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
         border = ' border-left:2px solid rgb(196, 207, 214);'
         if is_reply == 1:
             border = ''
-        tweet_html = '<tr style="font-size:0.9em;"><td style="width:56px;"><img style="width:48px; height:48px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
-            tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'],
-            tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
+        tweet_html = '<tr style="font-size:0.9em;"><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
+            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
         tweet_html += '<tr><td colspan="2" style="padding:0 0 0 24px;">'
-        tweet_html += '<table style="font-size:0.9em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(
-            border, text_html)
+        tweet_html += '<table style="font-size:0.9em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(border, text_html)
         tweet_html += '<tr><td>{}</td></tr></table></tr></td>'.format(media_html)
     elif is_quoted:
-        tweet_html = '<table style="font-size:0.9em; width:95%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img style="width:32px; height:32px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
-            tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'],
-            tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
+        avatar = '{}/image?url={}&width=32&height=32&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
+        tweet_html = '<table style="font-size:0.9em; width:95%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
+            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
         tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(text_html)
         tweet_html += '<tr><td colspan="2">{}</td></tr></table>'.format(media_html)
     else:
-        tweet_html = '<tr><td style="width:56px;"><img style="width:48px; height:48px; border-radius:50%;" src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3}<br /><small>@{1}</small></a></td></tr>'.format(
-            tweet_json['user']['profile_image_url_https'], tweet_json['user']['screen_name'],
-            tweet_json['user']['name'], verified_icon)
+        avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
+        tweet_html = '<tr><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3}<br /><small>@{1}</small></a></td></tr>'.format(
+            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon)
         tweet_html += '<tr><td colspan="2" style="padding:0 0 1em 0;">{}</td></tr>'.format(text_html)
         tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(media_html)
-        tweet_html += '<tr><td colspan="2"><a style="text-decoration:none;" href="{}"><small>{} · {}</small></a></td></tr>'.format(
-            tweet_url, tweet_time, tweet_date)
+        tweet_html += '<tr><td colspan="2"><a style="text-decoration:none;" href="{}"><small>{} · {}</small></a></td></tr>'.format(tweet_url, tweet_time, tweet_date)
 
     return tweet_html
 
@@ -380,6 +378,10 @@ def get_content(url, args, site_json, save_debug=False):
                 if r.status_code == 200:
                     utils.write_file(r.json, './debug/twitter_api.json')
 
+    tweet_json = get_tweet_detail(tweet_id)
+    if tweet_json:
+        utils.write_file(tweet_json, './debug/tweet.json')
+
     tweet_json = get_tweet_json(tweet_id)
     if not tweet_json:
         return None
@@ -390,7 +392,8 @@ def get_content(url, args, site_json, save_debug=False):
         tweet_user = tweet_json['user']['screen_name']
         clean_url = 'https://twitter.com/{}/status/{}'.format(tweet_user, tweet_id)
 
-    content_html = '<table style="width:80%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+    # content_html = '<table style="width:80%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+    content_html = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
 
     item = {}
     item['id'] = tweet_id
