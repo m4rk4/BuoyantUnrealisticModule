@@ -110,10 +110,12 @@ def render_content(content):
             content_html += '<p>{}</p>'.format(value)
 
     elif content['type'] == 'Header':
-        content_html += '<h{}>'.format(content['level'])
+        value = ''
         for it in content['value']:
-            content_html += render_content(it)
-        content_html += '</h{}>'.format(content['level'])
+            value += render_content(it)
+        if re.search(r'^Related:\s*<a\s', value, flags=re.I):
+            return ''
+        content_html += '<h{0}>{1}</h{0}>'.format(content['level'], value)
 
     elif content['type'] == 'LineBreak':
         content_html += '<br />'
