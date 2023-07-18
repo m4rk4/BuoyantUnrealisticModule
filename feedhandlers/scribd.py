@@ -49,14 +49,18 @@ def get_content(url, args, site_json, save_debug=False):
             item['author'] = {"name": embed_props['user']['name']}
         content_url = '{}?start_page=1&view_mode=scroll&access_key={}'.format(embed_props['embed_path'], embed_props['access_key'])
 
-    if not item.get('_image'):
-        if image:
-            item['_image'] = image
-        else:
-            item['_image'] = '{}/image?width=128&height=160'.format(config.server)
+    if not item.get('_image') and image:
+        item['_image'] = image
 
-    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content_url, item['_image'], item['url'], item['title'])
-    if item.get('summary'):
-        item['content_html'] += '<div style="font-size:0.9em;">{}</div>'.format(item['summary'])
-    item['content_html'] += '<div style="font-size:0.7em;">www.scribd.com</div></td></tr></table>'
+    if item.get('_image'):
+        caption = '<a href="{}">{}</a> (www.scribd.com)'.format(item['url'], item['title'])
+        if item.get('summary'):
+            caption += ' | ' + item['summary']
+        item['content_html'] = utils.add_image(item['_image'], caption)
+    else:
+        poster = '{}/image?width=128&height=160'.format(config.server)
+        item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content_url, poster, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<div>{}</div>'.format(item['summary'])
+            item['content_html'] += '<div style="font-size:0.8em;">www.scribd.com</div></td></tr></table>'
     return item
