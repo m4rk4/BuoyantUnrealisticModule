@@ -1926,7 +1926,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1073,
+        "deployment": 1077,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -5088,7 +5088,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "jl8hY7JU1Z7Psvs1dA_Ug",
+        "buildId": "z9qpxNNdmsa1n1T65ggOp",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -10447,7 +10447,12 @@
             "skip_wp_user": true
         },
         "decompose": [
-            {"tag": "svg", "attrs": {"class": "w-10"}}
+            {
+                "attrs": {
+                    "class": "w-10"
+                },
+                "tag": "svg"
+            }
         ],
         "feeds": [
             "https://stackdiary.com/feed"
