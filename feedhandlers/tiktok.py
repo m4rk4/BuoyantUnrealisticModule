@@ -1,4 +1,4 @@
-import base64, random, re
+import base64, random, re, requests
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from datetime import datetime
@@ -261,7 +261,8 @@ def get_item(item_info, args, site_json, save_debug):
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}<br/><small>{}</small></div><div style="clear:left;"></div></div>'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
 
-    item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
+    #item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
 
     if item.get('summary'):
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
@@ -269,7 +270,7 @@ def get_item(item_info, args, site_json, save_debug):
     if music_info:
         item['content_html'] += '<p>&#127925;&nbsp;{}</p>'.format(music_info)
 
-    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=480, img_style='border-radius:10px;')
+    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='border-radius:10px; width:100%;')
     item['content_html'] += '<br/><a href="{}"><small>Open in TikTok</small></a></td></tr></table>'.format(item['url'])
     return item
 
@@ -292,7 +293,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item_detail = get_item_detail(video_id)
     if save_debug:
-        utils.write_file(item_detail, './debug/video.json')
+        utils.write_file(item_detail, './debug/tiktok.json')
     return get_item(item_detail['itemInfo']['itemStruct'], args, site_json, save_debug)
 
 

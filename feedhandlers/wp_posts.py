@@ -301,6 +301,8 @@ def get_post_content(post, args, site_json, save_debug=False):
         el = soup.find('script', class_='yoast-schema-graph')
         if el:
             yoast_json = json.loads(el.string)
+    if yoast_json and save_debug:
+        utils.write_file(yoast_json, './debug/yoast.json')
 
     item = {}
     item['id'] = post['guid']['rendered']
@@ -459,13 +461,16 @@ def get_post_content(post, args, site_json, save_debug=False):
                             if it.get('name'):
                                 item['tags'].append(it['name'])
     if yoast_json:
-        it = next((it for it in yoast_json['@graph'] if it.get('keywords')), None)
-        if it:
-            for tag in it['keywords']:
-                if tag.startswith('category-'):
-                    item['tags'] += tag.split('/')[1:]
-                else:
-                    item['tags'].append(tag)
+        keywords = next((it['keywords'] for it in yoast_json['@graph'] if it.get('keywords')), None)
+        if keywords:
+            if isinstance(keywords, list):
+                for tag in keywords:
+                    if tag.startswith('category-'):
+                        item['tags'] += tag.split('/')[1:]
+                    else:
+                        item['tags'].append(tag)
+            elif isinstance(keywords, str):
+                item['tags'] += [tag.strip() for tag in keywords.split(',')]
     if post.get('parsely') and post['parsely'].get('meta') and post['parsely']['meta'].get('keywords'):
         item['tags'] = post['parsely']['meta']['keywords'].copy()
     elif post.get('parselyMeta') and post['parselyMeta'].get('parsely-tags'):

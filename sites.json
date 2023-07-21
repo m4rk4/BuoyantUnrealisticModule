@@ -411,6 +411,19 @@
         ],
         "module": "nine"
     },
+    "aier": {
+        "feeds": [
+            "https://www.aier.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": {
+            "article": "/wp/v2/article",
+            "book": "/wp/v2/book",
+            "chapter": "/wp/v2/chapter",
+            "research-publication": "/wp/v2/research-publication"
+        },
+        "wpjson_path": "https://www.aier.org/wp-json"
+    },
     "ajc": {
         "api_url": "https://www.ajc.com/pf/api/v3/content/fetch/",
         "arc_site": "ajc",
@@ -3147,6 +3160,58 @@
         ],
         "module": "vox"
     },
+    "daytondailynews": {
+        "api_url": "https://www.daytondailynews.com/pf/api/v3/content/fetch/",
+        "arc_site": "dayton-daily-news",
+        "author_feed": {
+            "query": {
+                "arc-site": "dayton-daily-news",
+                "arcSite": "dayton-daily-news",
+                "id": "AUTHOR",
+                "size": 10,
+                "uri": "PATH"
+            },
+            "source": "author-stories-list"
+        },
+        "content": {
+            "query": {
+                "arc-site": "dayton-daily-news",
+                "id": "ID",
+                "path": "PATH",
+                "published": "false",
+                "uri": "PATH"
+            },
+            "source": "content-api"
+        },
+        "deployment": 297,
+        "homepage_feed": {
+            "query": {
+                "arc-site": "dayton-daily-news"
+            },
+            "source": "nudge-api"
+        },
+        "module": "fusion",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "resizer_url": "https://www.daytondailynews.com/resizer/",
+        "section_feed": {
+            "query": {
+                "arcSite": "dayton-daily-news",
+                "includeContentTypes": "story, gallery, video",
+                "includeSections": "PATH",
+                "size": 10
+            },
+            "source": "query-feed"
+        },
+        "tag_feed": {
+            "query": {
+                "arcSite": "dayton-daily-news",
+                "includeContentTypes": "story, gallery, flatpage, video",
+                "includeTags": "PATH",
+                "size": 10
+            },
+            "source": "query-feed"
+        }
+    },
     "dcnewsnow": {
         "args": {
             "skip_wp_user": true
@@ -4624,6 +4689,14 @@
             "https://www.gamesradar.com/totalfilm"
         ],
         "module": "future"
+    },
+    "gamingalexandria": {
+        "feeds": [
+            "https://www.gamingalexandria.com/wp/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.gamingalexandria.com/wp/wp-json"
     },
     "gamingbible": {
         "channel": "gamingbible",
@@ -6255,6 +6328,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://lakersdaily.com/wp-json"
     },
+    "lamag": {
+        "feeds": [
+            "https://www.lamag.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.lamag.com/wp-json"
+    },
     "lancasteronline": {
         "feeds": [
             "https://lancasteronline.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
@@ -6413,6 +6494,14 @@
             },
             "source": "tag-feed-api"
         }
+    },
+    "leonardmaltin": {
+        "feeds": [
+            "https://leonardmaltin.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://leonardmaltin.com/wp-json"
     },
     "leoweekly": {
         "feeds": [
@@ -9482,6 +9571,15 @@
         "module": "gannett",
         "site_code": "NREC"
     },
+    "recordedfuture": {
+        "buildId": "lIaa720EWqqe5BTE28lRm",
+        "feeds": [
+            "https://www.recordedfuture.com/feed"
+        ],
+        "image_cms": "https://cms.recordedfuture.com",
+        "locale": "en",
+        "module": "rec_future"
+    },
     "reddit": {
         "module": "reddit"
     },
@@ -9957,6 +10055,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://securityintelligence.com/wp-json"
+    },
+    "securityweek": {
+        "feeds": [
+            "https://www.securityweek.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.securityweek.com/wp-json"
     },
     "seeedstudio": {
         "feeds": [
@@ -11895,6 +12001,15 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://theportager.com/wp-json"
+    },
+    "therecord": {
+        "buildId": "RSA7kKSy9d1okPCczeKQ4",
+        "feeds": [
+            "https://therecord.media/feed"
+        ],
+        "image_cms": "https://cms.therecord.media",
+        "locale": "",
+        "module": "rec_future"
     },
     "theregister": {
         "feeds": [

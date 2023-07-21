@@ -440,6 +440,14 @@ def get_content(url, args, site_json, save_debug=False):
                                     if not new_html:
                                         logger.warning('unhandled dynamic-inset-iframe parallax-gallery item in ' + iframe_url)
 
+                                elif iframe_json['subType'] == 'before-after':
+                                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                                    new_html += '<div style="flex:1; max-width:400px; min-width:256px; margin:auto;">'
+                                    new_html += utils.add_image(iframe_json['serverside']['data']['data']['items'][0]['data']['media'], iframe_json['serverside']['data']['data']['items'][0]['data']['label'])
+                                    new_html += '</div><!-- --><div style="flex:1; max-width:400px; min-width:256px; margin:auto;">'
+                                    new_html += utils.add_image(iframe_json['serverside']['data']['data']['items'][1]['data']['media'], iframe_json['serverside']['data']['data']['items'][1]['data']['label'])
+                                    new_html += '</div></div><!-- --><div><small>{}</small></div>'.format(iframe_json['serverside']['data']['data']['data']['caption'])
+
                                 elif iframe_json['subType'] == 'series-navigation':
                                     new_html = '<h4>{}</h4><ul>'.format(iframe_json['serverside']['data']['data']['data']['title'])
                                     for it in iframe_json['serverside']['data']['data']['items']:

@@ -686,12 +686,14 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
 
   fig_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
   if width:
-    fig_html += ' width:{};'.format(width)
+    if width != '0':
+      fig_html += ' width:{};'.format(width)
   elif not re.search(r'width:\s?\d+', img_style):
     fig_html += ' width:auto; max-width:100%;'
     #fig_html += ' width:100%;'
   if height:
-    fig_html += ' height:{};'.format(height)
+    if height != '0':
+      fig_html += ' height:{};'.format(height)
   else:
     fig_html += ' max-height:800px;'
   if img_style:

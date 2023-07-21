@@ -490,6 +490,8 @@ def get_item(content, url, args, site_json, save_debug):
         date = content['last_updated_date']
     elif content.get('updated_time'):
         date = content['updated_time']
+    elif content.get('display_date'):
+        date = content['display_date']
     if date:
         dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
         item['date_modified'] = dt.isoformat()
@@ -576,7 +578,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     for n in range(2):
         query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
-        if 'ajc.com' in split_url.netloc:
+        if re.search(r'ajc\.com|daytondailynews\.com', split_url.netloc):
             query = query.replace('ID', paths[-1])
         api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:

@@ -33,7 +33,7 @@ def get_content(url, args, site_json, save_debug=False):
             page_html = utils.get_url_html(url)
             if not page_html:
                 return None
-            m = re.search(r'https://lh3.googleusercontent.com/drive-viewer/[^"]+', page_html)
+            m = re.search(r'https://lh3\.googleusercontent\.com/drive-viewer/[^"]+', page_html)
             if m:
                 item['_image'] = m.group(0).encode('utf-8').decode('unicode_escape')
                 soup = BeautifulSoup(page_html, 'lxml')

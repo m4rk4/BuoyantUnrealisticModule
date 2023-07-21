@@ -131,7 +131,7 @@ def render_content(content):
     for child in content['children']:
         #print(child['name'])
 
-        if re.search(r'\b(advertising|byline|pagination|sidebar|social)\b', child['name']) or (child['name'] == 'dianomi' and child['config']['type'] == 'sidebar'):
+        if re.search(r'\b(advertising|byline|favorites-list|pagination|sidebar|social)\b', child['name']) or (child['name'] == 'dianomi' and child['config']['type'] == 'sidebar'):
             continue
 
         if 'hero' in child['name']:
@@ -290,6 +290,9 @@ def render_content(content):
                 content_html += '</table></figure><br/>'
             else:
                 content_html += '<blockquote>Unable to get historical data</blockquote><br/>'
+
+        elif child['name'] == 'dianomi' and child.get('config') and child['config'].get('type') and (child['config']['type'] == 'footer' or child['config']['type'] == 'sidebar'):
+            continue
 
         else:
             logger.warning('unhandled content ' + child['name'])

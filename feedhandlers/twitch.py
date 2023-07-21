@@ -9,13 +9,123 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_clip_content(url, args, site_json, save_debug=False):
+    # https://clips.twitch.tv/SpunkyBloodySamosaDAESuppy-PG9fVWXVgXdMJ0St
+    # https://clips.twitch.tv/embed?clip=SpunkyBloodySamosaDAESuppy-PG9fVWXVgXdMJ0St&parent=www.example.com
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if 'embed' in paths:
+        url_query = parse_qs(split_url.query)
+        if url_query.get('clip'):
+            clip_slug = url_query['clip'][0]
+        else:
+            logger.warning('unknown clip slug in ' + url)
+            return None
+    else:
+        if split_url.path.endswith('/'):
+            clip_slug = split_url.path[1:-1]
+        else:
+            clip_slug = split_url.path[1:]
+
+    session = requests.Session()
+    r = session.get(url)
+    m = re.search(r'cliendId="([^"]+)"', r.text)
+    if m:
+        client_id = m.group(1)
+    else:
+        client_id = 'kimne78kx3ncx6brgo4mv6wki5h1ko'
+    cookies = session.cookies.get_dict()
+    device_id = cookies['unique_id']
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US",
+        "authorization": "undefined",
+        "cache-control": "no-cache",
+        "client-id": client_id,
+        "content-type": "text/plain; charset=UTF-8",
+        "device-id": device_id,
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Chromium\";v=\"106\", \"Microsoft Edge\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site"
+    }
+
+    item = {}
+    item['id'] = clip_slug
+    item['url'] = 'https://clips.twitch.tv/' + clip_slug
+
+    query = {
+        "operationName": "ClipsTitle",
+        "variables": {
+            "slug": clip_slug
+        },
+        "query": "query ClipsTitle($slug: ID!) {\nclip(slug: $slug) {\nid\ntitle\n}\n}"
+    }
+    r = session.post('https://gql.twitch.tv/gql', json=query, headers=headers)
+    if r.status_code == 200:
+        twitch_json = r.json()
+        #utils.write_file(twitch_json, './debug/twitch.json')
+        item['title'] = twitch_json['data']['clip']['title']
+
+    query = {
+        "operationName": "ClipsBroadcasterInfo",
+        "variables": {
+            "slug": clip_slug
+        },
+        "query": "query ClipsBroadcasterInfo($slug: ID!) {\nclip(slug: $slug) {\nid\ngame {\nid\nname\ndisplayName\n}\nbroadcaster {\nid\nprofileImageURL(width: 28)\ndisplayName\nlogin\nstream {\nid\n}\n}\n}\n}"
+    }
+    r = session.post('https://gql.twitch.tv/gql', json=query, headers=headers)
+    if r.status_code == 200:
+        twitch_json = r.json()
+        #utils.write_file(twitch_json, './debug/twitch.json')
+        item['author'] = {}
+        item['author']['name'] = twitch_json['data']['clip']['broadcaster']['displayName']
+        item['author']['url'] = 'https://www.twitch.tv/' + twitch_json['data']['clip']['broadcaster']['login']
+        item['author']['avatar'] = twitch_json['data']['clip']['broadcaster']['profileImageURL']
+
+    query = {
+        "operationName": "WatchLivePrompt",
+        "variables": {
+            "slug": clip_slug
+        },
+        "query": "query WatchLivePrompt($slug: ID!) {\nclip(slug: $slug) {\nid\ndurationSeconds\nbroadcaster {\nid\nlogin\ndisplayName\nstream {\nid\ngame {\ndisplayName\nid\n}\n}\n}\nthumbnailURL(width: 86 height: 45)\n}\n}"
+    }
+    r = session.post('https://gql.twitch.tv/gql', json=query, headers=headers)
+    if r.status_code == 200:
+        twitch_json = r.json()
+        #utils.write_file(twitch_json, './debug/twitch.json')
+        item['_image'] = twitch_json['data']['clip']['thumbnailURL']
+        item['content_html'] = utils.add_image(item['_image'])
+
+    query = {
+        "operationName": "ClipsDownloadButton",
+        "variables": {
+            "slug": clip_slug
+        },
+        "query": 'query ClipsDownloadButton($slug: ID!) {\nclip(slug: $slug) {\nid\nbroadcaster {\nid\n}\ngame {\nid\nname\n}\nplaybackAccessToken(params: {platform: "web" playerType: "clips-download"}) {\nsignature\nvalue\n}\nvideoQualities {\nsourceURL\n}\n}\n}'
+    }
+    r = session.post('https://gql.twitch.tv/gql', json=query, headers=headers)
+    if r.status_code == 200:
+        twitch_json = r.json()
+        #utils.write_file(twitch_json, './debug/twitch.json')
+        item['']
+        item['content_html'] = utils.add_image(item['_image'])
+        # https://production.assets.clips.twitchcdn.net/OjTnLTxvX1Vl1YF3TCdErQ/AT-cm%7COjTnLTxvX1Vl1YF3TCdErQ.mp4?sig=c984a15674271cfb342a190b7647758740fccf18&token=%7B%22authorization%22%3A%7B%22forbidden%22%3Afalse%2C%22reason%22%3A%22%22%7D%2C%22clip_uri%22%3A%22https%3A%2F%2Fproduction.assets.clips.twitchcdn.net%2FOjTnLTxvX1Vl1YF3TCdErQ%2FAT-cm%257COjTnLTxvX1Vl1YF3TCdErQ.mp4%22%2C%22device_id%22%3A%2241a8658450a45d04%22%2C%22expires%22%3A1688232630%2C%22user_id%22%3A%22%22%2C%22version%22%3A2%7D
+    return item
+
+
 def get_content(url, args, site_json, save_debug=False):
     # https://player.twitch.tv/?video=1639676672
     # https://player.twitch.tv/?channel=reddark_247
     video_id = ''
     channel_id = ''
     split_url = urlsplit(url)
-    if split_url.netloc == 'player.twitch.tv':
+    if split_url.netloc == 'clips.twitch.tv':
+        return get_clip_content(url, args, site_json, save_debug)
+    elif split_url.netloc == 'player.twitch.tv':
         query = parse_qs(split_url.query)
         if query.get('video'):
             video_id = query['video'][0]
