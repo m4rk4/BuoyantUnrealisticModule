@@ -146,7 +146,12 @@ def get_content(url, args, site_json, save_debug=False):
     for el in article.find_all('ins'):
         el.decompose()
 
+    if save_debug:
+        utils.write_file(str(article), './debug/debug.html')
+
     for el in article.children:
+        # print('\nchild')
+        print(el)
         if el.name == 'div':
             if el.has_attr('x-data'):
                 el.decompose()
@@ -156,8 +161,16 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
             elif el.h3 and re.search(r'Recommended by Our Editors', el.h3.get_text(), flags=re.I):
                 el.decompose()
+            elif el.find(class_=re.compile(r'hide-')) or el.find(class_=re.compile(r'commerce-')):
+                el.decompose()
+            elif el.find('iframe'):
+                it = el.find('iframe')
+                new_html = utils.add_embed(it['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_before(new_el)
+                el.decompose()
             elif el.find(id=re.compile(r'video-container-')):
-                video_json = None
+                new_html = ''
                 for it in el.parent.find_all('script'):
                     m = re.search(r'window\.videoEmbeds\.push\(\{.*data:\s(\{.*\}).*\}\);', str(it), flags=re.S)
                     if m:
@@ -175,13 +188,14 @@ def get_content(url, args, site_json, save_debug=False):
                             video['height'] = m.group(1)
                     if videos:
                         video_src = utils.closest_dict(videos, '480')
-                    new_el = BeautifulSoup(
-                        utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], video_json['title']),
-                        'html.parser')
+                        if video_src:
+                            new_html = utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], video_json['title'])
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
                     el.insert_before(new_el)
                     el.decompose()
                 else:
-                    logger.warning('unable to parse video json data in ' + url)
+                    logger.warning('unhandled video-container in ' + item['url'])
 
     if '/reviews/' in url:
         review_html = ''
@@ -255,7 +269,8 @@ def get_content(url, args, site_json, save_debug=False):
                     break
         item['content_html'] += utils.add_image(img_src, caption)
 
-    item['content_html'] += str(article)
+    item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', article.decode_contents())
+    item['content_html'] = re.sub(r'<hr/>\s*<hr/>', '<hr/>', item['content_html'])
     return item
 
 

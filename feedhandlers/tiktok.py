@@ -1,4 +1,5 @@
-import base64, random, re, requests
+import base64, json, random, re, requests
+from bs4 import BeautifulSoup
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from datetime import datetime
@@ -291,10 +292,115 @@ def get_content(url, args, site_json, save_debug=False):
         # url is the video id
         video_id = url
 
-    item_detail = get_item_detail(video_id)
+    #item_detail = get_item_detail(video_id)
+    embed_path = '/embed/v2/' + video_id
+    embed_url = 'https://www.tiktok.com' + embed_path
+    page_html = utils.get_url_html(embed_url)
+    if not page_html:
+        return None
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', id='__FRONTITY_CONNECT_STATE__')
+    if not el:
+        logger.warning('unable to find __FRONTITY_CONNECT_STATE__ in ' + embed_url)
+        return None
+    connect_state = json.loads(el.string)
+    video_data = connect_state['source']['data'][embed_path]['videoData']
     if save_debug:
-        utils.write_file(item_detail, './debug/tiktok.json')
-    return get_item(item_detail['itemInfo']['itemStruct'], args, site_json, save_debug)
+        utils.write_file(video_data, './debug/tiktok.json')
+
+    item_info = video_data['itemInfos']
+    author_info = video_data['authorInfos']
+    challenge_info = video_data['challengeInfoList']
+    music_info = video_data['musicInfos']
+    text_extra = video_data['textExtra']
+
+    item = {}
+    item['id'] = item_info['id']
+    item['url'] = 'https://www.tiktok.com/@{}/video/{}'.format(author_info['uniqueId'], item_info['id'])
+
+    item['title'] = '{} posted'.format(author_info['uniqueId'])
+    if item_info.get('text'):
+        #desc = item_info['text'].replace('#', ' #').replace('  ', ' ').strip()
+        item['summary'] = item_info['text']
+        if len(item['summary']) > 50:
+            item['title'] += ': ' + item['summary'][:50] + '...'
+        else:
+            item['title'] += ': ' + item['summary']
+        n = 0
+        for it in text_extra:
+            x = (len(item_info['text'][:it['Start']].encode('utf-16-le')) // 2) - len(item_info['text'][:it['Start']])
+            i = it['Start'] - x
+            j = it['End'] - x
+            txt = item_info['text'][i:j]
+            if it.get('HashtagName'):
+                new_txt = '<a href="https://www.tiktok.com/tag/{}">{}</a>'.format(it['HashtagName'], txt)
+            elif it.get('UserUniqueId'):
+                if it.get('AwemeId'):
+                    new_txt = '▶ <a href="https://www.tiktok.com/@{}/video/{}">{}</a>'.format(it['UserUniqueId'], it['AwemeId'], txt)
+                else:
+                    new_txt = '<a href="https://www.tiktok.com/@{}">{}</a>'.format(it['UserUniqueId'], txt)
+            i = i + n
+            j = j + n
+            item['summary'] = item['summary'][:i] + new_txt + item['summary'][j:]
+            n = n + len(new_txt) - len(txt)
+    else:
+        item['title'] = ' a TikTok'
+
+    item['author'] = {}
+    item['author']['name'] = '{} (@{})'.format(author_info['nickName'], author_info['uniqueId'])
+
+    if len(challenge_info) > 0:
+        item['tags'] = []
+        for challenge in challenge_info:
+            if not challenge['challengeName'] in item['tags']:
+                item['tags'].append(challenge['challengeName'])
+
+    item['_image'] = item_info['covers'][0]
+    item['_video'] = item_info['video']['urls'][0]
+
+    #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{}"/><div style="overflow:hidden;">{}<br/><small>{}</small></div><div style="clear:left;"></div></div>'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
+
+    #item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
+    #item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border-collapse:collapse; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td colspan="2" style="margin:0; padding:0 0 8px 0;">'
+
+    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='width:100%;')
+
+    avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(author_info['coversMedium'][0]))
+    item['content_html'] += '</td></tr><tr><td style="width:48px; padding:0 8px 0 8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.tiktok.com/@{1}"><b>{1}</b></a>'.format(avatar, author_info['uniqueId'])
+    if author_info['verified']:
+        item['content_html'] += '&nbsp;<small>&#9989</small>'
+    item['content_html'] += '<br/><small>{}</small>'.format(author_info['nickName'])
+
+    dt = None
+    if item_info['createTime'] != '0':
+        dt = datetime.fromtimestamp(int(item_info['createTime']))
+    else:
+        page_html = utils.get_url_html(item['url'])
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('script', id='SIGI_STATE')
+            if el:
+                sigi_state = json.loads(el.string)
+                if sigi_state['ItemModule'][item['id']]['createTime'] != 0:
+                    dt = datetime.fromtimestamp(int(sigi_state['ItemModule'][item['id']]['createTime']))
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        item['content_html'] += '&nbsp;&bull;&nbsp;<small>{}</small>'.format(utils.format_display_date(dt, False))
+
+    item['content_html'] += '</td></tr><tr><td colspan="2" style="padding:8px;">'
+
+    if item.get('summary'):
+        item['content_html'] += '<p>{}</p>'.format(item['summary'])
+
+    if music_info:
+        item['_audio'] = music_info['playUrl'][0]
+        item['content_html'] += '<p>&#127925;&nbsp;<a href="https://www.tiktok.com/music/{}-{}?lang=en">{} &ndash; {}</a></p>'.format(music_info['musicName'].replace(' ', '-'), music_info['musicId'], music_info['musicName'], music_info['authorName'])
+
+    item['content_html'] += '<div><a href="{}"><small>Open in TikTok</small></a></div></td></tr></table>'.format(item['url'])
+    return item
 
 
 def get_feed(url, args, site_json, save_debug=False):

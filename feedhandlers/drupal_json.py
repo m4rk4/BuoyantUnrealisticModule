@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import utils
 from feedhandlers import rss
@@ -17,7 +17,7 @@ def get_api_json(api_path, data_type, id, filters=''):
         api_url += '/{}'.format(id)
     if filters:
         api_url += '?{}'.format(filters)
-    #print(api_url)
+    print(api_url)
     #headers = {"cache-control": "max-age=0"}
     api_json = utils.get_url_json(api_url)
     return api_json
@@ -62,6 +62,10 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                 img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_path)
             elif field_json['data']['relationships'].get('image'):
                 img_src = get_field_data(field_json['data']['relationships']['image']['data'], api_path)
+            elif field_json['data']['relationships'].get('field_image'):
+                img_src = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path)
+            else:
+                logger.warning('unknown image source for {} {}'.format(field_json['data']['type'], field_json['data']['id']))
             return utils.add_image(img_src, ' | '.join(captions))
 
         elif field_json['data']['type'] == 'media--mpx_video':
@@ -95,12 +99,31 @@ def get_field_data(data, api_path, caption='', video_poster=''):
         elif field_json['data']['type'] == 'media--instagram':
             return utils.add_embed(field_json['data']['attributes']['field_media_instagram'])
 
+        elif field_json['data']['type'] == 'media--brightcove_video':
+            return get_field_data(field_json['data']['relationships']['field_media_brightcove_video']['data'], api_path)
+
+        elif field_json['data']['type'] == 'brightcove_video--brightcove_video':
+            player = get_field_data(field_json['data']['relationships']['player']['data'], api_path)
+            poster = get_field_data(field_json['data']['relationships']['poster']['data'], api_path)
+            m = re.search(r'v1_static_(\d+)', poster)
+            if m:
+                return utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(m.group(1), player, field_json['data']['attributes']['video_id']))
+            else:
+                logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
+
+        elif field_json['data']['type'] == 'brightcove_player--brightcove_player':
+            return field_json['data']['attributes']['player_id']
+
         elif field_json['data']['type'] == 'file--file':
             if field_json['data']['attributes']['uri']['url'].startswith('/'):
                 netloc = urlsplit(api_path).netloc
-                return 'https://{}{}'.format(netloc, field_json['data']['attributes']['uri']['url'])
+                file_url = 'https://{}{}'.format(netloc, field_json['data']['attributes']['uri']['url'])
             else:
-                return field_json['data']['attributes']['uri']['url']
+                file_url = field_json['data']['attributes']['uri']['url']
+            return file_url
+
+        else:
+            logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
     return ''
 
 
@@ -117,41 +140,52 @@ def get_drupal_settings(url):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    page_html = utils.get_url_html(url)
-    if not page_html:
-        return None
-
     drupal_settings = None
     page_type = ''
     node_id = ''
     uuid = ''
-    soup = BeautifulSoup(page_html, 'lxml')
-    el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
-    if el:
-        drupal_settings = json.loads(el.string)
-        if save_debug:
-            utils.write_file(drupal_settings, './debug/drupal.json')
-        try:
-            uuid = drupal_settings['adobeLaunchData']['data']['metainfo']['uuid']
-        except:
-            node_id = drupal_settings['path']['currentPath'].split('/')[-1]
 
-    if not uuid:
-        el = soup.find('node-article-full', attrs={"uuid": True})
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if site_json.get('translate_path'):
+        translate_url = '{}?path={}'.format(site_json['translate_path'], quote_plus(split_url.path))
+        translate_json = utils.get_url_json(translate_url)
+        if translate_json:
+            uuid = translate_json['entity']['uuid']
+            node_id = translate_json['entity']['id']
+            page_type = '{}--{}'.format(translate_json['entity']['type'], translate_json['entity']['bundle'])
+            #page_type = translate_json['jsonapi']['resourceName']
+    else:
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
         if el:
-            uuid = el['uuid']
+            drupal_settings = json.loads(el.string)
+            if save_debug:
+                utils.write_file(drupal_settings, './debug/drupal.json')
+            try:
+                uuid = drupal_settings['adobeLaunchData']['data']['metainfo']['uuid']
+            except:
+                node_id = drupal_settings['path']['currentPath'].split('/')[-1]
 
-    el = soup.find('body')
-    if el and el.get('class'):
-        m = re.search(r'node--?type-([^\s]+)', ' '.join(el['class']))
-        if m:
-            page_type = 'node--' + m.group(1)
-        if not node_id:
-            m = re.search(r'-node-(\d+)', ' '.join(el['class']))
+        if not uuid:
+            el = soup.find('node-article-full', attrs={"uuid": True})
+            if el:
+                uuid = el['uuid']
+
+        el = soup.find('body')
+        if el and el.get('class'):
+            m = re.search(r'node--?type-([^\s]+)', ' '.join(el['class']))
             if m:
-                node_id = m.group(1)
-    if not page_type and '/article/' in url:
-        page_type = 'node--article'
+                page_type = 'node--' + m.group(1)
+            if not node_id:
+                m = re.search(r'-node-(\d+)', ' '.join(el['class']))
+                if m:
+                    node_id = m.group(1)
+        if not page_type and '/article/' in url:
+            page_type = 'node--article'
 
     if not page_type:
         logger.warning('unknown page type for ' + url)
@@ -184,7 +218,12 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
 
     item = {}
     item['id'] = page_json['id']
-    item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, page_json['attributes']['path']['alias'])
+
+    if page_json['attributes'].get('metatag_normalized'):
+        item['url'] = next((it['attributes']['href'] for it in page_json['attributes']['metatag_normalized'] if (it['tag'] == 'link' and it['attributes']['rel'] == 'canonical')), None)
+    if not item.get('url'):
+        item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, page_json['attributes']['path']['alias'])
+
     item['title'] = page_json['attributes']['title']
 
     dt = datetime.fromisoformat(page_json['attributes']['created'])
@@ -205,7 +244,12 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
             data = page_json['relationships']['field_author']['data']
             api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
             if api_json:
-                authors.append(api_json['data']['attributes']['title'])
+                if api_json['data']['attributes'].get('title'):
+                    authors.append(api_json['data']['attributes']['title'])
+                elif api_json['data']['attributes'].get('name'):
+                    authors.append(api_json['data']['attributes']['name'])
+                else:
+                    logger.warning('unknown field_author data attributes')
     elif page_json['relationships'].get('field_article_author') and page_json['relationships']['field_article_author'].get('data'):
         if isinstance(page_json['relationships']['field_article_author']['data'], list):
             for data in page_json['relationships']['field_article_author']['data']:
@@ -225,6 +269,8 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
     item['author'] = {}
     if authors:
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    elif site_json.get('default_author'):
+        item['author']['name'] = site_json['default_author']
     else:
         item['author']['name'] = urlsplit(item['url']).netloc
 
@@ -270,8 +316,16 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_image') and page_json['relationships']['field_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_image']['data'][0], site_json['api_path'], caption=caption)
-        item['_image'], caption = get_img_src(data_html)
+        if isinstance(page_json['relationships']['field_image']['data'], list):
+            data = page_json['relationships']['field_image']['data'][0]
+        else:
+            data = page_json['relationships']['field_image']['data']
+        data_html = get_field_data(data, site_json['api_path'], caption=caption)
+        if data['type'] == 'file--file':
+            item['_image'] = data_html
+            data_html = utils.add_image(data_html, caption)
+        else:
+            item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], site_json['api_path'], caption=caption)
@@ -316,7 +370,59 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
             item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], site_json['api_path'])
             item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
 
-    elif page_json['type'] == 'node--article':
+    elif page_json['type'] == 'node--cars_car':
+        # https://www.topgear.com/car-reviews/hyundai/ioniq-5
+        if page_json['attributes'].get('field_cars_editor_title'):
+            item['title'] = page_json['attributes']['field_cars_editor_title']
+        item['content_html'] += '<h2><u>OVERVIEW</u></h2>'
+        if page_json['attributes'].get('field_cars_what_is_it'):
+            item['content_html'] += '<h2>What is it?</h2>' + page_json['attributes']['field_cars_what_is_it']['processed']
+        if page_json['attributes'].get('field_cars_verdict'):
+            item['content_html'] += '<h2>What\'s the verdict?</h2>'
+            if page_json['attributes'].get('field_cars_verdict_text'):
+                item['content_html'] += utils.add_pullquote(page_json['attributes']['field_cars_verdict_text'])
+            item['content_html'] += page_json['attributes']['field_cars_verdict']['processed']
+        item['content_html'] += '<hr/><h2><u>DRIVING</u></h2>'
+        if page_json['attributes'].get('field_cars_driving'):
+            item['content_html'] += '<h2>What is it like to drive?</h2>' + page_json['attributes']['field_cars_driving']['processed']
+        item['content_html'] += '<hr/><h2><u>INTERIOR</u></h2>'
+        if page_json['attributes'].get('field_cars_inside'):
+            item['content_html'] += '<h2>What is it like to drive?</h2>' + page_json['attributes']['field_cars_inside']['processed']
+        item['content_html'] += '<hr/><h2><u>BUYING</u></h2>'
+        if page_json['attributes'].get('field_cars_owning'):
+            item['content_html'] += '<h2>What is it like to drive?</h2>' + page_json['attributes']['field_cars_owning']['processed']
+        item['content_html'] += '<hr/><h2><u>SPECS</u></h2><p><a href="{}/specs">View current specs and prices.</a></p>'.format(item['url'])
+        lede_html = ''
+        if page_json['relationships'].get('field_carousel_media') and page_json['relationships']['field_carousel_media'].get('data'):
+            item['content_html'] += '<hr/><h2><u>GALLERY</u></h2>'
+            for i, data in enumerate(page_json['relationships']['field_carousel_media']['data']):
+                if i == 0:
+                    if data['type'] != 'media--image':
+                        lede_html = get_field_data(data, site_json['api_path'])
+                    else:
+                        item['content_html'] += get_field_data(data, site_json['api_path'])
+                else:
+                    item['content_html'] += get_field_data(data, site_json['api_path'])
+        if not lede_html:
+            data = get_field_data(page_json['relationships']['field_image']['data'], site_json['api_path'])
+            if data.startswith('http'):
+                lede_html += utils.add_image(data)
+            else:
+                lede_html += data
+        if page_json['attributes'].get('field_cars_stand_first'):
+            lede_html = '<p><em>{}</em></p>'.format(page_json['attributes']['field_cars_stand_first']) + lede_html
+        lede_html += '<div>&nbsp;</div><div style="text-align:center; font-size:1.5em; font-weight:bold;">{}</div><div style="text-align:center;"><span style="font-size:2em; font-weight:bold;">{}</span>&nbsp;/10</div>'.format(page_json['attributes']['title'], page_json['attributes']['field_cars_rating'])
+        if page_json['attributes'].get('field_cars_what_we_say'):
+            lede_html += '<p><b>{}</b></p>'.format(page_json['attributes']['field_cars_what_we_say'])
+        if page_json['attributes'].get('field_cars_verdict_for'):
+            lede_html += '<p><b>GOOD STUFF:</b><br/>{}</p>'.format(page_json['attributes']['field_cars_verdict_for'])
+        if page_json['attributes'].get('field_cars_verdict_against'):
+            lede_html += '<p><b>BAD STUFF:</b><br/>{}</p>'.format(page_json['attributes']['field_cars_verdict_against'])
+        if page_json['attributes'].get('tg_price_range_field'):
+            lede_html += '<p><b>PRICE:</b><br/>£{:,.0f} &ndash; £{:,.0f}</p>'.format(float(page_json['attributes']['tg_price_range_field']['min_price_range']), float(page_json['attributes']['tg_price_range_field']['max_price_range']))
+        item['content_html'] = lede_html + '<hr/>' + item['content_html']
+
+    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--cars_road_test':
         if page_json['attributes'].get('field_introduction'):
             item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_introduction'])
 
@@ -364,6 +470,28 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                     el.decompose()
                 else:
                     logger.warning('unhandled data-embed-button {} in {}'.format(el['data-embed-button'], item['url']))
+
+            for el in body_soup.find_all('div', class_='media'):
+                new_html = ''
+                if 'media--type-image' in el['class']:
+                    it = el.find('img')
+                    if it:
+                        src = it['src']
+                        if src.startswith('/'):
+                            src = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, src)
+                        new_html = utils.add_image(src)
+                elif 'media--type-youtube' in el['class']:
+                    it = el.find('iframe')
+                    if it:
+                        query = parse_qs(urlsplit(it['src']).query)
+                        src = query['url'][0]
+                        new_html = utils.add_embed(src)
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    logger.warning('unhandled media {} in {}'.format(el['class'], item['url']))
 
             for el in body_soup.find_all('img', class_='figure-img'):
                 # TODO: caption?
@@ -418,6 +546,25 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                     el.insert_after(new_el)
                     el.decompose()
 
+            for el in body_soup.find_all('script', attrs={"type": "application/json"}):
+                i = el.string.find('{')
+                j = el.string.rfind('}')
+                if i > 0 and j > 0 and i != 1 and el.string[i:j+1].strip():
+                    el_json = json.loads(el.string[i:j+1])
+                    new_html = ''
+                    if el_json.get('component') and el_json['component'] == 'InlineGallery':
+                        for it in el_json['props']['media']:
+                            if it['image']['src'].startswith('/'):
+                                src = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, it['image']['src'])
+                            else:
+                                src = it['image']['src']
+                            new_html += utils.add_image(src)
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    el.decompose()
+
             for el in body_soup.find_all('script'):
                 el.decompose()
 
@@ -425,7 +572,14 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                 el.decompose()
 
             item['content_html'] += str(body_soup)
-            item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
+
+            if page_json['relationships'].get('field_carousel_media') and page_json['relationships']['field_carousel_media'].get('data'):
+                item['content_html'] += '<hr/><h2><u>GALLERY</u></h2>'
+                for data in page_json['relationships']['field_carousel_media']['data']:
+                    item['content_html'] += get_field_data(data, site_json['api_path'])
+
+    if item.get('content_html'):
+        item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 

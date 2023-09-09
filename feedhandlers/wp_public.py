@@ -68,7 +68,7 @@ def get_content(url, args, site_json, save_debug=False):
     if 'add_lede_img' in args and item.get('_image'):
         item['content_html'] += utils.add_image(item['_image'])
 
-    item['content_html'] += wp_posts.format_content(post_json['content'], item)
+    item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
     return item
 
 

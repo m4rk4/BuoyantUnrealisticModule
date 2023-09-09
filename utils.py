@@ -1,4 +1,4 @@
-import asyncio, importlib, io, json, os, pytz, random, re, requests, string, tldextract
+import asyncio, basencode, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
@@ -624,6 +624,7 @@ def open_pullquote():
 def close_pullquote(author=''):
   end_html = '</em>'
   if author:
+    author = re.sub(r'^(–\s*|&#8211;\s*)', '', author)
     end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
   #end_html += '</td></tr></table>'
   end_html += '</div><div style="clear:left"></div></div>'
@@ -816,8 +817,13 @@ def add_youtube_playlist(yt_id, width=640, height=360):
   return '<center><iframe width="{}" height="{}"  src="https://www.youtube-nocookie.com/embed/videoseries?list={}" allow="encrypted-media" allowfullscreen></iframe></center>'.format(width, height, yt_id)
 
 def get_twitter_url(tweet_id):
+  n = basencode.Number(int(tweet_id) / 1e15 * math.pi)
+  token = n.repr_in_base(36, max_frac_places=8)
+  token = re.sub(r'(0+|\.)', '', token)
   # tweet_json = get_url_json('https://cdn.syndication.twimg.com/tweet?id={}&lang=en'.format(tweet_id))
-  tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en'.format(tweet_id))
+  #tweet_json = utils.get_url_json('https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en'.format(tweet_id))
+  tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?features=tfw_timeline_list%3A%3Btfw_follower_count_sunset%3Atrue%3Btfw_tweet_edit_backend%3Aon%3Btfw_refsrc_session%3Aon%3Btfw_fosnr_soft_interventions_enabled%3Aon%3Btfw_mixed_media_15897%3Atreatment%3Btfw_experiments_cookie_expiration%3A1209600%3Btfw_show_birdwatch_pivots_enabled%3Aon%3Btfw_duplicate_scribes_to_settings%3Aon%3Btfw_use_profile_image_shape_enabled%3Aon%3Btfw_video_hls_dynamic_manifests_15082%3Atrue_bitrate%3Btfw_legacy_timeline_sunset%3Atrue%3Btfw_tweet_edit_frontend%3Aon&id={}&lang=en&token={}'.format(tweet_id, token)
+  tweet_json = get_url_json(tweet_url)
   if not tweet_json:
     return ''
   return 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_id)

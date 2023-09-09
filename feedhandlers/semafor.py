@@ -24,11 +24,38 @@ def get_next_data(url):
 
 
 def convert_unicode(matchobj):
-    return matchobj.group(0).encode('latin1').decode('utf-8')
+    try:
+        return matchobj.group(0).encode('latin1').decode('utf-8')
+    except:
+        return matchobj.group(0)
+
+
+def resize_image(image, width=1200):
+    img_src = re.sub('^image-', r'https://img.semafor.com/', image['asset']['_ref'])
+    img_src = re.sub('-(\w+)$', r'.\1', img_src)
+    return img_src + '?w={}&q=75&auto=format'.format(width)
+
+
+def add_image(image, func_resize_image):
+    img_src = func_resize_image(image)
+    captions = []
+    if image.get('caption'):
+        captions.append(image['caption'])
+    if image.get('attribution'):
+        captions.append(image['attribution'])
+    elif image.get('credit'):
+        captions.append(image['credit'])
+    elif image.get('rteCredit'):
+        credit = ''
+        for blk in image['rteCredit']:
+            credit += render_block(blk)
+        captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', credit, flags=re.S))
+    return utils.add_image(img_src, ' | '.join(captions))
 
 
 def render_block(block):
     content_html = ''
+    footnotes = []
     if block['_type'] == 'block':
         if block.get('style'):
             if block['style'] == 'normal':
@@ -55,11 +82,16 @@ def render_block(block):
             end_tag = ''
             if child['_type'] == 'span':
                 text = re.sub('[^\x00-\x7F]+', convert_unicode, child['text'])
+            elif child['_type'] == 'footnote':
+                start_tag = '<small><sup>'
+                end_tag = '</sup></small>'
+                text = child['number']
+                footnotes.append(child.copy())
             else:
                 logger.warning('unhandled block child type ' + child['_type'])
             if child.get('marks'):
                 for m in child['marks']:
-                    print(m)
+                    #print(m)
                     mark = next((it for it in block['markDefs'] if it['_key'] == m), None)
                     if mark:
                         if mark['_type'] == 'link':
@@ -74,31 +106,59 @@ def render_block(block):
                             logger.warning('unhandled markDef type ' + mark['_type'])
                     else:
                         start_tag += '<{}>'.format(m)
-
                         end_tag = '</{}>'.format(m) + end_tag
-            content_html += start_tag + text + end_tag
+            content_html += '{}{}{}'.format(start_tag, text, end_tag)
 
         content_html += block_end_tag
 
-    elif block['_type'] == 'imageEmbed':
-        img_src = re.sub('^image-', r'https://img.semafor.com/', block['imageEmbed']['asset']['_ref'])
-        img_src = re.sub('-(\w+)$', r'.\1', img_src)
-        captions = []
-        if block['imageEmbed'].get('caption'):
-            captions.append(block['imageEmbed']['caption'])
-        if block['imageEmbed'].get('attribution'):
-            captions.append(block['imageEmbed']['attribution'])
-        content_html += utils.add_image(img_src, ' | '.join(captions))
+    elif block['_type'] == 'imageEmbed' or block['_type'] == 'insetImage':
+        if block.get('image'):
+            image = block['image']
+        elif block.get('imageEmbed'):
+            image = block['imageEmbed']
+        else:
+            image = None
+            logger.warning('unhandled ' + block['_type'])
+        if image:
+            content_html += add_image(image, resize_image)
+
+    elif block['_type'] == 'insetImageSlideshow':
+        for image in block['slideshowImages']:
+            content_html += add_image(image, resize_image)
+
+    elif block['_type'] == 'pullQuote':
+        content_html += utils.add_pullquote(block['text'])
 
     elif block['_type'] == 'youtube' or block['_type'] == 'twitter':
         content_html += utils.add_embed(block['url'])
 
-    elif block['_type'] == 'ad':
+    elif block['_type'] == 'embedBlock':
+        soup = BeautifulSoup(block['html'], 'html.parser')
+        if soup.iframe:
+            content_html += utils.add_embed(soup.iframe['src'])
+        else:
+            logger.warning('unhandled embedBlock content')
+
+    elif block['_type'] == 'divider':
+        if block.get('variant') and block['variant'] == 'dotted-rule':
+            content_html += '<hr style="border-top:1px dashed black;" />'
+        else:
+            content_html += '<hr/>'
+
+    elif block['_type'] == 'ad' or block['_type'] == 'relatedStories' or block['_type'] == 'donateButton':
         pass
 
     else:
-        logger.warning('unhandled intro block type ' + block['_type'])
+        logger.warning('unhandled block type ' + block['_type'])
 
+    if footnotes:
+        content_html += '<table style="margin-left:1em; font-size:0.8em;">'
+        for footnote in footnotes:
+            footnote_html = ''
+            for blk in footnote['content']:
+                footnote_html += render_block(blk)
+            content_html += '<tr><td style="vertical-align:top;">{}</td><td style="vertical-align:top;">{}</td></tr>'.format(footnote['number'], re.sub(r'^<p>(.*)</p>$', r'\1', footnote_html, flags=re.S))
+        content_html += '</table><div>&nbsp;</div>'
     return content_html
 
 
@@ -106,10 +166,9 @@ def get_content(url, args, site_json, save_debug):
     next_data = get_next_data(url)
     if not next_data:
         return None
-
-    article_json = next_data['props']['pageProps']['article']
     if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
+        utils.write_file(next_data, './debug/debug.json')
+    article_json = next_data['props']['pageProps']['article']
 
     item = {}
     item['id'] = article_json['_id']
@@ -143,21 +202,24 @@ def get_content(url, args, site_json, save_debug):
     if not item.get('tags'):
         del item['tags']
 
+    item['content_html'] = ''
     if article_json.get('ledePhoto'):
         item['_image'] = article_json['ledePhoto']
+        item['content_html'] += add_image(article_json['ledePhoto'], resize_image)
 
     if article_json.get('seoDescription'):
         item['summary'] = article_json['seoDescription']
 
-    item['content_html'] = ''
     if article_json.get('intro') and article_json['intro'].get('body'):
         for block in article_json['intro']['body']:
             item['content_html'] += render_block(block)
 
     if article_json.get('semaforms'):
-        for semaform in article_json['semaforms']:
+        for i, semaform in enumerate(article_json['semaforms']):
+            if i > 0:
+                item['content_html'] += '<hr/>'
             if semaform.get('title'):
-                item['content_html'] += '<hr/><h2>{}</h2>'.format(semaform['title'])
+                item['content_html'] += '<h2>{}</h2>'.format(semaform['title'])
             if semaform['_type'] == 'scoop':
                 for block in semaform['scoop']:
                     item['content_html'] += render_block(block)
@@ -165,24 +227,33 @@ def get_content(url, args, site_json, save_debug):
                 for block in semaform['body']:
                     item['content_html'] += render_block(block)
             elif semaform['_type'] == 'reportersTake':
-                item['content_html'] += '<hr/><h2>{}\'s View</h2>'.format(semaform['author']['shortName'])
+                item['content_html'] += '<h2>{}\'s View</h2>'.format(semaform['author']['shortName'])
                 for block in semaform['thescoop']:
                     item['content_html'] += render_block(block)
+            elif semaform['_type'] == 'knowMore':
+                item['content_html'] += '<h2>Know More</h2>'
+                for block in semaform['knowMore']:
+                    item['content_html'] += render_block(block)
             elif semaform['_type'] == 'theViewFrom':
-                item['content_html'] += '<hr/><h2>The View from {}</h2>'.format(semaform['where'])
+                item['content_html'] += '<h2>The View from {}</h2>'.format(semaform['where'])
                 for block in semaform['theViewFrom']:
                     item['content_html'] += render_block(block)
             elif semaform['_type'] == 'roomForDisagreement':
-                item['content_html'] += '<hr/><h2>Room For Disagreement</h2>'
+                item['content_html'] += '<h2>Room For Disagreement</h2>'
                 for block in semaform['roomForDisagreement']:
                     item['content_html'] += render_block(block)
             elif semaform['_type'] == 'furtherReading':
-                item['content_html'] += '<hr/><h2>Notable</h2>'
+                item['content_html'] += '<h2>Notable</h2>'
                 for block in semaform['furtherReading']:
                     item['content_html'] += render_block(block)
             else:
                 logger.warning('unhandled semaform type {} in {}'.format(semaform['_type'], item['url']))
 
+    if article_json.get('signal'):
+        for signal in article_json['signal']:
+            item['content_html'] += '<hr/>'
+            for block in signal['body']:
+                item['content_html'] += render_block(block)
     return item
 
 

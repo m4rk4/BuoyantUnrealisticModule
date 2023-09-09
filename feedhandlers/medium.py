@@ -203,6 +203,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += start_tag + markup_text + end_tag
 
     item['content_html'] = item['content_html'].replace('</ol><ol>', '').replace('</ul><ul>', '')
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

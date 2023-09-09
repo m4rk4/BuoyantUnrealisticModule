@@ -24,6 +24,9 @@ def add_image(image, caption=''):
     img_src = resize_image(image['url'])
     #if 'localhost' in config.server:
     #    img_src = '{}/image?url={}'.format(config.server, quote_plus(img_src))
+    if not caption:
+        if image.get('attribution'):
+            caption = image['attribution']
     return utils.add_image(img_src, caption)
 
 
@@ -259,7 +262,8 @@ def render_body(body, body_zones=None):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22mosaicCardFeedLimit%22%3A8%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22a30f582ff45b31cdc13289410e3f43389417573d3911861db93b05aebe2a62f4%22%7D%7D&_client={}&_version=78ec64f'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
+    #graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22mosaicCardFeedLimit%22%3A8%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22a30f582ff45b31cdc13289410e3f43389417573d3911861db93b05aebe2a62f4%22%7D%7D&_client={}&_version=78ec64f'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
+    graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22first%22%3A4%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%225aa93ebf513d6ca4fec12fb19d574f82d9b1ec83a583ff5dea71269624d62a1a%22%7D%7D&_client={}&_version=d49f73a'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
     graph_json = utils.get_url_json(graph_url)
     if not graph_json:
         logger.debug('graphql unsuccessful, extracting data from ' + url)

@@ -1,10 +1,9 @@
-import json, re
+import json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
 
 import config, utils
-from feedhandlers import rss
 
 import logging
 
@@ -18,88 +17,116 @@ def format_caption_links(matchobj):
         return '<a href="https://www.instagram.com/{0}/">@{0}</a>'.format(matchobj.group(2))
 
 
-def get_content(url, args, site_json, save_debug=False):
-    # Need to use a proxy to show images because of CORS
-    # imageproxy = 'https://bibliogram.snopyta.org/imageproxy?url='
-
-    # Extract the post id
-    if args.get('bibliogram'):
-        m = re.search(r'{}\/([^\/]+)\/([^\/]+)'.format(args['bibliogram']), url)
-    else:
-        m = re.search(r'https?:\/\/(www\.)?instagram\.com\/([^\/]+)\/([^\/]+)', url)
-    if not m:
-        logger.warning('unable to parse Instgram url ' + url)
-        return None
-
-    headers = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-        "accept-language": "en-US,en;q=0.9",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "sec-ch-prefers-color-scheme": "dark",
-        "sec-ch-ua": "\"Microsoft Edge\";v=\"107\", \"Chromium\";v=\"107\", \"Not=A?Brand\";v=\"24\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "none",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
-    }
-    ig_url = 'https://www.instagram.com/{}/{}/'.format(m.group(2), m.group(3))
-    ig_embed = utils.get_url_html(ig_url + 'embed/captioned/?cr=1', headers=headers)
-    if not ig_embed:
-        return ''
-    if save_debug:
-        utils.write_file(ig_embed, './debug/instagram.html')
-
-    soup = BeautifulSoup(ig_embed, 'html.parser')
-
-    el = soup.find(class_='EmbedIsBroken')
-    if el:
-        msg = el.find(class_='ebmMessage').get_text()
-        if 'removed' in msg:
-            item = {}
-            item['content_html'] = '<blockquote><a href="{}">{}</a></blockquote>'.format(ig_url, msg)
-            return item
-        else:
-            logger.warning('embMessage "{}" in {}'.format(el.get_text(), ig_url))
-            return None
-
-    ig_data = None
-    m = re.search(r"window\.__additionalDataLoaded\('extra',(.+)\);<\/script>", ig_embed)
-    if m:
-        try:
-            ig_data = json.loads(m.group(1))
-        except:
-            ig_data = None
-
+def get_content(url, args, site_json, save_debug=False, ig_data=None):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[0], paths[1])
+    soup = None
     if not ig_data:
+        headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9",
+            "cache-control": "no-cache",
+            "dpr": "1",
+            "pragma": "no-cache",
+            "sec-ch-prefers-color-scheme": "light",
+            "sec-ch-ua": "\"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Microsoft Edge\";v=\"116\"",
+            "sec-ch-ua-full-version-list": "\"Chromium\";v=\"116.0.5845.97\", \"Not)A;Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"116.0.1938.54\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-ch-ua-platform-version": "\"15.0.0\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "viewport-width": "993",
+            "x-asbd-id": "129477",
+            "x-ig-app-id": "936619743392459",
+            "x-ig-www-claim": "0",
+            "x-requested-with": "XMLHttpRequest",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.54"
+        }
+        gql_url = 'https://www.instagram.com/graphql/query/?doc_id=18222662059122027&variables=%7B%22child_comment_count%22%3A3%2C%22fetch_comment_count%22%3A40%2C%22has_threaded_comments%22%3Atrue%2C%22parent_comment_count%22%3A24%2C%22shortcode%22%3A%22{}%22%7D'.format(paths[1])
+        gql_json = utils.get_url_json(gql_url, headers=headers)
+        if gql_json:
+            #utils.write_file(gql_json, './debug/debug.json')
+            ig_data = gql_json['data']['shortcode_media']
+    if not ig_data:
+        logger.debug('using embed data')
+        headers = {
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+            "accept-language": "en-US,en;q=0.9",
+            "cache-control": "no-cache",
+            "pragma": "no-cache",
+            "sec-ch-prefers-color-scheme": "dark",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"107\", \"Chromium\";v=\"107\", \"Not=A?Brand\";v=\"24\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "none",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
+        }
+        embed_url = ig_url + 'embed/captioned/?cr=1'
+        ig_embed = utils.get_url_html(embed_url, headers=headers)
+        if not ig_embed:
+            return ''
+        if save_debug:
+            utils.write_file(ig_embed, './debug/instagram.html')
+
         soup = BeautifulSoup(ig_embed, 'html.parser')
-        el = soup.find('script', string=re.compile(r'gql_data'))
+        el = soup.find(class_='EmbedIsBroken')
         if el:
-            m = re.search(r'handle\((.*?)\);requireLazy', el.string)
-            if m:
-                try:
-                    script_data = json.loads(m.group(1))
-                    #utils.write_file(script_data, './debug/instagram.json')
-                    for data in script_data['require']:
-                        if data[0] == 'PolarisEmbedSimple':
-                            context_json = json.loads(data[3][0]['contextJSON'])
-                            ig_data = context_json['gql_data']
-                            break
-                except:
-                    ig_data = None
+            msg = el.find(class_='ebmMessage').get_text()
+            if 'removed' in msg:
+                item = {}
+                item['content_html'] = '<blockquote><a href="{}">{}</a></blockquote>'.format(ig_url, msg)
+                return item
+            else:
+                logger.warning('embMessage "{}" in {}'.format(el.get_text(), ig_url))
+                return None
+
+        m = re.search(r"window\.__additionalDataLoaded\('extra',(.+)\);<\/script>", ig_embed)
+        if m:
+            try:
+                ig_data = json.loads(m.group(1))
+            except:
+                ig_data = None
+
+        if not ig_data:
+            soup = BeautifulSoup(ig_embed, 'html.parser')
+            el = soup.find('script', string=re.compile(r'gql_data'))
+            if el:
+                m = re.search(r'handle\((.*?)\);requireLazy', el.string)
+                if m:
+                    try:
+                        script_data = json.loads(m.group(1))
+                        #utils.write_file(script_data, './debug/instagram.json')
+                        for data in script_data['require']:
+                            if data[0] == 'PolarisEmbedSimple':
+                                context_json = json.loads(data[3][0]['contextJSON'])
+                                ig_data = context_json['gql_data']
+                                break
+                    except:
+                        ig_data = None
+
+        if ig_data:
+            ig_data = ig_data['shortcode_media']
 
     avatars = []
     users = []
     if ig_data:
         if save_debug:
             utils.write_file(ig_data, './debug/instagram.json')
-        avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['shortcode_media']['owner']['profile_pic_url']))
+        utils.write_file(ig_data, './debug/instagram.json')
+        if ig_data.get('owner'):
+            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['owner']['profile_pic_url']))
+            users.append(ig_data['owner']['username'])
+        elif ig_data.get('user'):
+            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['user']['profile_pic_url']))
+            users.append(ig_data['user']['username'])
         avatars.append(avatar)
-        users.append(ig_data['shortcode_media']['owner']['username'])
     else:
         el = soup.find(class_='Avatar')
         if el:
@@ -116,20 +143,49 @@ def get_content(url, args, site_json, save_debug=False):
 
     username = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(users))
     title = '{} posted on Instagram'.format(username)
-    caption = None
-    post_caption = '<a href="{}"><small>Open in Instagram</small></a>'.format(ig_url)
-    if ig_data:
-        try:
-            caption = ig_data['shortcode_media']['edge_media_to_caption']['edges'][0]['node']['text']
-        except:
-            caption = None
 
+    item = {}
+    item['id'] = ig_url
+    item['url'] = ig_url
+    if len(title) > 50:
+        item['title'] = title[:50] + '...'
+    else:
+        item['title'] = title
+    if ig_data:
+        if ig_data.get('taken_at_timestamp'):
+            # Assuming it's UTC
+            dt = datetime.fromtimestamp(ig_data['taken_at_timestamp']).replace(tzinfo=timezone.utc)
+        elif ig_data.get('taken_at'):
+            dt = datetime.fromtimestamp(ig_data['taken_at']).replace(tzinfo=timezone.utc)
+        else:
+            dt = None
+        if dt:
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+    item['author'] = {}
+    item['author']['name'] = username
+
+    if item.get('_display_date'):
+        post_caption = '<a href="{}"><small>{}</small></a>'.format(item['url'], item['_display_date'])
+    else:
+        post_caption = '<a href="{}"><small>Open in Instagram</small></a>'.format(item['url'])
+
+    caption = None
+    if ig_data:
+        if ig_data.get('caption'):
+            caption = ig_data['caption']['text']
+        else:
+            try:
+                caption = ig_data['edge_media_to_caption']['edges'][0]['node']['text']
+            except:
+                caption = None
         if caption:
             caption = caption.replace('\n', '<br />')
             caption = re.sub(r'(@|#)(\w+)', format_caption_links, caption)
             post_caption = '<p>{}</p>'.format(caption) + post_caption
 
-    if not caption:
+    if soup and not caption:
         caption = soup.find(class_='Caption')
         if caption:
             # Make paragragh instead of div to help with spacing
@@ -169,20 +225,40 @@ def get_content(url, args, site_json, save_debug=False):
                 post_caption = post_caption[5:]
 
     post_media = ''
-    media_type = soup.find(class_='Embed')['data-media-type']
+    if ig_data:
+        media_type = ig_data['__typename']
+    else:
+        media_type = soup.find(class_='Embed')['data-media-type']
     if media_type == 'GraphImage':
-        for el in soup.find_all('img', class_='EmbeddedMediaImage'):
-            if el.has_attr('srcset'):
-                img_src = utils.image_from_srcset(el['srcset'], 640)
+        if ig_data:
+            if ig_data.get('display_resources'):
+                img_src = ig_data['display_resources'][0]['src']
             else:
-                img_src = el['src']
+                img_src = ig_data['display_url']
             post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+        else:
+            for el in soup.find_all('img', class_='EmbeddedMediaImage'):
+                if el.has_attr('srcset'):
+                    img_src = utils.image_from_srcset(el['srcset'], 640)
+                else:
+                    img_src = el['src']
+                post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
 
     elif media_type == 'GraphVideo':
         if ig_data:
-            video_src = ig_data['shortcode_media']['video_url']
-            img = utils.closest_dict(ig_data['shortcode_media']['display_resources'], 'config_width', 640)
-            post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img['src'])), height='0', link=video_src, img_style='border-radius:10px;')
+            if ig_data.get('video_versions'):
+                video_src = ig_data['video_versions'][0]['url']
+            else:
+                video_src = ig_data['video_url']
+            if ig_data.get('display_resources'):
+                img = utils.closest_dict(ig_data['display_resources'], 'config_width', 640)
+                img_src = img['src']
+            elif ig_data.get('image_versions2'):
+                img = utils.closest_dict(ig_data['image_versions2']['candidates'], 'width', 640)
+                img_src = img['url']
+            else:
+                img_src = ig_data['display_url']
+            post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), height='0', link=video_src, img_style='border-radius:10px;')
         else:
             el = soup.find('img', class_='EmbeddedMediaImage')
             if el:
@@ -192,9 +268,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     elif media_type == 'GraphSidecar':
         if ig_data:
-            for edge in ig_data['shortcode_media']['edge_sidecar_to_children']['edges']:
+            for edge in ig_data['edge_sidecar_to_children']['edges']:
                 if edge['node']['__typename'] == 'GraphImage':
-                    img_src = edge['node']['display_resources'][0]['src']
+                    if edge['node'].get('display_resources'):
+                        img_src = edge['node']['display_resources'][0]['src']
+                    else:
+                        img_src = edge['node']['display_url']
                     post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
 
                 elif edge['node']['__typename'] == 'GraphVideo':
@@ -204,31 +283,17 @@ def get_content(url, args, site_json, save_debug=False):
                     else:
                         video_src = ''
                         caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
-                    img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
-                    post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img['src'])), caption, height='0', link=video_src, img_style='border-radius:10px;')
+                    if edge['node'].get('display_resources'):
+                        img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
+                        img_src = img['src']
+                    else:
+                        img_src = edge['node']['display_url']
+                    post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), caption, height='0', link=video_src, img_style='border-radius:10px;')
 
                 post_media += '<div>&nbsp;</div>'
-            post_media = post_media[:-10]
+            #post_media = post_media[:-10]
         else:
             logger.warning('Instagram GraphSidecar media without ig_data in ' + ig_url)
-
-    item = {}
-    item['id'] = ig_url
-    item['url'] = ig_url
-    if len(title) > 50:
-        item['title'] = title[:50] + '...'
-    else:
-        item['title'] = title
-
-    if ig_data and ig_data['shortcode_media'].get('taken_at_timestamp'):
-        # Assuming it's UTC
-        dt = datetime.fromtimestamp(ig_data['shortcode_media']['taken_at_timestamp']).replace(tzinfo=timezone.utc)
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
-    item['author'] = {}
-    item['author']['name'] = username
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
     #item['content_html'] = '<table style="table-layout:fixed; width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
@@ -246,23 +311,95 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     # For tags there is a json feed at https://www.instagram.com/explore/tags/trending/?__a=1 but it seems to be ip restricted
-    rssargs = args.copy()
-    m = re.search(r'https:\/\/www\.instagram\.com\/([^\/]+)', args['url'])
-    if not m:
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "dpr": "1",
+        "pragma": "no-cache",
+        "sec-ch-prefers-color-scheme": "light",
+        "sec-ch-ua": "\"Chromium\";v=\"116\", \"Not)A;Brand\";v=\"24\", \"Microsoft Edge\";v=\"116\"",
+        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"116.0.5845.97\", \"Not)A;Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"116.0.1938.54\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-ch-ua-platform-version": "\"15.0.0\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "viewport-width": "993",
+        "x-asbd-id": "129477",
+        "x-ig-app-id": "936619743392459",
+        "x-ig-www-claim": "0",
+        "x-requested-with": "XMLHttpRequest",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.1938.54"
+    }
+    api_url = 'https://www.instagram.com/api/v1/users/web_profile_info/?username={}&hl=en'.format(paths[0])
+    s = requests.Session()
+    r = s.get(api_url, headers=headers)
+    if r.status_code != 200:
         return None
-    username = m.group(1)
+    try:
+        user_json = r.json()
+    except:
+        logger.warning('error getting user data - likely rate-limited')
+        return None
+    if save_debug:
+        utils.write_file(user_json, './debug/feed.json')
 
-    bibliograms = utils.get_url_json('https://bibliogram.art/api/instances')
-    if bibliograms:
-        for bibliogram in bibliograms['data']:
-            if bibliogram['rss_enabled'] == True:
-                logger.debug('trying to get Instagram rss feed from ' + bibliogram['address'])
-                rssargs['bibliogram'] = bibliogram['address']
-                rssargs['url'] = '{}/u/{}/rss.xml'.format(bibliogram['address'], username)
-    else:
-        rssargs['url'] = 'https://bibliogram.snopyta.org/u/{}/rss.xml'.format(username)
+    n = 0
+    items = []
+    feed = utils.init_jsonfeed(args)
+    for edge in user_json['data']['user']['edge_owner_to_timeline_media']['edges'] +  user_json['data']['user']['edge_felix_video_timeline']['edges']:
+        #edge_url = 'https://www.instagram.com/p/{}/?utm_source=ig_embed&utm_campaign=loading'.format(edge['node']['shortcode'])
+        edge_url = 'https://www.instagram.com/p/{}/'.format(edge['node']['shortcode'])
+        if save_debug:
+            logger.debug('getting content from ' + edge_url)
+        edge['node']['owner']['profile_pic_url'] = user_json['data']['user']['profile_pic_url']
+        item = get_content(edge_url, args, site_json, save_debug, edge['node'])
+        if item:
+            if utils.filter_item(item, args) == True:
+                items.append(item)
+                n += 1
+                if 'max' in args:
+                    if n == int(args['max']):
+                        break
 
-    feed = rss.get_feed(url, rssargs, site_json, save_debug, get_content)
-    if feed:
-        return feed
-    return None
+    cookies = s.cookies.get_dict()
+    if cookies.get('csrftoken'):
+        logger.debug('getting clips')
+        headers['x-csrftoken'] = cookies['csrftoken']
+        body = {
+            "include_feed_video": True,
+            "page_size": 12,
+            "target_user_id": int(user_json['data']['user']['id'])
+        }
+        r = s.post('https://www.instagram.com/api/v1/clips/user/?hl=en', json=body, headers=headers)
+        if r.status_code == 200:
+            try:
+                clips_json = r.json()
+            except:
+                logger.warning('error getting clips data - likely rate-limited')
+                return None
+            if save_debug:
+                utils.write_file(clips_json, './debug/clips.json')
+            for clip in clips_json['items']:
+                # edge_url = 'https://www.instagram.com/p/{}/?utm_source=ig_embed&utm_campaign=loading'.format(edge['node']['shortcode'])
+                clip_url = 'https://www.instagram.com/reel/{}/'.format(clip['media']['code'])
+                if save_debug:
+                    logger.debug('getting content from ' + clip_url)
+                clip['media']['__typename'] = 'GraphVideo'
+                item = get_content(clip_url, args, site_json, save_debug, clip['media'])
+                if item:
+                    if utils.filter_item(item, args) == True:
+                        items.append(item)
+                        n += 1
+                        if 'max' in args:
+                            if n == int(args['max']):
+                                break
+        else:
+            logger.warning('error getting clips: ' + r.text)
+    feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
+    return feed

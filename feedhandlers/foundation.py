@@ -1,5 +1,5 @@
 import json, pytz, re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString, Tag
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
@@ -18,6 +18,8 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
 
     soup = BeautifulSoup(page_html, 'lxml')
     meta = {}
@@ -82,6 +84,16 @@ def get_content(url, args, site_json, save_debug=False):
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt, False)
+        else:
+            el = soup.find(attrs={"data-component-id": "SlideshowAuthor"})
+            if el:
+                m = re.search(r'on (\w+, \w+ \d{1,2}, \d{4} at \d+:\d+ (am|pm))', el.get_text())
+                if m:
+                    dt_loc = datetime.strptime(m.group(1), '%a, %b %d, %Y at %I:%M %p')
+                    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                    item['date_published'] = dt.isoformat()
+                    item['_timestamp'] = dt.timestamp()
+                    item['_display_date'] = utils.format_display_date(dt)
 
     if meta.get('author'):
         item['author'] = {"name": meta['author']}
@@ -112,6 +124,28 @@ def get_content(url, args, site_json, save_debug=False):
     if el:
         item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())
 
+    el = soup.find(class_='fdn-content-header-image-block')
+    if el:
+        img = el.find('img')
+        if img:
+            captions = []
+            it = el.find(class_='fdn-image-caption')
+            if it and it.get_text().strip():
+                captions.append(it.get_text().strip())
+            it = el.find(class_='fdn-image-credit')
+            if it and it.get_text().strip():
+                captions.append(it.get_text().strip())
+            if img.get('data-src'):
+                img_src = img['data-src']
+            else:
+                img_src = img['src']
+            img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
+            if 'imager' in img_paths:
+                img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+            item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
+        else:
+            logger.warning('unhandled fdn-content-header-image-block in ' + item['url'])
+
     el = soup.find(class_='fdn-magnum-block')
     if el:
         img = el.find('img')
@@ -127,7 +161,10 @@ def get_content(url, args, site_json, save_debug=False):
                 img_src = img['data-src']
             else:
                 img_src = img['src']
-            item['content_html'] += utils.add_image(img_src, ' | '.join(captions)) + '<br/>'
+            img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
+            if 'imager' in img_paths:
+                img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+            item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
         else:
             logger.warning('unhandled fdn-magnum-block in ' + item['url'])
 
@@ -144,6 +181,57 @@ def get_content(url, args, site_json, save_debug=False):
 
         for el in body.find_all('span', class_='__cf_email__'):
             el.unwrap()
+
+        for el in body.find_all('br', class_='Apple-interchange-newline'):
+            el.decompose()
+
+        def fix_div(el):
+            for it in el.contents:
+                if isinstance(it, NavigableString) and it.strip():
+                    #print('NavigableString: ' + it.strip())
+                    el.name = 'p'
+                    new_html = re.sub(r'\s*<br/>\s*<br/>\s*', '</p><p>', str(el))
+                    el.replace_with(BeautifulSoup(new_html, 'html.parser'))
+                    break
+                elif isinstance(it, Tag):
+                    #print('Tag: ' + it.name)
+                    if it.name == 'div' and not it.get('class'):
+                        fix_div(it)
+                    if re.search(r'\b(blockquote|br|div|h\d|ol|p|ul)\b', it.name):
+                        el.unwrap()
+                    else:
+                        el.name = 'p'
+                    break
+
+        for el in body.find_all('div', class_=False, recursive=False):
+            fix_div(el)
+
+        for el in body.find_all(attrs={"style": True}):
+            del el['style']
+
+        for el in body.contents:
+            if isinstance(el, NavigableString) and el.strip():
+                el.replace_with(BeautifulSoup('<p>{}</p>'.format(el), 'html.parser'))
+
+        p = None
+        for el in body.find_all(recursive=False):
+            if el.name == None:
+                continue
+            elif el.name == 'br':
+                el.decompose()
+            elif not re.search(r'\b(blockquote|div|h\d|ol|p|ul)\b', el.name):
+                p = el.find_previous_sibling()
+                if p.name == 'p':
+                    p.append(el)
+                else:
+                    p = None
+                    if el.name == 'i':
+                        el.wrap(soup.new_tag('p'))
+            elif p:
+                if el.name == 'p':
+                    p.extend(el.contents)
+                    el.decompose()
+                p = None
 
         for el in body.find_all('a', href=re.compile(r'^/')):
             el['href'] = '{}:{}{}'.format(split_url.scheme, split_url.netloc, el['href'])
@@ -162,7 +250,10 @@ def get_content(url, args, site_json, save_debug=False):
                     img_src = img['data-src']
                 else:
                     img_src = img['src']
-                new_html = utils.add_image(img_src, ' | '.join(captions)) + '<br/>'
+                img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
+                if 'imager' in img_paths:
+                    img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                new_html = utils.add_image(img_src, ' | '.join(captions))
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
@@ -202,7 +293,8 @@ def get_content(url, args, site_json, save_debug=False):
             title = el.find(class_='fdn-inline-connection-title')
             if title:
                 if re.search(r'related', title.get_text(), flags=re.I):
-                    new_html = '<br/>'
+                    el.decompose()
+                    continue
                 elif re.search(r'slideshow', title.get_text(), flags=re.I):
                     title = el.find(class_='fdn-inline-connection-headline')
                     new_html = '<div style="overflow:hidden;"><span style="font-size:0.9em; font-weight:bold;">Slideshow</span><br/><span style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></span></div>'.format(title.a['href'], title.get_text().strip())
@@ -254,7 +346,6 @@ def get_content(url, args, site_json, save_debug=False):
             el.decompose()
 
     item['content_html'] += body.decode_contents()
-    item['content_html'] = re.sub(r'</figure>\s*<br/>\s*<br/>', '</figure></br>', item['content_html'])
 
     if 'Slideshow' in paths:
         item['content_html'] += '<div>&nbsp;</div>'
@@ -270,8 +361,15 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='fdn-slideshow-credit')
                 if it and it.get_text().strip():
                     captions.append(it.get_text().strip())
-                it = el.find('img')
-                item['content_html'] += utils.add_image(it['data-src'], ' | '.join(captions))
+                img = el.find('img')
+                if img.get('data-src'):
+                    img_src = img['data-src']
+                else:
+                    img_src = img['src']
+                img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
+                if 'imager' in img_paths:
+                    img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
             else:
                 logger.warning('unhandled slideshow-image-block in ' + item['url'])
 

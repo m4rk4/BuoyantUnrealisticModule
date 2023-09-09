@@ -1,9 +1,10 @@
-import feedparser, json, re
+import feedparser, json, math, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config, utils
+from feedhandlers import rss
 
 import logging
 
@@ -38,7 +39,11 @@ def get_bb_url(url, get_json=False):
         content = utils.get_url_html(url, headers=headers, allow_redirects=False)
     if not content:
         # Try through browser
-        content = utils.get_browser_request(url, get_json)
+        try:
+            content = utils.get_browser_request(url, get_json)
+        except:
+            logger.warning('get_browser_request exception for ' + url)
+            return None
     return content
 
 
@@ -47,15 +52,168 @@ def add_video(video_id):
     api_url = 'https://www.bloomberg.com/media-manifest/embed?id=' + video_id
     video_json = get_bb_url(api_url, True)
     if video_json:
-        if video_json.get('description'):
-            caption = video_json['description']
-        elif video_json.get('title'):
-            caption = video_json['title']
+        caption = 'Watch: '
+        if video_json.get('title'):
+            caption += video_json['title']
+        elif video_json.get('description'):
+            caption += video_json['description']
         poster = resize_image('https:' + video_json['thumbnail']['baseUrl'])
         return utils.add_video(video_json['downloadURLs']['600'], 'video/mp4', poster, caption)
     else:
         logger.warning('error getting video json ' + api_url)
         return ''
+
+
+def format_content(content, images):
+    content_html = ''
+    if content['type'] == 'ad' or content['type'] == 'inline-newsletter':
+        pass
+    elif content['type'] == 'text':
+        start_tag = ''
+        end_tag = ''
+        if content.get('attributes'):
+            for key in content['attributes'].keys():
+                if key == 'strong':
+                    start_tag += '<strong>'
+                    end_tag = '</strong>' + end_tag
+                elif key == 'emphasis':
+                    start_tag += '<em>'
+                    end_tag = '</em>' + end_tag
+                else:
+                    logger.warning('unhandled text attribute ' + key)
+        content_html += start_tag + content['value'] + end_tag
+    elif content['type'] == 'br':
+        content_html += '<br/>'
+    elif content['type'] == 'paragraph':
+        content_html += '<p>'
+        for c in content['content']:
+            content_html += format_content(c, images)
+        content_html += '</p>'
+    elif content['type'] == 'link':
+        link = ''
+        if content['data']['destination'].get('web'):
+           link = content['data']['destination']['web']
+        elif content['data']['destination'].get('bbg'):
+            if content['data']['destination']['bbg'].startswith('bbg://people/'):
+                pass
+            elif content['data']['destination']['bbg'].startswith('bbg://msg/'):
+                link = content['data']['destination']['bbg'].replace('bbg://msg/', '')
+            elif content['data']['destination']['bbg'].startswith('bbg://securities/'):
+                keys = unquote_plus(content['data']['destination']['bbg']).split('/')[3].split(' ')
+                keys.remove('Equity')
+                link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
+            elif content['data']['destination']['bbg'].startswith('bbg://screens/wcrs'):
+                link = 'https://www.bloomberg.com/markets/currencies'
+            else:
+                logger.warning('unhandled bbg link ' + content['data']['destination']['bbg'])
+                link = content['data']['destination']['bbg']
+        if link:
+            content_html += '<a href="{}">'.format(link)
+        for c in content['content']:
+            content_html += format_content(c, images)
+        if link:
+            content_html += '</a>'
+    elif content['type'] == 'entity':
+        if content['subType'] == 'story' and content['meta']['type'] == 'StoryLink':
+            if content['data']['link']['destination'].get('web'):
+                content_html += '<a href="{}">'.format(content['data']['link']['destination']['web'])
+            for c in content['content']:
+                content_html += format_content(c, images)
+            content_html += '</a>'
+        elif content['subType'] == 'security' and content['meta']['type'] == 'SecurityLink':
+            keys = unquote_plus(content['data']['link']['destination']['bbg']).split('/')[3].split(' ')
+            keys.remove('Equity')
+            link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
+            content_html += '<a href="{}">'.format(link)
+            for c in content['content']:
+                content_html += format_content(c, images)
+            content_html += '</a>'
+        elif content['subType'] == 'person' and content['meta']['type'] == 'ProfileLink':
+            # TODO
+            for c in content['content']:
+                content_html += format_content(c, images)
+        else:
+            logger.warning('unhandled content entity type ' + content['subType'])
+            for c in content['content']:
+                content_html += format_content(c, images)
+    elif content['type'] == 'heading':
+        content_html += '<h{}>'.format(content['data']['level'])
+        for c in content['content']:
+            content_html += format_content(c, images)
+        content_html += '</h{}>'.format(content['data']['level'])
+    elif content['type'] == 'list':
+        if content['subType'] == 'unordered':
+            content_html += '<ul>'
+        else:
+            content_html += '<ol>'
+        for c in content['content']:
+            content_html += format_content(c, images)
+        if content['subType'] == 'unordered':
+            content_html += '</ul>'
+        else:
+            content_html += '</ol>'
+    elif content['type'] == 'listItem':
+        content_html += '<li>'
+        for c in content['content']:
+            content_html += format_content(c, images)
+        content_html += '</li>'
+    elif content['type'] == 'media':
+        if content['subType'] == 'photo' or content['subType'] == 'chart':
+            if content['data'].get('attachment') and images.get(content['data']['attachment']['id']):
+                image = images[content['data']['attachment']['id']]
+                captions = []
+                if image.get('caption'):
+                    captions.append(image['caption'])
+                elif image.get('title'):
+                    captions.append(image['title'])
+                if image.get('credit'):
+                    captions.append(image['credit'])
+                caption = re.sub(r'<p>|</p>', '', ' | '.join(captions))
+                content_html += utils.add_image(resize_image(image['url']), caption)
+            else:
+                captions = []
+                if content['data'][content['subType']].get('caption'):
+                    captions.append(content['data'][content['subType']]['caption'])
+                if content['data'][content['subType']].get('credit'):
+                    captions.append(content['data'][content['subType']]['credit'])
+                caption = re.sub(r'<p>|</p>', '', ' | '.join(captions))
+                if content['subType'] == 'chart':
+                    content_html += utils.add_image(content['data']['chart']['fallback'], caption)
+                else:
+                    content_html += utils.add_image(content['data']['photo']['src'], caption)
+        elif content['subType'] == 'video':
+            # content_html += add_video(content['data']['attachment']['id'])
+            caption = 'Watch: {}'.format(content['data']['attachment']['title'])
+            poster = resize_image(content['data']['attachment']['thumbnail']['url'])
+            content_html += utils.add_video(content['data']['attachment']['streams'][0]['url'], content['data']['attachment']['streams'][0]['type'], poster, caption)
+        elif content['subType'] == 'audio':
+            if content['data']['attachment'].get('image'):
+                poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(content['data']['attachment']['image']['url']))
+            else:
+                poster = '{}/static/play_button-48x48.png'.format(config.server)
+            content_html += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td>'.format(content['data']['attachment']['url'], poster)
+            content_html += '<td style="vertical-align:top;"><div style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content['data']['attachment']['url'], content['data']['attachment']['title'])
+            if content['data']['attachment'].get('description'):
+                content_html += '<div style="font-size:0.9em;">{}</div>'.format(content['data']['attachment']['description'])
+            if content['data']['attachment'].get('duration'):
+                s = float(int(content['data']['attachment']['duration']) / 1000)
+                h = math.floor(s / 3600)
+                s = s - h * 3600
+                m = math.floor(s / 60)
+                s = s - m * 60
+                if h > 0:
+                    duration = '{:0.0f}:{:02.0f}:{:02.0f}'.format(h, m, s)
+                else:
+                    duration = '{:0.0f}:{:02.0f}'.format(m, s)
+                content_html += '<div style="font-size:0.9em;">{}</div>'.format(duration)
+            content_html += '</td></tr></table>'
+        elif content['subType'] == 'embed':
+            content_html += utils.add_embed(content['href'])
+        else:
+            logger.warning('unhandled content media subtype ' + content['subType'])
+    else:
+        logger.warning('unhandled content type ' + content['type'])
+    return content_html
 
 
 def get_video_content(url, args, site_json, save_debug):
@@ -131,30 +289,28 @@ def get_video_content(url, args, site_json, save_debug):
     return item
 
 
-def get_newsletter_content(url, args, site_json, save_debug):
-    bb_html = get_bb_url(url)
-    if save_debug:
-        utils.write_file(bb_html, './debug/debug.html')
-    if not bb_html:
-        return None
-
-    soup = BeautifulSoup(bb_html, 'html.parser')
-    el = soup.find('script', attrs={"type": "application/json", "data-component-props": "OverlayAd"})
-    if not el:
-        logger.warning('unable to find newsletter props in ' + url)
-        return None
-    article_json = json.loads(el.string)
-    return get_item(article_json, args, site_json, save_debug)
-
-
 def get_content(url, args, site_json, save_debug):
-    if '/videos/' in url:
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    if 'videos' in paths:
         return get_video_content(url, args, site_json, save_debug)
-    elif '/newsletters/' in url:
-        return get_newsletter_content(url, args, site_json, save_debug)
+
+    # page_html = get_bb_url(url)
+    # if save_debug:
+    #     utils.write_file(page_html, './debug/debug.html')
+    page_html = utils.read_file('./debug/debug.html')
+    if page_html:
+        soup = BeautifulSoup(page_html, 'html.parser')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if el:
+            next_data = json.loads(el.string)
+            # if save_debug:
+            #     utils.write_file(next_data, './debug/next_data.json')
+            return get_item(next_data['props']['pageProps']['story'], args, site_json, save_debug)
+
+    logger.debug('unable to get __NEXT_DATA__ for ' + url)
 
     api_url = ''
-    split_url = urlsplit(url)
     m = re.search(r'\/(news|opinion)\/articles\/(.*)', split_url.path)
     if m:
         api_url = 'https://www.bloomberg.com/javelin/api/foundation_transporter/' + m.group(2)
@@ -166,35 +322,44 @@ def get_content(url, args, site_json, save_debug):
         logger.warning('unsupported url ' + url)
         return None
 
-    bb_json = get_bb_url(api_url, True)
-    if not bb_json:
+    api_json = get_bb_url(api_url, True)
+    if not api_json:
         return None
-    if save_debug:
-        utils.write_file(bb_json, './debug/content.json')
-
-    soup = BeautifulSoup(bb_json['html'], 'html.parser')
+    # if save_debug:
+    #     utils.write_file(api_json, './debug/content.json')
+    soup = BeautifulSoup(api_json['html'], 'html.parser')
     el = soup.find('script', attrs={"data-component-props": re.compile(r'ArticleBody|FeatureBody')})
-    if not el:
-        logger.warning('unable to find ArticleBody in ' + url)
-        return None
-    article_json = json.loads(el.string)
-    return get_item(article_json, args, site_json, save_debug)
+    if el:
+        article_json = json.loads(el.string)
+        return get_item(article_json['story'], args, site_json, save_debug)
+
+    logger.warning('unable to get content for ' + url)
+    return None
 
 
-def get_item(article_json, args, site_json, save_debug):
+def get_item(story_json, args, site_json, save_debug):
     if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
+        utils.write_file(story_json, './debug/debug.json')
 
     item = {}
-    item['id'] = article_json['story']['id']
-    item['url'] = article_json['story']['canonical']
-    item['title'] = article_json['story']['textHeadline']
+    item['id'] = story_json['id']
+    if story_json.get('canonical'):
+        item['url'] = story_json['canonical']
+    elif story_json.get('seoCanonical'):
+        item['url'] = story_json['seoCanonical']
+    elif story_json.get('url'):
+        item['url'] = story_json['url']
 
-    dt = datetime.fromisoformat(article_json['story']['publishedAt'].replace('Z', '+00:00'))
+    if story_json.get('textHeadline'):
+        item['title'] = story_json['textHeadline']
+    elif story_json.get('headline'):
+        item['title'] = story_json['headline']
+
+    dt = datetime.fromisoformat(story_json['publishedAt'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['story']['updatedAt'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(story_json['updatedAt'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
     if 'age' in args:
@@ -202,16 +367,22 @@ def get_item(article_json, args, site_json, save_debug):
             return None
 
     authors = []
-    for author in article_json['story']['authors']:
+    for author in story_json['authors']:
         authors.append(author['name'])
     if authors:
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
-    if article_json['story'].get('mostRelevantTags'):
-        item['tags'] = article_json['story']['mostRelevantTags'].copy()
+    if story_json.get('mostRelevantTags'):
+        item['tags'] = story_json['mostRelevantTags'].copy()
 
-    item['summary'] = article_json['story']['teaserBody']
+
+    if story_json.get('teaserBody'):
+        item['summary'] = story_json['teaserBody']
+    elif story_json.get('summary'):
+        item['summary'] = story_json['summary']
+    elif story_json.get('socialDescription'):
+        item['summary'] = story_json['socialDescription']
 
     item['content_html'] = ''
 
@@ -219,61 +390,151 @@ def get_item(article_json, args, site_json, save_debug):
     # if el:
     #  item['content_html'] += str(el)
 
-    if article_json['story'].get('dek'):
-        item['content_html'] += article_json['story']['dek']
+    if story_json.get('dek'):
+        item['content_html'] += story_json['dek']
 
-    if article_json['story'].get('abstract'):
+    if story_json.get('abstract'):
         item['content_html'] += '<ul>'
-        for it in article_json['story']['abstract']:
+        for it in story_json['abstract']:
             item['content_html'] += '<li>{}</li>'.format(it)
         item['content_html'] += '</ul>'
 
-    body = BeautifulSoup(article_json['story']['body'], 'html.parser')
+    if isinstance(story_json['body'], str):
+        body = BeautifulSoup(story_json['body'], 'html.parser')
+    else:
+        body = None
 
     lede = ''
-    if article_json['story'].get('ledeMediaKind'):
-        item['_image'] = article_json['story']['ledeImageUrl']
+    if story_json.get('lede'):
+        if story_json['lede']['type'] == 'image':
+            item['_image'] = story_json['ledeImageUrl']
+            captions = []
+            if story_json['lede'].get('caption'):
+                captions.append(story_json['lede']['caption'])
+            if story_json['lede'].get('credit'):
+                captions.append(story_json['lede']['credit'])
+            caption = re.sub(r'<p>|</p>', '', ' | '.join(captions))
+            lede += utils.add_image(resize_image(story_json['ledeImageUrl']), caption)
+        elif story_json['lede']['type'] == 'video':
+            video = None
+            if story_json.get('videoAttachments'):
+                for key, val in story_json['videoAttachments'].items():
+                    if val.get('id') == story_json['lede']['id']:
+                        video = val
+                        break
+            if video:
+                caption = 'Watch: {}'.format(video['title'])
+                poster = resize_image(video['thumbnail']['url'])
+                lede += utils.add_video(video['streams'][0]['url'], video['streams'][0]['type'], poster, caption)
+            else:
+                lede += add_video(story_json['lede']['id'])
+        else:
+            logger.warning('unhandled lede type {} in {}'.format(story_json['lede']['type'], item['url']))
+    elif story_json.get('ledeMediaKind'):
+        item['_image'] = story_json['ledeImageUrl']
         captions = []
-        if article_json['story'].get('ledeCaption'):
-            captions.append(article_json['story']['ledeCaption'])
-        if article_json['story'].get('ledeDescription'):
-            captions.append(article_json['story']['ledeDescription'])
-        if article_json['story'].get('ledeCredit'):
-            captions.append(article_json['story']['ledeCredit'])
-        caption = re.sub(r'<p>|<\/p>', '', ' | '.join(captions))
-        if article_json['story']['ledeMediaKind'] == 'image':
-            lede += utils.add_image(resize_image(article_json['story']['ledeImageUrl']), caption)
-        elif article_json['story']['ledeMediaKind'] == 'video':
-            lede += add_video(article_json['story']['ledeAttachment']['bmmrId'])
-    elif article_json['story'].get('imageAttachments'):
-        img_id = [*article_json['story']['imageAttachments']][0]
-        image = article_json['story']['imageAttachments'][img_id]
-        item['_image'] = image['baseUrl']
-        if not body.find('figure', attrs={"data-id": img_id}):
-            lede += utils.add_image(resize_image(image['baseUrl']), image['caption'])
+        if story_json.get('ledeCaption'):
+            captions.append(story_json['ledeCaption'])
+        if story_json.get('ledeDescription'):
+            captions.append(story_json['ledeDescription'])
+        if story_json.get('ledeCredit'):
+            captions.append(story_json['ledeCredit'])
+        caption = re.sub(r'<p>|</p>', '', ' | '.join(captions))
+        if story_json['ledeMediaKind'] == 'image':
+            lede += utils.add_image(resize_image(story_json['ledeImageUrl']), caption)
+        elif story_json['ledeMediaKind'] == 'video':
+            lede += add_video(story_json['ledeAttachment']['bmmrId'])
+    elif story_json.get('imageAttachments'):
+        img_id = [*story_json['imageAttachments']][0]
+        image = story_json['imageAttachments'][img_id]
+        if image.get('baseUrl'):
+            item['_image'] = image['baseUrl']
+        elif image.get('url'):
+            item['_image'] = image['url']
+        if body and not body.find('figure', attrs={"data-id": img_id}):
+            captions = []
+            if image.get('caption'):
+                captions.append(image['caption'])
+            elif image.get('title'):
+                captions.append(image['title'])
+            if image.get('credit'):
+                captions.append(image['credit'])
+            caption = re.sub(r'<p>|</p>', '', ' | '.join(captions))
+            lede += utils.add_image(resize_image(item['_image']), caption)
     if lede:
         item['content_html'] += lede
 
-    for el in body.find_all(attrs={"data-ad-placeholder": "Advertisement"}):
-        el.decompose()
+    if body:
+        for el in body.find_all(attrs={"data-ad-placeholder": "Advertisement"}):
+            el.decompose()
 
-    for el in body.find_all(class_=re.compile(r'-footnotes|for-you|-newsletter|page-ad|-recirc')):
-        el.decompose()
+        for el in body.find_all(class_=re.compile(r'-footnotes|for-you|-newsletter|page-ad|-recirc')):
+            el.decompose()
 
-    for el in body.find_all('a', href=re.compile(r'^\/')):
-        el['href'] = 'https://www.bloomberg.com' + el['href']
+        for el in body.find_all('a', href=re.compile(r'^\/')):
+            el['href'] = 'https://www.bloomberg.com' + el['href']
 
-    for el in body.find_all(['meta', 'script']):
-        el.decompose()
+        for el in body.find_all(['meta', 'script']):
+            el.decompose()
 
-    if save_debug:
-        utils.write_file(body.prettify(), './debug/debug.html')
+        if save_debug:
+            utils.write_file(body.prettify(), './debug/debug.html')
 
-    for el in body.find_all('figure'):
-        new_html = ''
-        if el.get('data-image-type') == 'chart':
-            if article_json['story']['imageAttachments'].get(el['data-id']):
-                image = article_json['story']['imageAttachments'][el['data-id']]
+        for el in body.find_all('figure'):
+            new_html = ''
+            if el.get('data-image-type') == 'chart':
+                if story_json['imageAttachments'].get(el['data-id']):
+                    image = story_json['imageAttachments'][el['data-id']]
+                    img_src = resize_image(image['baseUrl'])
+                    if image.get('themes'):
+                        theme = next((it for it in image['themes'] if it['id'] == 'white_background'), None)
+                        if theme:
+                            img_src = resize_image(theme['url'])
+                    captions = []
+                    it = el.find('div', class_='caption')
+                    if it and it.get_text().strip():
+                        captions.append(it.get_text().strip())
+                    it = el.find('div', class_='credit')
+                    if it and it.get_text().strip():
+                        captions.append(it.get_text().strip())
+                    new_html = utils.add_image(img_src, ' | '.join(captions))
+                else:
+                    chart = next((it for it in story_json['charts'] if it['id'] == el['data-id']), None)
+                    if chart:
+                        if chart.get('responsiveImages') and chart['responsiveImages'].get('mobile'):
+                            img_src = resize_image(chart['responsiveImages']['mobile']['url'])
+                            captions = []
+                            if chart.get('subtitle'):
+                                captions.append(chart['subtitle'])
+                            if chart.get('source'):
+                                captions.append(chart['source'])
+                            if chart.get('footnote'):
+                                captions.append(chart['footnote'])
+                            new_html = utils.add_image(img_src, ' | '.join(captions))
+                if not new_html:
+                    logger.warning('unhandled chart {} in {}'.format(el['data-id'], item['url']))
+
+            elif el.get('data-image-type') == 'audio':
+                poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(el.img['src']))
+                it = el.find('div', class_='caption')
+                if it and it.get_text().strip():
+                    caption = it.get_text().strip()
+                else:
+                    caption = 'Listen'
+                it = el.find('div', class_='credit')
+                if it and it.get_text().strip():
+                    credit = it.get_text().strip()
+                else:
+                    credit = 'Bloomberg Radio'
+                new_html = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><small>{}</small></div><div style="clear:left;">&nbsp;</div></div>'.format(
+                    el.source['src'], poster, caption, credit)
+
+            elif el.get('data-image-type') == 'video':
+                video = story_json['videoAttachments'][el['data-id']]
+                new_html = add_video(video['bmmrId'])
+
+            elif el.get('data-image-type') == 'photo' or el.get('data-type') == 'image':
+                image = story_json['imageAttachments'][el['data-id']]
                 img_src = resize_image(image['baseUrl'])
                 if image.get('themes'):
                     theme = next((it for it in image['themes'] if it['id'] == 'white_background'), None)
@@ -287,107 +548,63 @@ def get_item(article_json, args, site_json, save_debug):
                 if it and it.get_text().strip():
                     captions.append(it.get_text().strip())
                 new_html = utils.add_image(img_src, ' | '.join(captions))
+
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+
+        for el in body.find_all('div', class_='thirdparty-embed'):
+            new_html = ''
+            if el.blockquote and ('twitter-tweet' in el.blockquote['class']):
+                m = re.findall('https:\/\/twitter\.com\/[^\/]+\/statuse?s?\/\d+', str(el.blockquote))
+                new_html += utils.add_embed(m[-1])
+
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+
+        for el in body.find_all(class_='thirdparty-embed'):
+            new_html = ''
+            it = el.find(class_='instagram-media')
+            if it:
+                new_html = utils.add_embed(it['data-instgrm-permalink'])
+            elif el.iframe:
+                new_html = utils.add_embed(el.iframe['src'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
             else:
-                chart = next((it for it in article_json['story']['charts'] if it['id'] == el['data-id']), None)
-                if chart:
-                    if chart.get('responsiveImages') and chart['responsiveImages'].get('mobile'):
-                        img_src = resize_image(chart['responsiveImages']['mobile']['url'])
-                        captions = []
-                        if chart.get('subtitle'):
-                            captions.append(chart['subtitle'])
-                        if chart.get('source'):
-                            captions.append(chart['source'])
-                        if chart.get('footnote'):
-                            captions.append(chart['footnote'])
-                        new_html = utils.add_image(img_src, ' | '.join(captions))
-            if not new_html:
-                logger.warning('unhandled chart {} in {}'.format(el['data-id'], item['url']))
+                logger.warning('unhandled embed in ' + item['url'])
 
-        elif el.get('data-image-type') == 'audio':
-            poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(el.img['src']))
-            it = el.find('div', class_='caption')
-            if it and it.get_text().strip():
-                caption = it.get_text().strip()
-            else:
-                caption = 'Listen'
-            it = el.find('div', class_='credit')
-            if it and it.get_text().strip():
-                credit = it.get_text().strip()
-            else:
-                credit = 'Bloomberg Radio'
-            new_html = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><small>{}</small></div><div style="clear:left;">&nbsp;</div></div>'.format(
-                el.source['src'], poster, caption, credit)
+        for el in body.find_all(class_='paywall'):
+            el.attrs = {}
 
-        elif el.get('data-image-type') == 'video':
-            video = article_json['story']['videoAttachments'][el['data-id']]
-            new_html = add_video(video['bmmrId'])
+        # remove empty paragraphs
+        item['content_html'] += re.sub(r'<p\b[^>]*>(&nbsp;|\s)<\/p>', '', str(body))
 
-        elif el.get('data-image-type') == 'photo' or el.get('data-type') == 'image':
-            image = article_json['story']['imageAttachments'][el['data-id']]
-            img_src = resize_image(image['baseUrl'])
-            if image.get('themes'):
-                theme = next((it for it in image['themes'] if it['id'] == 'white_background'), None)
-                if theme:
-                    img_src = resize_image(theme['url'])
-            captions = []
-            it = el.find('div', class_='caption')
-            if it and it.get_text().strip():
-                captions.append(it.get_text().strip())
-            it = el.find('div', class_='credit')
-            if it and it.get_text().strip():
-                captions.append(it.get_text().strip())
-            new_html = utils.add_image(img_src, ' | '.join(captions))
+    elif isinstance(story_json['body'], dict) and story_json['body'].get('content'):
+        for content in story_json['body']['content']:
+            item['content_html'] += format_content(content, story_json.get('imageAttachments'))
+        if story_json.get('footer') and story_json['footer'].get('content'):
+            item['content_html'] += '<hr/>'
+            for content in story_json['footer']['content']:
+                item['content_html'] += format_content(content, story_json.get('imageAttachments'))
 
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-
-    for el in body.find_all('div', class_='thirdparty-embed'):
-        new_html = ''
-        if el.blockquote and ('twitter-tweet' in el.blockquote['class']):
-            m = re.findall('https:\/\/twitter\.com\/[^\/]+\/statuse?s?\/\d+', str(el.blockquote))
-            new_html += utils.add_embed(m[-1])
-
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-
-    for el in body.find_all(class_='thirdparty-embed'):
-        new_html = ''
-        it = el.find(class_='instagram-media')
-        if it:
-            new_html = utils.add_embed(it['data-instgrm-permalink'])
-        elif el.iframe:
-            new_html = utils.add_embed(el.iframe['src'])
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-        else:
-            logger.warning('unhandled embed in ' + item['url'])
-
-    for el in body.find_all(class_='paywall'):
-        el.attrs = {}
-
-    # remove empty paragraphs
-    item['content_html'] += re.sub(r'<p\b[^>]*>(&nbsp;|\s)<\/p>', '', str(body))
     return item
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    if url.endswith('.rss'):
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
+
     urls = []
     split_url = urlsplit(args['url'])
     paths = split_url.path[1:].split('/')
 
-    if args['url'].endswith('.rss'):
-        rss_feed = utils.get_url_html(args['url'])
-        if rss_feed:
-            d = feedparser.parse(rss_feed)
-            for entry in d.entries:
-                urls.append(entry.link)
-    elif 'newsletters' in paths:
+    if 'newsletters' in paths:
         if paths[-1] == 'latest':
             # https://www.bloomberg.com/newsletters/five-things/latest
             urls.append(utils.get_redirect_url(args['url']))
@@ -404,6 +621,52 @@ def get_feed(url, args, site_json, save_debug=False):
                                 if v.get('sampleUrl'):
                                     urls.append(v['sampleUrl'])
     else:
+        page_html = get_bb_url(url)
+        if save_debug:
+            utils.write_file(page_html, './debug/debug.html')
+        if page_html:
+            soup = BeautifulSoup(page_html, 'html.parser')
+            for el in soup.find_all(attrs={"data-component": "headline"}):
+                it = el.find('a')
+                if it:
+                    print(it['href'])
+
+            el = soup.find('script', id='__NEXT_DATA__')
+            if el:
+                next_data = json.loads(el.string)
+                if save_debug:
+                    utils.write_file(next_data, './debug/next_data.json')
+                modules = []
+                module_types = []
+                module_variations = []
+                for zone in next_data['props']['pageProps']['initialState']['curation']['zones']:
+                    if zone.get('columns'):
+                        for column in zone['columns']:
+                            if column.get('modules'):
+                                for module in column['modules']:
+                                    if module['__typename'] == 'CurationModule':
+                                        modules.append(module['id'])
+                                        if module.get('type'):
+                                            module_types.append(module['type'])
+                                        if module.get('variation'):
+                                            module_variations.append(module['variation'])
+                api_url = 'https://www.bloomberg.com/lineup-next/api/page/{}/module/{}?moduleVariations={}&moduleTypes={}&locale=en&publishedState=PUBLISHED'.format(paths[0], ','.join(modules), ','.join(module_variations), ','.join(module_types))
+                print(api_url)
+                api_json = get_bb_url(api_url, True)
+                if api_json:
+                    if save_debug:
+                        utils.write_file(api_json, './debug/feed.json')
+                    stories = {}
+                    for key, module in api_json['modules'].items():
+                        for it in module['items']:
+                            if it['__modelType'] == 'Story' and not stories.get(it['id']):
+                                stories[it['id']] = it
+                for key, val in stories.items():
+                    if val['type'] == 'video':
+                        print('video ' + val['id'])
+                    else:
+                        print(val['url'])
+
         if len(paths) > 1:
             logger.warning('unsupported feed ' + args['url'])
             return None
@@ -440,3 +703,6 @@ def get_feed(url, args, site_json, save_debug=False):
     feed = utils.init_jsonfeed(args)
     feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
+
+
+# https://www.bloomberg.com/lineup-next/api/storiesById/RZRGMAT0G1KW01

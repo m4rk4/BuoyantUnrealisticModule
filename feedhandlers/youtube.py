@@ -55,14 +55,16 @@ def get_author_info(channel_id):
         "X-YouTube-Client-Name": "2",
         "X-YouTube-Client-Version": "2.20180614"
     }
-    channel_json = utils.get_url_json('https://m.youtube.com/channel/{}/about?pbj=1'.format(channel_id), headers=headers)
+    channel_url = 'https://m.youtube.com/channel/{}/about?pbj=1'.format(channel_id)
+    #print(channel_url)
+    channel_json = utils.get_url_json(channel_url, headers=headers)
     if channel_json:
-        #utils.write_file(channel_json, './debug/channel.json')
+        utils.write_file(channel_json, './debug/channel.json')
         if isinstance(channel_json, list):
             channel_response = next((it for it in channel_json if it.get('response')), None)
         elif isinstance(channel_json, dict) and channel_json.get('response'):
             channel_response = channel_json
-        if channel_response:
+        if channel_response and channel_response['response'].get('metadata'):
             author = {}
             author['name'] = channel_response['response']['metadata']['channelMetadataRenderer']['title']
             author['url'] = channel_response['response']['metadata']['channelMetadataRenderer']['vanityChannelUrl']
@@ -180,8 +182,32 @@ def get_content(url, args, site_json, save_debug=False):
         heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
         link = 'https://www.youtube-nocookie.com/embed/{}' + video_id
+        poster = ''
 
-        video_stream = utils.closest_dict(player_response['streamingData']['formats'], 'height', 480)
+        if player_response['playabilityStatus']['status'] == 'UNPLAYABLE' or player_response['playabilityStatus']['status'] == 'LOGIN_REQUIRED':
+            video_stream = None
+            if player_response['playabilityStatus'].get('errorScreen') and player_response['playabilityStatus']['errorScreen'].get('playerErrorMessageRenderer'):
+                reasons = []
+                if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('reason'):
+                    msg = player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['reason']['simpleText']
+                    if not msg.endswith('.'):
+                        msg += '.'
+                    reasons.append(msg)
+                if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
+                    for it in player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['runs']:
+                        msg = it['text']
+                        if not msg.endswith('.'):
+                            msg += '.'
+                        reasons.append(msg)
+                if reasons:
+                    caption = '<strong>' + ' '.join(reasons) + '</strong> | ' + caption
+                if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('thumbnail'):
+                    poster = '{}/image?url={}&width=1080&overlay=https:{}'.format(config.server, quote_plus(item['_image']), quote_plus(player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']))
+        elif player_response.get('streamingData') and player_response['streamingData'].get('formats'):
+            video_stream = utils.closest_dict(player_response['streamingData']['formats'], 'height', 480)
+        else:
+            # TODO: use adaptiveFormats?
+            video_stream = None
         if video_stream:
             video_url = ''
             if video_stream.get('url'):
@@ -222,9 +248,10 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unknown video playback url for ' + item['url'])
                 video_url = 'https://www.youtube-nocookie.com/embed/' + video_id
                 poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, item['_image'])
-                item['content_html'] = utils.add_image(poster, caption, link=video_url)
+                item['content_html'] = utils.add_image(poster, caption, link=video_url, heading=heading)
         else:
-            poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, quote_plus(item['_image']))
+            if not poster:
+                poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, quote_plus(item['_image']))
             item['content_html'] = utils.add_image(poster, caption, link=link, heading=heading)
 
         if item.get('summary') and 'embed' not in args:

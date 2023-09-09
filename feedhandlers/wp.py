@@ -346,7 +346,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             el = soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
             if el:
                 if el.find('img'):
-                    item['content_html'] += wp_posts.add_image(el, None, base_url, add_caption)
+                    item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption)
                     lede = True
                 else:
                     it = el.find('iframe')
@@ -354,7 +354,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         item['content_html'] += utils.add_embed(it['src'])
                         lede = True
         if not lede:
-            item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image']))
+            item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
     if site_json.get('content'):
         for el in soup.find_all(site_json['content']['tag'], attrs=site_json['content']['attrs']):

@@ -125,7 +125,7 @@ def get_item(post_json, args, site_json, save_debug):
                             caption = figcap.decode_contents()
                         else:
                             caption = ''
-                        new_html = utils.add_image(img_src, caption)
+                        new_html += utils.add_image(img_src, caption)
             elif 'kg-video-card' in el['class']:
                 it = el.find('video')
                 if it:
@@ -260,6 +260,11 @@ def get_item(post_json, args, site_json, save_debug):
             elif el.find(id='remixd-audio-player-script'):
                 el.decompose()
                 continue
+            elif el.find('div', class_=['outpost-pub-container', 'subscribe']):
+                el.decompose()
+                continue
+            elif el.find('path', attrs={"d": "M0 0H6V6H0V0ZM12 6H6V12H0V18H6V12H12V18H18V12H12V6ZM12 6V0H18V6H12ZM30 0H36V6H30V0ZM42 6H36V12H30V18H36V12H42V18H48V12H42V6ZM42 6V0H48V6H42ZM66 0H60V6H66V12H60V18H66V12H72V18H78V12H72V6H78V0H72V6H66V0Z"}):
+                new_html = '<div>&nbsp;</div><hr style="border:8px dashed black; border-radius:4px; width:25%; margin-left:auto; margin-right:auto;"/><div>&nbsp;</div>'
             elif el.find('a', attrs={"href": re.compile(r'api\.addthis\.com')}):
                 el.decompose()
                 continue

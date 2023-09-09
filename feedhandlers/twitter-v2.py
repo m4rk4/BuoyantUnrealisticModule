@@ -1,7 +1,8 @@
-import dateutil, json, pytz, re, requests
+import base64, dateutil, json, pytz, re, requests
 from bs4 import BeautifulSoup
-from tweety.bot import Twitter
-from tweety.exceptions_ import *
+from requests_oauthlib import OAuth1
+from tweety import Twitter
+#from tweety.exceptions_ import *
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
@@ -9,6 +10,52 @@ import config, utils
 import logging
 
 logger = logging.getLogger(__name__)
+
+TW_CONSUMER_KEY = '3nVuSoBZnx6U4vzUxf5w'
+TW_CONSUMER_SECRET = 'Bcs59EFbbsdF6Sl9Ng71smgStWEGwXXKSjYvPVt7qys'
+
+gql_features = {
+    "android_graphql_skip_api_media_color_palette": False,
+    "blue_business_profile_image_shape_enabled": False,
+    "creator_subscriptions_subscription_count_enabled": False,
+    "creator_subscriptions_tweet_preview_api_enabled": True,
+    "freedom_of_speech_not_reach_fetch_enabled": False,
+    "graphql_is_translatable_rweb_tweet_is_translatable_enabled": False,
+    "hidden_profile_likes_enabled": False,
+    "highlights_tweets_tab_ui_enabled": False,
+    "interactive_text_enabled": False,
+    "longform_notetweets_consumption_enabled": True,
+    "longform_notetweets_inline_media_enabled": False,
+    "longform_notetweets_richtext_consumption_enabled": True,
+    "longform_notetweets_rich_text_read_enabled": False,
+    "responsive_web_edit_tweet_api_enabled": False,
+    "responsive_web_enhance_cards_enabled": False,
+    "responsive_web_graphql_exclude_directive_enabled": True,
+    "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+    "responsive_web_graphql_timeline_navigation_enabled": False,
+    "responsive_web_media_download_video_enabled": False,
+    "responsive_web_text_conversations_enabled": False,
+    "responsive_web_twitter_article_tweet_consumption_enabled": False,
+    "responsive_web_twitter_blue_verified_badge_is_enabled": True,
+    "rweb_lists_timeline_redesign_enabled": True,
+    "spaces_2022_h2_clipping": True,
+    "spaces_2022_h2_spaces_communities": True,
+    "standardized_nudges_misinfo": False,
+    "subscriptions_verification_info_enabled": True,
+    "subscriptions_verification_info_reason_enabled": True,
+    "subscriptions_verification_info_verified_since_enabled": True,
+    "super_follow_badge_privacy_enabled": False,
+    "super_follow_exclusive_tweet_notifications_enabled": False,
+    "super_follow_tweet_api_enabled": False,
+    "super_follow_user_api_enabled": False,
+    "tweet_awards_web_tipping_enabled": False,
+    "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
+    "tweetypie_unmention_optimization_enabled": False,
+    "unified_cards_ad_metadata_container_dynamic_card_content_query_enabled": False,
+    "verified_phone_label_enabled": False,
+    "vibe_api_enabled": False,
+    "view_counts_everywhere_api_enabled": False
+}
 
 
 def get_card(url, card):
@@ -173,200 +220,125 @@ def get_card(url, card):
     return card_html
 
 
-def get_tokens():
-    tokens = {
-        "access_token": "",
-        "guest_token": ""
-    }
-    access_token = ''
-    guest_token = ''
-    r = requests.post("https://api.twitter.com/oauth2/token", params={"grant_type": "client_credentials"}, auth=("CjulERsDeqhhjSme66ECg", "IQWdVyqFxghAtURHGeGiWAsmCAGmdW3WmbEx6Hck"))
-    if r.status_code != 200:
-        logger.warning('status error {} getting access token'.format(r.status_code))
-        return tokens
-    tokens['access_token'] = r.json()['access_token']
+def get_guest_account():
+    # https://github.com/zedeus/nitter/issues/983#issuecomment-1681199357
+    TW_ANDROID_BASIC_TOKEN = 'Basic ' + base64.b64encode((TW_CONSUMER_KEY + ':' + TW_CONSUMER_SECRET).encode('utf-8')).decode('utf-8')
+
+    # Bearer Token
     headers = {
-        "Authorization": "Bearer {}".format(tokens['access_token']),
-        "x-guest-token": "",
-        "x-twitter-active-user": "yes",
-        "Referer": "https://twitter.com",
-        "user-agent": "",
+        "Authorization": TW_ANDROID_BASIC_TOKEN,
+        "Content-Type": "application/x-www-form-urlencoded"
     }
-    r = requests.post("https://api.twitter.com/1.1/guest/activate.json", headers=headers)
+    r = requests.post('https://api.twitter.com/oauth2/token', headers=headers, data='grant_type=client_credentials')
     if r.status_code != 200:
-        logger.warning('status error {} getting guest token'.format(r.status_code))
-        return tokens
-    tokens['guest_token'] = r.json()['guest_token']
-    return tokens
-
-
-def get_tweet_detail(tweet_id, tokens=None):
-    # https://github.com/zedeus/nitter/issues/919#issuecomment-1619298877
-    if not tokens:
-        tokens = get_tokens()
-    if not tokens.get('access_token') or not tokens.get('guest_token'):
+        logger.warning('Unable to get bearer token')
         return None
-    headers = {
-        "Authorization": "Bearer {}".format(tokens['access_token']),
-        "x-guest-token": tokens['guest_token'],
-        "x-twitter-active-user": "yes",
-        "Referer": "https://twitter.com",
-        "user-agent": "",
-    }
+    bearer_token = ' '.join(r.json().values())
 
-    # https://github.com/zedeus/nitter/blob/0bc3c153d9b38a3c02f321fb64a375fef6b97e8e/src/consts.nim
-    features = {
-        "android_graphql_skip_api_media_color_palette": False,
-        "blue_business_profile_image_shape_enabled": False,
-        "creator_subscriptions_subscription_count_enabled": False,
-        "creator_subscriptions_tweet_preview_api_enabled": True,
-        "freedom_of_speech_not_reach_fetch_enabled": False,
-        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": False,
-        "hidden_profile_likes_enabled": False,
-        "highlights_tweets_tab_ui_enabled": False,
-        "interactive_text_enabled": False,
-        "longform_notetweets_consumption_enabled": True,
-        "longform_notetweets_inline_media_enabled": False,
-        "longform_notetweets_richtext_consumption_enabled": True,
-        "longform_notetweets_rich_text_read_enabled": False,
-        "responsive_web_edit_tweet_api_enabled": False,
-        "responsive_web_enhance_cards_enabled": False,
-        "responsive_web_graphql_exclude_directive_enabled": True,
-        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
-        "responsive_web_graphql_timeline_navigation_enabled": False,
-        "responsive_web_media_download_video_enabled": False,
-        "responsive_web_text_conversations_enabled": False,
-        "responsive_web_twitter_article_tweet_consumption_enabled": False,
-        "responsive_web_twitter_blue_verified_badge_is_enabled": True,
-        "rweb_lists_timeline_redesign_enabled": True,
-        "spaces_2022_h2_clipping": True,
-        "spaces_2022_h2_spaces_communities": True,
-        "standardized_nudges_misinfo": False,
-        "subscriptions_verification_info_enabled": True,
-        "subscriptions_verification_info_reason_enabled": True,
-        "subscriptions_verification_info_verified_since_enabled": True,
-        "super_follow_badge_privacy_enabled": False,
-        "super_follow_exclusive_tweet_notifications_enabled": False,
-        "super_follow_tweet_api_enabled": False,
-        "super_follow_user_api_enabled": False,
-        "tweet_awards_web_tipping_enabled": False,
-        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
-        "tweetypie_unmention_optimization_enabled": False,
-        "unified_cards_ad_metadata_container_dynamic_card_content_query_enabled": False,
-        "verified_phone_label_enabled": False,
-        "vibe_api_enabled": False,
-        "view_counts_everywhere_api_enabled": False
+    # Guest Token
+    headers = {
+        "Authorization": bearer_token
     }
+    r = requests.post('https://api.twitter.com/1.1/guest/activate.json', headers=headers)
+    if r.status_code != 200:
+        logger.warning('Unable to get guest token')
+        return None
+    guest_token = r.json()['guest_token']
+
+    # Flow Token
+    headers = {
+        "Authorization": bearer_token,
+        "Content-Type": "application/json",
+        "User-Agent": "TwitterAndroid/9.95.0-release.0 (29950000-r-0) ONEPLUS+A3010/9 (OnePlus;ONEPLUS+A3010;OnePlus;OnePlus3;0;;1;2016)",
+        "X-Twitter-API-Version": "5",
+        "X-Twitter-Client": "TwitterAndroid",
+        "X-Twitter-Client-Version": "9.95.0-release.0",
+        "OS-Version": "28",
+        "System-User-Agent": "Dalvik/2.1.0 (Linux; U; Android 9; ONEPLUS A3010 Build/PKQ1.181203.001)",
+        "X-Twitter-Active-User": "yes",
+        "X-Guest-Token": guest_token
+    }
+    body = '{"flow_token":null,"input_flow_data":{"country_code":null,"flow_context":{"start_location":{"location":"splash_screen"}},"requested_variant":null,"target_user_id":0},"subtask_versions":{"generic_urt":3,"standard":1,"open_home_timeline":1,"app_locale_update":1,"enter_date":1,"email_verification":3,"enter_password":5,"enter_text":5,"one_tap":2,"cta":7,"single_sign_on":1,"fetch_persisted_data":1,"enter_username":3,"web_modal":2,"fetch_temporary_password":1,"menu_dialog":1,"sign_up_review":5,"interest_picker":4,"user_recommendations_urt":3,"in_app_notification":1,"sign_up":2,"typeahead_search":1,"user_recommendations_list":4,"cta_inline":1,"contacts_live_sync_permission_prompt":3,"choice_selection":5,"js_instrumentation":1,"alert_dialog_suppress_client_events":1,"privacy_options":1,"topics_selector":1,"wait_spinner":3,"tweet_selection_urt":1,"end_flow":1,"settings_list":7,"open_external_link":1,"phone_verification":5,"security_key":3,"select_banner":2,"upload_media":1,"web":2,"alert_dialog":1,"open_account":2,"action_list":2,"enter_phone":2,"open_link":1,"show_code":1,"update_users":1,"check_logged_in_account":1,"enter_email":2,"select_avatar":4,"location_permission_prompt":2,"notifications_permission_prompt":4}}'
+    r = requests.post('https://api.twitter.com/1.1/onboarding/task.json?flow_name=welcome&api_version=1&known_device_token=&sim_country_code=us', headers=headers, data=body)
+    if r.status_code != 200:
+        logger.warning('Unable to get flow token')
+        return None
+    flow_token = r.json()['flow_token']
+
+    # Subtasks
+    body = '{"flow_token":"' + flow_token + '","subtask_inputs":[{"open_link":{"link":"next_link"},"subtask_id":"NextTaskOpenLink"}],"subtask_versions":{"generic_urt":3,"standard":1,"open_home_timeline":1,"app_locale_update":1,"enter_date":1,"email_verification":3,"enter_password":5,"enter_text":5,"one_tap":2,"cta":7,"single_sign_on":1,"fetch_persisted_data":1,"enter_username":3,"web_modal":2,"fetch_temporary_password":1,"menu_dialog":1,"sign_up_review":5,"interest_picker":4,"user_recommendations_urt":3,"in_app_notification":1,"sign_up":2,"typeahead_search":1,"user_recommendations_list":4,"cta_inline":1,"contacts_live_sync_permission_prompt":3,"choice_selection":5,"js_instrumentation":1,"alert_dialog_suppress_client_events":1,"privacy_options":1,"topics_selector":1,"wait_spinner":3,"tweet_selection_urt":1,"end_flow":1,"settings_list":7,"open_external_link":1,"phone_verification":5,"security_key":3,"select_banner":2,"upload_media":1,"web":2,"alert_dialog":1,"open_account":2,"action_list":2,"enter_phone":2,"open_link":1,"show_code":1,"update_users":1,"check_logged_in_account":1,"enter_email":2,"select_avatar":4,"location_permission_prompt":2,"notifications_permission_prompt":4}}'
+    r = requests.post('https://api.twitter.com/1.1/onboarding/task.json', headers=headers, data=body)
+    if r.status_code != 200:
+        logger.warning('Unable to get subtasks')
+        return None
+    guest_account = next((it['open_account'] for it in r.json()['subtasks'] if it['subtask_id'] == 'OpenAccount'), None)
+    if not guest_account:
+        logger.warning('No OpenAccount found')
+    # Save oauth token values in config.py
+    # twitter_oauth_token = guest_account['oauth_token']
+    # twitter_oauth_token_secret = guest_account['oauth_token_secret']
+    return guest_account
+
+
+def get_tweet_detail(tweet_id, oauth1):
     variables = {
         "focalTweetId": tweet_id,
-        "with_rux_injections": True,
+        "includeHasBirdwatchNotes": False,
         "includePromotedContent": False,
-        "withCommunity": False,
-        "withQuickPromoteEligibilityTweetFields": False,
         "withBirdwatchNotes": False,
-        "withSuperFollowsUserFields": False,
-        "withDownvotePerspective": False,
-        "withReactionsMetadata": False,
-        "withReactionsPerspective": False,
-        "withSuperFollowsTweetFields": False,
-        "withVoice": True,
+        "withVoice": False,
         "withV2Timeline": True
     }
-    field_toggles = {
-        "withArticleRichContentState": False
-    }
-    r = requests.get("https://api.twitter.com/graphql/XjlydVWHFIDaAUny86oh2g/TweetDetail", headers=headers,
-            params={"features": json.dumps(features), "variables": json.dumps(variables), "fieldToggles": json.dumps(field_toggles)})
+    r = requests.get("https://api.twitter.com/graphql/q94uRCEn65LZThakYcPT6g/TweetDetail", auth=oauth1,
+            params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
     if r.status_code != 200:
         logger.warning('status error {} getting TweetDetail'.format(r.status_code))
         return None
     return r.json()
 
 
-def get_user_by_screen_name(screen_name, tokens):
-    if not tokens:
-        tokens = get_tokens()
-    if not tokens.get('access_token') or not tokens.get('guest_token'):
-        return None
-    headers = {
-        "Authorization": "Bearer {}".format(tokens['access_token']),
-        "x-guest-token": tokens['guest_token'],
-        "x-twitter-active-user": "yes",
-        "Referer": "https://twitter.com",
-        "user-agent": "",
-    }
-
-    features = {
-        "hidden_profile_likes_enabled": False,
-        "responsive_web_graphql_exclude_directive_enabled": True,
-        "verified_phone_label_enabled": False,
-        "subscriptions_verification_info_verified_since_enabled": True,
-        "highlights_tweets_tab_ui_enabled": True,
-        "creator_subscriptions_tweet_preview_api_enabled": True,
-        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
-        "responsive_web_graphql_timeline_navigation_enabled": True
-    }
+def get_user_by_screen_name(screen_name, oauth1):
     variables = {
-        "screen_name": screen_name,
-        "withSafetyModeUserFields": True
+        "screen_name": screen_name
     }
-    r = requests.get("https://api.twitter.com/graphql/oUZZZ8Oddwxs8Cd3iW3UEA/UserByScreenName", headers=headers,
-                     params={"features": json.dumps(features), "variables": json.dumps(variables)})
+    r = requests.get("https://api.twitter.com/graphql/u7wQyGi6oExe8_TRWGMq4Q/UserResultByScreenNameQuery", auth=oauth1,
+                     params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
     if r.status_code != 200:
         logger.warning('status error {} getting UserByScreenName'.format(r.status_code))
         return None
     return r.json()
 
 
-def get_user_tweets_and_replies(user_id, tokens):
-    if not tokens:
-        tokens = get_tokens()
-    if not tokens.get('access_token') or not tokens.get('guest_token'):
-        return None
-    headers = {
-        "Authorization": "Bearer {}".format(tokens['access_token']),
-        "x-guest-token": tokens['guest_token'],
-        "x-twitter-active-user": "yes",
-        "Referer": "https://twitter.com",
-        "user-agent": "",
-    }
-
-    features = {
-        "responsive_web_twitter_blue_verified_badge_is_enabled": True,
-        "responsive_web_graphql_exclude_directive_enabled": True,
-        "verified_phone_label_enabled": False,
-        "responsive_web_graphql_timeline_navigation_enabled": True,
-        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
-        "tweetypie_unmention_optimization_enabled": True,
-        "vibe_api_enabled": True,
-        "responsive_web_edit_tweet_api_enabled": True,
-        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
-        "view_counts_everywhere_api_enabled": True,
-        "longform_notetweets_consumption_enabled": True,
-        "tweet_awards_web_tipping_enabled": False,
-        "freedom_of_speech_not_reach_fetch_enabled": False,
-        "standardized_nudges_misinfo": True,
-        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": False,
-        "interactive_text_enabled": True,
-        "responsive_web_text_conversations_enabled": False,
-        "longform_notetweets_richtext_consumption_enabled": False,
-        "responsive_web_enhance_cards_enabled": False
-    }
+def get_user_by_id(user_id, oauth1):
     variables = {
-        "userId": user_id,
-        "count": 40,
-        "includePromotedContent": True,
-        "withCommunity": True,
-        "withSuperFollowsUserFields": True,
-        "withDownvotePerspective": False,
-        "withReactionsMetadata": False,
-        "withReactionsPerspective": False,
-        "withSuperFollowsTweetFields": True,
-        "withVoice": True,
-        "withV2Timeline": True
+        "rest_id": user_id
     }
-    r = requests.get("https://api.twitter.com/graphql/pNl8WjKAvaegIoVH--FuoQ/UserTweetsAndReplies", headers=headers,
-                     params={"features": json.dumps(features), "variables": json.dumps(variables)})
+    r = requests.get("https://api.twitter.com/graphql/oPppcargziU1uDQHAUmH-A/UserResultByIdQuery", auth=oauth1,
+                     params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
+    if r.status_code != 200:
+        logger.warning('status error {} getting UserByScreenName'.format(r.status_code))
+        return None
+    return r.json()
+
+
+def get_user_tweets(user_id, oauth1):
+    variables = {
+        "userId": user_id
+    }
+    r = requests.get("https://api.twitter.com/graphql/3JNH4e9dq1BifLxAa3UMWg/UserWithProfileTweetsQueryV2", auth=oauth1,
+                     params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
+    if r.status_code != 200:
+        logger.warning('status error {} getting UserTweetsAndReplies'.format(r.status_code))
+        return None
+    return r.json()
+
+
+def get_user_tweets_and_replies(user_id, oauth1):
+    variables = {
+        "userId": user_id
+    }
+    r = requests.get("https://api.twitter.com/graphql/8IS8MaO-2EN6GZZZb8jF0g/UserWithProfileTweetsAndRepliesQueryV2", auth=oauth1,
+                     params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
     if r.status_code != 200:
         logger.warning('status error {} getting UserTweetsAndReplies'.format(r.status_code))
         return None
@@ -378,12 +350,8 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     tweet_id = paths[2]
 
-    tokens = {}
-    if args.get('access_token'):
-        tokens['access_token'] = args['access_token']
-    if args.get('guest_token'):
-        tokens['guest_token'] = args['guest_token']
-    tweet_json = get_tweet_detail(tweet_id, tokens)
+    oauth1 = OAuth1(TW_CONSUMER_KEY, TW_CONSUMER_SECRET, config.twitter_oauth_token, config.twitter_oauth_token_secret, realm='https://api.twitter.com/', signature_type="AUTH_HEADER", signature_method="HMAC-SHA1")
+    tweet_json = get_tweet_detail(tweet_id, oauth1)
     if not tweet_json:
         return None
     if save_debug:
@@ -400,30 +368,41 @@ def get_content(url, args, site_json, save_debug=False):
         is_retweet = True
     else:
         is_retweet = False
-    for instruction in tweet_json['data']['threaded_conversation_with_injections_v2']['instructions']:
-        if instruction['type'] == 'TimelineAddEntries':
-            for entry in instruction['entries']:
-                if entry['entryId'].startswith('tweet-'):
-                    tweet_result = entry['content']['itemContent']['tweet_results']['result']
-                    if not parent_id:
-                        if tweet_result.get('rest_id'):
-                            parent_id = tweet_result['rest_id']
+    if tweet_json.get('errors'):
+        body = 'Something went wrong.'
+        if tweet_json['errors'][0].get('message'):
+            body += ' {}'.format(tweet_json['errors'][0]['message'])
+        if is_retweet:
+            item['content_html'] = '<table style="font-size:0.95em; width:100%; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+            item['content_html'] += '<tr><td colspan="2"><div style="text-align:center;">{}</div></td></tr>'.format(body)
+            item['content_html'] += '</table>'
+        else:
+            item['content_html'] = '<tr><td colspan="2"><div style="text-align:center;">{}</div></td></tr>'.format(body)
+    else:
+        for instruction in tweet_json['data']['threaded_conversation_with_injections_v2']['instructions']:
+            if instruction['type'] == 'TimelineAddEntries':
+                for entry in instruction['entries']:
+                    if entry['entryId'].startswith('tweet-'):
+                        tweet_result = entry['content']['itemContent']['tweet_results']['result']
+                        if not parent_id:
+                            if tweet_result.get('rest_id'):
+                                parent_id = tweet_result['rest_id']
+                            else:
+                                parent_id = entry['entryId'].split('-')[-1]
+                        if tweet_id in entry['entryId'].split('-'):
+                            item = get_tweet(tweet_result, is_retweet=is_retweet)
                         else:
-                            parent_id = entry['entryId'].split('-')[-1]
-                    if tweet_id in entry['entryId'].split('-'):
-                        item = get_tweet(tweet_result, is_retweet=is_retweet)
-                    else:
-                        it = get_tweet(tweet_result, is_thread=True, is_retweet=is_retweet)
-                        if it:
-                            parents += it['content_html']
-                elif entry['entryId'].startswith('conversationthread-'):
-                    for content_item in entry['content']['items']:
-                        if content_item['item']['itemContent']['__typename'] == 'TimelineTweet':
-                            tweet_result = content_item['item']['itemContent']['tweet_results']['result']
-                            if tweet_result['__typename'] == 'Tweet' and tweet_result['legacy'].get('self_thread') and tweet_result['legacy']['self_thread']['id_str'] == parent_id:
-                                it = get_tweet(tweet_result, is_thread=True)
-                                if it:
-                                    children += it['content_html']
+                            it = get_tweet(tweet_result, is_thread=True, is_retweet=is_retweet)
+                            if it:
+                                parents += it['content_html']
+                    elif entry['entryId'].startswith('conversationthread-'):
+                        for content_item in entry['content']['items']:
+                            if content_item['item']['itemContent']['__typename'] == 'TimelineTweet':
+                                tweet_result = content_item['item']['itemContent']['tweet_results']['result']
+                                if tweet_result['__typename'] == 'Tweet' and tweet_result['legacy'].get('self_thread') and tweet_result['legacy']['self_thread']['id_str'] == parent_id:
+                                    it = get_tweet(tweet_result, is_thread=True)
+                                    if it:
+                                        children += it['content_html']
 
     if 'is_retweet' not in args:
         item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">' + parents + item['content_html'] + children + '</table>'
@@ -606,6 +585,7 @@ def get_tweet(tweet_result, tweet=None, user=None, is_thread=False, is_retweet=F
         if tweet_result and tweet_result.get('quoted_status_result'):
             rt_item = get_tweet(tweet_result['quoted_status_result']['result'], is_thread=False, is_retweet=True)
         else:
+            #print(tweet['quoted_status_permalink']['expanded'])
             rt_item = get_content(tweet['quoted_status_permalink']['expanded'], {"is_retweet": True}, {"module": "twitter-v2"}, False)
         if rt_item:
             item['content_html'] += '<div>&nbsp;</div>' + rt_item['content_html']
@@ -629,12 +609,12 @@ def get_feed(url, args, site_json, save_debug=False):
     query = parse_qs(split_url.query)
     if len(paths) == 1 and 'search' not in paths:
         # User tweets
-        tokens = get_tokens()
-        user_info = get_user_by_screen_name(paths[0], tokens)
+        oauth1 = OAuth1(TW_CONSUMER_KEY, TW_CONSUMER_SECRET, config.twitter_oauth_token, config.twitter_oauth_token_secret, realm='https://api.twitter.com/', signature_type="AUTH_HEADER", signature_method="HMAC-SHA1")
+        user_info = get_user_by_screen_name(paths[0], oauth1)
         if save_debug:
             utils.write_file(user_info, './debug/twitter.json')
         if user_info:
-            tweets_json = get_user_tweets_and_replies(user_info['data']['user']['result']['rest_id'], tokens)
+            tweets_json = get_user_tweets_and_replies(user_info['data']['user']['result']['rest_id'], oauth1)
             if tweets_json:
                 if save_debug:
                     utils.write_file(tweets_json, './debug/feed.json')
@@ -660,45 +640,6 @@ def get_feed(url, args, site_json, save_debug=False):
                     feed['title'] = '{} | Twitter'.format(user_info['data']['user']['result']['legacy']['screen_name'])
                     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     elif 'hashtag' in paths or 'search' in paths:
-        filter_ = None
-        if query:
-            if query.get('q'):
-                keyword = query['q'][0]
-            if query.get('f') and query['f'][0] == 'live':
-                filter_ = 'latest'
-        if 'hashtag' in paths:
-            keyword = '#{}'.format(paths[1])
-        app = Twitter()
-        tweets = app.request.perform_search(keyword, None, filter_)
-        if tweets:
-            #tweets_json = utils.read_json_file('./debug/feed.json')
-            tweets_json = json.loads(tweets.content)
-            if save_debug:
-                utils.write_file(tweets_json, './debug/feed.json')
-            n = 0
-            feed_items = []
-            for instruction in tweets_json['timeline']['instructions']:
-                for entry in instruction['addEntries']['entries']:
-                    if not entry['content'].get('item'):
-                        continue
-                    tweet = entry['content']['item']['content']['tweet']
-                    if tweet.get('promotedMetadata'):
-                        continue
-                    tweet = tweets_json['globalObjects']['tweets'][tweet['id']]
-                    user = tweets_json['globalObjects']['users'][tweet['user_id_str']]
-                    if save_debug:
-                        logger.debug('getting content for tweet ' + tweet['id_str'])
-
-                    item = get_tweet(None, tweet, user)
-                    if item:
-                        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">' + item['content_html'] + '</table>'
-                        if utils.filter_item(item, args) == True:
-                            feed_items.append(item)
-                            n += 1
-                            if 'max' in args:
-                                if n == int(args['max']):
-                                    break
-            feed = utils.init_jsonfeed(args)
-            feed['title'] = '{} | Twitter'.format(keyword)
-            feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+        # TODO
+        return None
     return feed

@@ -139,8 +139,17 @@ def format_block(block, content, netloc):
                 start_tag = '<p>'
                 end_tag = '</p>'
 
+        elif block['name'] == 'anchor-heading':
+            m = re.search(r'body-(h\d)', block['attribs']['class'])
+            if m:
+                start_tag = '<{}>'.format(m.group(1))
+                end_tag = '</{}>'.format(m.group(1))
+            else:
+                logger.warning('unhandled tag anchor-heading')
+
         elif block['name'] == 'image':
-            image = next((it for it in content['media'] if (it.get('id') and it['id'] == block['attribs']['mediaid'])), None)
+            #image = next((it for it in content['media'] if (it.get('id') and it['id'] == block['attribs']['mediaid'])), None)
+            image = next((it for it in content['media'] if (it.get('id') and (it['id'] == block['attribs']['mediaid'] or it['id'] == block['attribs']['id']))), None)
             if image:
                 return add_image(image, block['attribs'])
             else:
@@ -151,10 +160,12 @@ def format_block(block, content, netloc):
             block_html += '<div style="display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center;">'
             #block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
             for slide in block['response']['parsedSlides']:
+                if not slide:
+                    continue
                 block_html += '<div style="width:50%; min-width:400px;">'
                 if (slide.get('__typename') and slide['__typename'] == 'Image') or (slide.get('media_type') and slide['media_type'] == 'image'):
                     block_html += add_image(slide, gallery=True)
-                elif slide.get('__typename') and slide['__typename'] == 'Product':
+                elif (slide.get('__typename') and slide['__typename'] == 'Product') or slide.get('product_id'):
                     block_html += add_product(slide)
                 else:
                     logger.warning('unhandled slide type ' + slide['__typename'])
@@ -389,7 +400,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = content_json['id']
-    item['url'] = next_data['HRST']['article']['canonicalUrl']
+
+    #item['url'] = next_data['HRST']['article']['canonicalUrl']
+    item['url'] = next_data['props']['pageProps']['layoutContextProps']['canonicalUrl']
 
     if '</' in content_json['metadata']['index_title']:
         item['title'] = BeautifulSoup(content_json['metadata']['index_title'], 'html.parser').get_text()

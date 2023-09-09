@@ -138,7 +138,7 @@ def get_content(url, args, site_json, save_debug=False):
             authors.append(it['screen_name'])
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     elif article_json.get('byline'):
-        if article_json['byline'].startswith('<'):
+        if re.search(r'<|>', article_json['byline']):
             it = BeautifulSoup(article_json['byline'], 'html.parser').get_text().strip()
         else:
             it = article_json['byline']
@@ -242,7 +242,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = resize_image(article_json['preview']['url'])
         if not lede_img and article_json['type'] != 'image' and article_json['type'] != 'collection':
             embed_item = get_content('{}://{}/image_{}.html'.format(split_url.scheme, split_url.netloc, article_json['preview']['uuid']), {"embed": True}, site_json, False)
-            if embed_item:
+            if embed_item and embed_item.get('content_html'):
                 lede_img += embed_item['content_html']
             else:
                 lede_img += utils.add_image(item['_image'])
@@ -306,6 +306,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     if lede_img and not content_html.startswith('<figure'):
         item['content_html'] += lede_img
+
+    if soup:
+        for el in soup.find_all(class_='media-body'):
+            it = el.find(class_='media-heading')
+            if it and re.search(r'Disclaimer', it.get_text(), flags=re.I):
+                item['content_html'] += utils.add_blockquote(el.decode_contents())
 
     if content_html and 'embed' in args:
         if article_json['type'] != 'image':

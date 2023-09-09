@@ -18,7 +18,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    page_url = 'https://www.scribd.com/document/{}'.format(paths[1])
+    doc_id = paths[1]
+    page_url = 'https://www.scribd.com/document/{}'.format(doc_id)
     page_html = utils.get_url_html(page_url)
     if page_html:
         soup = BeautifulSoup(page_html, 'lxml')
@@ -40,11 +41,11 @@ def get_content(url, args, site_json, save_debug=False):
             if el:
                 image = el['content']
 
-    embed_props = utils.get_url_json('https://www.scribd.com/doc-page/embed-modal-props/{}'.format(item['id']))
+    embed_props = utils.get_url_json('https://www.scribd.com/doc-page/embed-modal-props/{}'.format(doc_id))
     if embed_props:
         if not item:
             item['id'] = embed_props['document_id']
-            item['url'] = embed_props['url']
+            item['url'] = embed_props['embed_path']
             item['title'] = embed_props['title']
             item['author'] = {"name": embed_props['user']['name']}
         content_url = '{}?start_page=1&view_mode=scroll&access_key={}'.format(embed_props['embed_path'], embed_props['access_key'])
@@ -62,5 +63,6 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content_url, poster, item['url'], item['title'])
         if item.get('summary'):
             item['content_html'] += '<div>{}</div>'.format(item['summary'])
-            item['content_html'] += '<div style="font-size:0.8em;">www.scribd.com</div></td></tr></table>'
+            item['content_html'] += '<div style="font-size:0.8em;">www.scribd.com</div>'
+        item['content_html'] += '</td></tr></table>'
     return item

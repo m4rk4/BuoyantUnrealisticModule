@@ -29,7 +29,7 @@ def calc_duration(seconds):
     return ', '.join(duration)
 
 
-def get_next_json(url):
+def get_next_json(url, site_json):
     split_url = urlsplit(url)
     if split_url.path.endswith('/'):
         path = split_url.path[:-1]
@@ -58,6 +58,35 @@ def get_next_json(url):
     return next_json
 
 
+def get_next_data(url, site_json):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    if len(paths) == 0:
+        path = '/index'
+    elif split_url.path.endswith('/'):
+        path = split_url.path[:-1]
+    else:
+        path = split_url.path
+    path += '.json'
+    next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
+    next_data = utils.get_url_json(next_url, retries=1)
+    if not next_data:
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        #utils.write_file(page_html, './debug/debug.html')
+        m = re.search(r'"buildId":"([^"]+)"', page_html)
+        if m and m.group(1) != site_json['buildId']:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
+            site_json['buildId'] = m.group(1)
+            utils.update_sites(url, site_json)
+            next_url = '{}://{}/_next/data/{}/{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
+            next_data = utils.get_url_json(next_url)
+            if not next_data:
+                return None
+    return next_data
+
+
 def get_content(url, args, site_json, save_debug=False):
     # https://omny.fm/shows/blindsided/03-paul-bissonnette/embed
     split_url = urlsplit(url)
@@ -66,8 +95,8 @@ def get_content(url, args, site_json, save_debug=False):
         logger.warning('unhandled url ' + url)
         return None
 
-    page_url = re.sub(r'/embed', '', url)
-    next_json = get_next_json(page_url)
+    page_url = re.sub(r'/embed', '', '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path))
+    next_json = get_next_data(page_url, site_json)
     if not next_json:
         return None
     if save_debug:
@@ -165,6 +194,55 @@ def get_content(url, args, site_json, save_debug=False):
             duration = calc_duration(clip['DurationSeconds'])
             item['content_html'] += '<tr><td><a href="{}"><img src="{}/static/play_button-48x48.png"/></a></td><td><a href="{}">{}</a><br><small>{}&nbsp;&bull;&nbsp;{}</td></tr>'.format(clip['AudioUrl'], config.server, clip['PublishedUrl'], clip['Title'], display_date, duration)
         item['content_html'] += '</table>'
+
+    elif next_json['pageProps'].get('playlist'):
+        playlist_json = next_json['pageProps']['playlist']
+        item['id'] = playlist_json['Id']
+        item['url'] = page_url
+        item['title'] = playlist_json['Title']
+        date = playlist_json['ModifiedAtUtc']
+        m = re.search(r'\.(\d{1,2})Z$', date)
+        if m:
+            date = date.replace(m.group(0), '.{}Z'.format(m.group(1).zfill(3)))
+        dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, False)
+        if playlist_json.get('Author'):
+            item['author'] = {
+                "name": playlist_json['Author']
+            }
+        elif playlist_json.get('Program'):
+            item['author'] = {
+                "name": playlist_json['Program']['Name']
+            }
+        if playlist_json.get('Categories'):
+            item['tags'] = playlist_json['Categories'].copy()
+        item['_image'] = playlist_json['ArtworkUrl']
+        item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:128px" /></a></td>'.format(item['url'], item['_image'])
+        item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+        if playlist_json.get('Description'):
+            item['content_html'] += '<div style="font-size:0.9em;">{}</div>'.format(playlist_json['Description'])
+        item['content_html'] += '</td></tr></table>'
+        if next_json['pageProps'].get('playlistPage') and next_json['pageProps']['playlistPage'].get('Clips'):
+            item['content_html'] += '<table style="border-left:3px solid #ccc; margin-left:1.5em;">'
+            for clip in next_json['pageProps']['playlistPage']['Clips']:
+                s = float(clip['DurationSeconds'])
+                h = math.floor(s / 3600)
+                s = s - h * 3600
+                m = math.floor(s / 60)
+                s = s - m * 60
+                if h > 0:
+                    duration = '{:0.0f}:{:02.0f}:{:02.0f}'.format(h, m, s)
+                else:
+                    duration = '{:0.0f}:{:02.0f}'.format(m, s)
+                date = clip['PublishedUtc']
+                m = re.search(r'\.(\d{1,2})Z$', date)
+                if m:
+                    date = date.replace(m.group(0), '.{}Z'.format(m.group(1).zfill(3)))
+                dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+                item['content_html'] += '<tr><td style="width:32px;"><a href="{}"><img src="{}/static/play_button-32x32.png"/></a></td><td><div><a href="{}">{}</a></div><div><small>{} &bull; {}</div></td></tr>'.format(clip['AudioUrl'], config.server, clip['PublishedUrl'], clip['Title'], utils.format_display_date(dt, False), duration)
+            item['content_html'] += '</table>'
     return item
 
 

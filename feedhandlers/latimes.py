@@ -176,8 +176,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     body = soup.find(class_=['rich-text-article-body-content', 'rich-text-body'])
     if not body:
-        logger.warning('unhable to find article-body-content in ' + item['url'])
-        return item
+        body = soup.find(attrs={"data-element": "story-body"})
+        if not body:
+            logger.warning('unhable to body content in ' + item['url'])
+            return item
 
     el = body.find(class_='subscriber-content')
     if el:

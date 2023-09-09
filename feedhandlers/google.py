@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
 import config, utils
+from feedhandlers import rss
 
 import logging
 
@@ -13,7 +14,16 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if split_url.netloc == 'drive.google.com':
+    if split_url.netloc == 'news.google.com':
+        page_html = utils.get_url_html(url)
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find(attrs={"data-n-au": True})
+        if el:
+            logger.debug('getting content for ' + el['data-n-au'])
+            item = utils.get_content(el['data-n-au'], args, save_debug)
+        else:
+            logger.warning('unknown target url for ' + url)
+    elif split_url.netloc == 'drive.google.com':
         if 'viewer' in paths:
             page_html = utils.get_url_html(url)
             if not page_html:
@@ -128,4 +138,8 @@ def get_feed(url, args, site_json, save_debug=False):
         feed = utils.init_jsonfeed(args)
         feed['title'] = 'Google Trends'
         feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+
+    elif split_url.netloc == 'news.google.com':
+        feed = rss.get_feed(url, args, site_json, save_debug, get_content)
+
     return feed

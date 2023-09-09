@@ -55,6 +55,9 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
       if len(urlsplit(entry_link).path) > 1:
         entry_link = utils.clean_url(entry_link)
 
+    if site_json['module'] == 'spreaker':
+      entry_link = entry.guid
+
     if 'guid' in entry:
       entry_id = entry.guid
     elif 'id' in entry:

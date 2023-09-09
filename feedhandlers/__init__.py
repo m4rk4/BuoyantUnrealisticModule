@@ -101,6 +101,7 @@ __all__ = ['abc_au',
            'hashnode',
            'healthline',
            'hearstnews',
+           'hello'
            'herokuapp_audm',
            'highgearmedia',
            'hsw',

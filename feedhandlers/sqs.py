@@ -150,8 +150,10 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-embed' in block['class']:
             if block.get('data-block-json'):
                 data_json = json.loads(block['data-block-json'])
-                #utils.write_file(data_json, './debug/sqs.json')
-                if data_json.get('html'):
+                if data_json.get('providerName') and data_json['providerName'] == 'Twitter':
+                    item['content_html'] += utils.add_embed(data_json['url'])
+                    continue
+                elif data_json.get('html'):
                     if re.search(r'disqus', data_json['html'], flags=re.I):
                         continue
                     elif re.search(r'iframe', data_json['html']):

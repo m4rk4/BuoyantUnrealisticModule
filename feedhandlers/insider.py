@@ -1,4 +1,4 @@
-import re
+import html, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, unquote_plus, urlsplit
@@ -117,10 +117,16 @@ def get_content(url, args, site_json, save_debug=False):
             continue
         if 'image-figure-image' in el['class']:
             img_src = ''
-            for img in el.find_all('img'):
-                if img.get('src'):
-                    if img['src'].startswith('https://i.insider.com'):
-                        img_src = resize_image(img['src'])
+            it = el.find(attrs={"data-srcs": True})
+            if it:
+                srcs = json.loads(html.unescape(it['data-srcs']))
+                img_src = list(srcs.keys())[0]
+                img_src = resize_image(img_src)
+            else:
+                for img in el.find_all('img'):
+                    if img.get('src'):
+                        if img['src'].startswith('https://i.insider.com'):
+                            img_src = resize_image(img['src'])
             if img_src:
                 captions = []
                 it = el.find(class_='image-caption')
@@ -325,13 +331,3 @@ def get_feed(url, args, site_json, save_debug=False):
                         break
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
-
-
-def test_handler():
-    feeds = ['https://feeds.insider.com/custom/all'
-             'https://feeds.businessinsider.com/custom/all',
-             'https://www.businessinsider.com/category/10-things-in-tech',
-             'https://www.businessinsider.com/category/newsletter'
-             'https://www.insider.com/guides']
-    for url in feeds:
-        get_feed({"url": url}, True)

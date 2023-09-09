@@ -145,6 +145,8 @@ def process_content_element(element, url, site_json, save_debug):
             poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(episode['image']))
             element_html += '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><h4>{}</h4><div style="clear:left;"></div><blockquote><small>{}</small></blockquote></div>'.format(
                 episode['audio'], poster, episode['title'], episode['summary'])
+        elif element['subtype'] == 'audio':
+            element_html += utils.add_embed(element['embed']['url'])
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif re.search(r'iframe', element['subtype'], flags=re.I):
@@ -174,10 +176,10 @@ def process_content_element(element, url, site_json, save_debug):
         else:
             cite = ''
         if element.get('subtype'):
-            if element['subtype'] == 'blockquote':
-                element_html += utils.add_blockquote(text)
-            elif element['subtype'] == 'pullquote':
+            if element['subtype'] == 'pullquote' or (element['subtype'] == 'blockquote' and cite):
                 element_html += utils.add_pullquote(text, cite)
+            elif element['subtype'] == 'blockquote':
+                element_html += utils.add_blockquote(text)
             else:
                 logger.warning('unhandled quote item type {}'.format(element['subtype']))
         else:
@@ -677,6 +679,9 @@ def get_feed(url, args, site_json, save_debug=False):
                         return None
                 else:
                     section = paths[-1]
+                    if site_json['section_feed'].get('section_replace'):
+                        for it in site_json['section_feed']['section_replace']:
+                            section = section.replace(it[0], it[1])
                     section_path = path.replace('/section', '')
                     query = re.sub(r'\s', '', json.dumps(site_json['section_feed']['query'])).replace('SECTIONPATH', section_path).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
             elif site_json.get('sections') and site_json['sections'].get(paths[-1]):

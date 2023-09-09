@@ -1,4 +1,4 @@
-import json, random, re, requests, string
+import basencode, json, math, random, re, requests, string
 from datetime import datetime
 from urllib.parse import quote_plus, unquote, urlsplit
 
@@ -324,7 +324,11 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
 
 
 def get_tweet_json(tweet_id):
-    return utils.get_url_json('https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en'.format(tweet_id))
+    n = basencode.Number(int(tweet_id) / 1e15 * math.pi)
+    token = n.repr_in_base(36, max_frac_places=8)
+    token = re.sub(r'(0+|\.)', '', token)
+    tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?features=tfw_timeline_list%3A%3Btfw_follower_count_sunset%3Atrue%3Btfw_tweet_edit_backend%3Aon%3Btfw_refsrc_session%3Aon%3Btfw_fosnr_soft_interventions_enabled%3Aon%3Btfw_mixed_media_15897%3Atreatment%3Btfw_experiments_cookie_expiration%3A1209600%3Btfw_show_birdwatch_pivots_enabled%3Aon%3Btfw_duplicate_scribes_to_settings%3Aon%3Btfw_use_profile_image_shape_enabled%3Aon%3Btfw_video_hls_dynamic_manifests_15082%3Atrue_bitrate%3Btfw_legacy_timeline_sunset%3Atrue%3Btfw_tweet_edit_frontend%3Aon&id={}&lang=en&token={}'.format(tweet_id, token)
+    return utils.get_url_json(tweet_url)
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -378,9 +382,9 @@ def get_content(url, args, site_json, save_debug=False):
                 if r.status_code == 200:
                     utils.write_file(r.json, './debug/twitter_api.json')
 
-    tweet_json = get_tweet_detail(tweet_id)
-    if tweet_json:
-        utils.write_file(tweet_json, './debug/tweet.json')
+        tweet_json = get_tweet_detail(tweet_id)
+        if tweet_json:
+            utils.write_file(tweet_json, './debug/tweet.json')
 
     tweet_json = get_tweet_json(tweet_id)
     if not tweet_json:

@@ -9,6 +9,8 @@ Instagram GraphSidecar media without ig_data in https://www.instagram.com/p/CsCJ
 Twitter
 Unified card: https://twitter.com/WEURO/status/1653368030037004288
 
+https://solarsystem.nasa.gov/api/v1/news_items/?order=publish_date+desc&per_page=50&page=0&search=&category=-438&tags=
+
 https://www.chronicle.com/article/as-bizarre-as-it-sounds-at-ohio-state-trustees-will-do-the-presidents-job
 ArticlePage-articleBody contentBody
 
@@ -28,6 +30,9 @@ https://www.larsenonfilm.com/guardians-of-the-galaxy-vol-3
 
 c-review-summary from html
 https://www.nextgenbase.com/dead-island-2-review/
+
+Add review score
+https://www.thecarexpert.co.uk/nissan-ariya-review-2023/
 
 Mastodon embeds
 https://matthewcassinelli.com/shortcuts-mac-menu-bar-progress-meter/
@@ -56,8 +61,9 @@ WP
 https://www.kitguru.net/reviews/
 https://www.nexstar.tv/stations/
 
+https://www.rvtravel.com/
+https://dailyinvestor.com/energy/28170/broken-solar-panels-manufactured-specifically-for-south-africa/
 https://bookriot.com/interesting-buildings-that-are-now-libraries-and-bookstores/
-https://musicindustryblog.wordpress.com/
 https://devblogs.microsoft.com/commandline/wp-json/wp/v2/posts/8371
 https://www.dailycartoonist.com/ - no wp-json, no meta
 https://www.nbcphiladelphia.com/wp-json/wp/v2/posts
@@ -141,7 +147,6 @@ Need to convert sites.json to use netloc instead of domain
 https://yahooeysblog.wordpress.com/, siteId=17277507
 
 Seems to be wp-posts format
-https://www.roku.com/blog/api/v1/posts?embed=true&page=1&limit=18&tags=578
 
 https://symantec-enterprise-blogs.security.com/blogs/api/v1/content-item/by-alias?aid=IOTVy1&alias=blog-post/zero-trust-risk-and-visibility&display-context=17202&sid=0ea78691-3b54-45e2-bd5f-b45ee9a86226
 
@@ -154,9 +159,6 @@ https://www.codingwithjesse.com/api/article/deploying-a-static-site-to-cloudflar
 https://www.treehugger.com/legend-christmas-spiders-4868322
 
 PRELOAD_STATE
-https://www.edmunds.com/car-news/2023-honda-civic-the-one-wed-buy.html
-https://www.edmunds.com/gateway/api/editorial/v3/content/?path=/research/best/car-news/honda-civic-how-wed-spec-it-for-2023,/research/car-news/honda-civic-how-wed-spec-it-for-2023,/car-news/honda-civic-how-wed-spec-it-for-2023&fetchcontents=true&ispreview=true&tree=true&externalfetch=true
-
 https://comicbook.com/gaming/news/steam-games-pc-best-2022/
 https://comicbook.com/article/json/442656/
 
@@ -250,6 +252,9 @@ https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott
 view-source:https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
 
 DRUPAL
+https://privacyinternational.org/long-read/5100/uk-governments-controversial-proposal-expand-surveillance-powers-what-you-need-know?_format=hal_json
+https://www.historytoday.com/archive/missing-pieces/lost-script-rapa-nui?_wrapper_format=drupal_ajax
+https://www.laphamsquarterly.org/
 https://www.gameinformer.com/
 https://www.jeffgeerling.com/blog
 https://beerconnoisseur.com/
@@ -264,6 +269,7 @@ https://circuitdigest.com/
 https://justthenews.com/
 https://www.justice.gov/
 https://circuitdigest.com/
+https://aphnetworks.com/index.php/
 
 Fusion
 Unknown content-api: https://en.as.com/racing/verstappen-wins-f1-australian-grand-prix-as-hamilton-makes-history-n/
@@ -322,6 +328,7 @@ http://jsbin.com/?html,output
   <meta name="viewport" content="width=device-width">
   <title>JS Bin</title>
 </head>
+<body>
 <body>
 <iframe style="width:800px; height:800px;" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2036.1076664343543!2d-91.13981355847015!3d30.420462377142552!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8626a6a8914ad1ff%3A0xdf5193b5cf94af5c!2s4600%20Bennington%20Ave%2C%20Baton%20Rouge%2C%20LA%2070808!5e1!3m2!1sen!2sus!4v1674376045866!5m2!1sen!2sus">
   </iframe>
