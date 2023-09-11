@@ -234,6 +234,9 @@ def get_content(url, args, site_json, save_debug=False):
                 new_html = utils.add_blockquote('<b>Tip:</b>' + el.decode_contents())
             elif 'emaki-custom-warning' in el['class']:
                 new_html = utils.add_blockquote('<span style="font-weight:bold; color:red;">Warning:</span>' + el.decode_contents(), border_color='red')
+            elif 'emaki-custom-key-points' in el['class']:
+                el.unwrap()
+                continue
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
