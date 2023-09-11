@@ -548,7 +548,8 @@ def get_item(content, url, args, site_json, save_debug):
         elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'video':
             item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
         elif content['promo_items'].get('images'):
-            item['_image'] = resize_image(content['promo_items']['images'][0], site_json)
+            if content['promo_items']['images'][0] != None:
+                item['_image'] = resize_image(content['promo_items']['images'][0], site_json)
     elif content.get('content_elements'):
         if content['content_elements'][0]['type'] == 'image':
             item['_image'] = resize_image(content['content_elements'][0], site_json)
