@@ -10173,6 +10173,14 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.reviewjournal.com/wp-json"
     },
+    "reviewonline": {
+        "feeds": [
+            "https://www.reviewonline.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.reviewonline.com/wp-json"
+    },
     "righto": {
         "feeds": [
             "https://www.righto.com/feeds/posts/default"
