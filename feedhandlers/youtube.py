@@ -133,12 +133,34 @@ def get_content(url, args, site_json, save_debug=False):
         if save_debug:
             utils.write_file(player_response, './debug/youtube.json')
         if not player_response.get('videoDetails'):
-            if player_response['playabilityStatus'].get('messages'):
-                item['title'] = ' '.join(player_response['playabilityStatus']['messages'])
-            else:
+            if player_response['playabilityStatus'].get('errorScreen') and player_response['playabilityStatus']['errorScreen'].get('playerErrorMessageRenderer'):
+                reasons = []
+                if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('reason'):
+                    msg = player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['reason']['simpleText']
+                    if not msg.endswith('.'):
+                        msg += '.'
+                    reasons.append(msg)
+                if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('subreason'):
+                    if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason'].get('simpleText'):
+                        msg = player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['simpleText']
+                        if not msg.endswith('.'):
+                            msg += '.'
+                        reasons.append(msg)
+                    elif player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason'].get('runs'):
+                        for it in player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['subreason']['runs']:
+                            msg = it['text']
+                            if not msg.endswith('.'):
+                                msg += '.'
+                            reasons.append(msg)
+                if reasons:
+                    item['title'] = ' '.join(reasons)
+            if not item.get('title'):
                 item['title'] = player_response['playabilityStatus']['status']
-            poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus('https://s.ytimg.com/yts/img/meh7-vflGevej7.png'))
-            caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+            caption = '<strong>{}</strong> | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+            if player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer'].get('thumbnail'):
+                poster = '{}/image?width=1280&height=720&overlay=https:{}'.format(config.server, quote_plus(player_response['playabilityStatus']['errorScreen']['playerErrorMessageRenderer']['thumbnail']['thumbnails'][0]['url']))
+            else:
+                poster = '{}/image?width=1280&height=720&overlay={}'.format(config.server, quote_plus('https://s.ytimg.com/yts/img/meh7-vflGevej7.png'))
             item['content_html'] = utils.add_image(poster, caption)
             return item
 
@@ -184,7 +206,7 @@ def get_content(url, args, site_json, save_debug=False):
         link = 'https://www.youtube-nocookie.com/embed/{}' + video_id
         poster = ''
 
-        if player_response['playabilityStatus']['status'] == 'UNPLAYABLE' or player_response['playabilityStatus']['status'] == 'LOGIN_REQUIRED':
+        if player_response['playabilityStatus']['status'] == 'ERROR' or player_response['playabilityStatus']['status'] == 'UNPLAYABLE' or player_response['playabilityStatus']['status'] == 'LOGIN_REQUIRED':
             video_stream = None
             if player_response['playabilityStatus'].get('errorScreen') and player_response['playabilityStatus']['errorScreen'].get('playerErrorMessageRenderer'):
                 reasons = []
