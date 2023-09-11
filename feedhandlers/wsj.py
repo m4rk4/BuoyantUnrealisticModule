@@ -182,6 +182,7 @@ def get_story_content(url, args, site_json, save_debug=False):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
     clean_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     if '/video/' in clean_url:
         return get_video_content(clean_url, args, site_json, save_debug)
@@ -191,14 +192,17 @@ def get_content(url, args, site_json, save_debug=False):
     if split_url.path.startswith('/amp/'):
         amp_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
     else:
-        amp_url = '{}://{}/amp{}'.format(split_url.scheme, split_url.netloc, split_url.path)
+        if 'articles' in paths:
+            amp_url = '{}://{}/amp{}'.format(split_url.scheme, split_url.netloc, split_url.path)
+        else:
+            amp_url = '{}://{}/amp/articles/{}'.format(split_url.scheme, split_url.netloc, paths[-1])
+    #print(amp_url)
     article_html = utils.get_url_html(amp_url, 'googlebot')
     if not article_html:
         return None
     article_html = re.sub(r'-\s{4,}', '-', article_html)
     if save_debug:
-        with open('./debug/debug.html', 'w', encoding='utf-8') as f:
-            f.write(article_html)
+        utils.write_file(article_html, './debug/debug.html')
 
     soup = BeautifulSoup(article_html, 'html.parser')
 
@@ -259,6 +263,9 @@ def get_content(url, args, site_json, save_debug=False):
         if not article_body:
             logger.warning('unable to find article body in ' + clean_url)
             return item
+
+    if save_debug:
+        utils.write_file(str(article_body), './debug/debug.html')
 
     article = article_body.find('section', attrs={"subscriptions-section": "content"})
     if not article:
@@ -401,12 +408,14 @@ def get_content(url, args, site_json, save_debug=False):
 
                                     elif iframe_json['serverside']['template'].get('template'):
                                         template = BeautifulSoup(iframe_json['serverside']['template']['template'], 'html.parser')
+                                        group_captions = []
                                         it = template.find(class_='origami-grouped-caption')
                                         if it:
-                                            group_caption = it.get_text()
-                                        else:
-                                            group_caption = ''
-                                        for img in template.find_all(class_='origami-image'):
+                                            group_captions.append(it.get_text())
+                                        it = template.find(class_='origami-grouped-credit')
+                                        if it:
+                                            group_captions.append(it.get_text())
+                                        for i, img in enumerate(template.find_all(class_=['origami-image', 'origami-item'])):
                                             captions = []
                                             it = img.find(class_='origami-caption')
                                             if it and it.get_text().strip():
@@ -416,12 +425,11 @@ def get_content(url, args, site_json, save_debug=False):
                                                 captions.append(it.get_text().strip())
                                             it = img.find('img')
                                             if it:
-                                                if group_caption:
-                                                    heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(group_caption)
+                                                if i == 0 and group_captions:
+                                                    heading = '<div style="text-align:center; font-size:1.1em; font-weight:bold">{}</div>'.format(' | '.join(group_captions))
                                                 else:
                                                     heading = ''
                                                 new_html += utils.add_image(it['src'], ' | '.join(captions), heading=heading)
-                                                group_caption = ''
                                     if not new_html:
                                         logger.debug('unhandled dynamic-inset-iframe origami in ' + iframe_url)
 
@@ -474,6 +482,14 @@ def get_content(url, args, site_json, save_debug=False):
                 new_html = convert_amp_image(el)
             else:
                 logger.warning('unhandled dynamic-inset-fallback in ' + clean_url)
+
+        elif 'bigtophero' in el['class']:
+            it = soup.find(class_=re.compile(r'articleLead|bigTop-hero'))
+            if el:
+                if it.find(class_='media-object-video'):
+                    new_html = convert_amp_video(it)
+                else:  # media-object-image
+                    new_html = convert_amp_image(it)
 
         elif len(el.contents) == 1:
             el.decompose()
