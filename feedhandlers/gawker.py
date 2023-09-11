@@ -47,12 +47,13 @@ def add_image(image):
 
 
 def add_kinja_video(video):
-    video_json = utils.get_url_json('https://kinja.com/api/core/video/views/videoById?videoId={}'.format(video['id']))
+    #video_json = utils.get_url_json('https://kinja.com/api/core/video/views/videoById?videoId={}'.format(video['id']))
+    video_json = utils.get_url_json('https://kotaku.com/api/videoupload/video/byIds?cb=&ids={}'.format(video['id']))
     if not video_json:
         logger.warning('unable to add Kinja video')
         return ''
-
-    video_src = video_json['data']['fastlyUrl']
+    video_data = video_json['data'][0]
+    video_src = video_data['fastlyUrl']
 
     if 'm3u8' in video_src:
         video_type = 'application/x-mpegURL'
@@ -62,7 +63,7 @@ def add_kinja_video(video):
         logger.warning('unknown video type in for '.format(video_src))
         video_type = 'application/x-mpegURL'
 
-    poster = get_image_src(video_json['data']['poster']['id'], video_json['data']['poster']['format'])
+    poster = get_image_src(video_data['poster']['id'], video_data['poster']['format'])
 
     captions = []
     if video.get('caption'):
@@ -78,7 +79,7 @@ def add_kinja_video(video):
         if content:
             captions.append(content)
     if not captions:
-        captions.append(video_json['data']['title'])
+        captions.append(video_data['title'])
 
     return utils.add_video(video_src, video_type, poster, ' | '.join(captions))
 
@@ -166,7 +167,8 @@ def render_content(content):
         content_html += utils.add_embed('https://www.youtube.com/watch?list={}&v={}'.format(content['id'], content['initialVideo']))
 
     elif content['type'] == 'Twitter':
-        content_html += utils.add_embed(utils.get_twitter_url(content['id']))
+        #content_html += utils.add_embed(utils.get_twitter_url(content['id']))
+        content_html += utils.add_embed('https://twitter.com/_/status/{}'.format(content['id']))
 
     elif content['type'] == 'Instagram':
         content_html += utils.add_embed('https://www.instagram.com/p/' + content['id'])
