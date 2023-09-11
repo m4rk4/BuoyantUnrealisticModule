@@ -383,18 +383,24 @@ def get_content(url, args, site_json, save_debug=False):
             if instruction['type'] == 'TimelineAddEntries':
                 for entry in instruction['entries']:
                     if entry['entryId'].startswith('tweet-'):
-                        tweet_result = entry['content']['itemContent']['tweet_results']['result']
-                        if not parent_id:
-                            if tweet_result.get('rest_id'):
-                                parent_id = tweet_result['rest_id']
+                        if entry['content']['itemContent']['tweet_results'].get('result'):
+                            tweet_result = entry['content']['itemContent']['tweet_results']['result']
+                            if not parent_id:
+                                if tweet_result.get('rest_id'):
+                                    parent_id = tweet_result['rest_id']
+                                else:
+                                    parent_id = entry['entryId'].split('-')[-1]
+                            if tweet_id in entry['entryId'].split('-'):
+                                item = get_tweet(tweet_result, is_retweet=is_retweet)
                             else:
-                                parent_id = entry['entryId'].split('-')[-1]
-                        if tweet_id in entry['entryId'].split('-'):
-                            item = get_tweet(tweet_result, is_retweet=is_retweet)
+                                it = get_tweet(tweet_result, is_thread=True, is_retweet=is_retweet)
+                                if it:
+                                    parents += it['content_html']
                         else:
-                            it = get_tweet(tweet_result, is_thread=True, is_retweet=is_retweet)
-                            if it:
-                                parents += it['content_html']
+                            if tweet_id in entry['entryId'].split('-'):
+                                item['content_html'] = '<tr><td colspan="2"><div style="text-align:center;">Hmm...this post doesn’t exist.</div></td></tr>'
+                            else:
+                                parents += '<tr><td colspan="2"><div style="text-align:center;">Hmm...this post doesn’t exist.</div></td></tr>'
                     elif entry['entryId'].startswith('conversationthread-'):
                         for content_item in entry['content']['items']:
                             if content_item['item']['itemContent']['__typename'] == 'TimelineTweet':
