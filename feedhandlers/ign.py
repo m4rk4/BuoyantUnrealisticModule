@@ -46,9 +46,6 @@ def get_video_data(slug, video_id=''):
         if not api_data:
             return None
         slug = api_data['data']['videoPlayerProps']['metadata']['slug']
-
-    print(slug)
-    #api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%2C%22region%22%3A%22us%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22689efcbe89287bd0f561caf42a9ab1e3abb4f09e7aa2937ed367ac1683ecd5d2%22%7D%7D'.format(slug)
     api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%226ba07ded7512c10289193c935c7b1b63fb26b9baf890bb0b0685cd4f2e5d8e87%22%7D%7D'.format(slug)
     api_data = get_api_data(api_url)
     if not api_data:
@@ -445,11 +442,16 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    headers = {"apollographql-client-name": "kraken",
+               "apollographql-client-version": "v0.23.5",
+               "content-type": "application/json",
+               "x-postgres-articles": "true"}
+
     split_url = urlsplit(args['url'])
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) == 0:
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=HomepageContentFeed&variables=%7B%22filter%22%3A%22Latest%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A12%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22181bfd3ccd2365e75755882430f2da42a663c2ea8c2f198c33a5562ea50fadfd%22%7D%7D'
-        data_keys = ['homepage', 'contentFeed', 'contentItems']
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=HomepageContentFeed&variables=%7B%22filter%22%3A%22Latest%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A12%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%228e11ab9cbe6f6280abc0f030db519070c11ef3c1b6911d33a83d6462c461bf8d%22%7D%7D'
+        data_keys = ['homepage', 'contentFeed', 'feedItems']
 
     elif paths[0] == 'news':
         if len(paths) > 1:
@@ -461,9 +463,8 @@ def get_feed(url, args, site_json, save_debug=False):
                 feed_filter = paths[1].captialize()
         else:
             feed_filter = 'Latest'
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=NewsContentFeed&variables=%7B%22filter%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%2C%22newsOnly%22%3Atrue%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2213bef5508c5f2d4610f93df7c872b8a362cb0dae29eba4e4804eb11809e77760%22%7D%7D'.format(feed_filter)
-
-        data_keys = ['homepage', 'contentFeed', 'contentItems']
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=HomepageContentFeed&variables=%7B%22filter%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%2C%22newsOnly%22%3Atrue%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%228e11ab9cbe6f6280abc0f030db519070c11ef3c1b6911d33a83d6462c461bf8d%22%7D%7D'.format(feed_filter)
+        data_keys = ['homepage', 'contentFeed', 'feedItems']
 
     elif paths[0] == 'reviews' or paths[0] == 'editors-choice':
         # review/editors-choice, filter, platform/genre
@@ -487,8 +488,8 @@ def get_feed(url, args, site_json, save_debug=False):
             query = parse_qs(split_url.query)
             if query.get('genre'):
                 genre = '%5B%22{}%22%5D'.format(query['genre'][0])
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ReviewsContentFeed&variables=%7B%22filter%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%2C%22editorsChoice%22%3A{}%2C%22sortOption%22%3A%22Latest%22%2C%22gamePlatformSlugs%22%3A{}%2C%22genreSlugs%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22664109766601448c3c393755d2234600e55000cfb760ad0d7200fdc1322c2adb%22%7D%7D'.format(feed_filter, editors_choice, platform, genre)
-        data_keys = ['reviewContentFeed', 'contentItems']
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ReviewsContentFeed&variables=%7B%22filter%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%2C%22editorsChoice%22%3A{}%2C%22sortOption%22%3A%22Latest%22%2C%22gamePlatformSlugs%22%3A{}%2C%22genreSlugs%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22b6e9c5db3b03ea9b7fdd936e0bc77ed45db6e5ede32a205fce4fb01a284cfb64%22%7D%7D'.format(feed_filter, editors_choice, platform, genre)
+        data_keys = ['reviewContentFeed', 'feedItems']
 
     elif paths[0] == 'videos':
         feed_filter = 'Videos'
@@ -496,14 +497,21 @@ def get_feed(url, args, site_json, save_debug=False):
             query = parse_qs(split_url.query)
             if query.get('filter'):
                 feed_filter = query['genre'][0].capitalize()
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ChannelContentFeed&variables=%7B%22slug%22%3A%22videos%22%2C%22region%22%3A%22us%22%2C%22filter%22%3A%22{}%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2210ffadcad21ceaa24ec9d252d60adbffd740f02165feb0ede135d745769161eb%22%7D%7D'.format(feed_filter)
-        data_keys = ['channel', 'contentFeed', 'contentItems']
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ChannelContentFeed&variables=%7B%22slug%22%3A%22videos%22%2C%22region%22%3A%22us%22%2C%22filter%22%3A%22{}%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%220dc7de16d185896e2f1cb4c5eecf42ee8dfc0b23200f0c79b072d9516688d967%22%7D%7D'
+        data_keys = ['channel', 'contentFeed', 'feedItems']
 
     elif paths[0] == 'person':
+        # Get authorId
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=AuthorInfo&variables=%7B%22nickname%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22d948c36fe858c1f89242f06dad0bff8f5ad8ba0a472a67aefb74e1f9858f0030%22%7D%7D'.format(paths[1])
+        api_data = utils.get_url_json(api_url, headers=headers)
+        if not api_data:
+            return None
         if len(paths) > 2:
             feed_filter = paths[2].capitalize()
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=AuthorMoreReviewsFeed&variables=%7B%22authorId%22%3A4917321%2C%22filter%22%3A%22{}%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%2C%22region%22%3A%22us%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22d2af4f25b9e6f73f4f2880e5c193f23e0cfae1240356feef992a7082a5b0b49e%22%7D%7D'.format(feed_filter)
-        data_keys = ['author', 'contentFeed', 'contentItems']
+        else:
+            feed_filter = 'Latest'
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=AuthorContentFeed&variables=%7B%22authorId%22%3A{}%2C%22filter%22%3A%22{}%22%2C%22count%22%3A10%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2200032d017178015ed43cbfeab79daee8c9e4a1014ba88ac208c5aa3b07baebde%22%7D%7D'.format(api_data['data']['author']['authorId'], feed_filter)
+        data_keys = ['contributor', 'contentFeed', 'feedItems']
 
     else:
         feed_filter = 'All'
@@ -511,13 +519,9 @@ def get_feed(url, args, site_json, save_debug=False):
             query = parse_qs(split_url.query)
             if query.get('filter'):
                 feed_filter = query['filter'][0].capitalize()
-        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ChannelContentFeed&variables=%7B%22slug%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22filter%22%3A%22{}%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%2210ffadcad21ceaa24ec9d252d60adbffd740f02165feb0ede135d745769161eb%22%7D%7D'.format(paths[0], feed_filter)
-        data_keys = ['channel', 'channelFeed', 'contentItems']
+        api_url = 'https://mollusk.apis.ign.com/graphql?operationName=ChannelContentFeed&variables=%7B%22slug%22%3A%22{}%22%2C%22region%22%3A%22us%22%2C%22filter%22%3A%22{}%22%2C%22startIndex%22%3A0%2C%22count%22%3A10%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%220dc7de16d185896e2f1cb4c5eecf42ee8dfc0b23200f0c79b072d9516688d967%22%7D%7D'.format(paths[0], feed_filter)
+        data_keys = ['channel', 'channelFeed', 'feedItems']
 
-    headers = {"apollographql-client-name": "kraken",
-               "apollographql-client-version": "v0.11.19",
-               "content-type": "application/json",
-               "x-postgres-articles": "true"}
     api_data = utils.get_url_json(api_url, headers=headers)
     if not api_data:
         return None
