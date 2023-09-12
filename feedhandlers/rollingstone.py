@@ -70,7 +70,20 @@ def get_content(url, args, site_json, save_debug=False):
 
     lede = ''
     if article_json.get('featured-video'):
-        lede += utils.add_embed(article_json['featured-video'])
+        if 'connatix_contextual_player' in article_json['featured-video']:
+            m = re.search(r'playerId:"([^"]+)",mediaId:"([^"]+)"', re.sub(r'\s', '', article_json['featured-video']))
+            if m:
+                video_src = 'https://vid.connatix.com/pid-{}/{}/playlist.m3u8'.format(m.group(1), m.group(2))
+                poster = 'https://img.connatix.com/pid-{}/{}/1_th.jpg?width=1000&format=jpeg&quality=60'.format(m.group(1), m.group(2))
+                caption = []
+                if article_json.get('featured-image'):
+                    if article_json['featured-image'].get('caption'):
+                        caption.append(article_json['featured-image']['caption'])
+                    if article_json['featured-image'].get('credit'):
+                        caption.append(article_json['featured-image']['credit'])
+                lede += utils.add_video(video_src, 'application/x-mpegURL', poster, ' | '.join(caption))
+        else:
+            lede += utils.add_embed(article_json['featured-video'])
 
     if article_json.get('featured-image'):
         for img in article_json['featured-image']['crops']:
@@ -144,10 +157,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in soup.find_all(class_='wp-block-embed'):
         new_html = ''
-        if 'is-provider-youtube' in el['class']:
-            it = el.find('iframe')
-            if it:
-                new_html = utils.add_embed(it['src'])
+        it = el.find('iframe')
+        if it:
+            new_html = utils.add_embed(it['src'])
         if new_html:
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
@@ -161,6 +173,22 @@ def get_content(url, args, site_json, save_debug=False):
             el.parent.decompose()
         else:
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+            el.decompose()
+
+    for el in soup.find_all('script'):
+        new_html = ''
+        if el.get('id') and 'connatix_contextual_player' in el['id']:
+            m = re.search(r'playerId:"([^"]+)",mediaId:"([^"]+)"', re.sub(r'\s', '', el.string))
+            if m:
+                video_src = 'https://vid.connatix.com/pid-{}/{}/playlist.m3u8'.format(m.group(1), m.group(2))
+                poster = 'https://img.connatix.com/pid-{}/{}/1_th.jpg?width=1000&format=jpeg&quality=60'.format(m.group(1), m.group(2))
+                new_html = utils.add_video(video_src, 'application/x-mpegURL', poster)
+            else:
+                logger.warning('unhandled connatix_contextual_player in ' + item['url'])
+        if new_html:
+            el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+            el.decompose()
+        else:
             el.decompose()
 
     item['content_html'] = lede + str(soup)
