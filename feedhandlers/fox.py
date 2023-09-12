@@ -215,6 +215,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = article_json['dek']
 
     item['content_html'] = ''
+    if article_json.get('standfirst'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirst'])
+
     if article_json['component_type'] == 'video':
         item['content_html'] += add_video(article_json)
         return item
@@ -292,6 +295,8 @@ def get_content(url, args, site_json, save_debug=False):
             pass
         else:
             logger.warning('unhandled content type {} in {}'.format(component['content_type'], item['url']))
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
