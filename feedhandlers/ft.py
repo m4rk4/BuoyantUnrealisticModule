@@ -71,7 +71,6 @@ def get_content(url, args, site_json, save_debug=False):
         "sec-fetch-user": "?1",
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36 Edg/108.0.1462.42"
-
     }
     article_html = utils.get_url_html(url, headers=headers)
     if not article_html:
@@ -157,7 +156,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += el.decode_contents()
 
     elif ld_json.get('articleBody'):
-        article_body = soup.find('div', attrs={"data-attribute": "article-content-body"})
+        article_body = soup.find(['article', 'div'], attrs={"data-attribute": "article-content-body"})
         for el in article_body.find_all('div', class_='o-ads'):
             el.decompose()
 
