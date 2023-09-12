@@ -64,7 +64,12 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
       entry_id = entry.id
     else:
       entry_id = entry_link
- 
+
+    split_url = urlsplit(entry_link)
+    if not split_url.path or split_url.path == '/':
+      logger.debug('skipping link with no path ' + entry_link)
+      continue
+
     # Skip duplicates
     if len(feed_items) > 0:
       if next((it for it in feed_items if (it['id'] == entry_id and it['url'] == entry_link)), None):

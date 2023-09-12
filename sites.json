@@ -13896,6 +13896,7 @@
     "washingtonpost": {
         "api_url": "https://www.washingtonpost.com/prism/api/",
         "arc_site": "washpost",
+        "audio_api": "https://www.washingtonpost.com/audioapi/api/v1/audio",
         "author_feed": {
             "query": {
                 "query": "prism://prism.query/author,AUTHOR&limit=10"
@@ -13909,6 +13910,10 @@
             "source": "prism-query"
         },
         "deployment": 0,
+        "feeds": [
+            "https://www.washingtonpost.com/personal-tech/",
+            "https://www.washingtonpost.com/people/geoffrey-a-fowler/"
+        ],
         "homepage_feed": {
             "query": {
                 "query": "PATH"
@@ -13916,6 +13921,7 @@
             "source": "prism-query"
         },
         "module": "fusion",
+        "referent_image_path": "https://arc-anglerfish-washpost-prod-washpost.s3.amazonaws.com/public/",
         "resizer_secret": "",
         "resizer_url": "",
         "section_feed": {

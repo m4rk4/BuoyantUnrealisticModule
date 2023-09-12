@@ -1,6 +1,6 @@
-import base64, hashlib, hmac, json, pytz, re, tldextract
+import base64, hashlib, hmac, json, math, pytz, re, tldextract
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote, quote_plus
 
 import config, utils
@@ -89,6 +89,7 @@ def process_content_element(element, url, site_json, save_debug):
         # Filter out ad content
         if not re.search(r'adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
             raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
+            #print(raw_soup.contents[0].name)
             if raw_soup.iframe:
                 if raw_soup.iframe.get('data-fallback-image-url'):
                     element_html += utils.add_image(raw_soup.iframe['data-fallback-image-url'], link=raw_soup.iframe['src'])
@@ -121,7 +122,7 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_image(raw_soup.contents[0]['data-fallback-image-url'])
             elif raw_soup.contents[0].name == 'hl2':
                 element_html += element['content'].replace('hl2', 'h2')
-            elif raw_soup.contents[0].name == 'style':
+            elif raw_soup.contents[0].name == 'ad' or raw_soup.contents[0].name == 'quizbespoke' or raw_soup.contents[0].name == 'style':
                 # can usually skip these
                 pass
             elif element.get('subtype') and element['subtype'] == 'subs_form':
@@ -147,6 +148,35 @@ def process_content_element(element, url, site_json, save_debug):
                 episode['audio'], poster, episode['title'], episode['summary'])
         elif element['subtype'] == 'audio':
             element_html += utils.add_embed(element['embed']['url'])
+        elif element['subtype'] == 'inline_audio':
+            # Might be WaPo specific
+            # https://www.washingtonpost.com/technology/2023/07/10/printer-home-hacks-tips/
+            audio_html = ''
+            if 'washpost' in element['embed']['url']:
+                audio_url = '{}/findBySlug/{}'.format(site_json['audio_api'], element['embed']['config']['slug'])
+                audio_json = utils.get_url_json(audio_url)
+                if audio_json:
+                    poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(audio_json['images']['coverImage']['url']))
+                    audio_html += '<table><tr><td><a href="{}"><img src="{}" /></a></td>'.format(audio_json['audio']['url'], poster)
+                    audio_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}://{}{}">{}</a></div>'.format(split_url.scheme, split_url.netloc, audio_json['canonicalUrl'], audio_json['title'])
+                    audio_html += '<div>by <a href="{}://{}/{}">{}</a></div>'.format(split_url.scheme, split_url.netloc, audio_json['seriesMeta']['seriesSlug'], audio_json['seriesMeta']['seriesName'])
+                    dt = datetime.fromtimestamp(audio_json['publicationDate']/1000).replace(tzinfo=timezone.utc)
+                    duration = []
+                    s = audio_json['duration']
+                    if s > 3600:
+                        h = s / 3600
+                        duration.append('{} hr'.format(math.floor(h)))
+                        m = (s % 3600) / 60
+                        duration.append('{} min'.format(math.ceil(m)))
+                    else:
+                        m = s / 60
+                        duration.append('{} min'.format(math.ceil(m)))
+                    audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), ', '.join(duration))
+                    audio_html += '<div style="font-size:0.8em;">{}</div></td></tr></table>'.format(audio_json['shortDescription'])
+            if audio_html:
+                element_html += audio_html
+            else:
+                logger.warning('unhandled custom_embed inline_audio')
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif re.search(r'iframe', element['subtype'], flags=re.I):
@@ -204,8 +234,9 @@ def process_content_element(element, url, site_json, save_debug):
         for it in element['items']:
             if it['type'] == 'text':
                 element_html += '<li>{}</li>'.format(it['content'])
+            elif it['type'] == 'list':
+                element_html += '{}'.format(process_content_element(it, url, site_json, save_debug))
             else:
-                # element_html += '<li>Unhandled list item type {}</li>'.format(element['type'])
                 logger.warning('unhandled list item type {}'.format(element['type']))
         if element['list_type'] == 'unordered':
             element_html += '</ul>'
@@ -336,7 +367,17 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'reference':
         if element.get('referent') and element['referent'].get('id'):
-            element_html += utils.add_embed(element['referent']['id'])
+            if element['referent']['type'] == 'image':
+                captions = []
+                if element['referent']['referent_properties'].get('caption'):
+                    captions.append(element['referent']['referent_properties']['caption'])
+                if element['referent']['referent_properties'].get('vanity_credits') and element['referent']['referent_properties']['vanity_credits'].get('by'):
+                    for it in element['referent']['referent_properties']['vanity_credits']['by']:
+                        captions.append(it['name'])
+                img_src = '{}{}.jpg'.format(site_json['referent_image_path'], element['referent']['id'])
+                element_html += utils.add_image(img_src, ' | '.join(captions))
+            else:
+                element_html += utils.add_embed(element['referent']['id'])
         else:
             logger.warning('unhandled reference element')
 
@@ -372,6 +413,7 @@ def process_content_element(element, url, site_json, save_debug):
 
 
 def get_content_html(content, url, site_json, save_debug):
+    split_url = urlsplit(url)
     content_html = ''
     if content['type'] == 'video':
         streams_mp4 = []
@@ -428,6 +470,12 @@ def get_content_html(content, url, site_json, save_debug):
             lead_image = content['promo_items']['basic']
         elif content['promo_items'].get('images'):
             lead_image = content['promo_items']['images'][0]
+    if lead_image and lead_image.get('_id'):
+        if content.get('content_elements'):
+            if content['content_elements'][0]['_id'] == lead_image['_id']:
+                lead_image = None
+            elif content['content_elements'][1]['_id'] == lead_image['_id']:
+                lead_image = None
     if lead_image:
         if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
@@ -453,7 +501,34 @@ def get_content_html(content, url, site_json, save_debug):
             caption = '<b>{}</b> &mdash; {}'.format(video['title'], video['description'])
             content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption)
 
-    content_html = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', content_html)
+    if content.get('subtype'):
+        if content['subtype'] == 'audio':
+            audio_html = ''
+            audio_url = '{}/{}'.format(site_json['audio_api'], content['fusion_additions']['audio']['id'])
+            audio_json = utils.get_url_json(audio_url)
+            if audio_json:
+                poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(audio_json['images']['coverImage']['url']))
+                audio_html += '<table><tr><td><a href="{}"><img src="{}" /></a></td>'.format(audio_json['audio']['url'], poster)
+                audio_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}://{}{}">{}</a></div>'.format(split_url.scheme, split_url.netloc, audio_json['canonicalUrl'], audio_json['title'])
+                audio_html += '<div>by <a href="{}://{}/{}">{}</a></div>'.format(split_url.scheme, split_url.netloc, audio_json['seriesMeta']['seriesSlug'], audio_json['seriesMeta']['seriesName'])
+                dt = datetime.fromtimestamp(audio_json['publicationDate'] / 1000).replace(tzinfo=timezone.utc)
+                duration = []
+                s = audio_json['duration']
+                if s > 3600:
+                    h = s / 3600
+                    duration.append('{} hr'.format(math.floor(h)))
+                    m = (s % 3600) / 60
+                    duration.append('{} min'.format(math.ceil(m)))
+                else:
+                    m = s / 60
+                    duration.append('{} min'.format(math.ceil(m)))
+                audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), ', '.join(duration))
+                audio_html += '<div style="font-size:0.8em;">{}</div></td></tr></table>'.format(audio_json['shortDescription'])
+            if audio_html:
+                content_html += audio_html
+            else:
+                logger.warning('unhandled audio subtype in ' + url)
+    content_html = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', content_html)
     return content_html
 
 
