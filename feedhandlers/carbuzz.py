@@ -124,7 +124,7 @@ def get_content(url, args, site_json, save_debug=False):
                 content_html += '<li>{}</li>'.format(credit['name'])
         content_html += '</ul><p>'
 
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', content_html)
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', content_html)
     return item
 
 
