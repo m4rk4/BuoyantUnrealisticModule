@@ -5095,6 +5095,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://geekdad.com/wp-json"
     },
+    "geektyrant": {
+        "feeds": [
+            "https://geektyrant.com/news?format=rss"
+        ],
+        "module": "sqs"
+    },
     "geekwire": {
         "feeds": [
             "https://www.geekwire.com/feed"
@@ -12635,6 +12641,13 @@
         "module": "wp_public",
         "site_id": 64552954
     },
+    "petewarden": {
+        "feeds": [
+            "https://petewarden.com/feed"
+        ],
+        "module": "wp_public",
+        "site_id": 55065938
+    },
     "thepewterplank": {
         "feeds": [
             "https://thepewterplank.com/feed"
@@ -13682,6 +13695,14 @@
     },
     "videopress": {
         "module": "videopress"
+    },
+    "videoweek": {
+        "feeds": [
+            "https://videoweek.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://videoweek.com/wp-json"
     },
     "vidible": {
         "module": "vidible"
