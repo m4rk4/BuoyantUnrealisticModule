@@ -5450,7 +5450,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "CvuIeZSIoK7-cMgu2-0lp",
+        "buildId": "N_DpPXhHNMwc_9_ZhjbuY",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -9244,6 +9244,13 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://petapixel.com/wp-json"
     },
+    "petewarden": {
+        "feeds": [
+            "https://petewarden.com/feed"
+        ],
+        "module": "wp_public",
+        "site_id": 55065938
+    },
     "petri": {
         "feeds": [
             "https://petri.com/feed"
@@ -12640,13 +12647,6 @@
         ],
         "module": "wp_public",
         "site_id": 64552954
-    },
-    "petewarden": {
-        "feeds": [
-            "https://petewarden.com/feed"
-        ],
-        "module": "wp_public",
-        "site_id": 55065938
     },
     "thepewterplank": {
         "feeds": [
