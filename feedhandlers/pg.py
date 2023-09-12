@@ -101,7 +101,7 @@ def get_content(url, args, site_json, save_debug=False):
     if el.get('class'):
       if 'twitter-tweet' in el['class']:
         links = el.find_all('a')
-        new_html = utils.add_embed(links['-1']['href'])
+        new_html = utils.add_embed(links[-1]['href'])
       elif 'instagram-media' in el['class']:
         new_html = utils.add_embed(el['data-instgrm-permalink'])
     if new_html:
