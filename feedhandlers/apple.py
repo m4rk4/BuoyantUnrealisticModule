@@ -260,7 +260,15 @@ def get_podcast_episode(episode):
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
     item['author'] = {"name": episode['attributes']['artistName']}
-    item['tags'] = episode['attributes']['genreNames'].copy() + episode['attributes']['topics'].copy()
+
+    item['tags'] = []
+    if episode['attributes'].get('genreNames'):
+        item['tags'] += episode['attributes']['genreNames'].copy()
+    if episode['attributes'].get('topics'):
+        item['tags'] += episode['attributes']['topics'].copy()
+    if not item.get('tags'):
+        del item['tags']
+
     item['_image'] = episode['attributes']['artwork']['url']
     item['_audio'] = utils.get_redirect_url(episode['attributes']['assetUrl'])
     item['summary'] = episode['attributes']['description']['standard']
