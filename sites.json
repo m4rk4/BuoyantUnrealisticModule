@@ -13384,7 +13384,7 @@
         "module": "twitch"
     },
     "twitter": {
-        "module": "twitter-v2"
+        "module": "twitter_api"
     },
     "tyla": {
         "channel": "tyla",
