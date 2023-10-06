@@ -2051,7 +2051,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1127,
+        "deployment": 1145,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -5450,7 +5450,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "kBQmRXgku97j9KfROHDoL",
+        "buildId": "7T70mNvrTt6tzcRzow1dV",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -8749,7 +8749,7 @@
         "wpjson_path": "https://www.omgubuntu.co.uk/wp-json"
     },
     "omny": {
-        "buildId": "TzSondRLLqMbhrj4FWL0V",
+        "buildId": "p3dEWkkpj884lMg6CHzGF",
         "module": "omnyfm"
     },
     "omnycontent": {
@@ -10114,7 +10114,7 @@
             },
             "source": "article-by-id-or-url-v1"
         },
-        "deployment": 156,
+        "deployment": 159,
         "homepage_feed": {
             "query": {
                 "arc-site": "reuters",
