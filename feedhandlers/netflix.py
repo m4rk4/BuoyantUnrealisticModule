@@ -106,12 +106,15 @@ def get_content(url, args, site_json, save_debug=False):
         "operationName": "PulsePageQuery",
         "variables":{
             "withProfile": False,
-            "url": '/' + '/'.join(paths[1:])
+            "url": '/' + '/'.join(paths[1:]),
+            "params":{
+                "isWebView": False
+            }
         },
         "extensions": {
             "persistedQuery": {
                 "version":1,
-                "sha256Hash":"426c651cce64f4575f839beba6b651f938019e47b3ff23758a670986621ae9a8"
+                "sha256Hash":"7ab158dcfc7e3d526e0abbf30d3da116c884bb2813597c422b39ef9bb15a8fcf"
             }
         }
     }
@@ -192,7 +195,7 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += '<p><em>{}</em></p>'.format(entity['bodyRichText']['html'])
                 if entity.get('backgroundImage'):
                     item['content_html'] += utils.add_image(entity['backgroundImage']['url'], entity.get('imageCredit'))
-            # elif entity['__typename'] == 'PulseVideoPlayerEntity':
+            #elif entity['__typename'] == 'PulseVideoPlayerEntity':
             #     video_src = get_video_src(entity['videoID'])
             #     if video_src:
             #         item['content_html'] += utils.add_video(video_src, 'application/x-mpegURL',  entity['image']['url'])

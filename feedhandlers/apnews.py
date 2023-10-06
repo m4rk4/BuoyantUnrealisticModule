@@ -15,6 +15,8 @@ def add_media(media):
         size = utils.closest_value(media['imageRenderedSizes'], 1000)
         url = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
         media_html = utils.add_image(url, media['flattenedCaption'])
+    elif media['type'] == 'Video' and media.get('jwVideoStatus'):
+        media_html = utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(media['jwMediaId']))
     elif media['type'] == 'YouTube':
         media_html = utils.add_embed('https://www.youtube.com/watch?v={}'.format(media['externalId']))
     else:
@@ -145,14 +147,16 @@ def get_item(content_data, args, site_json, save_debug=False):
                 break
 
     item['content_html'] = ''
-    if content_data.get('leadPhotoId'):
-        if content_data.get('media'):
-            for media in content_data['media']:
-                if media['id'] == content_data['leadPhotoId']:
-                    item['content_html'] = add_media(media)
-                    break
-        else:
-            item['content_html'] = utils.add_image(item['image'])
+    if content_data.get('leadVideoId'):
+        media = next((it for it in content_data['media'] if it['id'] == content_data['leadVideoId']), None)
+        if media:
+            item['content_html'] = add_media(media)
+    elif content_data.get('leadPhotoId'):
+        media = next((it for it in content_data['media'] if it['id'] == content_data['leadPhotoId']), None)
+        if media:
+            item['content_html'] = add_media(media)
+    else:
+        item['content_html'] = utils.add_image(item['image'])
 
     item['content_html'] += str(story_soup)
 

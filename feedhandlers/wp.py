@@ -203,13 +203,24 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     authors = []
     if site_json.get('author'):
-        for el in soup.find_all(site_json['author']['tag'], attrs=site_json['author']['attrs']):
-            if el.name == 'a':
-                authors.append(el.get_text())
+        for el in utils.get_soup_elements(site_json['author'], soup):
+            author = ''
+            if el.name == 'meta':
+                author = el['content']
+            elif el.name == 'a':
+                author = el.get_text().strip()
             else:
-                for it in el.find_all('a', href=re.compile(r'author|staff')):
-                    authors.append(it.get_text())
-            if authors:
+                for it in el.find_all('a', href=re.compile(r'author|correspondents|staff')):
+                    author = it.get_text().strip()
+                    if author not in authors:
+                        authors.append(author)
+            if not authors and el.get_text().strip():
+                author = re.sub(r'^By ', '', el.get_text().strip(), flags=re.I)
+            if author:
+                author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
+                if author not in authors:
+                    authors.append(author)
+            if authors and not site_json['author'].get('multi'):
                 break
     elif article_json and article_json.get('author'):
         if isinstance(article_json['author'], dict):
@@ -232,6 +243,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             authors.append(meta['parsely-author'].replace(',', '&#44;'))
     if not authors and oembed_json and oembed_json.get('author_name'):
             authors.append(oembed_json['author_name'].replace(',', '&#44;'))
+    if not authors and site_json.get('authors'):
+        authors.append(site_json['authors']['default'])
     if authors:
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
@@ -240,7 +253,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     item['tags'] = []
     if site_json.get('tags'):
-        for el in soup.find_all(site_json['tags']['tag'], attrs=site_json['tags']['attrs']):
+        for el in utils.get_soup_elements(site_json['tags'], soup):
             if el.name == 'a':
                 item['tags'].append(el.get_text().strip())
             else:
@@ -263,6 +276,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
     if not item.get('tags'):
         del item['tags']
+    else:
+        # Remove duplicates (case-insensitive)
+        item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
 
     if ld_json:
         for it in ld_json:
@@ -303,9 +319,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     item['content_html'] = ''
     if 'add_subtitle' in args:
         if site_json.get('subtitle'):
-            el = soup.find(site_json['subtitle']['tag'], attrs=site_json['subtitle']['attrs'])
-            if el:
-                item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())
+            subtitles = []
+            for el in utils.get_soup_elements(site_json['subtitle'], soup):
+                subtitles.append(el.get_text())
+            if subtitles:
+                item['content_html'] += '<p><em>{}</em></p>'.format('<br/>'.join(subtitles))
         elif item.get('summary'):
             item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
@@ -316,52 +334,58 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             add_caption = True
         lede = False
         if site_json.get('lede_video'):
-            el = soup.find(site_json['lede_video']['tag'], attrs=site_json['lede_video']['attrs'])
-            if el:
-                it = el.find(class_='jw-video-box')
-                if it:
-                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
-                    lede = True
-                else:
-                    it = el.find(id=re.compile(r'jw-player-'))
+            elements = utils.get_soup_elements(site_json['lede_video'], soup)
+            if elements:
+                el = elements[0]
+                if el:
+                    it = el.find(class_='jw-video-box')
                     if it:
-                        if article_json.get('video'):
-                            item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
-                            lede = True
-                        else:
-                            it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
-                            if it:
-                                m = re.search(r'"mediaid":"([^"]+)"', it.string)
-                                if m:
-                                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
-                                    lede = True
-                    else:
-                        it = el.find(class_='video-wrapper')
-                        if it and it.get('data-type') and it['data-type'] == 'youtube':
-                            item['content_html'] += utils.add_embed(it['data-src'])
-                            lede = True
-                        else:
-                            logger.warning('unhandled lede video wrapper in ' + item['url'])
-        if not lede and site_json.get('lede_img'):
-            el = soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
-            if el:
-                if el.find('img'):
-                    item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption)
-                    lede = True
-                else:
-                    it = el.find('iframe')
-                    if it:
-                        item['content_html'] += utils.add_embed(it['src'])
+                        item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
                         lede = True
+                    else:
+                        it = el.find(id=re.compile(r'jw-player-'))
+                        if it:
+                            if article_json.get('video'):
+                                item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
+                                lede = True
+                            else:
+                                it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
+                                if it:
+                                    m = re.search(r'"mediaid":"([^"]+)"', it.string)
+                                    if m:
+                                        item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
+                                        lede = True
+                        else:
+                            it = el.find(class_='video-wrapper')
+                            if it and it.get('data-type') and it['data-type'] == 'youtube':
+                                item['content_html'] += utils.add_embed(it['data-src'])
+                                lede = True
+                            else:
+                                it = el.find('iframe')
+                                if it:
+                                    item['content_html'] += utils.add_embed(it['src'])
+                                    lede = True
+                                else:
+                                    logger.warning('unhandled lede video wrapper in ' + item['url'])
+        if not lede and site_json.get('lede_img'):
+            elements = utils.get_soup_elements(site_json['lede_img'], soup)
+            if elements:
+                el = elements[0]
+                if el:
+                    if el.find('img'):
+                        item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption)
+                        lede = True
+                    else:
+                        it = el.find('iframe')
+                        if it:
+                            item['content_html'] += utils.add_embed(it['src'])
+                            lede = True
         if not lede:
             item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
     if site_json.get('content'):
-        for el in soup.find_all(site_json['content']['tag'], attrs=site_json['content']['attrs']):
-            if site_json.get('decompose'):
-                for tag in site_json['decompose']:
-                    for it in el.find_all(tag['tag'], attrs=tag['attrs']):
-                        it.decompose()
+        contents = utils.get_soup_elements(site_json['content'], soup)
+        for el in contents:
             it = el.find('body')
             if it:
                 item['content_html'] += wp_posts.format_content(it.decode_contents(), item, site_json, module_format_content)

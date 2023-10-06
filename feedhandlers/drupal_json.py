@@ -10,20 +10,32 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+api_links = None
 
 def get_api_json(api_path, data_type, id, filters=''):
-    api_url = '{}{}'.format(api_path, data_type.replace('--', '/'))
+    global api_links
+    api_url = ''
+    if api_links:
+        if api_links.get(data_type):
+            api_url = api_links[data_type]['href']
+        else:
+            dt = data_type.split('--')
+            if api_links.get(dt[-1]):
+                api_url = api_links[dt[-1]]['href']
+    if not api_url:
+        api_url = '{}{}'.format(api_path, data_type.replace('--', '/'))
     if id:
         api_url += '/{}'.format(id)
     if filters:
         api_url += '?{}'.format(filters)
-    print(api_url)
     #headers = {"cache-control": "max-age=0"}
     api_json = utils.get_url_json(api_url)
     return api_json
 
 
 def get_img_src(fig_html):
+    if not fig_html:
+        return '', ''
     figure = BeautifulSoup(fig_html, 'html.parser')
     img_src = figure.img['src']
     if figure.figcaption:
@@ -122,6 +134,23 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                 file_url = field_json['data']['attributes']['uri']['url']
             return file_url
 
+        elif field_json['data']['type'] == 'paragraph--p_text':
+            return field_json['data']['attributes']['field_p_text_text']['processed']
+
+        elif field_json['data']['type'] == 'paragraph--p_media':
+            media_html = ''
+            for data in field_json['data']['relationships']['field_p_media_upload']['data']:
+                media_html += get_field_data(data, api_path)
+            return media_html
+
+        elif field_json['data']['type'] == 'media--p_image':
+            if field_json['data']['relationships']['field_p_media_img']['data']['meta'].get('title'):
+                caption = field_json['data']['relationships']['field_p_media_img']['data']['meta']['title']
+            else:
+                caption = ''
+            img_src = get_field_data(field_json['data']['relationships']['field_p_media_img']['data'], api_path)
+            return utils.add_image(img_src, caption)
+
         else:
             logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
     return ''
@@ -187,12 +216,21 @@ def get_content(url, args, site_json, save_debug=False):
         if not page_type and '/article/' in url:
             page_type = 'node--article'
 
+    if site_json.get('default_page_type'):
+        page_type = site_json['default_page_type']
+
     if not page_type:
         logger.warning('unknown page type for ' + url)
         return None
 
+    global api_links
+    if not api_links:
+        api_json = utils.get_url_json(site_json['api_path'])
+        if api_json:
+            api_links = api_json['links']
+
     if uuid:
-        api_json = get_api_json(site_json['api_path'], page_type, uuid)
+        api_json = get_api_json(site_json['api_path'], page_type, uuid, '')
     elif node_id:
         filters = 'filter[nid-filter][condition][path]=drupal_internal__nid&filter[nid-filter][condition][value]={}'.format(node_id)
         api_json = get_api_json(site_json['api_path'], page_type, '', filters)
@@ -206,13 +244,15 @@ def get_content(url, args, site_json, save_debug=False):
         page_json = api_json['data'][0]
     else:
         page_json = api_json['data']
-    if node_id and page_json['attributes']['drupal_internal__nid'] != int(node_id):
+    if node_id and (\
+            (page_json['attributes'].get('drupal_internal__nid') and page_json['attributes']['drupal_internal__nid'] != int(node_id)) or
+            (page_json['attributes'].get('legacy_id') and page_json['attributes']['legacy_id'] != int(node_id))):
         logger.warning('jsonapi filter returned the wrong article for ' + url)
         return None
-    return get_item(page_json, drupal_settings, args, site_json, save_debug)
+    return get_item(page_json, drupal_settings, url, args, site_json, save_debug)
 
 
-def get_item(page_json, drupal_settings, args, site_json, save_debug):
+def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
     if save_debug:
         utils.write_file(page_json, './debug/debug.json')
 
@@ -222,16 +262,38 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
     if page_json['attributes'].get('metatag_normalized'):
         item['url'] = next((it['attributes']['href'] for it in page_json['attributes']['metatag_normalized'] if (it['tag'] == 'link' and it['attributes']['rel'] == 'canonical')), None)
     if not item.get('url'):
-        item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, page_json['attributes']['path']['alias'])
+        if page_json['attributes'].get('path'):
+            item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, page_json['attributes']['path']['alias'])
+        elif page_json['attributes'].get('rel_alt_links'):
+            m = re.search(r'/{}([^"]+)'.format(drupal_settings['path']['pathPrefix']), page_json['attributes']['rel_alt_links'][0])
+            if m:
+                item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, m.group(0))
+    if not item.get('url'):
+        item['url'] = url
 
     item['title'] = page_json['attributes']['title']
 
-    dt = datetime.fromisoformat(page_json['attributes']['created'])
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(page_json['attributes']['changed'])
-    item['date_modified'] = dt.isoformat()
+    if page_json['attributes'].get('created'):
+        dt = datetime.fromisoformat(page_json['attributes']['created'])
+    elif page_json['attributes'].get('published_on'):
+        dt = datetime.fromisoformat(page_json['attributes']['published_on'])
+    elif page_json['attributes'].get('publication_date'):
+        dt = datetime.fromisoformat(page_json['attributes']['publication_date'])
+    else:
+        dt = None
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+
+    if page_json['attributes'].get('changed'):
+        dt = datetime.fromisoformat(page_json['attributes']['changed'])
+    elif page_json['attributes'].get('last_updated'):
+        dt = datetime.fromisoformat(page_json['attributes']['last_updated'])
+    else:
+        dt = None
+    if dt:
+        item['date_modified'] = dt.isoformat()
 
     authors = []
     if page_json['relationships'].get('field_author') and page_json['relationships']['field_author'].get('data'):
@@ -263,6 +325,11 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('field_authors') and page_json['relationships']['field_authors'].get('data'):
         for data in page_json['relationships']['field_authors']['data']:
+            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            if api_json:
+                authors.append(api_json['data']['attributes']['title'])
+    elif page_json['relationships'].get('author_profile') and page_json['relationships']['author_profile'].get('data'):
+        for data in page_json['relationships']['author_profile']['data']:
             api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
@@ -329,6 +396,9 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
         lede_html = data_html
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], site_json['api_path'], caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+    elif page_json['relationships'].get('teaser_image') and page_json['relationships']['teaser_image'].get('data'):
+        data_html = get_field_data(page_json['relationships']['teaser_image']['data'], site_json['api_path'], caption=caption)
         item['_image'], caption = get_img_src(data_html)
 
     if page_json['attributes'].get('field_video_pid'):
@@ -437,6 +507,11 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
             body_soup = BeautifulSoup(page_json['attributes']['body']['processed'], 'html.parser')
         elif page_json['attributes'].get('field_article_body'):
             body_soup = BeautifulSoup(page_json['attributes']['field_article_body'][0]['processed'], 'html.parser')
+        elif page_json['relationships'].get('field_paragraphs'):
+            paragraphs = ''
+            for data in page_json['relationships']['field_paragraphs']['data']:
+                paragraphs += get_field_data(data, site_json['api_path'])
+            body_soup = BeautifulSoup(paragraphs, 'html.parser')
         else:
             logger.warning('unknown body content in ' + item['url'])
             body_soup = None
@@ -578,6 +653,24 @@ def get_item(page_json, drupal_settings, args, site_json, save_debug):
                 for data in page_json['relationships']['field_carousel_media']['data']:
                     item['content_html'] += get_field_data(data, site_json['api_path'])
 
+    elif page_json['type'] == 'article':
+        # https://www.psychologytoday.com/us/articles/202309/inside-the-mind-of-a-hero
+        if page_json['attributes'].get('subtitle'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['subtitle'])
+
+    elif page_json['type'] == 'blog_entry':
+        # https://www.psychologytoday.com/us/blog/psych-unseen/202309/antipsychotic-therapy-since-the-1950s-little-has-changed
+        if page_json['attributes'].get('field_blog_entry_subtitle'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_blog_entry_subtitle'])
+        if page_json['attributes'].get('field_key_points'):
+            item['content_html'] += '<h4>Key points</h4><ul>'
+            for it in page_json['attributes']['field_key_points']:
+                item['content_html'] += '<li>{}</li>'.format(it)
+            item['content_html'] += '</ul>'
+        # TODO: content???
+        if page_json['attributes'].get('field_references'):
+            item['content_html'] += page_json['attributes']['field_references']['processed']
+
     if item.get('content_html'):
         item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
@@ -600,10 +693,10 @@ def get_feed(url, args, site_json, save_debug=False):
             utils.write_file(api_json, './debug/feed.json')
         if api_json:
             for article in api_json['data']:
+                article_url = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, article['attributes']['path']['alias'])
                 if save_debug:
-                    url = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, article['attributes']['path']['alias'])
-                    logger.debug('getting content for ' + url)
-                item = get_item(article, None, args, site_json, save_debug)
+                    logger.debug('getting content for ' + article_url)
+                item = get_item(article, None, article_url, args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         feed_items.append(item)

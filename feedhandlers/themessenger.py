@@ -80,14 +80,20 @@ def get_content(url, args, site_json, save_debug=False):
     if post_json['story'].get('subHead'):
         item['content_html'] += '<p><em>{}</em></p>'.format(post_json['story']['subHead'])
 
+    lede = False
+    if post_json.get('storyVideoOptions') and post_json['storyVideoOptions'].get('videoMediaId'):
+        item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(post_json['storyVideoOptions']['videoMediaId']))
+        lede = True
+
     if post_json.get('featuredImage') and post_json['featuredImage'].get('node'):
         image_node = post_json['featuredImage']['node']
         item['_image'] = image_node['sourceUrl']
-        if image_node.get('mediaOptions') and image_node['mediaOptions'].get('mediaCredit'):
-            caption = image_node['mediaOptions']['mediaCredit']
-        else:
-            caption = ''
-        item['content_html'] += utils.add_image(resize_image(image_node['sourceUrl']), caption)
+        if not lede:
+            if image_node.get('mediaOptions') and image_node['mediaOptions'].get('mediaCredit'):
+                caption = image_node['mediaOptions']['mediaCredit']
+            else:
+                caption = ''
+            item['content_html'] += utils.add_image(resize_image(image_node['sourceUrl']), caption)
 
     for block in post_json['blocks']:
         if block['__typename'] == 'CoreParagraphBlock' or block['__typename'] == 'CoreListBlock':

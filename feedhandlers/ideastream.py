@@ -1,10 +1,9 @@
 import html, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import config, utils
-from feedhandlers import rss
 
 import logging
 
@@ -79,7 +78,7 @@ def get_image(el_image):
     it = el_image.find(class_='Figure-caption')
     if it:
         text = it.get_text().strip()
-        if text:
+        if text and text != '.':
             caption.append(text)
     it = el_image.find(class_='Figure-credit')
     if it:
@@ -92,6 +91,34 @@ def get_image(el_image):
         if text:
             caption.append(text)
     return img_src, ' | '.join(caption)
+
+
+def add_carousel(carousel, n=0):
+    # n = 1 : first slide only
+    # n = 0 : all slides
+    # n = -1 : exclude first slide
+    carousel_html = ''
+    for i, slide in enumerate(carousel.find_all(class_='Carousel-slide')):
+        if n == 0 or (n == 1 and i == 0) or (n == -1 and i > 0):
+            captions = []
+            it = slide.find(class_='CarouselSlide-infoDescription')
+            if it:
+                captions.append(it.decode_contents())
+            it = slide.find(class_='CarouselSlide-infoAttribution')
+            if it:
+                captions.append(it.decode_contents())
+            img_src = ''
+            it = slide.find('img')
+            if it:
+                if it.get('data-flickity-lazyload'):
+                    img_src = it['data-flickity-lazyload']
+                elif it.get('src'):
+                    img_src = it['src']
+            if img_src:
+                carousel_html += utils.add_image(img_src, ' | '.join(captions))
+            else:
+                logger.warning('unknown Carousel-slide img src')
+    return carousel_html
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -146,10 +173,22 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = el['content']
 
     item['content_html'] = ''
+    gallery = ''
     el = soup.find(class_='ArtP-lead')
     if el:
-        img_src, caption = get_image(el)
-        item['content_html'] += utils.add_image(img_src, caption)
+        if el.find(class_='VideoEnh'):
+            it = el.find(class_='YouTubeVideoPlayer')
+            if it:
+                item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v=' + it['data-video-id'])
+            else:
+                logger.warning('unhandled VideoEnh in ArtP-lead in ' + item['url'])
+        elif el.find(class_='Carousel'):
+            it = el.find(class_='Carousel')
+            item['content_html'] += add_carousel(it, 1)
+            gallery = '<h2>Gallery</h2>' + add_carousel(it, -1)
+        else:
+            img_src, caption = get_image(el)
+            item['content_html'] += utils.add_image(img_src, caption)
     elif item.get('_image'):
         item['content_html'] += utils.add_image(item['_image'])
 
@@ -163,7 +202,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['attachments'] = []
             item['attachments'].append(attachment)
             item['_audio'] = audio_src
-            item['content_html'] += '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">Listen ({1})</a></h4></blockquote>'.format(audio_src, duration)
+            item['content_html'] += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen ({2})</a></span></div>'.format(audio_src, config.server, duration)
 
     article = soup.find(class_='ArtP-articleBody')
 
@@ -192,12 +231,24 @@ def get_content(url, args, site_json, save_debug=False):
             img_src, caption = get_image(el)
             new_html = utils.add_image(img_src, caption)
 
+        elif el.find(class_='Carousel'):
+            new_html = add_carousel(el)
+
         elif el.find(class_='twitter-tweet'):
             links = el.find_all('a')
             new_html = utils.add_embed(links[-1]['href'])
 
+        elif el.find(class_='instagram-media'):
+            it = el.find('blockquote', class_='instagram-media')
+            new_html = utils.add_embed(it['data-instgrm-permalink'])
+
         elif el.find('iframe'):
             new_html = utils.add_embed(el.iframe['src'])
+
+        elif el.find(class_='HtmlModule'):
+            if el.find(id=re.compile(r'om-\w+-holder')):
+                el.decompose()
+                continue
 
         else:
             logger.warning('unhandled Enhancement in ' + url)
@@ -215,9 +266,32 @@ def get_content(url, args, site_json, save_debug=False):
     for el in article.find_all('script'):
         el.decompose()
 
-    item['content_html'] += str(article)
+    item['content_html'] += str(article) + gallery
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    return rss.get_feed(url, args, site_json, save_debug, get_content)
+    #return rss.get_feed(url, args, site_json, save_debug, get_content)
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+    soup = BeautifulSoup(page_html, 'lxml')
+
+    n = 0
+    feed_items = []
+    for el in soup.find_all(class_=re.compile(r'Promo[A-C]-title|List[A-C]-items-item')):
+        if save_debug:
+            logger.debug('getting content for ' + el.a['href'])
+        item = get_content(el.a['href'], args, site_json, save_debug)
+        if item:
+            if utils.filter_item(item, args) == True:
+                feed_items.append(item)
+                n += 1
+                if 'max' in args:
+                    if n == int(args['max']):
+                        break
+    feed = utils.init_jsonfeed(args)
+    #feed['title'] = 'Stories - PGA of America'
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+    return feed

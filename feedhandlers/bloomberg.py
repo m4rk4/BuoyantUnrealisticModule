@@ -1,4 +1,4 @@
-import feedparser, json, math, re
+import json, math, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, unquote_plus, urlsplit
@@ -100,8 +100,14 @@ def format_content(content, images):
                 link = content['data']['destination']['bbg'].replace('bbg://msg/', '')
             elif content['data']['destination']['bbg'].startswith('bbg://securities/'):
                 keys = unquote_plus(content['data']['destination']['bbg']).split('/')[3].split(' ')
-                keys.remove('Equity')
-                link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
+                if 'Equity' in keys:
+                    keys.remove('Equity')
+                    link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
+                elif 'USGG30YR' in keys:
+                    link = 'https://www.bloomberg.com/markets/rates-bonds/government-bonds/us'
+                else:
+                    logger.warning('unhandled bbg link ' + content['data']['destination']['bbg'])
+                    link = content['data']['destination']['bbg']
             elif content['data']['destination']['bbg'].startswith('bbg://screens/wcrs'):
                 link = 'https://www.bloomberg.com/markets/currencies'
             else:
@@ -295,17 +301,17 @@ def get_content(url, args, site_json, save_debug):
     if 'videos' in paths:
         return get_video_content(url, args, site_json, save_debug)
 
-    # page_html = get_bb_url(url)
-    # if save_debug:
-    #     utils.write_file(page_html, './debug/debug.html')
-    page_html = utils.read_file('./debug/debug.html')
+    page_html = get_bb_url(url)
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+    # page_html = utils.read_file('./debug/debug.html')
     if page_html:
         soup = BeautifulSoup(page_html, 'html.parser')
         el = soup.find('script', id='__NEXT_DATA__')
         if el:
             next_data = json.loads(el.string)
-            # if save_debug:
-            #     utils.write_file(next_data, './debug/next_data.json')
+            if save_debug:
+                utils.write_file(next_data, './debug/next.json')
             return get_item(next_data['props']['pageProps']['story'], args, site_json, save_debug)
 
     logger.debug('unable to get __NEXT_DATA__ for ' + url)

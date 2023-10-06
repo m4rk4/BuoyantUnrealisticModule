@@ -135,7 +135,7 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unhandled embed-wrapper in ' + item['url'])
 
     for el in soup.find_all('pre'):
-        el['style'] = 'margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;'
+        el['style'] = 'margin-left:2vw; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;'
 
     for el in soup.find_all('code'):
         if not (el.parent and el.parent == 'p'):

@@ -14,7 +14,6 @@ def get_content(url, args, site_json, save_debug=False):
     # https://www.scribd.com/document/646431800/Sex-Racism-Corruption-Documents-Detail-Widespread-Misconduct-in-US-Marshals
     item = {}
     image = ''
-    scribd_json = None
 
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
@@ -28,19 +27,27 @@ def get_content(url, args, site_json, save_debug=False):
             scribd_json = json.loads(el.string[el.string.find('{'):el.string.rfind('}')+1])
             if save_debug:
                 utils.write_file(scribd_json, './debug/scribd.json')
-            item['id'] = scribd_json['body_props']['document']['id']
-            item['url'] = scribd_json['body_props']['sharing_buttons_props']['url']
-            item['title'] = scribd_json['body_props']['document']['title']
-            item['author'] = {"name": scribd_json['body_props']['document']['publisher_info']['name']}
-            item['_image'] = scribd_json['body_props']['sharing_buttons_props']['thumbnail_url']
-            if scribd_json['body_props']['document'].get('description'):
-                item['summary'] = scribd_json['body_props']['document']['description']
+            if scribd_json.get('body_props'):
+                body_props = scribd_json['body_props']
+            elif scribd_json.get('bodyProps'):
+                body_props = scribd_json['bodyProps']
+            else:
+                logger.warning('unable to determine body props in ' + url)
+                return None
+            item['id'] = body_props['document']['id']
+            item['url'] = body_props['sharing_buttons_props']['url']
+            item['title'] = body_props['document']['title']
+            item['author'] = {"name": body_props['document']['publisher_info']['name']}
+            item['_image'] = body_props['sharing_buttons_props']['thumbnail_url']
+            if body_props['document'].get('description'):
+                item['summary'] = body_props['document']['description']
             content_url = item['url']
         else:
             el = soup.find('meta', attrs={"property": "og:image"})
             if el:
                 image = el['content']
 
+    content_url = ''
     embed_props = utils.get_url_json('https://www.scribd.com/doc-page/embed-modal-props/{}'.format(doc_id))
     if embed_props:
         if not item:
@@ -57,7 +64,7 @@ def get_content(url, args, site_json, save_debug=False):
         caption = '<a href="{}">{}</a> (www.scribd.com)'.format(item['url'], item['title'])
         if item.get('summary'):
             caption += ' | ' + item['summary']
-        item['content_html'] = utils.add_image(item['_image'], caption)
+        item['content_html'] = utils.add_image(item['_image'], caption, link=content_url)
     else:
         poster = '{}/image?width=128&height=160'.format(config.server)
         item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content_url, poster, item['url'], item['title'])

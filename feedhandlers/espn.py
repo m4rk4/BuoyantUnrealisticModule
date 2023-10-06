@@ -262,7 +262,7 @@ def get_story(story_json, args, site_json, save_debug=False):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    id = ''
+    story_json = None
     if '/story/_/id/' in url:
         m = re.search(r'/id/(\d+)', url)
         if m:
@@ -271,9 +271,6 @@ def get_content(url, args, site_json, save_debug=False):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 story_json = api_json['headlines'][0]
-            else:
-                return None
-
     elif re.search(r'(preview|recap)\?gameId=\d+', url):
         m = re.search(r'gameId=(\d+)', url)
         if m:
@@ -282,9 +279,6 @@ def get_content(url, args, site_json, save_debug=False):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 story_json = api_json['content']
-            else:
-                return None
-
     elif '/video/' in url:
         m = re.search('id=(\d+)', url)
         if not m:
@@ -295,19 +289,14 @@ def get_content(url, args, site_json, save_debug=False):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 story_json = api_json['videos'][0]
-            else:
-                return None
-
     elif '/blog/' in url:
         api_url = utils.clean_url(url) + '?partial=article&xhr=1&device=desktop&country=us&lang=en&region=us&site=espn&edition-host=espn.com&site-type=full&userab=0'
         api_json = utils.get_url_json(api_url)
         if api_json:
             story_json = api_json['content']
-        else:
-            return None
 
-    if not id:
-        logger.warning('unable to parse story/video id in ' + url)
+    if not story_json:
+        logger.warning('unable to get story_json for ' + url)
         return None
 
     if save_debug:

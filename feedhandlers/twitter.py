@@ -10,6 +10,76 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def replace_tombstone_entities(block):
+    if not block.get('entities'):
+        return block['text']
+    entities = block['entities'].copy()
+    indices = []
+    for entity in entities:
+        indices.append(entity['from_index'])
+        indices.append(entity['to_index'])
+        if entity.get('ref'):
+            if '/t.co/' in entity['ref']['url']:
+                link = utils.get_redirect_url(entity['ref']['url']['url'])
+            else:
+                link = entity['ref']['url']
+            entity['start_tag'] = '<a href="{}">'.format(link)
+            entity['end_tag'] = '</a>'
+    # remove duplicates and sort
+    indices = sorted(list(set(indices)))
+    n = 0
+    text = ''
+    for i in indices:
+        text += block['text'][n:i]
+        from_entities = list(filter(lambda entities: entities['from_index'] == i and entities.get('start_tag'), entities))
+        from_entities = sorted(from_entities, key=lambda x: x['to_index'])
+        for j, entity in enumerate(from_entities):
+            text += entity['start_tag']
+            entity['order'] = i + j
+        to_entities = list(filter(lambda entities: entities['to_index'] == i and entities.get('end_tag'), entities))
+        to_entities = sorted(to_entities, key=lambda x: (x['from_index'], x['order']), reverse=True)
+        for entity in to_entities:
+            text += entity['end_tag']
+        n = i
+    text += block['text'][n:]
+    return text
+
+
+def replace_birdwatch_entities(block):
+    if not block.get('entities'):
+        return block['text']
+    entities = block['entities'].copy()
+    indices = []
+    for entity in entities:
+        indices.append(entity['fromIndex'])
+        indices.append(entity['toIndex'])
+        if entity.get('ref'):
+            if '/t.co/' in entity['ref']['url']['url']:
+                link = utils.get_redirect_url(entity['ref']['url']['url'])
+            else:
+                link = entity['ref']['url']['url']
+            entity['start_tag'] = '<a href="{}">'.format(link)
+            entity['end_tag'] = '</a>'
+    # remove duplicates and sort
+    indices = sorted(list(set(indices)))
+    n = 0
+    text = ''
+    for i in indices:
+        text += block['text'][n:i]
+        from_entities = list(filter(lambda entities: entities['fromIndex'] == i and entities.get('start_tag'), entities))
+        from_entities = sorted(from_entities, key=lambda x: x['toIndex'])
+        for j, entity in enumerate(from_entities):
+            text += entity['start_tag']
+            entity['order'] = i + j
+        to_entities = list(filter(lambda entities: entities['toIndex'] == i and entities.get('end_tag'), entities))
+        to_entities = sorted(to_entities, key=lambda x: (x['fromIndex'], x['order']), reverse=True)
+        for entity in to_entities:
+            text += entity['end_tag']
+        n = i
+    text += block['text'][n:]
+    return text
+
+
 def get_expanded_url(tweet_json, link):
     for url in tweet_json['entities']['urls']:
         if url['url'] == link:
@@ -289,6 +359,16 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
     if tweet_json.get('quoted_tweet'):
         media_html += make_tweet(tweet_json['quoted_tweet'], is_quoted=True)
 
+    if tweet_json.get('birdwatch_pivot'):
+        media_html += '<div style="border:1px solid black; border-radius:10px; padding:0.5em;">'
+        if tweet_json['birdwatch_pivot'].get('title'):
+            media_html += '<div style="margin-bottom:0.5em;"><strong>{}</strong></div>'.format(tweet_json['birdwatch_pivot']['title'])
+        if tweet_json['birdwatch_pivot'].get('subtitle'):
+            media_html += '<div style="margin-bottom:0.5em;">' + replace_birdwatch_entities(tweet_json['birdwatch_pivot']['subtitle']).replace('\n', '<br/>') + '</div>'
+        if tweet_json['birdwatch_pivot'].get('footer'):
+            media_html += '<div><small>' + replace_birdwatch_entities(tweet_json['birdwatch_pivot']['footer']).replace('\n', '<br/>') + '</small></div>'
+        media_html += '</div>'
+
     if tweet_json['user']['verified'] == True:
         verified_icon = ' &#9989;'
     else:
@@ -328,63 +408,16 @@ def get_tweet_json(tweet_id):
     token = n.repr_in_base(36, max_frac_places=8)
     token = re.sub(r'(0+|\.)', '', token)
     tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?features=tfw_timeline_list%3A%3Btfw_follower_count_sunset%3Atrue%3Btfw_tweet_edit_backend%3Aon%3Btfw_refsrc_session%3Aon%3Btfw_fosnr_soft_interventions_enabled%3Aon%3Btfw_mixed_media_15897%3Atreatment%3Btfw_experiments_cookie_expiration%3A1209600%3Btfw_show_birdwatch_pivots_enabled%3Aon%3Btfw_duplicate_scribes_to_settings%3Aon%3Btfw_use_profile_image_shape_enabled%3Aon%3Btfw_video_hls_dynamic_manifests_15082%3Atrue_bitrate%3Btfw_legacy_timeline_sunset%3Atrue%3Btfw_tweet_edit_frontend%3Aon&id={}&lang=en&token={}'.format(tweet_id, token)
+    #tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en&token=0'.format(tweet_id)
     return utils.get_url_json(tweet_url)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    tweet_id = ''
-    tweet_user = ''
-    clean_url = ''
-
-    # url can be just the id
-    if url.startswith('https'):
-        clean_url = utils.clean_url(url)
-        m = re.search('twitter\.com/([^/]+)/statuse?s?/(\d+)', clean_url)
-        if m:
-            tweet_user = m.group(1)
-            tweet_id = m.group(2)
-        else:
-            logger.warning('error determining tweet id in ' + url)
-            return None
-    elif url.isnumeric():
-        tweet_id = url
-
-    if False:
-        session = requests.Session()
-        r = session.get(url)
-        print(r.status_code)
-        if r.status_code == 200:
-            cookies = session.cookies.get_dict()
-            if cookies.get('guest_id'):
-                guest_id = unquote(cookies['guest_id']).split(':')[-1]
-                headers = {
-                    "accept": "*/*",
-                    "accept-language": "en-US,en;q=0.9",
-                    "authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
-                    "cache-control": "no-cache",
-                    "content-type": "application/json",
-                    "pragma": "no-cache",
-                    "sec-ch-ua": "\"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"114\", \"Microsoft Edge\";v=\"114\"",
-                    "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": "\"Windows\"",
-                    "sec-fetch-dest": "empty",
-                    "sec-fetch-mode": "cors",
-                    "sec-fetch-site": "same-origin",
-                    "x-csrf-token": ''.join(random.choices(string.ascii_letters + string.digits, k=32)),
-                    "x-guest-token": guest_id,
-                    "x-twitter-active-user": "yes",
-                    "x-twitter-client-language": "en"
-                }
-                api_url = 'https://twitter.com/i/api/graphql/2ICDjqPd81tulZcYrtpTuQ/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22{}%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Afalse%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_media_download_video_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Afalse%7D'.format(tweet_id)
-                print(api_url)
-                r = session.get(api_url, headers=headers)
-                print(r.status_code)
-                if r.status_code == 200:
-                    utils.write_file(r.json, './debug/twitter_api.json')
-
-        tweet_json = get_tweet_detail(tweet_id)
-        if tweet_json:
-            utils.write_file(tweet_json, './debug/tweet.json')
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    tweet_id = paths[-1]
+    if not tweet_id.isnumeric():
+        logger.warning('error determining tweet id in ' + url)
 
     tweet_json = get_tweet_json(tweet_id)
     if not tweet_json:
@@ -392,20 +425,25 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(tweet_json, './debug/twitter.json')
 
-    if not clean_url:
-        tweet_user = tweet_json['user']['screen_name']
-        clean_url = 'https://twitter.com/{}/status/{}'.format(tweet_user, tweet_id)
+    if tweet_json.get('tombstone'):
+        # https://twitter.com/gerald1064/status/1537123311041355776
+        item = {}
+        item['id'] = tweet_id
+        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="text-align:center;">{}</td></tr></table>'.format(replace_tombstone_entities(tweet_json['tombstone']['text']))
+        return item
+
+    tweet_user = tweet_json['user']['screen_name']
 
     # content_html = '<table style="width:80%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
     content_html = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
 
     item = {}
     item['id'] = tweet_id
-    item['url'] = clean_url
+    item['url'] = '{}://{}/{}/status/{}'.format(split_url.scheme, split_url.netloc, tweet_user, tweet_id)
     item['author'] = {}
     item['author']['name'] = tweet_user
 
-    if not tweet_json['id_str'] in clean_url:
+    if tweet_json['id_str'] != tweet_id:
         # Retweet
         item['title'] = '{} retweeted: {}'.format(tweet_user, tweet_json['text'])
         content_html += '<tr><td colspan="2"><small>&#128257;&nbsp;<a style="text-decoration:none;" href="https://twitter.com/{0}">@{0}</a> retweeted</small></td></tr>'.format(tweet_user)
@@ -452,35 +490,11 @@ def get_content(url, args, site_json, save_debug=False):
                 parent = get_tweet_json(parent['parent']['id_str'])
             else:
                 parent = None
-
         for parent in tweet_thread:
             content_html += make_tweet(parent, is_parent=True)
-
     tweet_thread.append(tweet_json)
 
     content_html += make_tweet(tweet_json)
-
-    if False:
-        # Find the conversation thread (replies from the same user)
-        search_scraper = None
-        try:
-            query = 'from:{} conversation_id:{} (filter:safe OR -filter:safe)'.format(tweet_user, tweet_id)
-            search_scraper = sntwitter.TwitterSearchScraper(query)
-        except Exception as e:
-            logger.warning('TwitterSearchScraper exception {} in {}'.format(e.__class__, clean_url))
-
-        if search_scraper:
-            try:
-                tweet_replies = []
-                for i, tweet in enumerate(search_scraper.get_items()):
-                    tweet_json = get_tweet_json(tweet.id)
-                    if tweet_json.get('in_reply_to_screen_name') and tweet_json['in_reply_to_screen_name'] == tweet_user:
-                        tweet_replies.append(tweet_json)
-                for i, tweet_json in reversed(list(enumerate(tweet_replies))):
-                    content_html += make_tweet(tweet_json, is_reply=i + 1)
-            except Exception as e:
-                logger.warning('TwitterSearchScraper.get_items exception {} in {}'.format(e.__class__, clean_url))
-
     content_html += '</table><br/>'
     item['content_html'] = content_html
     return item

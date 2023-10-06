@@ -1,88 +1,156 @@
 import json, re
+import dateutil.parser
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import unquote_plus, urlsplit
+from datetime import datetime
+from urllib.parse import unquote_plus
 
-import config, utils
+import utils
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, width=1000):
-    return img_src.replace('image/upload/', 'image/upload/t_fit-{}w,f_auto,q_auto:best/'.format(width))
-
-
-def add_image(image):
+def add_image(image, width=1200, height=800):
     captions = []
     if image.get('caption'):
         captions.append(image['caption'])
-    if image.get('source'):
+    if image.get('source') and image['source'].get('name'):
         captions.append(image['source']['name'])
-    return utils.add_image(resize_image(image['url']['primary']), ' | '.join(captions))
+    img_src = image['url']['primary'].replace('/upload/rockcms/', '/upload/w_{},h_{},c_fit/rockcms/'.format(width, height))
+    return utils.add_image(img_src, ' | '.join(captions))
 
 
 def add_video(video):
-    video_assets = []
-    for video_asset in video['videoAssets']:
-        if video_asset['format'] == 'MPEG4':
-            video_assets.append(video_asset)
-    video_asset = utils.closest_dict(video_assets, 'height', 480)
-
-    video_html = utils.get_url_html(video_asset['publicUrl'])
-    video_soup = BeautifulSoup(video_html, 'html.parser')
-    video_assets = []
-    videos = video_soup.find_all('video')
-    if videos:
-        for el in videos:
-            video_asset = {}
-            video_asset['src'] = el['src']
-            video_asset['height'] = el['height']
-            video_asset['width'] = el['width']
-            video_assets.append(video_asset)
-        video_asset = utils.closest_dict(video_assets, 'height', 480)
-        video_src = video_asset['src']
-        poster = resize_image(video['primaryImage']['url']['primary'])
-        captions = []
-        if video.get('headline'):
-            captions.append(video['headline']['primary'])
-        if video.get('source'):
-            captions.append(video['source']['name'])
-    else:
-        el = video_soup.find('ref')
-        if el:
-            video_src = el['src']
-            poster = '{}/image?width=960&height=540&color=grey&overlay=videeo'.format(config.server)
-            captions = []
-            if el.has_attr('title'):
-                captions.append(el['title'])
-            if el.has_attr('abstract'):
-                captions.append(el['abstract'])
-        else:
+    video_src = ''
+    video_asset = next((it for it in video['videoAssets'] if it['format'] == 'MPEG4'), None)
+    if video_asset:
+        page_html = utils.get_url_html(video_asset['publicUrl'])
+        if not page_html:
             return ''
-    return utils.add_video(video_src, 'video/mp4', poster, ' | '.join(captions))
+        soup = BeautifulSoup(page_html, 'html.parser')
+        video_el = soup.find('video')
+        if video_el:
+            video_src = video_el['src']
+            video_type = 'video/mp4'
+    if not video_src:
+        video_asset = next((it for it in video['videoAssets'] if it['format'] == 'M3U'), None)
+        if video_asset:
+            video_src = utils.get_redirect_url(video_asset['publicUrl'])
+            video_type = 'application/x-mpegURL'
+    poster = video['primaryImage']['url']['primary'].replace('/upload/rockcms/', '/upload/w_1200,h_800,c_fit/rockcms/')
+    if video.get('headline') and video['headline'].get('primary'):
+        caption = video['headline']['primary']
+    elif video.get('description') and video['description'].get('primary'):
+        caption = video['description']['primary']
+    else:
+        caption = ''
+    return utils.add_video(video_src, video_type, poster, caption)
+
+
+def render_contents(contents):
+    content_html = ''
+    for content in contents:
+        if content['type'] == 'markup':
+            if content['element'] == 'br' or content['element'] == 'hr':
+                content_html += '<{}/>'.format(content['element'])
+            else:
+                content_html += '<{0}>{1}</{0}>'.format(content['element'], content['html'])
+        elif content['type'] == 'embeddedImage':
+            content_html += add_image(content['image'])
+        elif content['type'] == 'embeddedVideo':
+            content_html += add_video(content['video'])
+        elif content['type'] == 'embeddedWidget':
+            if content['widget']['name'] == 'IFRAMELY_EXTERNAL_EMBED':
+                content_html += utils.add_embed(content['widget']['properties']['canonical-url'])
+            elif content['widget']['name'] == 'youtubeplus':
+                content_html += utils.add_embed('https://www.youtube.com/watch?v=' + content['widget']['properties']['youtube-id'])
+            elif content['widget']['name'] == 'tweetplus_embed':
+                soup = BeautifulSoup(unquote_plus(content['widget']['properties']['desktop']), 'html.parser')
+                links = soup.find_all('a')
+                content_html += utils.add_embed(links[-1]['href'])
+            elif content['widget']['name'] == 'CUSTOM_EMBED' and content['widget']['properties']['embed']['type'] == 'BLOCKQUOTE':
+                content_html += utils.add_pullquote(content['widget']['properties']['embed']['text'])
+            elif content['widget']['name'] == 'CUSTOM_EMBED' and content['widget']['properties']['embed']['type'] == 'SUMMARY_BOX':
+                content_html += '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;"><h3>{}</h3><ul>'.format(content['widget']['properties']['embed']['headline'])
+                for it in content['widget']['properties']['embed']['items']:
+                    content_html += '<li>{}</li>'.format(it)
+                content_html += '</ul></blockquote>'
+            else:
+                logger.warning('unhandled embeddedWidget ' + content['widget']['name'])
+        elif content['type'] == 'embeddedTaxonomy':
+            embed_json = utils.get_url_json('https://www.nbcnews.com/bentoapi/card/search?filters=type:card%20AND%20taxonomy:{}&size=150&page=1'.format(content['taxonomy']['path']))
+            if embed_json:
+                utils.write_file(embed_json, './debug/embed.json')
+                for embed_item in embed_json['data']['search']['items']:
+                    content_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div><div style="font-size:1.2em; font-weight:bold;">{}</div><div style="font-size:0.9em;">'.format(embed_item['headline']['primary'])
+                    if embed_item.get('authors'):
+                        authors = []
+                        for it in embed_item['authors']:
+                            if it.get('person'):
+                                authors.append(it['person']['name'])
+                            elif it.get('name'):
+                                authors.append(it['name'])
+                        if authors:
+                            content_html += 'By {}<br/>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
+                    content_html += '{}</div><div>&nbsp;</div>'.format(utils.format_display_date(dateutil.parser.parse(embed_item['date']['publishedAt'])))
+                    content_html += render_contents(embed_item['content']['markupAndEmbeds'])
+        elif content['type'] == 'embeddedProduct':
+            content_html += '<table><tr><td style="width:128px;"><img src="{}" style="width:100%;"/></td>'.format(content['product']['promotionalMedia'][0]['url']['primary'])
+            link = utils.get_redirect_url(content['product']['offers'][0]['externalUrl'])
+            content_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><br/>'.format(link, content['product']['name'])
+            for offer in content['product']['offers']:
+                link = utils.get_redirect_url(offer['externalUrl'])
+                prices = []
+                for it in offer['prices']:
+                    prices.append(float(it['price']))
+                content_html += '<div><a href="{}">${:0.2f} at {}</a></div>'.format(link, min(prices), offer['seller']['name'])
+            content_html += '</td></tr></table>'
+        elif content['type'] == 'embeddedRecipe':
+            content_html += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td>'.format(content['recipe']['url']['primary'], content['recipe']['teaseImage']['url']['primary'])
+            content_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(content['recipe']['url']['primary'], content['recipe']['headline']['primary'])
+            authors = []
+            for it in content['recipe']['authors']:
+                authors.append(it['name'])
+            if authors:
+                content_html += '<div>by {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
+            content_html += '</td></tr></table>'
+        else:
+            logger.warning('unhandled content type ' + content['type'])
+    return content_html
+
+
+def get_next_data(url):
+    page_html = utils.get_url_html(url)
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', id='__NEXT_DATA__')
+    if not el:
+        logger.warning('unable to find __NEXT_DATA__ in ' + url)
+        return None
+    next_data = json.loads(el.string)
+    return next_data
 
 
 def get_content(url, args, site_json, save_debug=False):
-    article_html = utils.get_url_html(url)
-    article_soup = BeautifulSoup(article_html, 'html.parser')
-    next_data = article_soup.find('script', id='__NEXT_DATA__')
+    if 'dataviz.nbcnews.com' in url:
+        # TODO: screenshot
+        # https://dataviz.nbcnews.com/projects/20230818-precipitation-weather-map/?state=NY&hide=hed
+        return None
+
+    next_data = get_next_data(url)
     if not next_data:
         return None
-    next_json = json.loads(next_data.string)
     if save_debug:
-        utils.write_file(next_json, './debug/debug.json')
+        utils.write_file(next_data, './debug/next.json')
 
-    if next_json['page'] == '/article':
-        article_json = next_json['props']['initialState']['article']['content'][0]
-    elif next_json['page'] == '/video' or next_json['page'] == '/videoEmbed':
-        article_json = next_json['props']['initialState']['video']['current']
-    elif next_json['page'] == '/slideshow':
-        article_json = next_json['props']['initialState']['slideshow']['current']
+    if next_data['props']['pageProps']['pageView'] == 'video':
+        article_json = next_data['props']['initialState']['video']['current']
+    elif next_data['props']['pageProps']['pageView'] == 'recipe':
+        article_json = next_data['props']['initialState']['recipe']['current']
     else:
-        logger.warning('unknown page type {} in {}'.format(next_json['page'], url))
-        return None
+        article_json = next_data['props']['initialState']['article']['content'][0]
+    if save_debug:
+        utils.write_file(article_json, './debug/debug.json')
 
     item = {}
     item['id'] = article_json['id']
@@ -90,238 +158,152 @@ def get_content(url, args, site_json, save_debug=False):
     item['title'] = article_json['headline']['primary']
 
     if article_json.get('date'):
-        dt_pub = datetime.fromisoformat(article_json['date']['publishedAt'].replace('Z', '+00:00'))
-        dt_mod = datetime.fromisoformat(article_json['date']['modifiedAt'].replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(article_json['date']['publishedAt'].replace('Z', '+00:00'))
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = datetime.fromisoformat(article_json['date']['modifiedAt'].replace('Z', '+00:00'))
+        item['date_modified'] = dt.isoformat()
     else:
-        dt_pub = datetime.strptime(article_json['datePublished'], '%a %b %d %Y %H:%M:%S GMT+0000 (UTC)').astimezone(
-            timezone.utc)
-        dt_mod = datetime.strptime(article_json['dateModified'], '%a %b %d %Y %H:%M:%S GMT+0000 (UTC)').astimezone(
-            timezone.utc)
-    item['date_published'] = dt_pub.isoformat()
-    item['_timestamp'] = dt_pub.timestamp()
-    item['_display_date'] = utils.format_display_date(dt_pub)
-    item['date_modified'] = dt_mod.isoformat()
+        dt = dateutil.parser.parse(article_json['datePublished'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = dateutil.parser.parse(article_json['dateModified'])
+        item['date_modified'] = dt.isoformat()
 
+    item['author'] = {}
     if article_json.get('authors'):
         authors = []
-        for author in article_json['authors']:
-            authors.append(author['person']['name'].strip())
+        for it in article_json['authors']:
+            if it.get('person'):
+                authors.append(it['person']['name'])
+            elif it.get('name'):
+                authors.append(it['name'])
         if authors:
-            item['author'] = {}
-            if len(authors) == 1:
-                item['author']['name'] = authors[0]
-            else:
-                item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     elif article_json.get('source'):
-        item['author'] = {}
-        item['author']['name'] = article_json['source']['name']
+        item['author']['name'] = article_json['source']['name'].title()
+    elif article_json.get('publisher'):
+        item['author']['name'] = article_json['publisher']['name'].title()
 
     item['tags'] = []
-    for key, val in article_json['taxonomy'].items():
-        if isinstance(article_json['taxonomy'][key], dict):
-            if not article_json['taxonomy'][key]['name'] in item['tags']:
-                item['tags'].append(article_json['taxonomy'][key]['name'])
-        elif isinstance(article_json['taxonomy'][key], list):
-            for tag in article_json['taxonomy'][key]:
-                if not tag['name'] in item['tags']:
-                    item['tags'].append(tag['name'])
+    if article_json['taxonomy'].get('primarySection'):
+        item['tags'].append(article_json['taxonomy']['primarySection']['name'])
+    if article_json['taxonomy'].get('primaryTopic'):
+        item['tags'].append(article_json['taxonomy']['primaryTopic']['name'])
+    if article_json['taxonomy'].get('topics'):
+        for it in article_json['taxonomy']['topics']:
+            if it['name'] not in item['tags']:
+                item['tags'].append(it['name'])
+    if article_json['taxonomy'].get('additionalTerms'):
+        for it in article_json['taxonomy']['additionalTerms']:
+            if it['name'] not in item['tags']:
+                item['tags'].append(it['name'])
+    if not item.get('tags'):
+        del item['tags']
+
+    if article_json.get('teaseImage'):
+        item['_image'] = article_json['teaseImage']['url']['primary']
+    elif article_json.get('socialImage'):
+        item['_image'] = article_json['socialImage']['url']['primary']
+
+    if article_json.get('description'):
+        item['summary'] = article_json['description']['primary']
 
     item['content_html'] = ''
     if article_json.get('dek'):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
 
     if article_json.get('primaryMedia'):
-        if article_json['primaryMedia'].get('video'):
-            item['content_html'] += add_video(article_json['primaryMedia']['video'])
-            item['_image'] = resize_image(article_json['primaryMedia']['video']['primaryImage']['url']['primary'])
-        elif article_json['primaryMedia'].get('image'):
+        if article_json['primaryMedia']['type'] == 'embeddedImage':
             item['content_html'] += add_image(article_json['primaryMedia']['image'])
-            item['_image'] = resize_image(article_json['primaryMedia']['image']['url']['primary'])
-    elif article_json.get('primaryImage'):
-        item['_image'] = resize_image(article_json['primaryImage']['url']['primary'])
+        elif article_json['primaryMedia']['type'] == 'embeddedVideo':
+            item['content_html'] += add_video(article_json['primaryMedia']['video'])
 
-    item['summary'] = article_json['description']['primary']
-
-    if article_json.get('videoAssets'):
+    if article_json['type'] == 'video':
         item['content_html'] += add_video(article_json)
-        if not 'embed' in args:
+        if item.get('summary'):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
 
-    if article_json.get('slides'):
-        for slide in article_json['slides']:
-            img_src = resize_image(slide['image']['url']['primary'])
-            captions = []
-            if slide['image'].get('caption'):
-                captions.append(slide['image']['caption'])
-            if slide['image'].get('authors'):
-                authors = []
-                for author in slide['authors']:
-                    authors.append(author['name'])
-                captions.append(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
-            if slide['image'].get('source'):
-                captions.append(slide['source']['name'])
-            if slide['headline'].get('primary'):
-                item['content_html'] += '<h4>{}</h4>'.format(slide['headline']['primary'])
-            item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
-
     if article_json.get('body'):
-        for el in article_json['body']:
-            if el['type'] == 'markup':
-                if el['element'] == 'br':
-                    item['content_html'] += '<{}/>'.format(el['element'])
-                elif el['element'] == 'blockquote':
-                    if el['html'].startswith('<p>"') and el['html'].endswith('"</p>'):
-                        item['content_html'] += utils.add_pullquote(el['html'])
-                    else:
-                        item['content_html'] += utils.add_blockquote(el['html'])
-                else:
-                    item['content_html'] += '<{0}>{1}</{0}>'.format(el['element'], el['html'])
+        item['content_html'] += render_contents(article_json['body'])
 
-            elif el['type'] == 'embeddedImage':
-                item['content_html'] += add_image(el['image'])
-
-            elif el['type'] == 'embeddedVideo':
-                if el.get('video'):
-                    item['content_html'] += add_video(el['video'])
-
-            elif el['type'] == 'embeddedWidget':
-                widget_html = ''
-                if el['widget']['name'] == 'CUSTOM_EMBED':
-                    if el['widget']['properties']['embed']['type'] == 'BLOCKQUOTE':
-                        widget_html = utils.add_blockquote(el['widget']['properties']['embed']['text'].strip())
-
-                    elif el['widget']['properties']['embed']['type'] == 'PULL_QUOTE':
-                        widget_html = utils.add_pullquote(el['widget']['properties']['embed']['text'].strip(),
-                                                          el['widget']['properties']['embed']['attribution'])
-
-                    elif el['widget']['properties']['embed']['type'] == 'LIFT_OUT':
-                        widget_html = 'pass'
-
-                elif el['widget']['name'] == 'nbc_blockquote':
-                    embed_soup = BeautifulSoup(unquote_plus(el['widget']['baseline']), 'html.parser')
-                    widget_html = utils.add_blockquote(embed_soup.get_text())
-
-                elif el['widget']['name'] == 'youtubeplus':
-                    embed_soup = BeautifulSoup(unquote_plus(el['widget']['baseline']), 'html.parser')
-                    widget_html = utils.add_embed(embed_soup.iframe['src'])
-
-                elif el['widget']['name'] == 'tweetplus_embed':
-                    embed_soup = BeautifulSoup(unquote_plus(el['widget']['baseline']), 'html.parser')
-                    tweet_url = embed_soup.find_all('a')[-1]['href']
-                    if re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url):
-                        widget_html = utils.add_embed(tweet_url)
-
-                elif el['widget']['name'] == 'instagramplus':
-                    widget_html = utils.add_embed(el['widget']['fallbackUrl'])
-
-                elif el['widget']['name'] == 'IFRAMELY_EXTERNAL_EMBED':
-                    embed_soup = BeautifulSoup(unquote_plus(el['widget']['baseline']), 'html.parser')
-                    if embed_soup.div and embed_soup.div.has_attr('class'):
-                        if 'iframely-twitter' in embed_soup.div['class']:
-                            widget_html = utils.add_embed(el['widget']['fallbackUrl'])
-                        elif 'iframely-youtube' in embed_soup.div['class']:
-                            widget_html = utils.add_embed(el['widget']['fallbackUrl'])
-                        elif 'iframely-card' in embed_soup.div['class']:
-                            if re.search('^https:\/\/www\.(msnbc|nbcnews)\.com', el['widget']['fallbackUrl']):
-                                widget_html = 'pass'
-                        else:
-                            widget_html = '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(
-                                el['widget']['fallbackUrl'])
-
-                elif el['widget']['name'] == 'advanced_embed':
-                    embed_html = unquote_plus(el['widget']['baseline'])
-                    m = re.search(r'https:\/\/dataviz\.nbcnews\.com\/projects\/[^\/]+\/[^\.]+\.html', embed_html)
-                    if m:
-                        widget_html = '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(
-                            m.group(0))
-                    elif re.search(r'opinary-widget-embed|menu-embed', embed_html):
-                        widget_html = 'pass'
-                    else:
-                        embed_soup = BeautifulSoup(embed_html, 'html.parser')
-                        if embed_soup.iframe:
-                            widget_html = utils.add_embed(embed_soup.iframe['src'])
-                        elif embed_soup.blockquote:
-                            if 'twitter-tweet' in embed_soup.blockquote['class']:
-                                tweet_url = embed_soup.find_all('a')[-1]['href']
-                                if re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url):
-                                    widget_html = utils.add_embed(tweet_url)
-
-                elif re.search(r'nbc_featuredlink|nbc_liftout', el['widget']['name']):
-                    widget_html = 'pass'
-
-                if widget_html != 'pass':
-                    if widget_html:
-                        item['content_html'] += widget_html
-                    else:
-                        logger.warning('unhandled embeddedWidget in ' + url)
-
-            elif el['type'] == 'embeddedProduct':
-                poster = '{}/image?height=128&url={}'.format(config.server,
-                                                             el['product']['teaseImage']['url']['primary'])
-                desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>${} at <a href="{}">{}</a>'.format(
-                    utils.get_redirect_url(el['product']['offers'][0]['externalUrl']), el['product']['name'],
-                    el['product']['offers'][0]['price'], el['product']['offers'][0]['seller']['externalUrl'],
-                    el['product']['offers'][0]['seller']['name'])
-                item[
-                    'content_html'] += '<div><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;">&nbsp;</div>'.format(
-                    poster, desc)
-
+    if article_json['type'] == 'recipe':
+        if article_json.get('aggregateRating'):
+            item['content_html'] += '<p><b>Rating:</b> <span style="font-size:1.2em; font-weight:bold;">{}</span> / 5 <small>({})</small></p>'.format(article_json['aggregateRating']['ratingValue'], article_json['aggregateRating']['ratingCount'])
+        if article_json.get('chefNotes'):
+            item['content_html'] += render_contents(article_json['chefNotes'])
+        if article_json.get('prepTime'):
+            m = re.search(r'PT(\d+)M', article_json['prepTime'])
+            if m:
+                item['content_html'] += '<p><b>Prep Time:</b> {} mins</p>'.format(m.group(1))
             else:
-                logger.warning('unhandled body type {} in {}'.format(el['type'], url))
+                logger.warning('unknown prepTime in ' + item['url'])
+        if article_json.get('cookTime'):
+            m = re.search(r'PT(\d+)M', article_json['cookTime'])
+            if m:
+                item['content_html'] += '<p><b>Cook Time:</b> {} mins</p>'.format(m.group(1))
+            else:
+                logger.warning('unknown cookTime in ' + item['url'])
+        if article_json.get('servingSize'):
+            item['content_html'] += '<p><b>Servings:</b> {}</p>'.format(article_json['servingSize'])
+        if article_json.get('yield'):
+            item['content_html'] += '<p><b>Yields:</b> {}</p>'.format(article_json['yield'])
+        item['content_html'] += '<h3><u>Ingredients</u></h3>'
+        for ingredients in article_json['ingredients']:
+            if ingredients['title']:
+                item['content_html'] += '<h4>{}</h4>'.format(ingredients['title'])
+            item['content_html'] += '<ul>'
+            for it in ingredients['ingredients']:
+                item['content_html'] += '<li>'
+                if it.get('quantity'):
+                    item['content_html'] += '<b>{}</b> '.format(it['quantity'])
+                if it.get('measurementUnit'):
+                    item['content_html'] += '{} '.format(it['measurementUnit'])
+                item['content_html'] += '{}</li>'.format(it['name'])
+            item['content_html'] += '</ul>'
+        item['content_html'] += '<h3><u>Preparation</u></h3>' + render_contents(article_json['instructions'])
 
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    split_url = urlsplit(args['url'])
-    article_html = utils.get_url_html(args['url'])
-    article_soup = BeautifulSoup(article_html, 'html.parser')
-    next_data = article_soup.find('script', id='__NEXT_DATA__')
+    next_data = get_next_data(url)
     if not next_data:
         return None
-    next_json = json.loads(next_data.string)
     if save_debug:
-        utils.write_file(next_json, './debug/feed.json')
+        utils.write_file(next_data, './debug/feed.json')
 
-    all_items = []
-    for layout in next_json['props']['initialState']['front']['curation']['layouts']:
-        for package in layout['packages']:
-            for item in package['items']:
-                if item['type'] == 'custom':
-                    logger.warning('skipping custom item ' + item['computedValues']['url'])
-                    continue
-                it = {}
-                it['id'] = item['id']
-                it['url'] = item['computedValues']['url']
-                dt = datetime.strptime(item['item']['datePublished'], '%a %b %d %Y %H:%M:%S GMT+0000 (UTC)').astimezone(
-                    timezone.utc)
-                it['_timestamp'] = dt.timestamp()
-                if 'age' in args:
-                    if not utils.check_age(it, args):
-                        continue
-                all_items.append(it)
-
-    uniq_items = {it['id']: it for it in all_items}.values()
-    sorted_items = sorted(uniq_items, key=lambda i: i['_timestamp'], reverse=True)
+    content_items = []
+    if '/author/' in url:
+        content_items = next_data['props']['pageProps']['person']['content']['items']
+    else:
+        for layout in next_data['props']['initialState']['front']['curation']['layouts']:
+            for package in layout['packages']:
+                content_items += package['items']
 
     n = 0
-    items = []
-    for it in sorted_items:
-        if save_debug:
-            logger.debug('getting content for ' + it['url'])
-        if split_url.netloc in it['url']:
-            item = get_content(it['url'], args, site_json, save_debug)
-        elif '3rd_party' in args:
-            item = utils.get_content(it['url'], args, site_json, save_debug)
-        else:
+    feed_items = []
+    for content in content_items:
+        if 'deals.today.com' in content['computedValues']['url']:
+            if save_debug:
+                logger.debug('skipping content for ' + content['computedValues']['url'])
             continue
+        if save_debug:
+            logger.debug('getting content for ' + content['computedValues']['url'])
+        item = get_content(content['computedValues']['url'], args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
-                items.append(item)
+                feed_items.append(item)
                 n += 1
                 if 'max' in args:
                     if n == int(args['max']):
                         break
+
     feed = utils.init_jsonfeed(args)
-    feed['items'] = items.copy()
+    if next_data['props']['pageProps'].get('category'):
+        feed['title'] = '{} | On3.com'.format(next_data['pageProps']['category']['categoryName'])
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

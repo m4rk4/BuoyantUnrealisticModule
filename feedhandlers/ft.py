@@ -90,6 +90,12 @@ def get_content(url, args, site_json, save_debug=False):
         ld_json = None
 
     if not ld_json:
+        el = soup.find('script', id='page-kit-app-context')
+        if el:
+            context_json = json.loads(el.string)
+            if context_json['contentType'] == 'podcast':
+                logger.warning('podcast content')
+                return None
         logger.warning('unable to find ld+json data in ' + url)
         return None
 
@@ -264,11 +270,3 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://www.ft.com/rss/home',
-             'https://www.ft.com/technology?format=rss',
-             'https://www.ft.com/opinion?format=rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

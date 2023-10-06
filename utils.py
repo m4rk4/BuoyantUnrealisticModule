@@ -1,4 +1,4 @@
-import asyncio, basencode, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import asyncio, basencode, cloudscraper, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
@@ -166,6 +166,9 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
   elif user_agent == 'googlebot':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+  elif user_agent == 'chatgpt':
+    # https://platform.openai.com/docs/plugins/bot
+    ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
   else: # Googlebot
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 
@@ -189,7 +192,24 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
     else:
       status_code = ''
     logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
-    r = None
+    if r != None and r.status_code == 403:
+      logger.debug('trying cloudscraper')
+      scraper = cloudscraper.create_scraper()
+      #scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "android", "desktop": False}, delay=10)
+      try:
+        r = scraper.get(url)
+        r.raise_for_status()
+      except Exception as e:
+        if r != None:
+          if r.status_code == 402 or r.status_code == 500:
+            return r
+          else:
+            status_code = ' status code {}'.format(r.status_code)
+        else:
+          status_code = ''
+        logger.warning('scraper error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+        r = None
+    #r = None
   return r
 
 def get_browser_request(url, get_json=False, save_screenshot=False):
@@ -247,6 +267,7 @@ def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_
 def find_redirect_url(url):
   #print(url)
   split_url = urlsplit(url)
+  paths = list(filter(None, split_url.path.split('/')))
   if 'cloudfront.net' in split_url.netloc:
     url_html = get_url_html(url)
     m = re.search(r'"redirect":"([^"]+)"', url_html)
@@ -296,6 +317,9 @@ def find_redirect_url(url):
         el = soup.find('iframe', id='offer')
         if el:
           return find_redirect_url(el['src'])
+    elif 'redirect.mp3' in paths:
+      n = paths.index('redirect.mp3')
+      return 'https://' + '/'.join(paths[n+1:])
     elif split_url.netloc == 'howl.me':
       pass
     else:
@@ -435,7 +459,10 @@ def read_file(filename):
 def closest_value(lst, target):
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i]) - target))]
 
-def closest_dict(lst, k, target):
+def closest_dict(lst_of_dict, k, target):
+  lst = [it for it in lst_of_dict if it.get(k)]
+  if not lst:
+    return None
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i][k]) - target))]
 
 def image_from_srcset(srcset, target):
@@ -671,12 +698,11 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc=''):
-  fig_html = '<figure '
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style=''):
   if fig_style:
-    fig_html += 'style="{}">'.format(fig_style)
+    fig_html = '<figure style="{}">'.format(fig_style)
   else:
-    fig_html += 'style="margin:0; padding:0;">'
+    fig_html = '<figure style="margin:0; padding:0;">'
 
   if heading:
     fig_html += heading
@@ -705,7 +731,10 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     fig_html += '</a>'
 
   if caption:
-    fig_html += '<figcaption><small>{}</small></figcaption>'.format(caption)
+    if figcap_style:
+      fig_html += '<figcaption style="{}"><small>{}</small></figcaption>'.format(figcap_style, caption)
+    else:
+      fig_html += '<figcaption><small>{}</small></figcaption>'.format(caption)
 
   if desc:
     fig_html += desc
@@ -725,7 +754,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
   if video_type == 'video/mp4' or video_type == 'video/webm':
     video_src = video_url
 
-  elif video_type == 'application/x-mpegURL':
+  elif video_type == 'application/x-mpegURL' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
@@ -922,6 +951,8 @@ def add_embed(url, args={}, save_debug=False):
       embed_url = clean_url(embed_url)
   elif 'cloudfront.net' in embed_url:
     embed_url = get_redirect_url(embed_url)
+  elif 'dts.podtrac.com/redirect' in embed_url:
+    embed_url = get_redirect_url(embed_url)
   elif 'embedly.com' in embed_url:
     split_url = urlsplit(embed_url)
     params = parse_qs(split_url.query)
@@ -933,13 +964,19 @@ def add_embed(url, args={}, save_debug=False):
       m = re.search(r'"linkUri":"([^"]+)"', embed_html)
       if m:
         embed_url = m.group(1)
+  elif 'urldefense.com' in embed_url:
+    m = re.search(r'__https://?(.*?)__', embed_url)
+    if m:
+      embed_url = 'https://' + m.group(1)
+    else:
+      embed_url = get_redirect_url(embed_url)
   logger.debug('embed content from ' + embed_url)
 
   embed_args = args.copy()
   embed_args['embed'] = True
   # limit playlists to 10 items
   if re.search(r'(apple|bandcamp|soundcloud|spotify)', embed_url):
-    embed_args['max'] = 10
+    embed_args['max'] = 3
 
   module, site_json = get_module(embed_url)
   if module:
@@ -999,3 +1036,38 @@ def get_ld_json(url):
   for el in soup.find_all('script', type='application/ld+json'):
     ld_json.append(json.loads(el.string))
   return ld_json
+
+def get_soup_elements(tag, soup):
+  if tag.get('selector'):
+    elements = soup.select(tag['selector'])
+    if tag.get('parent'):
+      parents = []
+      for el in elements:
+        parents.append(el.find_parent(tag['parent']))
+      elements = parents
+  elif tag.get('regex'):
+    key = list(tag['attrs'].keys())[0]
+    val = list(tag['attrs'].values())[0]
+    if tag['regex'] == 'attrs':
+      elements = soup.find_all(tag['tag'], attrs={key: re.compile(val)})
+    elif tag['regex'] == 'tag':
+      elements = soup.find_all(re.compile(tag['tag']), attrs=tag['attrs'])
+    elif tag['regex'] == 'both':
+      key = list(tag['attrs'].keys())[0]
+      val = list(tag['attrs'].values())[0]
+      elements = soup.find_all(re.compile(tag['tag']), attrs={key: re.compile(val)})
+  else:
+    elements = soup.find_all(tag['tag'], attrs=tag['attrs'])
+  return elements
+
+def calc_duration(s):
+  duration = []
+  if s > 3600:
+    h = s / 3600
+    duration.append('{} hr'.format(math.floor(h)))
+    m = (s % 3600) / 60
+    duration.append('{} min'.format(math.ceil(m)))
+  else:
+    m = s / 60
+    duration.append('{} min'.format(math.ceil(m)))
+  return ', '.join(duration)

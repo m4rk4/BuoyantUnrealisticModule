@@ -1,11 +1,11 @@
-import base64, dateutil, json, pytz, re, requests
+import base64, json, pytz, re, requests
+import dateutil.parser
 from bs4 import BeautifulSoup
 from requests_oauthlib import OAuth1
-from tweety import Twitter
-#from tweety.exceptions_ import *
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
+from feedhandlers import twitter
 
 import logging
 
@@ -280,21 +280,34 @@ def get_guest_account():
     return guest_account
 
 
-def get_tweet_detail(tweet_id, oauth1):
-    variables = {
-        "focalTweetId": tweet_id,
-        "includeHasBirdwatchNotes": False,
-        "includePromotedContent": False,
-        "withBirdwatchNotes": False,
-        "withVoice": False,
-        "withV2Timeline": True
-    }
-    r = requests.get("https://api.twitter.com/graphql/q94uRCEn65LZThakYcPT6g/TweetDetail", auth=oauth1,
+def get_tweet_detail(tweet_id, oauth1, by_rest_id=False):
+    if by_rest_id:
+        variables = {
+            "tweetId": tweet_id,
+            "withCommunity": False,
+            "includePromotedContent": False,
+            "withVoice": False
+        }
+        api_url = 'https://twitter.com/i/api/graphql/DJS3BdhUhcaEpZ7B7irJDg/TweetResultByRestId'
+    else:
+        variables = {
+            "focalTweetId": tweet_id,
+            "includeHasBirdwatchNotes": False,
+            "includePromotedContent": False,
+            "withBirdwatchNotes": False,
+            "withVoice": False,
+            "withV2Timeline": True
+        }
+        api_url = 'https://api.twitter.com/graphql/q94uRCEn65LZThakYcPT6g/TweetDetail'
+    r = requests.get(api_url, auth=oauth1,
             params={"features": json.dumps(gql_features), "variables": json.dumps(variables)})
-    if r.status_code != 200:
+    if r.status_code == 200:
+        return r.json()
+    elif r.status_code == 429:
+        logger.warning('status error 429: guest account is being rate limited')
+    else:
         logger.warning('status error {} getting TweetDetail'.format(r.status_code))
         return None
-    return r.json()
 
 
 def get_user_by_screen_name(screen_name, oauth1):
@@ -346,14 +359,24 @@ def get_user_tweets_and_replies(user_id, oauth1):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    tweet_id = ''
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    tweet_id = paths[2]
+    if split_url.netloc == 'platform.twitter.com' and 'embed' in paths:
+        query = parse_qs(split_url.query)
+        if query.get('id'):
+            tweet_id = query['id'][0]
+    else:
+        tweet_id = paths[2]
+    if not tweet_id:
+        logger.warning('unknown tweet id in ' + url)
+        return None
 
     oauth1 = OAuth1(TW_CONSUMER_KEY, TW_CONSUMER_SECRET, config.twitter_oauth_token, config.twitter_oauth_token_secret, realm='https://api.twitter.com/', signature_type="AUTH_HEADER", signature_method="HMAC-SHA1")
     tweet_json = get_tweet_detail(tweet_id, oauth1)
     if not tweet_json:
-        return None
+        logger.debug('using twitter handler for ' + url)
+        return twitter.get_content(url, args, site_json, save_debug)
     if save_debug:
         if 'embed' in args:
             utils.write_file(tweet_json, './debug/twitter.json')
@@ -382,6 +405,7 @@ def get_content(url, args, site_json, save_debug=False):
         for instruction in tweet_json['data']['threaded_conversation_with_injections_v2']['instructions']:
             if instruction['type'] == 'TimelineAddEntries':
                 for entry in instruction['entries']:
+                    #print(entry['entryId'])
                     if entry['entryId'].startswith('tweet-'):
                         if entry['content']['itemContent']['tweet_results'].get('result'):
                             tweet_result = entry['content']['itemContent']['tweet_results']['result']
@@ -404,11 +428,12 @@ def get_content(url, args, site_json, save_debug=False):
                     elif entry['entryId'].startswith('conversationthread-'):
                         for content_item in entry['content']['items']:
                             if content_item['item']['itemContent']['__typename'] == 'TimelineTweet':
-                                tweet_result = content_item['item']['itemContent']['tweet_results']['result']
-                                if tweet_result['__typename'] == 'Tweet' and tweet_result['legacy'].get('self_thread') and tweet_result['legacy']['self_thread']['id_str'] == parent_id:
-                                    it = get_tweet(tweet_result, is_thread=True)
-                                    if it:
-                                        children += it['content_html']
+                                if content_item['item']['itemContent']['tweet_results'].get('result'):
+                                    tweet_result = content_item['item']['itemContent']['tweet_results']['result']
+                                    if tweet_result['__typename'] == 'Tweet' and tweet_result['legacy'].get('self_thread') and tweet_result['legacy']['self_thread']['id_str'] == parent_id:
+                                        it = get_tweet(tweet_result, is_thread=True)
+                                        if it:
+                                            children += it['content_html']
 
     if 'is_retweet' not in args:
         item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">' + parents + item['content_html'] + children + '</table>'

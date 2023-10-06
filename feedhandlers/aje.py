@@ -30,7 +30,10 @@ def get_graphql_json(url):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if paths[0] == 'program':
+    if 'liveblog' in paths:
+        op_name = 'ArchipelagoSingleLiveBlogQuery'
+        post_type = 'liveblog'
+    elif paths[0] == 'program':
         op_name = 'ArchipelagoSingleArticleQuery'
         post_type = 'episode'
     elif paths[0] == 'opinions':
@@ -117,6 +120,20 @@ def get_content(url, args, site_json, save_debug=False):
                 captions.append(image['image']['credit'])
             img_src = 'https://www.aljazeera.com{}?w=1000x'.format(image['image']['sourceUrl'])
             item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
+
+    if post_type == 'liveblog':
+        gql_url = 'https://www.aljazeera.com/graphql?wp-site=aje&operationName=SingleLiveBlogChildrensQuery&variables=%7B%22postName%22%3A%22{}%22%7D&extensions=%7B%7D'.format(quote_plus(paths[-1]))
+        children_json = get_graphql_json(gql_url)
+        if children_json:
+            for child_id in children_json['data']['article']['children']:
+                gql_url = 'https://www.aljazeera.com/graphql?wp-site=aje&operationName=LiveBlogUpdateQuery&variables=%7B%22postID%22%3A{}%2C%22postType%22%3A%22liveblog-update%22%2C%22preview%22%3A%22%22%2C%22isAmp%22%3Afalse%7D&extensions=%7B%7D'.format(child_id)
+                child_json = get_graphql_json(gql_url)
+                if child_json:
+                    #utils.write_file(child_json, './debug/child.json')
+                    dt = datetime.fromisoformat(child_json['data']['posts']['modified_gmt'] + '+00:00')
+                    item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div><div>Update: {}</div><h3>{}</h3>'.format(utils.format_display_date(dt), child_json['data']['posts']['title'])
+                    #print(child_json['data']['posts']['content'])
+                    item['content_html'] += wp_posts.format_content(child_json['data']['posts']['content'], item)
 
     item['content_html'] = re.sub(r'src="/', 'src="https://www.aljazeera.com/', item['content_html'])
     item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])

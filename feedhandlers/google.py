@@ -1,4 +1,4 @@
-import json, re
+import feedparser, json, re
 from bs4 import BeautifulSoup
 from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
@@ -23,6 +23,23 @@ def get_content(url, args, site_json, save_debug=False):
             item = utils.get_content(el['data-n-au'], args, save_debug)
         else:
             logger.warning('unknown target url for ' + url)
+    elif split_url.netloc == 'docs.google.com' and 'gview' in paths:
+        # https://docs.google.com/gview?url=https://static.fox5atlanta.com/www.fox5atlanta.com/content/uploads/2023/09/23.09.07_DOJ-Letter-re-Clayton-County-Jail.pdf
+        query = parse_qs(split_url.query)
+        item['url'] = query['url'][0]
+        page_html = utils.get_url_html(url)
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            item['title'] = soup.title.get_text()
+            el = soup.find('img', class_='drive-viewer-prerender-thumbnail')
+            if el:
+                item['_image'] = 'https://docs.google.com' + el['src']
+                caption = '<a href="{}">{}</a>'.format(item['url'], item['title'])
+                item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
+            else:
+                item['content_html'] = '<table><tr><td style="width:3em;"><span style="font-size:3em;">🗎</span></td><td><a href="{}">{}</a></td></tr></table>'.format(item['url'], item['title'])
+        else:
+            item['content_html'] = '<table><tr><td style="width:3em;"><span style="font-size:3em;">🗎</span></td><td><a href="{0}">{0}</a></td></tr></table>'.format(item['url'])
     elif split_url.netloc == 'drive.google.com':
         if 'viewer' in paths:
             page_html = utils.get_url_html(url)
@@ -140,6 +157,29 @@ def get_feed(url, args, site_json, save_debug=False):
         feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
 
     elif split_url.netloc == 'news.google.com':
-        feed = rss.get_feed(url, args, site_json, save_debug, get_content)
-
+        #feed = rss.get_feed(url, args, site_json, save_debug, get_content)
+        news_feed = utils.get_url_html(url)
+        if not news_feed:
+            return None
+        try:
+            d = feedparser.parse(news_feed)
+        except:
+            logger.warning('Feedparser error ' + url)
+            return None
+        feed_items = []
+        for entry in d.entries:
+            if save_debug:
+                logger.debug('getting content for ' + entry.link)
+            item = get_content(entry.link, args, site_json, save_debug)
+            if not item and entry.description:
+                soup = BeautifulSoup(entry.description, 'html.parser')
+                for link in soup.find_all('a'):
+                    item = get_content(link, args, site_json, save_debug)
+                    if item:
+                        break
+            if item:
+                if utils.filter_item(item, args) == True:
+                    feed_items.append(item)
+        feed['title'] = 'Google News'
+        feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

@@ -11,12 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, site_json, width=1000):
+def resize_image(img_src, site_json, width=1000, height=800):
     #print(img_src)
+    # if site_json and site_json.get('resize_image'):
+    #     return utils.clean_url(img_src) +
     split_url = urlsplit(img_src)
     query = parse_qs(split_url.query)
     img_path = '{}://{}'.format(split_url.scheme, split_url.netloc)
-    if site_json.get('img_path'):
+    if site_json and site_json.get('img_path'):
         img_src = img_src.replace(img_path, site_json['img_path'])
         img_path = site_json['img_path']
     if query.get('url'):
@@ -26,7 +28,7 @@ def resize_image(img_src, site_json, width=1000):
         return '{}{}?w={}&ssl=1'.format(img_path, split_url.path, width)
     if query.get('width') or query.get('height'):
         return '{}{}?width={}'.format(img_path, split_url.path, width)
-    if query.get('resize'):
+    if query.get('resize') and not query.get('crop'):
         m = re.search(r'(\d+),(\d+)', query['resize'][0])
         if m:
             w = int(m.group(1))
@@ -63,7 +65,11 @@ def add_image(el, el_parent, base_url, site_json, caption=True, decompose=True, 
         el_parent = el
         for it in reversed(el.find_parents()):
             #print('Parent: ' + it.name)
-            if it.name == 'p':
+            if it.name == '[document]':
+                break
+            elif it.name == 'table' or it.name == 'tbody' or it.name == 'tr' or it.name == 'td':
+                continue
+            elif it.name == 'p':
                 has_str = False
                 for c in it.contents:
                     if isinstance(c, bs4.element.NavigableString) or (isinstance(c, bs4.element.Tag) and c.name in ['b', 'em', 'i', 'strong']):
@@ -160,7 +166,7 @@ def add_image(el, el_parent, base_url, site_json, caption=True, decompose=True, 
                 if it and it.get_text().strip():
                     credit = it.get_text().strip()
             if not credit:
-                it = elm.find(class_=re.compile(r'image-attribution|image-credit|credits-text|image_source'))
+                it = elm.find(class_=re.compile(r'image-attribution|image-credit|photo-credit|credits-text|image_source'))
                 if it and it.get_text().strip():
                     credit = it.get_text().strip()
             if not credit:
@@ -244,6 +250,9 @@ def add_image(el, el_parent, base_url, site_json, caption=True, decompose=True, 
             it.attrs = {}
             it.name = 'p'
             desc += str(it)
+    elif el.find(class_='gallery-item__caption'):
+        it = el.find(class_='gallery-item__caption')
+        desc = it.decode_contents()
 
     if not (el.get('class') and 'bannerad' in el['class']):
         new_html = utils.add_image(resize_image(img_src, site_json), ' | '.join(captions), link=link, desc=desc)
@@ -296,8 +305,196 @@ def render_content(content, url):
     return content_html
 
 
-def get_post_content(post, args, site_json, save_debug=False):
-    page_soup = None
+def get_authors(post, yoast_json, page_soup, item, args, site_json):
+    authors = []
+    if site_json.get('author'):
+        if not page_soup:
+            page_html = utils.get_url_html(item['url'])
+            if page_html:
+                page_soup = BeautifulSoup(page_html, 'lxml')
+        if page_soup:
+            for el in utils.get_soup_elements(site_json['author'], page_soup):
+                if el.name == 'meta':
+                    authors.append(el['content'])
+                elif el.name == 'a':
+                    authors.append(el.get_text())
+                else:
+                    for it in el.find_all('a', href=re.compile(r'author|correspondents|staff')):
+                        authors.append(it.get_text())
+                if not authors and el.get_text().strip():
+                    authors.append(re.sub(r'^By ', '', el.get_text().strip(), flags=re.I))
+                if authors:
+                    break
+    if authors:
+        return authors
+
+    if post.get('rj_fields') and post['rj_fields'].get('_rj_field_byline_author') and post['rj_fields']['_rj_field_byline_author'].get('authors'):
+        return post['rj_fields']['_rj_field_byline_author']['authors'].copy()
+
+    if post.get('authors'):
+        for it in post['authors']:
+            if isinstance(it, dict):
+                if it.get('display_name'):
+                    authors.append(it['display_name'])
+                elif it.get('name'):
+                    authors.append(it['name'])
+        return authors
+
+    if post.get('author_info'):
+        authors.append(post['author_info']['display_name'])
+        return authors
+
+    if post.get('byline'):
+        for it in post['byline']:
+            if isinstance(it, dict) and it.get('text'):
+                authors.append(it['text'])
+        return authors
+
+    if post.get('bylines'):
+        for it in post['bylines']:
+            if it.get('display_name'):
+                authors.append(it['display_name'])
+        return authors
+
+    if post.get('shared_authors'):
+        for it in post['shared_authors']:
+            authors.append(it['title'])
+        return authors
+
+    if post.get('post_meta') and post['post_meta'].get('personOverride'):
+        if isinstance(post['post_meta']['personOverride'], list):
+            return post['post_meta']['personOverride'].copy()
+        elif isinstance(post['post_meta']['personOverride'], str):
+            authors.append(post['post_meta']['personOverride'])
+            return authors
+
+    if not authors and post.get('meta') and post['meta'].get('byline') and isinstance(post['meta']['byline'], str):
+        authors.append(post['meta']['byline'])
+        return authors
+
+    if not authors and post.get('metadata') and post['metadata'].get('author'):
+        return post['metadata']['author'].copy()
+
+    if post.get('parsely') and post['parsely'].get('meta') and post['parsely']['meta'].get('author'):
+        for author in post['parsely']['meta']['author']:
+            authors.append(author['name'])
+        return authors
+
+    if post.get('parsely') and post['parsely'].get('meta') and post['parsely']['meta'].get('creator'):
+        return post['parsely']['meta']['creator'].copy()
+
+    if post.get('parselyMeta') and post['parselyMeta'].get('parsely-author'):
+        return post['parselyMeta']['parsely-author'].copy()
+
+    if post.get('_links') and post['_links'].get('ns:byline'):
+        for link in post['_links']['ns:byline']:
+            if site_json.get('replace_links_path'):
+                link_href = link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1])
+            else:
+                link_href = link['href']
+            link_json = utils.get_url_json(link_href)
+            if link_json and link_json.get('title'):
+                authors.append(link_json['title']['rendered'])
+    if authors:
+        return authors
+
+    if post.get('_links') and post['_links'].get('wp:term'):
+        for link in post['_links']['wp:term']:
+            if link.get('taxonomy') and link['taxonomy'] == 'author':
+                link_json = utils.get_url_json(link['href'])
+                if link_json:
+                    for it in link_json:
+                        authors.append(it['name'].replace('-', ' ').title())
+    if authors:
+        return authors
+
+    if post.get('yoast_head_json') and post['yoast_head_json'].get('author'):
+        authors.append(post['yoast_head_json']['author'])
+        return authors
+
+    if yoast_json and yoast_json.get('@graph'):
+        for it in yoast_json['@graph']:
+            if it.get('@type') and it['@type'] == 'Article' and it.get('author'):
+                if isinstance(it['author'], list):
+                    for author in it['author']:
+                        if author.get('name'):
+                            authors.append(author['name'])
+                elif isinstance(it['author'], dict) and it['author'].get('name'):
+                    authors.append(it['author']['name'])
+                elif isinstance(it['author'], str):
+                    authors.append(it['author'])
+        if not authors:
+            for it in yoast_json['@graph']:
+                if it.get('@type') and it['@type'] == 'Person':
+                    if it.get('name') and not re.search(r'No Author', it['name'], flags=re.I):
+                        authors.append(it['name'])
+    if authors:
+        return authors
+
+    if yoast_json and yoast_json.get('twitter_misc') and yoast_json['twitter_misc'].get('Written by'):
+        authors.append(yoast_json['twitter_misc']['Written by'])
+        return authors
+
+    if post.get('acf') and post['acf'].get('art_author'):
+        for it in post['acf']['art_author']:
+            authors.append(it['post_title'])
+        return authors
+
+    if post.get('coauthors_byline'):
+        authors.append(re.sub(r'By ', '', post['coauthors_byline'], flags=re.I))
+        return authors
+
+    if post.get('_links') and post['_links'].get('author'):
+        if 'skip_wp_user' not in args:
+            for link in post['_links']['author']:
+                if site_json.get('replace_links_path'):
+                    link_href = link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1])
+                else:
+                    link_href = link['href']
+                link_json = utils.get_url_json(link_href)
+                if link_json and link_json.get('name') and not re.search(r'No Author', link_json['name'], flags=re.I):
+                    authors.append(link_json['name'])
+            if authors:
+                return authors
+
+        update_sites = False
+        wp_item = None
+        for i, link in enumerate(post['_links']['author']):
+            author = list(filter(None, urlsplit(link['href']).path[1:].split('/')))[-1]
+            if site_json.get('authors') and site_json['authors'].get(author):
+                authors.append(site_json['authors'][author])
+            elif site_json.get('authors') and site_json['authors'].get('default'):
+                authors.append(site_json['authors']['default'])
+            else:
+                if not wp_item:
+                    embed_args = args.copy()
+                    embed_args['embed'] = True
+                    wp_item = wp.get_content(item['url'], embed_args, site_json, False)
+                if wp_item and wp_item.get('author'):
+                    wp_authors = re.split(r'(, | and )', wp_item['author']['name'])
+                    authors.append(wp_authors[i])
+                    if site_json.get('authors'):
+                        site_json['authors'][author] = wp_authors[i]
+                        logger.debug('adding unknown author {} as {}'.format(author, wp_authors[i]))
+                        update_sites = True
+                else:
+                    logger.debug('unknown author {} in {}'.format(author, item['url']))
+                    authors.append('Unknown author {}'.format(author))
+        if update_sites:
+            utils.update_sites(item['url'], site_json)
+
+    if post.get('_wamu_show'):
+        link = next((it for it in post['_links']['wp:term'] if it['taxonomy'] == '_wamu_show'), None)
+        if link:
+            link_json = utils.get_url_json(link['href'])
+            if link_json:
+                for it in link_json:
+                    if it.get('name'):
+                        authors.append(it['name'])
+    return authors
+
+
+def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     if save_debug:
         utils.write_file(post, './debug/debug.json')
 
@@ -320,6 +517,7 @@ def get_post_content(post, args, site_json, save_debug=False):
     else:
         item['url'] = post['link']
     split_url = urlsplit(item['url'])
+    paths = list(filter(None, split_url.path.split('/')))
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
     item['title'] = BeautifulSoup('<p>{}</p>'.format(post['title']['rendered']), 'html.parser').get_text()
@@ -338,135 +536,7 @@ def get_post_content(post, args, site_json, save_debug=False):
             return None
 
     item['author'] = {}
-    authors = []
-    if site_json.get('author'):
-        if not page_soup:
-            page_html = utils.get_url_html(item['url'])
-            if page_html:
-                page_soup = BeautifulSoup(page_html, 'lxml')
-        if page_soup:
-            el = page_soup.find(site_json['author']['tag'], attrs=site_json['author']['attrs'])
-            if el:
-                if el.name == 'a':
-                    authors.append(el.get_text())
-                else:
-                    for it in el.find_all('a', href=re.compile(r'author|staff')):
-                        authors.append(it.get_text())
-                if not authors:
-                    authors.append(re.sub(r'^By ', '', el.get_text().strip(), flags=re.I))
-    if not authors and post.get('rj_fields') and post['rj_fields'].get('_rj_field_byline_author') and post['rj_fields']['_rj_field_byline_author'].get('authors'):
-        authors = post['rj_fields']['_rj_field_byline_author']['authors'].copy()
-    if not authors and post.get('authors'):
-        for it in post['authors']:
-            if isinstance(it, dict):
-                if it.get('display_name'):
-                    authors.append(it['display_name'])
-                elif it.get('name'):
-                    authors.append(it['name'])
-    if not authors and post.get('author_info'):
-        authors.append(post['author_info']['display_name'])
-    if not authors and post.get('byline'):
-        for it in post['byline']:
-            if isinstance(it, dict) and it.get('text'):
-                authors.append(it['text'])
-    if not authors and post.get('bylines'):
-        for it in post['bylines']:
-            if it.get('display_name'):
-                authors.append(it['display_name'])
-    if not authors and post.get('shared_authors'):
-        for it in post['shared_authors']:
-            authors.append(it['title'])
-    if not authors and post.get('meta') and post['meta'].get('byline'):
-        authors.append(post['meta']['byline'])
-    if not authors and post.get('metadata') and post['metadata'].get('author'):
-        authors = post['metadata']['author'].copy()
-    if not authors and post.get('parsely') and post['parsely'].get('meta'):
-        if post['parsely']['meta'].get('author'):
-            for author in post['parsely']['meta']['author']:
-                authors.append(author['name'])
-        elif post['parsely']['meta'].get('creator'):
-            authors = post['parsely']['meta']['creator'].copy()
-    if not authors and post.get('parselyMeta') and post['parselyMeta'].get('parsely-author'):
-        for it in post['parselyMeta']['parsely-author']:
-            authors.append(it)
-    if not authors and post.get('_links'):
-        if post['_links'].get('ns:byline'):
-            for link in post['_links']['ns:byline']:
-                if site_json.get('replace_links_path'):
-                    link_json = utils.get_url_json(link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1]))
-                else:
-                    link_json = utils.get_url_json(link['href'])
-                if link_json and link_json.get('title'):
-                    authors.append(link_json['title']['rendered'])
-        elif post['_links'].get('wp:term'):
-            for link in post['_links']['wp:term']:
-                if link.get('taxonomy') and link['taxonomy'] == 'author':
-                    link_json = utils.get_url_json(link['href'])
-                    if link_json:
-                        for it in link_json:
-                            authors.append(it['name'].replace('-', ' ').title())
-    if not authors and yoast_json:
-        if post.get('yoast_head_json') and post['yoast_head_json'].get('author'):
-            authors.append(post['yoast_head_json']['author'])
-        else:
-            for it in yoast_json['@graph']:
-                if it.get('@type') and it['@type'] == 'Article' and it.get('author'):
-                    if isinstance(it['author'], list):
-                        for author in it['author']:
-                            if author.get('name'):
-                                authors.append(author['name'])
-                    elif isinstance(it['author'], dict) and it['author'].get('name'):
-                        authors.append(it['author']['name'])
-                    elif isinstance(it['author'], str):
-                        authors.append(it['author'])
-            if not authors:
-                for it in yoast_json['@graph']:
-                    if it.get('@type') and it['@type'] == 'Person':
-                        if it.get('name') and not re.search(r'No Author', it['name'], flags=re.I):
-                            authors.append(it['name'])
-            if not authors and yoast_json.get('twitter_misc') and yoast_json['twitter_misc'].get('Written by'):
-                authors.append(yoast_json['twitter_misc']['Written by'])
-    if not authors and post.get('acf') and post['acf'].get('art_author'):
-        for it in post['acf']['art_author']:
-            authors.append(it['post_title'])
-    if not authors and post.get('coauthors_byline'):
-        authors.append(re.sub(r'By ', '', post['coauthors_byline'], flags=re.I))
-    if not authors and post['_links'].get('author'):
-        if 'skip_wp_user' not in args:
-            for link in post['_links']['author']:
-                if site_json.get('replace_links_path'):
-                    link_json = utils.get_url_json(link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1]))
-                else:
-                    link_json = utils.get_url_json(link['href'])
-                if link_json:
-                    if link_json.get('name') and not re.search(r'No Author', link_json['name'], flags=re.I):
-                        authors.append(link_json['name'])
-        else:
-            update_sites = False
-            wp_item = None
-            for i, link in enumerate(post['_links']['author']):
-                author = list(filter(None, urlsplit(link['href']).path[1:].split('/')))[-1]
-                if site_json.get('authors') and site_json['authors'].get(author):
-                    authors.append(site_json['authors'][author])
-                elif site_json.get('authors') and site_json['authors'].get('default'):
-                    authors.append(site_json['authors']['default'])
-                else:
-                    if not wp_item:
-                        embed_args = args.copy()
-                        embed_args['embed'] = True
-                        wp_item = wp.get_content(item['url'], embed_args, site_json, False)
-                    if wp_item and wp_item.get('author'):
-                        wp_authors = re.split(r'(, | and )', wp_item['author']['name'])
-                        authors.append(wp_authors[i])
-                        if site_json.get('authors'):
-                            site_json['authors'][author] = wp_authors[i]
-                            logger.debug('adding unknown author {} as {}'.format(author, wp_authors[i]))
-                            update_sites = True
-                    else:
-                        logger.debug('unknown author {} in {}'.format(author, item['url']))
-                        authors.append('Unknown author {}'.format(author))
-            if update_sites:
-                utils.update_sites(item['url'], site_json)
+    authors = get_authors(post, yoast_json, page_soup, item, args, site_json)
     if authors:
         for i in range(len(authors)):
             authors[i] = re.sub(r', (.*)', r' (\1)', authors[i])
@@ -528,8 +598,12 @@ def get_post_content(post, args, site_json, save_debug=False):
                 if link_json and link_json.get('media_type'):
                     if link_json['media_type'] == 'image':
                         if link_json.get('media_details') and link_json['media_details'].get('sizes'):
-                            item['_image'] = utils.closest_dict(list(link_json['media_details']['sizes'].values()), 'width', 1000)['source_url']
-                        else:
+                            image = utils.closest_dict(list(link_json['media_details']['sizes'].values()), 'width', 1000)
+                            if image and image.get('source_url'):
+                                item['_image'] = image['source_url']
+                            elif image and image.get('url'):
+                                item['_image'] = image['url']
+                        if not item.get('_image'):
                             item['_image'] = link_json['source_url']
                         captions = []
                         if link_json.get('description'):
@@ -538,7 +612,7 @@ def get_post_content(post, args, site_json, save_debug=False):
                                 caption = soup.get_text().strip()
                                 if caption:
                                     captions.append(caption)
-                        if not captions and link_json.get('caption'):
+                        if not captions and link_json.get('caption') and link_json['caption'].get('rendered') and isinstance(link_json['caption']['rendered'], str):
                             soup = BeautifulSoup(link_json['caption']['rendered'], 'html.parser')
                             if not soup.find(class_=True):
                                 #caption = soup.get_text().strip()
@@ -612,7 +686,7 @@ def get_post_content(post, args, site_json, save_debug=False):
     if item.get('_image'):
         item['_image'] = resize_image(item['_image'], site_json)
 
-    if post.get('excerpt') and post['excerpt'].get('rendered'):
+    if post.get('excerpt') and post['excerpt'].get('rendered') and isinstance(post['excerpt']['rendered'], str):
         item['summary'] = BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text()
     elif post.get('yoast_head_json'):
         if post['yoast_head_json'].get('description'):
@@ -657,8 +731,13 @@ def get_post_content(post, args, site_json, save_debug=False):
                 pass
             else:
                 logger.warning('unhandled acf_fc_layout module {} in {}'.format(module['acf_fc_layout'], item['url']))
+    elif post.get('type') and post['type'] == 'video':
+        if post.get('excerpt') and post['excerpt'].get('rendered'):
+            content_html += post['excerpt']['rendered']
+        elif post.get('html_stripped_summary'):
+            content_html += '<p>{}</p>'.format(post['html_stripped_summary'])
     else:
-        logger.warning('unknown post content in {}' + item['url'])
+        logger.warning('unknown post content in ' + item['url'])
 
     content_html = content_html.replace('\u2028', '')
 
@@ -671,6 +750,8 @@ def get_post_content(post, args, site_json, save_debug=False):
     elif post.get('meta'):
         if post['meta'].get('sub_title'):
             lede += '<p><em>{}</em></p>'.format(post['meta']['sub_title'])
+        elif post['meta'].get('nbc_subtitle'):
+            lede += '<p><em>{}</em></p>'.format(post['meta']['nbc_subtitle'])
         elif post['meta'].get('sub_heading'):
             lede += '<p><em>{}</em></p>'.format(post['meta']['sub_heading'])
         elif post['meta'].get('subheadline'):
@@ -683,14 +764,18 @@ def get_post_content(post, args, site_json, save_debug=False):
             multi_title = json.loads(post['meta']['multi_title'])
             if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
                 lede += '<p><em>{}</em></p>'.format(multi_title['titles']['headline']['additional']['headline_subheadline'])
+    elif post.get('cmb2'):
+        if post['cmb2'].get('articles_metabox') and post['cmb2']['articles_metabox'].get('_cmb_standfirst'):
+            lede += '<p><em>{}</em></p>'.format(post['cmb2']['articles_metabox']['_cmb_standfirst'])
     if not subtitle and 'add_subtitle' in args:
-        if post.get('yoast_head_json'):
+        if post.get('excerpt') and post['excerpt'].get('rendered'):
+            lede += '<p><em>{}</em></p>'.format(BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text())
+        elif post.get('yoast_head_json'):
             if post['yoast_head_json'].get('description'):
                 lede += '<p><em>{}</em></p>'.format(post['yoast_head_json']['description'])
             elif post['yoast_head_json'].get('og_description'):
                 lede += '<p><em>{}</em></p>'.format(post['yoast_head_json']['og_description'])
-        elif post.get('excerpt') and post['excerpt'].get('rendered'):
-            lede += '<p><em>{}</em></p>'.format(BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text())
+
     if subtitle:
         lede += '<p><em>{}</em></p>'.format(subtitle)
 
@@ -735,6 +820,48 @@ def get_post_content(post, args, site_json, save_debug=False):
                                 video_src = 'https://vid.connatix.com/pid-{}/{}/playlist.m3u8'.format(m.group(1), media_id)
                                 poster = 'https://img.connatix.com/pid-{}/{}/1_th.jpg?width=1000&format=jpeg&quality=60'.format(m.group(1), media_id)
                                 video_lede += utils.add_video(video_src, 'application/x-mpegURL', poster)
+        elif post.get('meta') and ((post['meta'].get('media_pid') and post['meta']['video_provider'] == 'mpx') or (post['meta'].get('lede_video_id') and 'nbc' in split_url.netloc)):
+            video_meta = ''
+            if post['meta'].get('lede_video_id'):
+                if not page_soup:
+                    page_html = utils.get_url_html(item['url'])
+                    if page_html:
+                        page_soup = BeautifulSoup(page_html, 'lxml')
+                if page_soup:
+                    el = page_soup.find(attrs={"data-react-component": "VideoPlayer"})
+                    if el:
+                        video_meta = json.loads(html.unescape(el['data-meta']))
+            else:
+                video_meta = post['meta']
+            if video_meta:
+                ssid = 'ots_{}_{}'.format(site_json['call_letters'], '_'.join(paths[:-2]))
+                video_url = 'https://link.theplatform.com/s/{}/media/{}?formats=MPEG-DASH+widevine,M3U+appleHlsEncryption,M3U+none,MPEG-DASH+none,MPEG4,MP3&format=SMIL&fwsitesection={}&fwNetworkID=382114&pprofile=ots_desktop_html&sensitive=false&usPrivacy=1YNN&w=647&h=363.9375&rnd={}&mode=on-demand&tracking=true&vpaid=script&schema=2.0&sdk=PDK+6.1.3'.format(site_json['account_id'], video_meta['media_pid'], ssid, math.floor(random.random() * 10000000))
+                video_html = utils.get_url_html(video_url)
+                if video_html:
+                    video_soup = BeautifulSoup(video_html, 'html.parser')
+                    el = video_soup.find('ref')
+                    if el:
+                        captions = []
+                        if el.get('abstract'):
+                            captions.append(el['abstract'])
+                        elif post['meta'].get('video_captions'):
+                            captions.append(post['meta']['video_captions'])
+                        if el.get('author'):
+                            captions.append(el['author'])
+                        if el.get('copyright'):
+                            captions.append(el['copyright'])
+                        elif post['meta'].get('video_copyright'):
+                            captions.append(post['meta']['video_copyright'])
+                        video_lede += utils.add_video(el['src'], el['type'], video_meta.get('mpx_thumbnail_url'), ' | '.join(captions))
+                    else:
+                        captions = []
+                        if video_meta.get('video_captions'):
+                            captions.append(video_meta['video_captions'])
+                        if video_meta.get('video_copyright'):
+                            captions.append(video_meta['video_copyright'])
+                        el = video_soup.find('video')
+                        if el:
+                            video_lede += utils.add_video(el['src'], 'application/x-mpegURL', video_meta.get('mpx_thumbnail_url'), ' | '.join(captions))
         elif site_json.get('lede_video'):
             if not page_soup:
                 page_html = utils.get_url_html(item['url'])
@@ -870,6 +997,10 @@ def get_post_content(post, args, site_json, save_debug=False):
                         it.decompose()
                     lede += '<h2>Specs</h2>' + str(el)
 
+    if post.get('audio') and 'add_audio' in args:
+        # https://wamu.org/story/23/10/05/a-bumpy-vaccine-rollout-and-the-ongoing-risks-of-covid/
+        lede += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen</a></span></div>'.format(post['audio']['audioFile'], config.server)
+
     item['content_html'] = format_content(lede + content_html, item, site_json)
 
     # if re.search('makezine\.com/(projects|products)', item['url']):
@@ -915,7 +1046,7 @@ def get_post_content(post, args, site_json, save_debug=False):
 
 
 def format_content(content_html, item, site_json=None, module_format_content=None):
-    utils.write_file(content_html, './debug/debug.html')
+    #utils.write_file(content_html, './debug/debug.html')
     split_url = urlsplit(item['url'])
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
@@ -930,12 +1061,15 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     # Remove site-specific elements
     if site_json and site_json.get('decompose'):
         for it in site_json['decompose']:
-            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, soup):
                 el.decompose()
+
     if site_json and site_json.get('unwrap'):
         for it in site_json['unwrap']:
-            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, soup):
                 el.unwrap()
+
+    utils.write_file(str(soup), './debug/debug.html')
 
     # Format module specific content
     if module_format_content:
@@ -1709,6 +1843,20 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled epyt-video-wrapper in ' + item['url'])
 
+    for el in soup.find_all(class_='ami-video-placeholder'):
+        it = el.find('script', attrs={"data-type": "s2nScript"})
+        if it and it.get('src'):
+            if it['src'].startswith('//'):
+                src = 'https:' + it['src']
+            else:
+                src = it['src']
+            new_html = utils.add_embed(src)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled ami-video-placeholder')
+
     for el in soup.find_all('a', class_='story-img-link'):
         if el.get('data-displayinline'):
             new_html = utils.add_embed(el['data-displayinline'])
@@ -1722,12 +1870,20 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             data_json = json.loads(el['data-settings'])
             if data_json['video_type'] == 'youtube':
                 new_html = utils.add_embed(data_json['youtube_url'])
+        elif 'elementor-widget-image' in el['class']:
+            add_image(el, None, base_url, site_json)
+            continue
+        elif 'elementor-widget-divider' in el['class']:
+            new_html = '<hr/>'
+        elif 'elementor-widget-author-box' in el['class']:
+            el.decompose()
+            continue
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
         else:
-            logger.warning('unhandled elementor-element in ' + item['url'])
+            logger.warning('unhandled elementor-element {} in {}'.format(el['class'], item['url']))
 
     for el in soup.find_all(class_='sketchfab-embed-wrapper'):
         new_html = ''
@@ -1750,7 +1906,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled infogram-embed in ' + item['url'])
 
-    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'm-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout']):
+    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'list-gallery', 'm-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout']):
         if set(['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery']).intersection(el['class']):
             images = None
             if el.find('ul', class_='gallery-wrap'):
@@ -1773,6 +1929,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         elif 'inline-slideshow' in el['class']:
             # https://trendeepro.com/like-emily-ratajkowski-im-a-mom-who-takes-my-baby-to-work/
             images = el.find_all(class_='inline-slideshow__slide')
+            caption = True
+        elif 'list-gallery' in el['class']:
+            images = el.find_all(class_='ami-gallery-item')
             caption = True
         elif 'm-carousel' in el['class']:
             # https://www.digitaltrends.com/mobile/oneplus-11-review/
@@ -2187,7 +2346,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unknown iframe src in ' + item['url'])
 
-    for el in soup.find_all(class_='twitter-tweet'):
+    for el in soup.find_all(class_=['twitter-tweet', 'twitter-video']):
         links = el.find_all('a')
         new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
         el.insert_after(new_el)
@@ -2308,6 +2467,11 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()
+
+    for el in soup.find_all(class_=re.compile(r'textbox\d')):
+        el.name = 'blockquote'
+        el.attrs = {}
+        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in soup.find_all(class_='wp-block-file'):
         # https://scalawagmagazine.org/2023/06/new-orleans-musicians-clinic/
@@ -2459,67 +2623,69 @@ def get_content(url, args, site_json, save_debug=False):
         del paths[-1]
         args['embed'] = True
 
-    if isinstance(site_json['posts_path'], str):
-        posts_path = site_json['posts_path']
-    elif isinstance(site_json['posts_path'], dict):
-        key = set(paths).intersection(site_json['posts_path'].keys())
-        if key:
-            posts_path = site_json['posts_path'][list(key)[0]]
-        else:
-            posts_path = site_json['posts_path']['default']
-
-    if site_json['wpjson_path'].startswith('/'):
-        wpjson_path = '{}://{}{}'.format(split_url.scheme, split_url.netloc, site_json['wpjson_path'])
-    else:
-        wpjson_path = site_json['wpjson_path']
-
-    # Try to determine the post id or slug from the path
+    page_soup = None
     post = None
-    for it in paths:
-        if it.isnumeric() and len(it) > 4:
-            post_url = '{}{}/{}'.format(wpjson_path, posts_path, it)
-        elif '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
-            slug = it.split('.')[0]
-            m = re.search(r'-(\d{5,}$)', slug)
-            if m and not (len(m.group(1)) == 8 and m.group(1).startswith('202')):
-                post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1))
+    post_url = ''
+    if site_json.get('posts_path'):
+        if isinstance(site_json['posts_path'], str):
+            posts_path = site_json['posts_path']
+        elif isinstance(site_json['posts_path'], dict):
+            key = set(paths).intersection(site_json['posts_path'].keys())
+            if key:
+                posts_path = site_json['posts_path'][list(key)[0]]
             else:
-                post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, slug)
+                posts_path = site_json['posts_path']['default']
+
+        if site_json['wpjson_path'].startswith('/'):
+            wpjson_path = '{}://{}{}'.format(split_url.scheme, split_url.netloc, site_json['wpjson_path'])
         else:
-            continue
-        post = utils.get_url_json(post_url)
+            wpjson_path = site_json['wpjson_path']
+
+        # Try to determine the post id or slug from the path
+        for it in paths:
+            if it.isnumeric() and len(it) > 4:
+                post_url = '{}{}/{}'.format(wpjson_path, posts_path, it)
+            elif '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
+                slug = it.split('.')[0]
+                m = re.search(r'-(\d{5,}$)', slug)
+                if m and not (len(m.group(1)) == 8 and m.group(1).startswith('202')):
+                    post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1))
+                else:
+                    post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, slug)
+            else:
+                continue
+            post = utils.get_url_json(post_url)
+            if post:
+                break
         if post:
-            break
-    if post:
-        if isinstance(post, list):
-            return get_post_content(post[0], args, site_json, save_debug)
-        else:
-            return get_post_content(post, args, site_json, save_debug)
+            if isinstance(post, list):
+                return get_post_content(post[0], args, site_json, page_soup, save_debug)
+            else:
+                return get_post_content(post, args, site_json, page_soup, save_debug)
 
     # Look for the post id in the page
-    post_url = ''
     page_html = utils.get_url_html(url)
     if page_html:
         if save_debug:
             utils.write_file(page_html, './debug/debug.html')
-        soup = BeautifulSoup(page_html, 'html.parser')
-        el = soup.find('link', attrs={"rel": "alternate", "type": "application/json", "href": re.compile(r'wp-json')})
+        page_soup = BeautifulSoup(page_html, 'html.parser')
+        el = page_soup.find('link', attrs={"rel": "alternate", "type": "application/json", "href": re.compile(r'wp-json')})
         if el:
             post_url = el['href']
         else:
-            el = soup.find('link', attrs={"rel": "shortlink"})
+            el = page_soup.find('link', attrs={"rel": "shortlink"})
             if el:
                 query = parse_qs(urlsplit(el['href']).query)
                 if query.get('p'):
                     post_url = '{}{}/{}'.format(wpjson_path, posts_path, query['p'][0])
         if not post_url:
-            el = soup.find(id=re.compile(r'post-\d+'))
+            el = page_soup.find(id=re.compile(r'post-\d+'))
             if el:
                 m = re.search(r'post-(\d+)', el['id'])
                 if m:
                     post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1))
             else:
-                el = soup.find(class_=re.compile(r'postid-\d+'))
+                el = page_soup.find(class_=re.compile(r'postid-\d+'))
                 if el:
                     m = re.search(r'postid-(\d+)', ' '.join(el['class']))
                     if m:
@@ -2527,12 +2693,10 @@ def get_content(url, args, site_json, save_debug=False):
     if not post_url:
         logger.warning('unable to determine wp-json post url in ' + url)
         return None
-
     post = utils.get_url_json(post_url)
     if not post:
         return None
-
-    return get_post_content(post, args, site_json, save_debug)
+    return get_post_content(post, args, site_json, page_soup, save_debug)
 
 
 def get_feed(url, args, site_json, save_debug=False):
@@ -2544,7 +2708,7 @@ def get_feed(url, args, site_json, save_debug=False):
             for post in posts:
                 if save_debug:
                     logger.debug('getting content from ' + post['link'])
-                item = get_post_content(post, args, site_json, save_debug)
+                item = get_post_content(post, args, site_json, None, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         feed['items'].append(item)

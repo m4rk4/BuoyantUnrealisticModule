@@ -376,8 +376,10 @@ def process_content_element(element, url, site_json, save_debug):
                         captions.append(it['name'])
                 img_src = '{}{}.jpg'.format(site_json['referent_image_path'], element['referent']['id'])
                 element_html += utils.add_image(img_src, ' | '.join(captions))
-            else:
+            elif element['referent']['id'].startswith('http'):
                 element_html += utils.add_embed(element['referent']['id'])
+            else:
+                logger.warning('unhandled referent id ' + element['referent']['id'])
         else:
             logger.warning('unhandled reference element')
 
@@ -470,12 +472,15 @@ def get_content_html(content, url, site_json, save_debug):
             lead_image = content['promo_items']['basic']
         elif content['promo_items'].get('images'):
             lead_image = content['promo_items']['images'][0]
-    if lead_image and lead_image.get('_id'):
-        if content.get('content_elements'):
-            if content['content_elements'][0]['_id'] == lead_image['_id']:
+    if lead_image and lead_image.get('_id') and content.get('content_elements'):
+        for i in range(min(2, len(content['content_elements']))):
+            if content['content_elements'][i]['_id'] == lead_image['_id']:
                 lead_image = None
-            elif content['content_elements'][1]['_id'] == lead_image['_id']:
-                lead_image = None
+                break
+        # if content['content_elements'][0]['_id'] == lead_image['_id']:
+        #     lead_image = None
+        # elif content['content_elements'][1]['_id'] == lead_image['_id']:
+        #     lead_image = None
     if lead_image:
         if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
@@ -528,6 +533,7 @@ def get_content_html(content, url, site_json, save_debug):
                 content_html += audio_html
             else:
                 logger.warning('unhandled audio subtype in ' + url)
+
     content_html = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', content_html)
     return content_html
 

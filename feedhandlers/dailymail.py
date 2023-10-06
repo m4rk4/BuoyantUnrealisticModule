@@ -75,7 +75,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     body = soup.find(attrs={"itemprop": "articleBody"})
     if body:
-        for el in body.find_all(class_='molads_ff'):
+        if save_debug:
+            utils.write_file(str(body), './debug/debug.html')
+
+        for el in body.find_all(class_=['molads_ff', 'fff-inline', 'perform-player']):
+            # perform-player seems to be unrelated videos
             el.decompose()
 
         for el in body.find_all(class_='moduleFull'):
@@ -83,9 +87,6 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
             else:
                 logger.warning('unhandled moduleFull in ' + item['url'])
-
-        for el in body.find_all(class_='fff-inline'):
-            el.decompose()
 
         for el in body.find_all(class_='related-carousel'):
             if el.parent and el.parent.name == 'div':
@@ -95,14 +96,25 @@ def get_content(url, args, site_json, save_debug=False):
 
         for el in body.find_all(class_='mol-img-group'):
             new_html = ''
-            img = el.find('img')
-            if img:
-                it = el.find(class_='imageCaption')
+            it = el.find(class_='imageCaption')
+            if it:
+                caption = it.decode_contents()
+            else:
+                caption = ''
+            images = el.find_all(class_='mol-img')
+            if len(images) == 1:
+                it = el.find('img')
                 if it:
-                    caption = it.get_text().strip()
-                else:
-                    caption = ''
-                new_html = utils.add_image(img['data-src'], caption)
+                    new_html = utils.add_image(it['data-src'], caption)
+            else:
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                for img in images:
+                    it = img.find('img')
+                    if it:
+                        new_html += '<div style="flex:1; min-width:256px;">{}</div>'.format(utils.add_image(it['data-src']))
+                new_html += '</div>'
+                if caption:
+                    new_html += '<!--caption--><div><small>{}</small></div>'.format(caption)
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -126,7 +138,10 @@ def get_content(url, args, site_json, save_debug=False):
 
         for el in body.find_all(class_='mol-embed'):
             new_html = ''
-            if el.find(class_='tiktok-embed'):
+            if el.find(class_='twitter-tweet'):
+                links = el.find_all('a')
+                new_html = utils.add_embed(links[-1]['href'])
+            elif el.find(class_='tiktok-embed'):
                 it = el.find('blockquote')
                 new_html = utils.add_embed(it['cite'])
             if new_html:

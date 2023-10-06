@@ -255,7 +255,7 @@ def get_content(url, args, site_json, save_debug=False):
                         img_src = m.group(2).replace('&amp;', '&')
                     elif page_soup:
                         for a in soup.body.find_all('a'):
-                            print(a['href'])
+                            #print(a['href'])
                             it = a.find('img')
                             if it and img_path in it['src']:
                                 media_link = 'https://www.facebook.com' + urlsplit(a['href']).path + '?type=3'

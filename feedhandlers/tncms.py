@@ -16,7 +16,7 @@ def resize_image(img_src, width=1200):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    print(url)
+    #print(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     m = re.search(r'([^_]+)_([0-91-f\-]+)\.html?', paths[-1])
@@ -201,12 +201,22 @@ def get_content(url, args, site_json, save_debug=False):
                         if m:
                             captions.append(m.group(1))
                         lede_img = utils.add_video(video_src, 'application/x-mpegURL', poster, ' | '.join(captions))
-                else:
+                elif el.find('video', class_='tnt-video'):
+                    # https://www.fox23.com/news/body-camera-video-shows-zach-bryan-being-put-in-handcuffs-after-being-pulled-over-days/article_aac4fc36-5874-11ee-bf4c-9325fd988ebb.html
+                    videos = el.find_all('video', class_='tnt-video')
+                    for video in videos:
+                        it = video.find('source', attrs={"type": "video/mp4"})
+                        if not it:
+                            it = video.find('source', attrs={"type": "application/x-mpegURL"})
+                        if it and it['src'] not in lede_img:
+                            lede_img += utils.add_video(it['src'], it['type'], video['poster'], video.get('data-title'))
+                        else:
+                            logger.warning('unknown tnt-video source in ' + item['url'])
+                elif el.find('iframe'):
                     it = el.find('iframe')
-                    if it:
-                        lede_img = utils.add_embed(it['src'])
-                    else:
-                        logger.warning('unhandled asset-video-primary in ' + item['url'])
+                    lede_img = utils.add_embed(it['src'])
+                else:
+                    logger.warning('unhandled asset-video-primary in ' + item['url'])
 
             el = soup.find(id='asset-photo-carousel')
             if el:
@@ -320,7 +330,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += content_html
 
     if gallery:
-        item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', gallery)
+        item['content_html'] += gallery
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

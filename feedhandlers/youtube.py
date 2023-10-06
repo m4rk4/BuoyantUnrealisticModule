@@ -1,6 +1,6 @@
 import json, math, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 from pytube.cipher import Cipher
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
@@ -132,6 +132,7 @@ def get_content(url, args, site_json, save_debug=False):
             return None
         if save_debug:
             utils.write_file(player_response, './debug/youtube.json')
+        utils.write_file(player_response, './debug/youtube.json')
         if not player_response.get('videoDetails'):
             if player_response['playabilityStatus'].get('errorScreen') and player_response['playabilityStatus']['errorScreen'].get('playerErrorMessageRenderer'):
                 reasons = []
@@ -169,10 +170,14 @@ def get_content(url, args, site_json, save_debug=False):
 
         if player_response.get('microformat') and player_response['microformat'].get('playerMicroformatRenderer'):
             if player_response['microformat']['playerMicroformatRenderer'].get('publishDate'):
-                # Format is YYY-MM-DD. Not sure of the timezone, assume it's localized.
-                tz_loc = pytz.timezone(config.local_tz)
+                # Sometimes gives full iso format with timezone, other times it's just YYYY-MM-DD
                 dt_loc = datetime.fromisoformat(player_response['microformat']['playerMicroformatRenderer']['publishDate'])
-                dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                if dt_loc.tzinfo:
+                    dt = dt_loc.astimezone(timezone.utc)
+                else:
+                    # Assume it's localized
+                    tz_loc = pytz.timezone(config.local_tz)
+                    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
                 item['date_published'] = dt.isoformat()
                 item['_timestamp'] = dt.timestamp()
                 item['_display_date'] = utils.format_display_date(dt, False)
@@ -203,7 +208,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
         caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
-        link = 'https://www.youtube-nocookie.com/embed/{}' + video_id
+        link = 'https://www.youtube-nocookie.com/embed/' + video_id
         poster = ''
 
         if player_response['playabilityStatus']['status'] == 'ERROR' or player_response['playabilityStatus']['status'] == 'UNPLAYABLE' or player_response['playabilityStatus']['status'] == 'LOGIN_REQUIRED':

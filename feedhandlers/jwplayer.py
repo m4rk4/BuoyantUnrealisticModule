@@ -37,7 +37,10 @@ def get_content(url, args, site_json, save_debug=False):
     for video in video_json['playlist'][0]['sources']:
         if video.get('type') == 'video/mp4':
             videos.append(video)
-    video = utils.closest_dict(videos, 'height', 480)
+    if videos:
+        video = utils.closest_dict(videos, 'height', 480)
+    else:
+        video = video_json['playlist'][0]['sources'][0]
     item['_video'] = video['file']
 
     if video_json['playlist'][0].get('description'):

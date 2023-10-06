@@ -352,11 +352,17 @@ def get_content(url, args, site_json, save_debug):
         return None
     if save_debug:
         utils.write_file(next_data, './debug/next.json')
+    entry_json = None
     if next_data['props']['pageProps'].get('entityProps'):
         entry_json = next_data['props']['pageProps']['entityProps']['hydration']['responses'][0]['data']['entryRevision']
     elif next_data['props']['pageProps'].get('hydration'):
-        entry_json = next((it['data']['entity'] for it in next_data['props']['pageProps']['hydration']['responses'] if it['operationName'] == 'EntityLayoutQuery'), None)
-    else:
+        response = next((it for it in next_data['props']['pageProps']['hydration']['responses'] if ('ArticleLayoutQuery' in it['operationName'] or 'EntityLayoutQuery' in it['operationName'])), None)
+        if response and response.get('data'):
+            if response['data'].get('entryRevision'):
+                entry_json = response['data']['entryRevision']
+            elif response['data'].get('entity'):
+                entry_json = response['data']['entity']
+    if not entry_json:
         logger.warning('unable to determine entry data in ' + url)
         return None
     return get_item(entry_json, args, site_json, save_debug)

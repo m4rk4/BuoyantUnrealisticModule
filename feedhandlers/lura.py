@@ -200,8 +200,11 @@ def get_content(url, args, site_json, save_debug=False):
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
-    if utils.url_exists(video_json['src_image_url']):
+    if video_json.get('src_image_url') and utils.url_exists(video_json['src_image_url']):
         item['_image'] = video_json['src_image_url']
+        poster = item['_image']
+    elif video_json.get('src_logo_url') and utils.url_exists(video_json['src_logo_url']):
+        item['_image'] = video_json['src_logo_url']
         poster = item['_image']
     else:
         poster = ''

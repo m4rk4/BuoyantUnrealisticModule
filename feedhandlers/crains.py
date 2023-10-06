@@ -43,6 +43,8 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
 
     soup = BeautifulSoup(page_html, 'html.parser')
     el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
@@ -128,12 +130,14 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unhandled embed in ' + item['url'])
         elif 'item--paragraph--type--factbox' in el['class']:
-            title = el.find(class_='paragraph-inline-title')
+            title = el.find(class_='paragraph-inline-title').get_text()
+            if re.search(r'Find it in our digital edition', title, flags=re.I):
+                continue
             if el.img:
                 img_src = '{}/image?url={}&width=128'.format(config.server, quote_plus(el.img['src']))
-                content_html += '<table><tr><td><img src="{}"/></td><td style="vertical-align:top;"><h4 style="margin:0;">{}</h4><small>{}</small></td></tr></table>'.format(img_src, title.get_text(), el.p.decode_contents())
+                content_html += '<table><tr><td><img src="{}"/></td><td style="vertical-align:top;"><h4 style="margin:0;">{}</h4><small>{}</small></td></tr></table>'.format(img_src, title, el.p.decode_contents())
             else:
-                content_html += '<blockquote><strong>{}:</strong>{}</blockquote>'.format(title.get_text(), el.p.decode_contents())
+                content_html += '<blockquote><strong>{}:</strong>{}</blockquote>'.format(title, el.p.decode_contents())
         elif 'item--paragraph--type--related' in el['class']:
             pass
         elif 'item--paragraph--type--newsletter-widget-v1' in el['class']:

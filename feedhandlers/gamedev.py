@@ -15,8 +15,7 @@ def resize_image(img_src, width=1000):
     return utils.clean_url(img_src) + '?width=1000&quality=80&format=webply'
 
 
-def get_next_data(url):
-    tld = tldextract.extract(url)
+def get_next_data(url, site_json):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) == 0:
@@ -26,34 +25,27 @@ def get_next_data(url):
     else:
         path = split_url.path
     path += '.json'
-
-    sites_json = utils.read_json_file('./sites.json')
-    build_id = sites_json[tld.domain]['buildId']
-    next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, build_id, path)
+    if site_json.get('assetPrefix'):
+        next_url = '{}/_next/data/{}{}'.format(site_json['assetPrefix'], site_json['buildId'], path)
+    else:
+        next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
-        logger.debug('updating gamedeveloper.com buildId')
         page_html = utils.get_url_html(url)
         soup = BeautifulSoup(page_html, 'html.parser')
         el = soup.find('script', id='__NEXT_DATA__')
         if el:
             next_data = json.loads(el.string)
-            if next_data['buildId'] != build_id:
-                sites_json[tld.domain]['buildId'] = next_data['buildId']
-                utils.write_file(sites_json, './sites.json')
+            if next_data['buildId'] != site_json['buildId']:
+                logger.debug('updating {} buildId'.format(split_url.netloc))
+                site_json['buildId'] = next_data['buildId']
+                utils.update_sites(url, site_json)
             return next_data['props']
-
-        m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != build_id:
-            sites_json[tld.domain]['buildId'] = m.group(1)
-            utils.write_file(sites_json, './sites.json')
-            next_url = '{}://{}/_next/data/{}/en{}'.format(split_url.scheme, split_url.netloc, m.group(1), path)
-            return utils.get_url_json(next_url)
     return next_data
 
 
 def get_content(url, args, site_json, save_debug=False):
-    next_data = get_next_data(url)
+    next_data = get_next_data(url, site_json)
     if not next_data:
         return None
     if save_debug:
@@ -64,7 +56,7 @@ def get_content(url, args, site_json, save_debug=False):
 def get_item(article_json, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['uid']
-    item['url'] = 'https://www.gamedeveloper.com/{}{}'.format(article_json['term_selector']['primaryTerm'], article_json['url'])
+    item['url'] = '{}/{}{}'.format(site_json['site_href'], article_json['term_selector']['primaryTerm'], article_json['url'])
     item['title'] = BeautifulSoup(article_json['title'], 'html.parser').text
 
     dt = datetime.fromisoformat(article_json['published_date'].replace('Z', '+00:00'))
@@ -166,17 +158,18 @@ def get_feed(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(next_data, './debug/feed.json')
 
+    split_url = urlsplit(url)
     n = 0
     feed_items = []
     if next_data['pageProps']['data'].get('contents'):
         for article in next_data['pageProps']['data']['contents']:
-            url = 'https://www.gamedeveloper.com' + article['fullUrl']
+            article_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['fullUrl'])
             if save_debug:
-                logger.debug('getting content for ' + url)
+                logger.debug('getting content for ' + article_url)
             if article.get('body'):
                 item = get_item(article, args, site_json, save_debug)
             else:
-                item = get_content(url, args, site_json, save_debug)
+                item = get_content(article_url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)
@@ -187,13 +180,13 @@ def get_feed(url, args, site_json, save_debug=False):
     elif next_data['pageProps']['data'].get('dataStandardViewInit'):
         for it in next_data['pageProps']['data']['dataStandardViewInit']['items']:
             article = it['_source']
-            url = 'https://www.gamedeveloper.com/{}{}'.format(article['term_selector']['primaryTerm'], article['url'])
+            article_url = '{}://{}/{}{}'.format(split_url.scheme, split_url.netloc, article['term_selector']['primaryTerm'], article['url'])
             if save_debug:
-                logger.debug('getting content for ' + url)
+                logger.debug('getting content for ' + article_url)
             if article.get('body'):
                 item = get_item(article, args, site_json, save_debug)
             else:
-                item = get_content(url, args, site_json, save_debug)
+                item = get_content(article_url, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
                     feed_items.append(item)
@@ -204,8 +197,8 @@ def get_feed(url, args, site_json, save_debug=False):
 
     feed = utils.init_jsonfeed(args)
     if next_data['pageProps']['data'].get('labelInfo'):
-        feed['title'] = 'Game Developer | ' + next_data['pageProps']['data']['labelInfo']['title']
+        feed['title'] = '{} | {}'.format(next_data['pageProps']['data']['labelInfo']['title'], split_url.netloc)
     elif next_data['pageProps']['data'].get('tagManagerArgs'):
-        feed['title'] = 'Game Developer | ' + next_data['pageProps']['data']['tagManagerArgs']['dataLayer']['pageTitle']
+        feed['title'] = '{} | {}'.format(next_data['pageProps']['data']['tagManagerArgs']['dataLayer']['pageTitle'], split_url.netloc)
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
