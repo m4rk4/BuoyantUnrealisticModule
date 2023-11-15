@@ -76,7 +76,7 @@ def get_player_response(video_id):
     player_response = None
     player_url = ''
     page_html = utils.get_url_html('https://www.youtube.com/watch?v={}'.format(video_id))
-    # utils.write_file(page_html, './debug/youtube.html')
+    #utils.write_file(page_html, './debug/youtube.html')
     soup = BeautifulSoup(page_html, 'lxml')
     el = soup.find('script', string=re.compile(r'var ytInitialPlayerResponse\s?='))
     if el:

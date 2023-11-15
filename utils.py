@@ -1,9 +1,10 @@
-import asyncio, basencode, cloudscraper, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import basencode, cloudscraper, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from requests.adapters import HTTPAdapter, Retry
+from requests.adapters import HTTPAdapter
+from urllib3.util import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
@@ -148,9 +149,9 @@ def requests_retry_session(retries=4):
     total=retries,
     read=retries,
     connect=retries,
-    backoff_factor=1,
+    backoff_factor=0.1,
     status_forcelist=[404, 429, 502, 503, 504],
-    method_whitelist=["HEAD", "GET", "OPTIONS"]
+    allowed_methods={"HEAD", "GET", "OPTIONS"}
   )
   adapter = HTTPAdapter(max_retries=retry)
   session.mount('http://', adapter)
