@@ -249,10 +249,12 @@ def get_content(url, args, site_json, save_debug=False):
             new_html += '<div style="flex:2; min-width:256px; margin:auto;">'
             info = it.find(class_=['list-info', 'info-data'])
             if info:
-                if info.h4.a:
-                    new_html += '<div><a href="{}"><span style="font-size:1.2em; font-weight:bold">{}</span></a></div>'.format(utils.get_redirect_url(info.h4.a['href']), info.h4.get_text())
-                else:
-                    new_html += '<div><span style="font-size:1.2em; font-weight:bold">{}</span></div>'.format(info.h4.get_text())
+                info_name = info.find(class_='product-name')
+                if info_name:
+                    if info_name.a:
+                        new_html += '<div><a href="{}"><span style="font-size:1.2em; font-weight:bold">{}</span></a></div>'.format(utils.get_redirect_url(info_name.a['href']), info_name.get_text())
+                    else:
+                        new_html += '<div><span style="font-size:1.2em; font-weight:bold">{}</span></div>'.format(info_name.get_text())
             sib = it.find_next_sibling()
             if sib and sib.get('class') and 'bottom-info' in sib['class']:
                 info = sib.find(class_='desc')

@@ -151,7 +151,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in article.children:
         # print('\nchild')
-        print(el)
+        # print(el)
         if el.name == 'div':
             if el.has_attr('x-data'):
                 el.decompose()

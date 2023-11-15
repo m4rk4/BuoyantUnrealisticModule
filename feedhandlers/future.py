@@ -346,13 +346,17 @@ def get_content(url, args, site_json, save_debug=False):
 
         for el in body.find_all(class_='imageGallery-wrapper'):
             new_html = ''
-            m = re.search(r'-(imageGallery-\d+)', el['id'])
+            m = re.search(r'-(imageGallery-.+)', el['id'])
             if m:
-                it = body.find('script', id=re.compile(r'-{}-hydrate'.format(m.group(1))))
+                it = body.find('script', attrs={"data-id": re.compile(r'-{}-hydrate'.format(m.group(1)))})
                 if it:
-                    m = re.search('var data = (\{.*?\});\n', it.string)
-                    if m:
-                        gallery_json = json.loads(m.group(1))
+                    i = it.string.find('JSON.stringify(') + 15
+                    j = it.string.rfind('}),') + 1
+                    try:
+                        gallery_json = json.loads(it.string[i:j])
+                    except:
+                        gallery_json = None
+                    if gallery_json:
                         if save_debug:
                             utils.write_file(gallery_json, './debug/gallery.json')
                         for slide in gallery_json['galleryData']:
@@ -424,6 +428,12 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
             else:
                 logger.warning('unhandled instagram-embed in ' + item['url'])
+
+        for el in body.find_all(class_='tiktok-embed'):
+            new_html = utils.add_embed(el['cite'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
 
         for el in body.find_all(class_='soundcloud-embed'):
             it = el.find('iframe')

@@ -1,7 +1,7 @@
-import base64, hashlib, hmac, json, math, pytz, re, tldextract
+import base64, hashlib, hmac, json, math, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit, quote, quote_plus
+from urllib.parse import urlsplit, unquote_plus, quote_plus
 
 import config, utils
 from feedhandlers import rss
@@ -106,6 +106,8 @@ def process_content_element(element, url, site_json, save_debug):
             elif raw_soup.blockquote and raw_soup.blockquote.get('class'):
                 if 'tiktok-embed' in raw_soup.blockquote['class']:
                     element_html += utils.add_embed(raw_soup.blockquote['cite'])
+                elif 'instagram-media' in raw_soup.blockquote['class']:
+                    element_html += utils.add_embed(raw_soup.blockquote['data-instgrm-permalink'])
             elif raw_soup.script and raw_soup.script.get('src'):
                 if 'sendtonews.com' in raw_soup.script['src']:
                     element_html += utils.add_embed(raw_soup.script['src'])
@@ -179,6 +181,74 @@ def process_content_element(element, url, site_json, save_debug):
                 logger.warning('unhandled custom_embed inline_audio')
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
+        elif element['subtype'] == 'flourish_visualisation':
+            embed_url = 'https://flo.uri.sh/visualisation/{}/embed?auto=1'.format(element['embed']['config']['visualizationNumber'])
+            element_html += utils.add_image('{}/screenshot?url={}&locator=main&width=1200&height=800'.format(config.server, quote_plus(embed_url)), '<a href="{}">View Flourish Visualization</a>'.format(embed_url))
+        elif element['subtype'] == 'tabseparator':
+            element_html += '<div>&nbsp;</div><hr/><div>&nbsp;<h2>{}</h2></div>'.format(unquote_plus(element['embed']['config']['tabTitle']))
+            if element['embed']['config']['contentSource'] == 'dynamic':
+                opts = json.loads(unquote_plus(element['embed']['config']['opts']))
+                embed_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], opts['contentAPI'], element['embed']['config']['opts'], site_json['deployment'], site_json['arc_site'])
+                embed_json = utils.get_url_json(embed_url)
+                if embed_json:
+                    #utils.write_file(embed_json, './debug/embed.json')
+                    for el in embed_json['content_elements']:
+                        if el['type'] == 'story':
+                            embed_item = get_item(el, url, {'embed': True}, site_json, save_debug)
+                            if embed_item:
+                                element_html += embed_item['content_html'] + '<div>&nbsp;</div>'
+                        else:
+                            content_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, el['canonical_url'])
+                            content_json = utils.get_url_json('{}content-api?query=%7B%22_id%22%3A%22{}%22%7D&d={}&_website={}'.format(site_json['api_url'], el['_id'], site_json['deployment'], site_json['arc_site']))
+                            if content_json:
+                                #utils.write_file(content_json, './debug/content.json')
+                                element_html += process_content_element(content_json, content_url, site_json, save_debug)
+        elif element['subtype'] == 'arena-api-inline':
+            arena_url = '{}arena-cache-api?query=%7B%22embedSlug%22%3A%22{}%22%2C%22provider%22%3A%22arena-api-inline%22%7D&d={}&_website={}'.format(site_json['api_url'], element['embed']['config']['embedId'], site_json['deployment'], site_json['arc_site'])
+            arena_json = utils.get_url_json(arena_url)
+            if arena_json:
+                # utils.write_file(arena_json, './debug/arena.json')
+                n = len(arena_json['posts']) - 1
+                for i, post in enumerate(arena_json['posts']):
+                    dt = datetime.fromtimestamp(post['createdAt']/1000).replace(tzinfo=timezone.utc)
+                    element_html += '<div>Update: {}</div>'.format(utils.format_display_date(dt))
+                    if post.get('sender'):
+                        element_html += '<div>By {}</div>'.format(post['sender']['displayName'])
+                    if post['message'].get('title'):
+                        element_html += '<h3>{}</h3>'.format(post['message']['title'])
+                    if post['message'].get('media'):
+                        if post['message']['media']['providerName'] == 'Twitter' or post['message']['media']['providerName'] == 'YouTube':
+                            element_html += utils.add_embed(post['message']['media']['url'])
+                        else:
+                            logger.warning('unhandled arena media provider ' + post['message']['media']['providerName'])
+                    if post['message'].get('text'):
+                        post_soup = BeautifulSoup(post['message']['text'], 'html.parser')
+                        for img in post_soup.find_all('img'):
+                            caption = ''
+                            fig = img.find_parent('figure')
+                            if fig:
+                                el = fig.find('figcaption')
+                                if el:
+                                    caption = el.decode_contents()
+                            else:
+                                fig = img
+                            new_html = utils.add_image(img['src'], caption)
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            p = fig.find_parent('p')
+                            if p:
+                                p.insert_before(new_el)
+                            else:
+                                fig.insert_before(new_el)
+                            fig.decompose()
+                        element_html += str(post_soup)
+                    if i < n:
+                        element_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+        elif element['subtype'] == 'inset':
+            embed_html = ''
+            if element['embed']['config'].get('headline'):
+                embed_html += '<div style="font-size:1.1em; font-weight:bold">{}</div>'.format(element['embed']['config']['headline'])
+            embed_html += element['embed']['config']['content']
+            element_html += utils.add_blockquote(embed_html)
         elif re.search(r'iframe', element['subtype'], flags=re.I):
             embed_html = base64.b64decode(element['embed']['config']['base64HTML']).decode('utf-8')
             m = re.search(r'src="([^"]+)"', embed_html)
@@ -186,7 +256,7 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled custom_embed iframe')
-        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
             pass
         else:
             logger.warning('unhandled custom_embed ' + element['subtype'])
@@ -405,6 +475,17 @@ def process_content_element(element, url, site_json, save_debug):
             element_html += '<p>updated {}</p>'.format(date)
         element_html += get_content_html(element, url, site_json, save_debug)
 
+    elif element['type'] == 'link_list':
+        if element['subtype'] == 'key-moments':
+            element_html += '<h3>{}</h3><ul>'.format(element['title'])
+            for it in element['items']:
+                element_html += '<li>{}</li>'.format(it['content'])
+            element_html += '</ul>'
+        elif element['subtype'] == 'link-list' or element['subtype'] == 'splash-story-bullet':
+            pass
+        else:
+            logger.warning('unhandled link_list subtype ' + element['subtype'])
+
     elif element['type'] == 'interstitial_link':
         pass
 
@@ -482,7 +563,7 @@ def get_content_html(content, url, site_json, save_debug):
         # elif content['content_elements'][1]['_id'] == lead_image['_id']:
         #     lead_image = None
     if lead_image:
-        if content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
+        if not content.get('content_elements') or content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
 
     for element in content['content_elements']:
@@ -646,6 +727,16 @@ def get_item(content, url, args, site_json, save_debug):
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; border:1px solid black;">'
+        if item.get('_image'):
+            item['content_html'] += '<div style="flex:1; min-width:400px; margin:auto;"><img src="{}" style="display:block; width:100%;"/></div>'.format(item['_image'])
+        item['content_html'] += '<div style="flex:1; min-width:256px; margin:auto; padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>By {}</div><div>{}</div>'.format(item['url'], item['title'], item['author']['name'], item['_display_date'])
+        if content.get('subheadlines') and content['subheadlines'].get('basic'):
+            item['content_html'] += '<p><em>{}</em></p>'.format(content['subheadlines']['basic'])
+        item['content_html'] += '</div></div>'
+        return item
+
     item['content_html'] = get_content_html(content, url, site_json, save_debug)
     return item
 
@@ -714,13 +805,17 @@ def get_feed(url, args, site_json, save_debug=False):
         if len(paths) == 0:
             source = site_json['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
-        elif re.search(r'about|author|people|staff|team', paths[0]):
+        elif re.search(r'about|author|people|staff|team', paths[0]) or (len(paths) > 1 and paths[1].lower() == 'author'):
             if paths[0] == 'about':
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
                 author = paths[-1]
             elif len(paths) > 1:
-                # https://www.cleveland.com/staff/tpluto/posts.html
-                author = paths[1]
+                if paths[1].lower() == 'author':
+                    # https://www.thenationalnews.com/topics/Author/neil-murphy/
+                    author = paths[-1]
+                else:
+                    # https://www.cleveland.com/staff/tpluto/posts.html
+                    author = paths[1]
             else:
                 # https://www.baltimoresun.com/bal-nathan-ruiz-20190328-staff.html
                 m = re.search(r'(.*)-staff\.html', paths[0])

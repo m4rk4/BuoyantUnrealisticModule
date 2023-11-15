@@ -91,7 +91,8 @@ def get_content(url, args, site_json, save_debug=False):
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
-    utils.write_file(api_json, './debug/debug.json')
+    if save_debug:
+        utils.write_file(api_json, './debug/debug.json')
 
     article_json = api_json['result']['pageContext']['node']['data']['content']
     if save_debug:
@@ -154,7 +155,7 @@ def get_content(url, args, site_json, save_debug=False):
         for content in article_json['images']:
             item['content_html'] += add_image(content, site_json)
 
-    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
+    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', item['content_html'])
     return item
 
 

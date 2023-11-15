@@ -82,6 +82,9 @@ def get_content(url, args, site_json, save_debug=False):
     for el in soup.find_all(['h2', 'h3', 'h4', 'p', 'ol', 'ul']):
         el.attrs = {}
 
+    for el in soup.find_all('blockquote', class_=False):
+        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+
     blocks = soup.find_all('div', class_='sqs-block')
     if item.get('_image') and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
         item['content_html'] += utils.add_image(item['_image'])

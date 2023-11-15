@@ -718,3 +718,42 @@ def get_feed(url, args, site_json, save_debug=False):
         feed['items'] = sorted(feed['items'], key=lambda i: i['_timestamp'], reverse=True)
 
     return feed
+
+
+# headers = {
+#     "accept": "*/*",
+#     "accept-language": "en-US,en;q=0.9",
+#     "cache-control": "no-cache",
+#     "content-type": "application/json",
+#     "nyt-app-type": "project-vi",
+#     "nyt-app-version": "0.0.5",
+#     "nyt-token": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAs+/oUCTBmD/cLdmcecrnBMHiU/pxQCn2DDyaPKUOXxi4p0uUSZQzsuq1pJ1m5z1i0YGPd1U1OeGHAChWtqoxC7bFMCXcwnE1oyui9G1uobgpm1GdhtwkR7ta7akVTcsF8zxiXx7DNXIPd2nIJFH83rmkZueKrC4JVaNzjvD+Z03piLn5bHWU6+w+rA+kyJtGgZNTXKyPh6EC6o5N+rknNMG5+CdTq35p8f99WjFawSvYgP9V64kgckbTbtdJ6YhVP58TnuYgr12urtwnIqWP9KSJ1e5vmgf3tunMqWNm6+AnsqNj8mCLdCuc5cEB74CwUeQcP2HQQmbCddBy2y0mEwIDAQAB",
+#     "pragma": "no-cache",
+#     "sec-ch-ua": "\"Microsoft Edge\";v=\"119\", \"Chromium\";v=\"119\", \"Not?A_Brand\";v=\"24\"",
+#     "sec-ch-ua-mobile": "?0",
+#     "sec-ch-ua-platform": "\"Windows\"",
+#     "sec-fetch-dest": "empty",
+#     "sec-fetch-mode": "cors",
+#     "sec-fetch-site": "same-site",
+#     "x-nyt-internal-meter-override": "undefined"
+# }
+# gql_query = {
+#     "operationName":"BylineQuery",
+#     "variables":{
+#         "id":"/by/amanda-holpuch",
+#         "first":10,
+#         "streamQuery":{
+#             "sort":"newest"
+#         },
+#         "exclusionMode":"HIGHLIGHTS_AND_EMBEDDED",
+#         "cursor":"YXJyYXljb25uZWN0aW9uOjk="
+#     },
+#     "extensions":{
+#         "persistedQuery":{
+#             "version":1,
+#             "sha256Hash":"81946cc09e695f69de07ae9ea9464a0482184d22be099c11e616f28f9e3ca377"
+#         }
+#     },
+#     "query":"query BylineQuery($id: String!, $first: Int, $cursor: String, $streamQuery: CollectionStreamQuery, $exclusionMode: StreamExclusionMode) {\n  anyWork(id: $id) {\n    ... on Person {\n      id\n      url\n      bioUrl\n      isAdvertisingBrandSensitive\n      ...Header_byline\n      ...Supplemental_byline\n      ...BylineHelmet_byline\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment Header_byline on Person {\n  id\n  displayName\n  legacyData {\n    htmlBiography\n    __typename\n  }\n  promotionalMedia {\n    ... on Image {\n      id\n      headshots: crops(renditionNames: [\"thumbLarge\"]) {\n        renditions {\n          url\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Supplemental_byline on Person {\n  id\n  ...Stream_byline\n  ...SupplementalModules_byline\n  __typename\n}\n\nfragment Stream_byline on Person {\n  id\n  stream(\n    first: $first\n    after: $cursor\n    streamQuery: $streamQuery\n    exclusionMode: $exclusionMode\n  ) {\n    ...AssetStream_stream\n    pageInfo {\n      hasNextPage\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment AssetStream_stream on AssetsConnection {\n  ...Connection_pageInfo\n  edges @filterEmpty {\n    node {\n      __typename\n      ...StreamAsset_asset\n    }\n    __typename\n  }\n  pageInfo {\n    hasNextPage\n    endCursor\n    __typename\n  }\n  totalCount\n  __typename\n}\n\nfragment StreamAsset_asset on Node {\n  id\n  ... on Published {\n    url\n    firstPublished\n    __typename\n  }\n  ... on Article {\n    typeOfMaterials\n    archiveProperties {\n      lede\n      __typename\n    }\n    __typename\n  }\n  ... on CreativeWork {\n    headline {\n      default\n      __typename\n    }\n    bylines {\n      renderedRepresentation\n      prefix\n      creators: creatorSnapshots {\n        ... on PersonSnapshot {\n          displayName\n          url\n          promotionalMedia {\n            ... on Image {\n              id\n              crops {\n                renditions {\n                  url\n                  name\n                  __typename\n                }\n                __typename\n              }\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    kicker\n    summary\n    __typename\n  }\n  ... on HasPromotionalProperties {\n    promotionalMedia {\n      __typename\n      ... on Image {\n        id\n        ...Stream_image\n        __typename\n      }\n      ... on Video {\n        id\n        promotionalMedia {\n          ... on Node {\n            id\n            __typename\n          }\n          ... on Image {\n            id\n            ...Stream_image\n            __typename\n          }\n          ... on Video {\n            id\n            ... on Node {\n              id\n              __typename\n            }\n            promotionalMedia {\n              ... on Image {\n                id\n                ...Stream_image\n                __typename\n              }\n              __typename\n            }\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on Audio {\n        id\n        promotionalMedia {\n          ... on Image {\n            id\n            ...Stream_image\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on Slideshow {\n        id\n        promotionalMedia {\n          ... on Image {\n            id\n            ...Stream_image\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on Interactive {\n        id\n        promotionalMedia {\n          ... on Image {\n            id\n            ...Stream_image\n            __typename\n          }\n          __typename\n        }\n        __typename\n      }\n      ... on EmbeddedInteractive {\n        id\n        promotionalMedia {\n          ... on Image {\n            id\n            ...Stream_image\n            __typename\n          }\n          ...Stream_image\n          __typename\n        }\n        __typename\n      }\n    }\n    __typename\n  }\n  ... on Video {\n    embedded\n    __typename\n  }\n  ... on Slideshow {\n    displayProperties {\n      template\n      __typename\n    }\n    __typename\n  }\n  ... on Article {\n    translations {\n      ...TranslationLinks_translations\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment Stream_image on Image {\n  id\n  crops(cropNames: [THREE_BY_TWO]) {\n    name\n    renditions {\n      width\n      url\n      name\n      height\n      __typename\n    }\n    __typename\n  }\n  timesTags {\n    vernacular\n    __typename\n  }\n  __typename\n}\n\nfragment TranslationLinks_translations on ArticleTranslation {\n  url\n  linkText\n  translatedLinkText\n  language {\n    code\n    __typename\n  }\n  __typename\n}\n\nfragment Connection_pageInfo on RelayConnection {\n  pageInfo {\n    hasNextPage\n    hasPreviousPage\n    startCursor\n    endCursor\n    __typename\n  }\n  __typename\n}\n\nfragment SupplementalModules_byline on Person {\n  id\n  ...EmailAuthor_data\n  contactDetails {\n    socialMedia {\n      ...SocialMedia_data\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n\nfragment EmailAuthor_data on Person {\n  id\n  displayName\n  publiclyEmailable\n  __typename\n}\n\nfragment SocialMedia_data on ContactDetailsSocialMedia {\n  type\n  account\n  __typename\n}\n\nfragment BylineHelmet_byline on Person {\n  id\n  promotionalMedia {\n    ... on Image {\n      id\n      crops {\n        renditions {\n          url\n          name\n          __typename\n        }\n        __typename\n      }\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n"
+# }
+# r = requests.post('https://samizdat-graphql.nytimes.com/graphql/v2', json=gql_query, headers=headers)

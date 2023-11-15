@@ -94,9 +94,6 @@ def get_content(url, args, site_json, save_debug=False):
     elif article_json.get('standfirstShort'):
         item['summary'] = article_json['standfirstShort']
 
-    if article_json.get('thumbnail'):
-        item['_image'] = article_json['thumbnail']['urls']['header']
-
     item['content_html'] = ''
 
     if article_json['type'] == 'video':
@@ -115,18 +112,38 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if article_json.get('standfirstLong'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirstLong'])
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirstLong'].encode('iso-8859-1').decode('utf-8'))
 
-    if item.get('_image'):
-        if article_json['thumbnail'].get('caption'):
-            caption = re.sub(r'^<p>(.*)</p>$', r'\1', article_json['thumbnail']['caption'])
+    if article_json.get('thumbnail'):
+        image = article_json['thumbnail']
+    elif article_json.get('imageSquare'):
+        image = article_json['imageSquare']
+    else:
+        image = None
+    if image:
+        if image.get('url'):
+            item['_image'] = image['url']
+        if image.get('urls'):
+            item['_image'] = image['urls']['header']
+        if image.get('caption'):
+            caption = re.sub(r'^<p>(.*)</p>$', r'\1', image['caption'])
         elif article_json.get('thumbnailAttribution'):
             caption = re.sub(r'^<p>(.*)</p>$', r'\1', article_json['thumbnailAttribution'])
         else:
             caption = ''
         item['content_html'] += utils.add_image(item['_image'], caption)
 
-    soup = BeautifulSoup(article_json['body'], 'html.parser')
+    body = ''
+    if article_json.get('body'):
+        body = article_json['body']
+    elif article_json.get('section1'):
+        # Sections based on psyche.co
+        sections = ['Need to know', 'What to do', 'Key points', 'Learn more', 'Links & books']
+        r = re.compile(r'section\d')
+        for i, it in enumerate(list(filter(r.match, article_json.keys()))):
+            body += '<h2>{}</h2>'.format(sections[i]) + article_json[it].encode('iso-8859-1').decode('utf-8')
+    soup = BeautifulSoup(body, 'html.parser')
+
     for el in soup.find_all('figure'):
         new_html = ''
         if el.get('class') and 'ld-embed-block-wrapper' in el['class']:

@@ -1,4 +1,5 @@
-import html, json, pytz, re
+import copy, html, json, pytz, re
+import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -31,6 +32,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     meta = {}
     for el in soup.find_all('meta'):
+        if not el.get('content'):
+            continue
         if el.get('property'):
             key = el['property']
         elif el.get('name'):
@@ -71,26 +74,57 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if save_debug:
         utils.write_file(ld_json, './debug/debug.json')
 
-    page_json = None
     article_json = None
-    for it in ld_json:
-        if not it.get('@type'):
-            continue
-        if isinstance(it['@type'], str):
-            if it['@type'] == 'WebPage':
-                page_json = it
-            elif not article_json and re.search(r'Article', it['@type']):
-                article_json = it
-            elif not article_json and it['@type'] == 'Product':
-                if it.get('Review'):
-                    article_json = it['Review']
-        elif isinstance(it['@type'], list):
-            if 'WebPage' in it['@type']:
-                page_json = it
-            elif not article_json and re.search(r'Article', '|'.join(it['@type'])):
-                article_json = it
-    if page_json and not article_json:
-        article_json = page_json
+    ld_page = None
+    ld_article = None
+    ld_people = []
+    ld_images = []
+    for ld in ld_json:
+        if isinstance(ld, dict):
+            it = ld
+            if not it.get('@type'):
+                continue
+            if isinstance(it['@type'], str):
+                if it['@type'] == 'WebPage':
+                    ld_page = it
+                elif not article_json and 'Article' in it['@type']:
+                    ld_article = it
+                elif not article_json and it['@type'] == 'Product' and it.get('Review'):
+                    ld_article = it['Review']
+                elif it['@type'] == 'Person':
+                    ld_people.append(it)
+                elif it['@type'] == 'ImageObject':
+                    ld_images.append(it)
+            elif isinstance(it['@type'], list):
+                if 'WebPage' in it['@type']:
+                    ld_page = it
+                elif not article_json and re.search(r'Article', '|'.join(it['@type'])):
+                    article_json = it
+        elif isinstance(ld, list):
+            for it in ld:
+                if not it.get('@type'):
+                    continue
+                if isinstance(it['@type'], str):
+                    if it['@type'] == 'WebPage':
+                        ld_page = it
+                    elif not article_json and 'Article' in it['@type']:
+                        ld_article = it
+                    elif not article_json and it['@type'] == 'Product' and it.get('Review'):
+                        ld_article = it['Review']
+                    elif it['@type'] == 'Person':
+                        ld_people.append(it)
+                    elif it['@type'] == 'ImageObject':
+                        ld_images.append(it)
+                elif isinstance(it['@type'], list):
+                    if 'WebPage' in it['@type']:
+                        ld_page = it
+                    elif not article_json and re.search(r'Article', '|'.join(it['@type'])):
+                        article_json = it
+
+    if ld_article:
+        article_json = ld_article
+    elif ld_page:
+        article_json = ld_page
 
     el = soup.find('link', attrs={"rel": "alternative", "type": "application/json+oembed"})
     if el:
@@ -184,10 +218,18 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
                 date = dt.isoformat()
     if date:
-        dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
+        try:
+            dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
+        except:
+            dt = dateutil.parser.parse(date)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
+    elif site_json.get('date'):
+        # This is for displaying content, the real date to be substituted from the rss feed
+        for el in utils.get_soup_elements(site_json['date'], soup):
+            item['_display_date'] = el.get_text()
+            break
 
     date = ''
     if meta and meta.get('article:modified_time'):
@@ -230,9 +272,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             for it in article_json['author']:
                 if it.get('name'):
                     authors.append(it['name'].replace(',', '&#44;'))
-    if not authors and ld_json:
-        for it in ld_json:
-            if it.get('@type') and ((isinstance(it['@type'], str) and it['@type'] == 'Person') or (isinstance(it['@type'], list) and 'Person' in it['@type'])):
+    if not authors and ld_people:
+        if ld_people:
+            for it in ld_people:
                 authors.append(it['name'].replace(',', '&#44;'))
     if not authors and meta:
         if meta.get('author'):
@@ -280,10 +322,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         # Remove duplicates (case-insensitive)
         item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
 
-    if ld_json:
-        for it in ld_json:
-            if it.get('@type') and it['@type'] == 'ImageObject':
-                item['_image'] = it['url']
+    if ld_images:
+        item['_image'] = ld_images[0]['url']
     if not item.get('_image') and article_json:
         if article_json.get('image'):
             if isinstance(article_json['image'], dict):
@@ -316,6 +356,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><h4><a href="{}">{}</a></h4><p><small>{}</small></p></div></div>'.format(item['url'], item['_image'], item['url'], item['title'], item['summary'])
         return item
 
+    gallery = ''
     item['content_html'] = ''
     if 'add_subtitle' in args:
         if site_json.get('subtitle'):
@@ -372,7 +413,12 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             if elements:
                 el = elements[0]
                 if el:
-                    if el.find('img'):
+                    if el.find(class_='rslides'):
+                        it = el.find('li')
+                        item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, add_caption)
+                        lede = True
+                        gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
+                    elif el.find('img'):
                         item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption)
                         lede = True
                     else:
@@ -391,6 +437,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 item['content_html'] += wp_posts.format_content(it.decode_contents(), item, site_json, module_format_content)
             else:
                 item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+    if gallery:
+        item['content_html'] += '<h3>Gallery</h3>' + gallery
     return item
 
 

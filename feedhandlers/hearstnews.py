@@ -38,7 +38,8 @@ def add_hst_exco_video(player_id):
 def render_content(content):
     content_html = ''
     if content['type'] == 'text':
-        content_html += content['params']['html1']
+        if not re.search(r'<strong>RELATED</strong>', content['params']['html1'], flags=re.I):
+            content_html += content['params']['html1']
 
     elif content['type'] == 'image':
         content_html += add_image(content['params'])
@@ -173,9 +174,11 @@ def get_content(url, args, site_json, save_debug=False):
     if content_json.get('image'):
         item['_image'] = content_json['image']['original']['url'].replace('rawImage', '1000x0')
 
-    item['summary'] = content_json['abstract']
-
     item['content_html'] = ''
+    if content_json.get('abstract'):
+        item['summary'] = content_json['abstract']
+        item['content_html'] += '<p><em>{}</em></p>'.format(re.sub(r'^<p>(.*)</p>$', r'\1', content_json['abstract']))
+
     if content_json['body'][0]['type'] == 'gallery':
         item['content_html'] += add_image(content_json['body'][0]['params']['cover'])
     elif content_json['body'][0]['type'] != 'image' and item.get('_image'):

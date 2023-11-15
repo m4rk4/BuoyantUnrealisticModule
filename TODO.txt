@@ -1,3 +1,18 @@
+Fix spacing:
+https://twitter.com/RashidaTlaib/status/1714342122185191596
+https://twitter.com/coinbase/status/1704985637651095880
+
+Fix Facebook embed: https://www.hindustantimes.com/trending/lost-tortoise-returns-home-after-over-three-years-101698240995777.html
+
+Include Snapshot: https://www.xfire.com/is-grand-theft-auto-6-coming-nintendo-switch-2/
+
+Amazon book embeds:
+https://vocal.media/fiction/review-of-trusting-her-heart-by-lyla-davis
+https://read.amazon.com/kp/embed?asin=B0BL1LWW6H
+
+Digistore24 embeds
+https://vocal.media/bookclub/the-man-s-guide-to-love-language-ebook-ag3g0co7
+
 https://www.news.com.au/entertainment/awards/all-the-best-looks-from-the-2023-mtv-vmas-afterparties/news-story/18bdd4c20fa61155ce5a7ab8e474c52b
 https://content.api.news/v3/articles/18bdd4c20fa61155ce5a7ab8e474c52b?api_key=9uz93nsd4pggfwhqcjnhmafw
 https://content.api.news/v3/videos/84f0160df72fdd0774995355c245b0d5?api_key=9uz93nsd4pggfwhqcjnhmafw
@@ -73,6 +88,7 @@ Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
 
 WP
+https://www.positive.news/environment/agriculture/fixing-the-food-chain/
 https://www.kitguru.net/reviews/
 https://www.nexstar.tv/stations/
 
@@ -97,7 +113,6 @@ https://vinepair.com/wp-json/wp/v2/posts
 https://locusmag.com/wp-json/wp/v2/posts
 https://news.pollstar.com/wp-json/wp/v2/posts
 https://www.brickfanatics.com/wp-json/wp/v2/posts
-https://www.commentary.org/wp-json/wp/v2/posts
 https://nichegamer.com/wp-json/wp/v2/posts
 https://www.discoursemagazine.com/wp-json/wp/v2/posts/5051
 https://lastminuteengineers.com/wp-json/wp/v2/posts/485
@@ -136,7 +151,6 @@ https://www.wundertech.net/wp-json/wp/v2/posts
 https://www.telecompetitor.com/wp-json/wp/v2/posts
 https://www.groundedreason.com/wp-json/wp/v2/posts
 https://metaroids.com/wp-json/wp/v2/posts
-https://undark.org/wp-json/wp/v2/posts
 https://mpost.io/wp-json/wp/v2/posts
 https://aanwire.com/wp-json/wp/v2/posts
 
@@ -266,6 +280,14 @@ https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott
 view-source:https://www.si.com/nfl/2022/09/27/giants-10-players-on-field-for-ezekiel-elliott-touchdown-run-cowboys
 https://www.meidastouch.com/
 https://www.thestreet.com
+https://dealbreaker.com/
+https://bitcoinmagazine.com/
+https://atozsports.com/
+
+
+HearstTV
+https://www.wbaltv.com/article/lidia-makes-landfall-as-category-4-hurricane/45507390
+https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
@@ -288,9 +310,10 @@ https://justthenews.com/
 https://www.justice.gov/
 https://circuitdigest.com/
 https://aphnetworks.com/index.php/
-
-Fusion
-Unknown content-api: https://en.as.com/racing/verstappen-wins-f1-australian-grand-prix-as-hamilton-makes-history-n/
+https://www.al-monitor.com/
+https://gamersnexus.net/
+https://www.torquenews.com/
+https://www.elevenwarriors.com/ohio-state-football
 
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
@@ -387,3 +410,8 @@ https://webcache.googleusercontent.com/search?q=cache:<url>
 
 Beehiiv?
 https://www.artisana.ai/articles/politicians-may-get-free-pass-under-metas-ai-generated-image-rules
+
+Texas Tribune
+https://www.texastribune.org/api/v2/articles/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url&limit=5&front_page=true
+https://www.texastribune.org/api/v2/articles/43737/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url,authors,tags,placeholders
+placeholders don't show element contents??

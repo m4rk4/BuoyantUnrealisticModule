@@ -316,6 +316,9 @@ def get_content(url, args, site_json, save_debug=False):
                 el.unwrap()
 
         for el in body.find_all(class_='display-card'):
+            if el.find(class_='adsninja-video-player'):
+                el.decompose()
+                continue
             it = el.find(class_='w-display-card-info')
             if it and it.get_text().strip():
                 new_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'

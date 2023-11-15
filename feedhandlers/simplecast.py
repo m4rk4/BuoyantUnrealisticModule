@@ -70,15 +70,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = episode_json['description']
 
-    duration = []
-    t = math.floor(float(episode_json['duration']) / 3600)
-    if t >= 1:
-        duration.append('{} hr'.format(t))
-    t = math.ceil((float(episode_json['duration']) - 3600 * t) / 60)
-    if t > 0:
-        duration.append('{} min.'.format(t))
+    duration = utils.calc_duration(episode_json['duration'])
 
-    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/><small>{}</small><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['name'], item['_display_date'], ', '.join(duration))
+    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>{}</div><div><small>{}&nbsp;&bull;&nbsp;{}</small></div></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['name'], item['_display_date'], duration)
     if 'embed' not in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
     return item

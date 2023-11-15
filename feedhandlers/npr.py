@@ -67,8 +67,13 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['author'] = {}
     if ld_json.get('author'):
-        authors = ld_json['author']['name'].copy()
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        if isinstance(ld_json['author'], list):
+            authors = ld_json['author']['name'].copy()
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        elif isinstance(ld_json['author'], dict):
+            item['author']['name'] = ld_json['author']['name']
+        elif isinstance(ld_json['author'], str):
+            item['author']['name'] = ld_json['author']
     elif ld_json.get('publisher') and ld_json['publisher'].get('name'):
         item['author']['name'] = ld_json['publisher']['name']
     else:
@@ -91,6 +96,21 @@ def get_content(url, args, site_json, save_debug=False):
 
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
+
+    item['content_html'] = ''
+    if '/player/' in url:
+        el = page_soup.find('script', string=re.compile(r'audioModel'))
+        if el:
+            i = el.string.find('{')
+            j = el.string.rfind('}') + 1
+            audio_json = json.loads(el.string[i:j])
+            poster = '{}/image?url={}&height=128&crop=128,128&overlay=audio'.format(config.server, item['_image'])
+            item['content_html'] += '<table><tr><td><a href="{}"><img src="{}" /></a></td>'.format(audio_json['audioSrc'], poster)
+            item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>by {}</div>'.format(audio_json['storyUrl'], audio_json['title'], item['author']['name'])
+            item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), utils.calc_duration(audio_json['duration']))
+            item['content_html'] += '</table>'
+        if '/embed/' in url:
+            return item
 
     text_html = utils.get_url_html('https://text.npr.org/' + item['id'])
     if not text_html:
@@ -116,60 +136,61 @@ def get_content(url, args, site_json, save_debug=False):
                 it.decompose()
 
     story_text = page_soup.find(id='storytext')
-    for el in story_text.find_all(class_='bucketwrap'):
-        new_html = ''
-        if 'image' in el['class']:
-            img_src = ''
-            it = el.find('source')
-            if it:
-                img_src = utils.image_from_srcset(it['srcset'], 1200)
-            if not img_src:
-                it = el.find('img')
+    if story_text:
+        for el in story_text.find_all(class_='bucketwrap'):
+            new_html = ''
+            if 'image' in el['class']:
+                img_src = ''
+                it = el.find('source')
                 if it:
-                    img_src = it['src']
-            if img_src:
-                caption = ''
-                it = el.find(class_='caption')
-                if it and it.get_text().strip():
-                    caption = it.get_text().strip()
-                new_html = utils.add_image(img_src, caption)
-        elif 'pullquote' in el['class']:
-            it = el.find(class_='byline')
-            if it:
-                author = it.get_text().strip()
+                    img_src = utils.image_from_srcset(it['srcset'], 1200)
+                if not img_src:
+                    it = el.find('img')
+                    if it:
+                        img_src = it['src']
+                if img_src:
+                    caption = ''
+                    it = el.find(class_='caption')
+                    if it and it.get_text().strip():
+                        caption = it.get_text().strip()
+                    new_html = utils.add_image(img_src, caption)
+            elif 'pullquote' in el['class']:
+                it = el.find(class_='byline')
+                if it:
+                    author = it.get_text().strip()
+                else:
+                    author = ''
+                it = el.find(class_='bucket')
+                new_html = utils.add_pullquote(it.decode_contents().strip(), author)
+            elif 'statichtml' in el['class']:
+                it = el.find('blockquote')
+                if it:
+                    if 'tiktok-embed' in it['class']:
+                        new_html = utils.add_embed(it['cite'])
+                    elif 'instagram-media' in it['class']:
+                        new_html = utils.add_embed(it['data-instgrm-permalink'])
+                if not new_html:
+                    logger.warning('unhandled bucketwrap statichtml in ' + item['url'])
+            elif 'internallink' in el['class'] and 'insettwocolumn' in el['class'] or 'twitter' in el['class'] or 'youtube-video' in el['class']:
+                pass
             else:
-                author = ''
-            it = el.find(class_='bucket')
-            new_html = utils.add_pullquote(it.decode_contents().strip(), author)
-        elif 'statichtml' in el['class']:
-            it = el.find('blockquote')
-            if it:
-                if 'tiktok-embed' in it['class']:
-                    new_html = utils.add_embed(it['cite'])
-                elif 'instagram-media' in it['class']:
-                    new_html = utils.add_embed(it['data-instgrm-permalink'])
-            if not new_html:
-                logger.warning('unhandled bucketwrap statichtml in ' + item['url'])
-        elif 'internallink' in el['class'] and 'insettwocolumn' in el['class'] or 'twitter' in el['class'] or 'youtube-video' in el['class']:
-            pass
-        else:
-            logger.warning('unhandled bucketwrap class {} in {}'.format(el['class'], item['url']))
+                logger.warning('unhandled bucketwrap class {} in {}'.format(el['class'], item['url']))
 
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            it = el.find_previous_sibling()
-            if not it:
-                it = paragraphs.find('p')
-                it.insert_before(new_el)
-            elif it.name == 'p':
-                txt = it.get_text().strip()[-50:]
-                for it in paragraphs.find_all('p'):
-                    if it.get_text().strip().endswith(txt):
-                        it.insert_after(new_el)
-                        new_html = ''
-                        break
-                if new_html:
-                    logger.warning('unable to determine where to add bucketwrap element in ' + item['url'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                it = el.find_previous_sibling()
+                if not it:
+                    it = paragraphs.find('p')
+                    it.insert_before(new_el)
+                elif it.name == 'p':
+                    txt = it.get_text().strip()[-50:]
+                    for it in paragraphs.find_all('p'):
+                        if it.get_text().strip().endswith(txt):
+                            it.insert_after(new_el)
+                            new_html = ''
+                            break
+                    if new_html:
+                        logger.warning('unable to determine where to add bucketwrap element in ' + item['url'])
 
     el = page_soup.find(class_='audio-module-controls-wrap')
     if el:
@@ -212,7 +233,7 @@ def get_content(url, args, site_json, save_debug=False):
     for el in paragraphs.find_all('a', href=re.compile('^/')):
         el['href'] = 'https://www.npr.com' + el['href']
 
-    item['content_html'] = re.sub(r'<hr/>\s+Related Story: <a [^>]+>[^<]+</a>\s?<hr/>', '', paragraphs.decode_contents())
+    item['content_html'] += re.sub(r'<hr/>\s+Related Story: <a [^>]+>[^<]+</a>\s?<hr/>', '', paragraphs.decode_contents())
     return item
 
 

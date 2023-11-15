@@ -1,4 +1,4 @@
-import av, re
+import av, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -34,20 +34,25 @@ def get_next_data(url, site_json):
         path = split_url.path
         query = '&slug={}'.format(paths[-1])
 
-    next_url = '{0}://{1}/_next/data/{2}/en/_sites/{3}{4}.json?siteSlug={3}{5}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], site_json['siteSlug'], path, query)
+    if site_json.get('siteSlug'):
+        next_url = '{0}://{1}/_next/data/{2}/en/_sites/{3}{4}.json?siteSlug={3}{5}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], site_json['siteSlug'], path, query)
+    else:
+        next_url = '{}://{}/_next/data/{}/en/{}.json?{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, query)
     #print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != site_json['buildId']:
-            logger.debug('updating {} buildId'.format(split_url.netloc))
-            site_json['buildId'] = m.group(1)
-            utils.update_sites(url, site_json)
-            next_url = '{0}://{1}/_next/data/{2}/en/_sites/{3}{4}.json?siteSlug={3}{5}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], site_json['siteSlug'], path, query)
-            next_data = utils.get_url_json(next_url)
-            if not next_data:
-                return None
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if el:
+            next_data = json.loads(el.string)
+            if next_data['buildId'] != site_json['buildId']:
+                logger.debug('updating {} buildId'.format(split_url.netloc))
+                site_json['buildId'] = next_data['buildId']
+                utils.update_sites(url, site_json)
+            return next_data['props']
     return next_data
 
 
@@ -132,6 +137,19 @@ def format_block(block):
         for blk in block['innerBlocks']:
             quote += format_block(blk)
         block_html = utils.add_blockquote(quote)
+    elif block['name'] == 'core/pullquote' and block['tagName'] == 'figure':
+        m = re.search(r'<blockquote>(.*?)</blockquote>', block['innerHTML'])
+        if m:
+            quote = m.group(1)
+            m = re.search(r'<cite>(.*?)</cite>', block['innerHTML'])
+            if m:
+                author = m.group(1)
+                quote = quote.replace(m.group(0), '')
+            else:
+                author = ''
+            block_html += utils.add_pullquote(quote, author)
+        else:
+            logger.warning('unknown core/pullquote quote')
     elif block['name'] == 'core/list':
         block_html = '<' + block['tagName']
         if block.get('attributes'):
@@ -146,6 +164,7 @@ def format_block(block):
     else:
         logger.warning('unhandled content block ' + block['name'])
     return block_html
+
 
 def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url, site_json)
@@ -208,7 +227,7 @@ def get_content(url, args, site_json, save_debug=False):
 def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    if len(paths) > 1 and 'feed' in paths:
+    if len(paths) > 0 and 'feed' in paths:
         return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     next_data = get_next_data(url, site_json)
@@ -232,9 +251,13 @@ def get_feed(url, args, site_json, save_debug=False):
                     if n == int(args['max']):
                         break
 
-    feed['title'] = next_data['pageProps']['siteTitle']
-    if next_data['pageProps'].get('title'):
-        feed['title'] += ' | ' + next_data['pageProps']['title']
-
+    if next_data['pageProps'].get('seo') and next_data['pageProps']['seo'].get('title'):
+        feed['title'] = next_data['pageProps']['seo']['title']
+    elif next_data['pageProps'].get('siteTitle'):
+        feed['title'] = next_data['pageProps']['siteTitle']
+        if next_data['pageProps'].get('title'):
+            feed['title'] += ' | ' + next_data['pageProps']['title']
+    elif next_data['pageProps'].get('title'):
+        feed['title'] = '{} | {}'.format(next_data['pageProps']['title'], split_url.netloc)
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

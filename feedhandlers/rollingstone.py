@@ -1,5 +1,5 @@
 import pytz, re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from datetime import datetime
 from urllib.parse import urlsplit
 
@@ -18,17 +18,27 @@ def resize_image(img_src, width=1000):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    m = re.search(r'-(\d+)$', paths[-1])
-    if not m:
+
+    post_id = ''
+    m = re.search(r'-lists/[^/]+-(\d+)', split_url.path)
+    if m:
+        post_id = m.group(1)
+        post_type = 'pmc_list'
+    else:
+        m = re.search(r'-(\d+)$', paths[-1])
+        if m:
+            post_id = m.group(1)
+            post_type = 'posts'
+    if not post_id:
         logger.warning('unable to parse post id from ' + url)
         return None
 
-    post_url = '{}{}/{}'.format(site_json['wpjson_path'], site_json['posts_path'], m.group(1))
+    post_url = '{}/wp/v2/{}/{}'.format(site_json['wpjson_path'], post_type, post_id)
     post_json = utils.get_url_json(post_url)
     if post_json and save_debug:
         utils.write_file(post_json, './debug/post.json')
 
-    article_url = '{}/mobile-apps/v1/article/{}'.format(site_json['wpjson_path'], m.group(1))
+    article_url = '{}/mobile-apps/v1/article/{}'.format(site_json['wpjson_path'], post_id)
     article_json = utils.get_url_json(article_url)
     if not article_json:
         return None
@@ -45,7 +55,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt_utc = tz_est.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt_utc.isoformat()
     item['_timestamp'] = dt_utc.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt_utc.strftime('%b'), dt_utc.day, dt_utc.year)
+    item['_display_date'] = utils.format_display_date(dt_utc)
 
     dt_loc = datetime.fromisoformat(article_json['updated-at'])
     dt_utc = tz_est.localize(dt_loc).astimezone(pytz.utc)
@@ -116,6 +126,12 @@ def get_content(url, args, site_json, save_debug=False):
         el.string = el.string.upper()
         el.unwrap()
 
+    for el in soup.find_all(class_='pmc-not-a-paywall'):
+        el.unwrap()
+
+    for el in soup.find_all('p', class_='paragraph'):
+        el.attrs = {}
+
     for el in soup.find_all(id=re.compile(r'attachment_\d+')):
         img = el.find('img')
         if img:
@@ -175,6 +191,11 @@ def get_content(url, args, site_json, save_debug=False):
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
 
+    for el in soup.find_all('blockquote', class_='pullquote'):
+        new_html = utils.add_pullquote(el.decode_contents())
+        el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+        el.decompose()
+
     for el in soup.find_all('script'):
         new_html = ''
         if el.get('id') and 'connatix_contextual_player' in el['id']:
@@ -192,6 +213,72 @@ def get_content(url, args, site_json, save_debug=False):
             el.decompose()
 
     item['content_html'] = lede + str(soup)
+
+    if post_json['type'] == 'pmc_list':
+        n = len(post_json['meta']['pmc_list_order'])
+        for i, list_id in enumerate(post_json['meta']['pmc_list_order']):
+            list_item_url = '{}/wp/v2/pmc_list_item/{}'.format(site_json['wpjson_path'], list_id)
+            list_item = utils.get_url_json(list_item_url)
+            if list_item:
+                if save_debug:
+                    utils.write_file(list_item, './debug/list.json')
+                item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+                if list_item['meta'].get('_pmc_featured_video_override_data'):
+                    item['content_html'] += utils.add_embed(list_item['meta']['_pmc_featured_video_override_data'])
+                elif list_item['_links'].get('wp:featuredmedia'):
+                    media_json = utils.get_url_json(list_item['_links']['wp:featuredmedia'][0]['href'])
+                    if media_json:
+                        if media_json['media_type'] == 'image':
+                            img_src = None
+                            images = []
+                            for key, val in media_json['media_details']['sizes'].items():
+                                if any(it in key for it in ['thumb', 'small', 'tiny', 'landscape', 'portrait', 'square', 'logo', 'footer', 'archive', 'column', 'author', 'sponsor', 'hero']):
+                                    continue
+                                images.append(val)
+                            if images:
+                                image = utils.closest_dict(images, 'width', 1000)
+                                if image and image.get('source_url'):
+                                    img_src = image['source_url']
+                                elif image and image.get('url'):
+                                    img_src = image['url']
+                            else:
+                                if media_json.get('soure_url'):
+                                    img_src = media_json['source_url']
+                            if img_src:
+                                if media_json['caption'].get('rendered'):
+                                    if media_json['caption']['rendered'].startswith('<p'):
+                                        caption = BeautifulSoup(media_json['caption']['rendered'], 'html.parser').p.decode_contents().strip()
+                                    else:
+                                        caption = BeautifulSoup(media_json['caption']['rendered'], 'html.parser').get_text().strip()
+                                else:
+                                    caption = ''
+                                item['content_html'] += utils.add_image(img_src, caption) + '<div>&nbsp;</div>'
+                else:
+                    logger.warning('unhandled list item featured media ' + list_item_url)
+                if post_json['meta'].get('pmc_list_numbering'):
+                    if post_json['meta']['pmc_list_numbering'] == 'none':
+                        num = ''
+                    elif post_json['meta']['pmc_list_numbering'] == 'desc':
+                        num = '<span style="font-size:2.4em; font-weight:bold; line-height:1em; vertical-align:middle;">{} | </span>'.format(n - i)
+                    else:
+                        num = '<span style="font-size:2.4em; font-weight:bold; line-height:1em; vertical-align:middle;">{} | </span>'.format(i + 1)
+                else:
+                    num = ''
+                item['content_html'] += '<div>{}<span style="font-size:1.2em; font-weight:bold; line-height:2em; vertical-align:middle;">{}</span></div>'.format(num, list_item['title']['rendered'])
+                if list_item['meta'].get('pmc_list_item_description'):
+                    item['content_html'] += '<div style="font-size:1.1em;">{}</div>'.format(list_item['meta']['pmc_list_item_description'])
+                if list_item.get('content') and list_item['content'].get('rendered'):
+                    li_soup = BeautifulSoup(list_item['content']['rendered'], 'html.parser')
+                    for el in li_soup.find_all(text=lambda text: isinstance(text, Comment)):
+                        el.extract()
+                    for el in li_soup.find_all(class_='pmc-not-a-paywall'):
+                        el.unwrap()
+                    for el in li_soup.find_all('p', class_='paragraph'):
+                        el.attrs = {}
+                    for el in li_soup.find_all(class_='lrv-u-text-transform-uppercase'):
+                        el.string = el.string.upper()
+                        el.unwrap()
+                    item['content_html'] += str(li_soup)
     return item
 
 

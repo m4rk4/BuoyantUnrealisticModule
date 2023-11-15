@@ -1,7 +1,8 @@
 import re, requests
 from datetime import datetime
+from urllib.parse import quote_plus
 
-import utils
+import config, utils
 
 import logging
 
@@ -75,6 +76,7 @@ def get_content(url, args, site_json, save_debug=False):
     video_json = r.json()
     if save_debug:
         utils.write_file(video_json, './debug/video.json')
+    # utils.write_file(video_json, './debug/video.json')
 
     item['title'] = video_json['name']
 
@@ -111,14 +113,17 @@ def get_content(url, args, site_json, save_debug=False):
         for source in video_json['sources']:
             if source.get('src') and source.get('type') and source['type'] == 'application/x-mpegURL':
                 sources.append(source)
-    try:
+    if sources:
         source = utils.closest_dict(sources, 'height', 480)
-    except:
-        source = sources[0]
-    item['_video'] = source['src']
-    item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], item['title'])
+        if not source:
+            source = sources[0]
+        item['_video'] = source['src']
+        item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], item['title'])
+    else:
+        logger.warning('unknown video source for ' + item['url'])
+        poster = '{}/image?url={}&width=1200&overlay=video'.format(config.server, quote_plus(item['_image']))
+        item['content_html'] = utils.add_image(poster, item['title'], link=item['url'])
 
     if not 'embed' in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
-
     return item

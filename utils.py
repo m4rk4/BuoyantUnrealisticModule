@@ -169,6 +169,9 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
   elif user_agent == 'chatgpt':
     # https://platform.openai.com/docs/plugins/bot
     ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
+  elif user_agent == 'facebook':
+    # https://gitlab.com/magnolia1234/bypass-paywalls-chrome-clean/-/blob/master/background.js
+    ua = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
   else: # Googlebot
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 
@@ -749,10 +752,13 @@ def add_audio(audio_src, title='', poster='', desc='', link=''):
     audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc=''):
+def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False):
   video_src = ''
   if video_type == 'video/mp4' or video_type == 'video/webm':
-    video_src = video_url
+    if use_videojs:
+      video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
+    else:
+      video_src = video_url
 
   elif video_type == 'application/x-mpegURL' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
@@ -1046,18 +1052,29 @@ def get_soup_elements(tag, soup):
         parents.append(el.find_parent(tag['parent']))
       elements = parents
   elif tag.get('regex'):
-    key = list(tag['attrs'].keys())[0]
-    val = list(tag['attrs'].values())[0]
     if tag['regex'] == 'attrs':
-      elements = soup.find_all(tag['tag'], attrs={key: re.compile(val)})
+      key = list(tag['attrs'].keys())[0]
+      val = list(tag['attrs'].values())[0]
+      if tag.get('tag'):
+        elements = soup.find_all(tag['tag'], attrs={key: re.compile(val)})
+      else:
+        elements = soup.find_all(attrs={key: re.compile(val)})
     elif tag['regex'] == 'tag':
-      elements = soup.find_all(re.compile(tag['tag']), attrs=tag['attrs'])
+      if tag.get('attrs'):
+        elements = soup.find_all(re.compile(tag['tag']), attrs=tag['attrs'])
+      else:
+        elements = soup.find_all(re.compile(tag['tag']))
     elif tag['regex'] == 'both':
       key = list(tag['attrs'].keys())[0]
       val = list(tag['attrs'].values())[0]
       elements = soup.find_all(re.compile(tag['tag']), attrs={key: re.compile(val)})
   else:
-    elements = soup.find_all(tag['tag'], attrs=tag['attrs'])
+    if tag.get('tag') and tag.get('attrs'):
+      elements = soup.find_all(tag['tag'], attrs=tag['attrs'])
+    elif tag.get('tag') and not tag.get('attrs'):
+      elements = soup.find_all(tag['tag'])
+    elif not tag.get('tag') and tag.get('attrs'):
+      elements = soup.find_all(attrs=tag['attrs'])
   return elements
 
 def calc_duration(s):

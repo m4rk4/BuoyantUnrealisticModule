@@ -191,6 +191,24 @@ def make_card(card_json, tweet_json):
             if card_desc:
                 card_html += '<br/>' + card_desc
             card_html += '</div></figure>'
+        elif unified_card['type'] == 'image_website':
+            images = []
+            destinations = []
+            for component in unified_card['components']:
+                object = unified_card['component_objects'][component]
+                if object['type'] == 'media':
+                    media = unified_card['media_entities'][object['data']['id']]
+                    if media['type'] == 'photo':
+                        images.append(media['media_url_https'])
+                    else:
+                        logger.warning('unhandled unified card media type ' + media['type'])
+                elif object['type'] == 'details' and object['data'].get('destination'):
+                    destination = unified_card['destination_objects'][object['data']['destination']]
+                    destinations.append(destination['data']['url_data'])
+            for i, image in enumerate(images):
+                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
+                card_html += '<a href="{}"><img src={} style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(destinations[i]['url'], image)
+                card_html += '<div style="margin:8px;"><small><a href="{}">{}</a></small></div></figure>'.format(destinations[i]['url'], destinations[i]['vanity'])
         else:
             logger.warning('unhandled unified card type ' + unified_card['type'])
 
@@ -495,7 +513,7 @@ def get_content(url, args, site_json, save_debug=False):
     tweet_thread.append(tweet_json)
 
     content_html += make_tweet(tweet_json)
-    content_html += '</table><br/>'
+    content_html += '</table><div>&nbsp;</div>'
     item['content_html'] = content_html
     return item
 

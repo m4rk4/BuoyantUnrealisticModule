@@ -52,18 +52,26 @@ def add_gallery(gallery_ref, image_netloc, link_preview=True):
     return gallery_html
 
 
-def add_video(video_ref, image_netloc):
-    ref_split = video_ref.split(':')
+def add_video(block, image_netloc, page_soup):
+    ref_split = block['node_ref'].split(':')
     video_json = utils.get_url_json('https://www.{}.com/_/video/{}/'.format(ref_split[0], ref_split[-1]))
-    if not video_json:
-        return ''
-    if video_json['message'].get('kaltura_mp4_url'):
-        return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
-    elif video_json['message'].get('mezzanine_url'):
-        return utils.add_video(video_json['message']['mezzanine_url'], 'application/x-mpegURL', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
-    else:
-        logger.warning('unsupported video ' + video_ref)
-        return ''
+    if video_json:
+        if video_json['message'].get('kaltura_mp4_url'):
+            return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
+        elif video_json['message'].get('mezzanine_url'):
+            return utils.add_video(video_json['message']['mezzanine_url'], 'application/x-mpegURL', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
+        else:
+            logger.warning('unsupported video ' + video_ref)
+            return ''
+    # Look for Youtube video
+    el = page_soup.find('section', id=re.compile(block['etag']))
+    if el:
+        it = el.find('script', string=re.compile(r'renderYoutubeVideoBlock'))
+        if it:
+            m = re.search(r"cueVideoById\('([^']+)'", it.string)
+            if m:
+                return utils.add_embed('https://www.youtube.com/watch?v=' + m.group(1))
+    return ''
 
 
 def get_content(url, args, site_json, save_debug):
@@ -158,7 +166,7 @@ def get_content(url, args, site_json, save_debug):
             elif 'block:gallery-block' in block['_schema']:
                 item['content_html'] += add_gallery(block['node_ref'], site_json['image_netloc'])
             elif 'block:video-block' in block['_schema']:
-                item['content_html'] += add_video(block['node_ref'], site_json['image_netloc'])
+                item['content_html'] += add_video(block, site_json['image_netloc'], soup)
             elif 'block:youtube-video-block' in block['_schema']:
                 item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v={}'.format(block['id']))
             elif 'block:twitter-tweet-block' in block['_schema']:

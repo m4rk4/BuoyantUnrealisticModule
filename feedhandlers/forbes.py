@@ -191,9 +191,16 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unhandled vestpocket in ' + item['url'])
 
     for el in soup.find_all(class_=re.compile(r'subhead\d?-embed')):
-        text = el.get_text().strip()
-        if el.name == 'h4' and text == 'By {}'.format(item['author']['name']):
-            el.decompose()
+        text = el.get_text().strip().lower()
+        if el.name == 'h4':
+            print(text)
+            if text.startswith('by'):
+                if all([True if it.lower() in text else False for it in authors]):
+                    el.decompose()
+            elif 'more from forbes' in text:
+                for it in el.find_next_siblings('a', class_='link-embed'):
+                    it.decompose()
+                el.decompose()
         elif text == 'Topline':
             el.decompose()
         elif text == '':

@@ -28,7 +28,8 @@ def get_api_json(api_path, data_type, id, filters=''):
         api_url += '/{}'.format(id)
     if filters:
         api_url += '?{}'.format(filters)
-    #headers = {"cache-control": "max-age=0"}
+    # headers = {"cache-control": "max-age=0"}
+    # print(api_url)
     api_json = utils.get_url_json(api_url)
     return api_json
 
@@ -208,7 +209,7 @@ def get_content(url, args, site_json, save_debug=False):
         if el and el.get('class'):
             m = re.search(r'node--?type-([^\s]+)', ' '.join(el['class']))
             if m:
-                page_type = 'node--' + m.group(1)
+                page_type = 'node--' + m.group(1).replace('-', '_')
             if not node_id:
                 m = re.search(r'-node-(\d+)', ' '.join(el['class']))
                 if m:
@@ -301,7 +302,12 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             for data in page_json['relationships']['field_author']['data']:
                 api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
                 if api_json:
-                    authors.append(api_json['data']['attributes']['title'])
+                    if api_json['data']['attributes'].get('title'):
+                        authors.append(api_json['data']['attributes']['title'])
+                    elif api_json['data']['attributes'].get('name'):
+                        authors.append(api_json['data']['attributes']['name'])
+                    else:
+                        logger.warning('unknown field_author data attributes')
         else:
             data = page_json['relationships']['field_author']['data']
             api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
@@ -372,6 +378,10 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         lede_html = data_html
     elif page_json['relationships'].get('field_article_hero_image') and page_json['relationships']['field_article_hero_image'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], site_json['api_path'], caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html = data_html
+    elif page_json['relationships'].get('field_main_hero_image') and page_json['relationships']['field_main_hero_image'].get('data'):
+        data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], site_json['api_path'], caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):
@@ -492,7 +502,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             lede_html += '<p><b>PRICE:</b><br/>£{:,.0f} &ndash; £{:,.0f}</p>'.format(float(page_json['attributes']['tg_price_range_field']['min_price_range']), float(page_json['attributes']['tg_price_range_field']['max_price_range']))
         item['content_html'] = lede_html + '<hr/>' + item['content_html']
 
-    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--cars_road_test':
+    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--cars_road_test':
         if page_json['attributes'].get('field_introduction'):
             item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_introduction'])
 
@@ -546,7 +556,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                 else:
                     logger.warning('unhandled data-embed-button {} in {}'.format(el['data-embed-button'], item['url']))
 
-            for el in body_soup.find_all('div', class_='media'):
+            for el in body_soup.find_all(['div', 'figure'], class_='media'):
                 new_html = ''
                 if 'media--type-image' in el['class']:
                     it = el.find('img')
@@ -554,7 +564,12 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                         src = it['src']
                         if src.startswith('/'):
                             src = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, src)
-                        new_html = utils.add_image(src)
+                        it = el.find(class_='field--name-field-media-caption')
+                        if it:
+                            caption = it.p.decode_contents()
+                        else:
+                            caption = ''
+                        new_html = utils.add_image(src, caption)
                 elif 'media--type-youtube' in el['class']:
                     it = el.find('iframe')
                     if it:

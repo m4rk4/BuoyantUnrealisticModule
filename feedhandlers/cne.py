@@ -21,16 +21,17 @@ def find_elements(el_name, el_json, el_ret):
     return
 
 
-def get_caption(props):
+def get_caption(props, credit_only=False):
     captions = []
-    if props.get('dangerousCaption'):
-        m = re.search(r'^<p>(.*)</p>\s*$', props['dangerousCaption'], flags=re.S)
-        if m:
-            captions.append(m.group(1))
-        else:
-            captions.append(props['dangerousCaption'])
-    elif props.get('caption'):
-        captions.append(props['caption'])
+    if not credit_only:
+        if props.get('dangerousCaption'):
+            m = re.search(r'^<p>(.*)</p>\s*$', props['dangerousCaption'], flags=re.S)
+            if m:
+                captions.append(m.group(1))
+            else:
+                captions.append(props['dangerousCaption'])
+        elif props.get('caption'):
+            captions.append(props['caption'])
 
     if props.get('dangerousCredit'):
         captions.append(props['dangerousCredit'])
@@ -53,14 +54,14 @@ def get_image_src(image, width=1000):
     return src['url']
 
 
-def add_image(props, width=1000, caption=''):
+def add_image(props, width=1000, caption='', credit_only=False):
     if props.get('image'):
         image = props['image']
     else:
         image = props
     img_src = get_image_src(image, width)
     if not caption:
-        caption = get_caption(props)
+        caption = get_caption(props, credit_only)
     return utils.add_image(img_src, caption)
 
 
@@ -243,20 +244,22 @@ def get_content(url, args, site_json, save_debug=False):
         return wp_posts.get_content(url, args, site_json, save_debug)
 
     article_json = None
-    split_url = urlsplit(url)
-    if not 'www.newyorker.com' in split_url.netloc:
-        json_url = url + '?format=json'
+    clean_url = utils.clean_url(url)
+    if not '/www.newyorker.com/' in clean_url:
+        json_url = clean_url + '?format=json'
         article_json = utils.get_url_json(json_url)
     if not article_json:
-        page_html = utils.get_url_html(url)
+        page_html = utils.get_url_html(clean_url)
         if not page_html:
             return None
         soup = BeautifulSoup(page_html, 'html.parser')
         el = soup.find('script', string=re.compile(r'window\.__PRELOADED_STATE__'))
         if not el:
-            logger.warning('unable to find PRELOADED_STATE in ' + url)
+            logger.warning('unable to find PRELOADED_STATE in ' + clean_url)
             return None
-        preload_json = json.loads(el.string[29:-1])
+        i = el.string.find('{')
+        j = el.string.rfind('}') + 1
+        preload_json = json.loads(el.string[i:j])
         article_json = preload_json['transformed']
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
@@ -302,16 +305,26 @@ def get_content(url, args, site_json, save_debug=False):
     item['summary'] = article_json['head.description']
     item['content_html'] = ''
 
-    if article_json['head.pageType'] == article_json['head.og.type']:
+    if article_json.get(article_json['head.pageType']):
+        page_type = article_json['head.pageType']
+    elif article_json.get(article_json['head.og.type']):
         page_type = article_json['head.og.type']
     else:
-        if article_json['head.pageType'] in item['url']:
-            page_type = article_json['head.pageType']
-        elif article_json['head.og.type'] in item['url']:
-            page_type = article_json['head.og.type']
-        else:
-            logger.warning('unknown page type for ' + item['url'])
+        logger.warning('unknown page type for ' + item['url'])
+        return None
     body_json = article_json[page_type].get('body')
+
+    # if article_json['head.pageType'] == article_json['head.og.type']:
+    #     page_type = article_json['head.og.type']
+    # else:
+    #     if article_json.get('head.pageType'):
+    #         page_type =
+    #     if article_json['head.pageType'] in item['url']:
+    #         page_type = article_json['head.pageType']
+    #     elif article_json['head.og.type'] in item['url']:
+    #         page_type = article_json['head.og.type']
+    #     else:
+    #         logger.warning('unknown page type for ' + item['url'])
 
     if article_json[page_type].get('headerProps'):
         if article_json[page_type]['headerProps'].get('dangerousDek'):
@@ -333,7 +346,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += utils.add_image(item['_image'])
 
     if page_type == 'review':
-        item['content_html'] += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><hr/>'.format(
+        item['content_html'] += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><div>&nbsp;</div><hr/><div>&nbsp;</div>'.format(
             article_json['review']['rating'], article_json['review']['bestRating'], article_json['review']['pros'],
             article_json['review']['cons'])
 
@@ -342,9 +355,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     if page_type == 'gallery':
         for it in article_json[page_type]['items']:
-            item['content_html'] += '<hr />'
+            item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
             if it.get('image'):
-                item['content_html'] += add_image(it['image'])
+                item['content_html'] += add_image(it['image'], credit_only=True)
             if it.get('dangerousHed'):
                 item['content_html'] += '<h3>{}</h3>'.format(it['dangerousHed'])
             if it.get('brand') and it.get('name'):
@@ -362,6 +375,7 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += '{}</a></li>'.format(offer['sellerName'])
                 item['content_html'] += '</ul>'
 
+    split_url = urlsplit(url)
     item['content_html'] = item['content_html'].replace('<a href="/', '<a href="{}://{}/'.format(split_url.scheme, split_url.netloc))
     item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item

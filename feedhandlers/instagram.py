@@ -116,6 +116,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
 
     avatars = []
     users = []
+    names = []
+    verified = []
     if ig_data:
         if save_debug:
             utils.write_file(ig_data, './debug/instagram.json')
@@ -123,9 +125,16 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         if ig_data.get('owner'):
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['owner']['profile_pic_url']))
             users.append(ig_data['owner']['username'])
+            names.append('<br/>' + ig_data['owner']['full_name'])
+            if ig_data.get('is_verified'):
+                verified.append(' &#9989;')
+            else:
+                verified.append('')
         elif ig_data.get('user'):
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['user']['profile_pic_url']))
             users.append(ig_data['user']['username'])
+            names.append('')
+            verified.append('')
         avatars.append(avatar)
     else:
         el = soup.find(class_='Avatar')
@@ -133,6 +142,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
             avatars.append(avatar)
             users.append(soup.find(class_='UsernameText').get_text())
+            names.append('')
+            verified.append('')
         else:
             for el in soup.find_all(class_='CollabAvatar'):
                 avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
@@ -140,6 +151,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 m = re.search(r'^/([^/]+)/', urlsplit(el['href']).path)
                 if m:
                     users.append(m.group(1))
+                    names.append('')
+                    verified.append('')
 
     username = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(users))
     title = '{} posted on Instagram'.format(username)
@@ -166,26 +179,21 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     item['author'] = {}
     item['author']['name'] = username
 
-    if item.get('_display_date'):
-        post_caption = '<a href="{}"><small>{}</small></a>'.format(item['url'], item['_display_date'])
-    else:
-        post_caption = '<a href="{}"><small>Open in Instagram</small></a>'.format(item['url'])
-
-    caption = None
+    post_caption = ''
     if ig_data:
         if ig_data.get('caption'):
-            caption = ig_data['caption']['text']
+            post_caption = ig_data['caption']['text']
         else:
             try:
-                caption = ig_data['edge_media_to_caption']['edges'][0]['node']['text']
+                post_caption = ig_data['edge_media_to_caption']['edges'][0]['node']['text']
             except:
-                caption = None
-        if caption:
-            caption = caption.replace('\n', '<br />')
-            caption = re.sub(r'(@|#)(\w+)', format_caption_links, caption)
-            post_caption = '<p>{}</p>'.format(caption) + post_caption
+                post_caption = None
+        if post_caption:
+            post_caption = post_caption.replace('\n', '<br/>')
+            post_caption = re.sub(r'(@|#)(\w+)', format_caption_links, post_caption)
+            post_caption = '<p>{}</p>'.format(post_caption)
 
-    if soup and not caption:
+    if soup and not post_caption:
         caption = soup.find(class_='Caption')
         if caption:
             # Make paragragh instead of div to help with spacing
@@ -220,7 +228,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
 
             if str(caption):
                 title = '{} posted: {}'.format(username, caption.get_text())
-                post_caption = str(caption) + post_caption
+                post_caption = str(caption)
             while post_caption.startswith('<br/>'):
                 post_caption = post_caption[5:]
 
@@ -235,14 +243,16 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 img_src = ig_data['display_resources'][0]['src']
             else:
                 img_src = ig_data['display_url']
-            post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+            #post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+            post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(img_src, config.server, quote_plus(img_src))
         else:
             for el in soup.find_all('img', class_='EmbeddedMediaImage'):
                 if el.has_attr('srcset'):
                     img_src = utils.image_from_srcset(el['srcset'], 640)
                 else:
                     img_src = el['src']
-                post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+                #post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+                post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(img_src, config.server, quote_plus(img_src))
 
     elif media_type == 'GraphVideo':
         if ig_data:
@@ -258,13 +268,16 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 img_src = img['url']
             else:
                 img_src = ig_data['display_url']
-            post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), height='0', link=video_src, img_style='border-radius:10px;')
+            #post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), height='0', link=video_src, img_style='border-radius:10px;')
+            post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(video_src, config.server, quote_plus(img_src))
         else:
             el = soup.find('img', class_='EmbeddedMediaImage')
             if el:
-                poster = '{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(el['src']))
-                caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
-                post_media += utils.add_image(poster, caption, height='0', link=ig_url, img_style='border-radius:10px;')
+                img_src = el['src']
+                poster = '{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src))
+                caption = '<div style="padding:0 8px 0 8px;"><small><a href="{}">Watch on Instagram</a></small></div>'.format(ig_url)
+                #post_media += utils.add_image(poster, caption, height='0', link=ig_url, img_style='border-radius:10px;')
+                post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(ig_url, config.server, quote_plus(img_src), caption)
 
     elif media_type == 'GraphSidecar':
         if ig_data:
@@ -274,7 +287,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                         img_src = edge['node']['display_resources'][0]['src']
                     else:
                         img_src = edge['node']['display_url']
-                    post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+                    #post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
+                    post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(img_src, config.server, quote_plus(img_src))
 
                 elif edge['node']['__typename'] == 'GraphVideo':
                     if edge['node'].get('video_url'):
@@ -282,30 +296,43 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                         caption = ''
                     else:
                         video_src = ''
-                        caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
+                        #caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
+                        caption = '<div style="padding:0 8px 0 8px;"><small><a href="">{}>Watch on Instagram</a></small></div>'.format(ig_url)
                     if edge['node'].get('display_resources'):
                         img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
                         img_src = img['src']
                     else:
                         img_src = edge['node']['display_url']
-                    post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), caption, height='0', link=video_src, img_style='border-radius:10px;')
-
-                post_media += '<div>&nbsp;</div>'
+                    #post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), caption, height='0', link=video_src, img_style='border-radius:10px;')
+                    post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(video_src, config.server, quote_plus(img_src), caption)
+                #post_media += '<div>&nbsp;</div>'
             #post_media = post_media[:-10]
         else:
             logger.warning('Instagram GraphSidecar media without ig_data in ' + ig_url)
+    post_media = re.sub('<div>&nbsp;</div>$', '', post_media)
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
     #item['content_html'] = '<table style="table-layout:fixed; width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-collapse:collapse;">'
     for i in range(len(users)):
-        item['content_html'] += '<tr><td style="width:48px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></td></tr>'.format(avatars[i], users[i])
-    item['content_html'] += '<tr><td colspan="2" style="word-wrap:break-word;">'
+        if i == 0:
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td><td style="width:48px; text-align:center; verticla-align:middle;"><a href="{4}"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
+        else:
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatars[i], users[i], verified[i], names[i])
 
+    item['content_html'] += '<tr><td colspan="3" style="padding:0;">'
     if post_media:
         item['content_html'] += post_media
+    item['content_html'] += '</td></tr>'
 
-    item['content_html'] += '<p>{}</p></div></td></table>'.format(post_caption)
+    item['content_html'] += '<tr><td colspan="3" style="padding:8px; word-wrap:break-word;">{}</td></tr>'.format(post_caption)
+
+    item['content_html'] += '<td colspan="3" style="padding:8px;">'
+    if item.get('_display_date'):
+        item['content_html'] += '<a href="{}"><small>{}</small></a>'.format(item['url'], item['_display_date'])
+    else:
+        item['content_html'] += '<a href="{}"><small>Open in Instagram</small></a>'.format(item['url'])
+    item['content_html'] += '</td></tr></table>'
     return item
 
 

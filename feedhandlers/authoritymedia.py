@@ -1,6 +1,6 @@
-import re, tldextract
+import re
 from datetime import datetime
-from urllib.parse import urlsplit, quote_plus
+from urllib.parse import urlsplit
 
 import config, utils
 from feedhandlers import rss

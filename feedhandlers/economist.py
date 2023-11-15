@@ -120,6 +120,11 @@ def get_content(url, args, site_json, save_debug=False):
             content_json = content_parts[0]
             item['id'] = next_json['props']['pageProps']['content']['id']
             item['url'] = next_json['props']['pageProps']['pageUrl']
+        elif 'Article' in next_json['props']['pageProps']['content']['type']:
+            content_parts = None
+            content_json = next_json['props']['pageProps']['content']
+            item['id'] = next_json['props']['pageProps']['content']['id']
+            item['url'] = next_json['props']['pageProps']['pageUrl']
         else:
             logger.warning('unhandled content type {} in {}'.format(next_json['props']['pageProps']['content']['type'], url))
 
@@ -162,6 +167,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = content_json['description']
 
     item['content_html'] = ''
+    if content_json.get('description'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(content_json['description'])
+
     if not content_json.get('text') or (item.get('_image') and content_json['text'][0].get('name') and content_json['text'][0]['name'] != 'figure'):
         if item['_image'].startswith('/'):
             item['_image'] = 'https://www.economist.com' + item['_image']
