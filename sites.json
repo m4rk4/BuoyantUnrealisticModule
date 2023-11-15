@@ -697,7 +697,7 @@
     },
     "apple": {
         "module": "apple",
-        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjkxMDAyNzQyLCJleHAiOjE2OTcyMjM1NDIsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.oNUL421fm-GbG7xDCDgsW0UgPypdkVlbINvx7f7rLFyiZu0aUwYHMv8l2aqXMBEYhA618gqmo1fMjQjqbSZLSw"
+        "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkRBSlcxUk8wNjIifQ.eyJpc3MiOiJFUk1UQTBBQjZNIiwiaWF0IjoxNjk1NjYxMDc1LCJleHAiOjE3MDE4ODE4NzUsInJvb3RfaHR0cHNfb3JpZ2luIjpbImFwcGxlLmNvbSJdfQ.3Ou5fKKLTABgACeMDRHQoZIVsJVGN6NdBrgVfW-jt9Rc4mja2beq_ds09snxWL2lh56K-KZUqSTOoiHggX6zGQ"
     },
     "appleinsider": {
         "module": "appleinsider"
@@ -2162,7 +2162,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1142,
+        "deployment": 1162,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -5792,7 +5792,7 @@
         "wpjson_path": "https://hackaday.com/wp-json"
     },
     "hackernoon": {
-        "buildId": "7T70mNvrTt6tzcRzow1dV",
+        "buildId": "HiO97ighcKQkoaM6fGfqB",
         "module": "hackernoon",
         "x-algolia-api-key": "e0088941fa8f9754226b97fa87a7c340",
         "x-algolia-application-id": "mo7dwh9y8c"
@@ -9445,7 +9445,7 @@
         "wpjson_path": "https://www.omgubuntu.co.uk/wp-json"
     },
     "omny": {
-        "buildId": "p3dEWkkpj884lMg6CHzGF",
+        "buildId": "GwgShPwH7hrsarPQ9pLlr",
         "module": "omnyfm"
     },
     "omnycontent": {
@@ -11044,7 +11044,7 @@
             },
             "source": "article-by-id-or-url-v1"
         },
-        "deployment": 157,
+        "deployment": 162,
         "homepage_feed": {
             "query": {
                 "arc-site": "reuters",
