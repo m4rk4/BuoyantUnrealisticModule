@@ -673,13 +673,16 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                             item['_image'] = link_json['source_url']
                         captions = []
                         if link_json.get('description'):
-                            soup = BeautifulSoup(link_json['description']['rendered'], 'html.parser')
-                            if not soup.find('img'):
-                                caption = soup.get_text().strip()
-                                if caption:
-                                    if link_json['description']['rendered'].startswith('<p'):
-                                        caption = soup.p.decode_contents().strip()
-                                    captions.append(caption)
+                            if isinstance(link_json['description'], str):
+                                captions.append(link_json['description'])
+                            else:
+                                soup = BeautifulSoup(link_json['description']['rendered'], 'html.parser')
+                                if not soup.find('img'):
+                                    caption = soup.get_text().strip()
+                                    if caption:
+                                        if link_json['description']['rendered'].startswith('<p'):
+                                            caption = soup.p.decode_contents().strip()
+                                        captions.append(caption)
                         if not captions and link_json.get('caption') and link_json['caption'].get('rendered') and isinstance(link_json['caption']['rendered'], str):
                             soup = BeautifulSoup(link_json['caption']['rendered'], 'html.parser')
                             caption = soup.get_text().strip()
@@ -2338,11 +2341,11 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         it = el.find('img')
         if it:
             poster += '&url=' + quote_plus(it['src'])
-        it = el.find('audio')
+        it = el.find('a', href=re.compile(r'\.mp3'))
         if it:
-            audio_src = it.source['src']
+            audio_src = utils.get_redirect_url(it['href'])
         else:
-            audio_src = ''
+            audio_src = item['url']
         it = el.find('h4')
         if it:
             title = '<h3>{}</h3>'.format(it.get_text())

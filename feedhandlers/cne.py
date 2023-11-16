@@ -86,13 +86,22 @@ def add_video(props, width=960):
 
 
 def add_product(props):
-    content_html = '<table style="width:100%"><tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4><ul>'.format(props['image']['sources']['sm']['url'], props['dangerousHed'])
-    for offer in props['multipleOffers']:
-        content_html += '<li><a href="{}">'.format(offer['offerUrl'])
-        if offer.get('price'):
-            content_html += '{} at '.format(offer['price'])
-        content_html += offer['sellerName'] + '</a></li>'
-    content_html += '</ul></td></tr></table>'
+    content_html = '<table style="width:100%"><tr>'
+    if props.get('image'):
+        content_html += '<td style="width:128px;"><img src="{}" style="width:128px;"/></td>'.format(props['image']['sources']['sm']['url'])
+    if props.get('dangerousHed'):
+        content_html += '<td style="vertical-align:top;"><h4 style="margin-top:0; margin-bottom:0.5em;">{}</h4>'.format(props['dangerousHed'])
+    if props.get('dangerousDek'):
+        content_html += '<div>{}</div>'.format(props['dangerousDek'])
+    if props.get('multipleOffers'):
+        content_html += '<ul>'
+        for offer in props['multipleOffers']:
+            content_html += '<li><a href="{}">'.format(offer['offerUrl'])
+            if offer.get('price'):
+                content_html += '{} at '.format(offer['price'])
+            content_html += offer['sellerName'] + '</a></li>'
+        content_html += '</ul>'
+    content_html += '</td></tr></table>'
     return content_html
 
 
