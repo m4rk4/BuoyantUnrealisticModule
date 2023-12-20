@@ -327,7 +327,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
 
     item['content_html'] += '<tr><td colspan="3" style="padding:8px; word-wrap:break-word;">{}</td></tr>'.format(post_caption)
 
-    item['content_html'] += '<td colspan="3" style="padding:8px;">'
+    item['content_html'] += '<tr><td colspan="3" style="padding:8px;">'
     if item.get('_display_date'):
         item['content_html'] += '<a href="{}"><small>{}</small></a>'.format(item['url'], item['_display_date'])
     else:

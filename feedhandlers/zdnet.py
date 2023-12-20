@@ -41,38 +41,52 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path[1:].split('/')))
     slug = paths[-1]
     tld = tldextract.extract(url)
-    api_key = site_json['apiKey']
-    secret_key = site_json['secretKey']
+    secret_key = site_json['secret_key']
     if '/pictures/' in split_url.path:
-        api_url = 'https://cmg-prod.apigee.net/v1/xapi/galleries/{}/{}/web?apiKey={}&componentName=gallery&componentDisplayName=Gallery&componentType=Gallery'.format(tld.domain, slug, api_key)
-    elif re.search(r'/videos?/', split_url.path):
-        api_url = 'https://cmg-prod.apigee.net/v1/xapi/videos/{}/{}/web?apiKey={}&componentName=video&componentDisplayName=Video&componentType=Video'.format(tld.domain, slug, api_key)
-    elif tld.domain == 'cnet' and re.search(r'-(preview|review)/?$', split_url.path):
-        slug = re.sub(r'-(preview|review)/?$', '', slug)
-        api_url = 'https://cmg-prod.apigee.net/v1/xapi/reviews/{}/{}/web?apiKey={}&componentName=review&componentDisplayName=Review&componentType=Review'.format(tld.domain, slug, api_key)
+        api_url = '{}/composer/{}/pages/gallery/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
+    elif '/video/' in split_url.path or '/videos/' in split_url.path:
+        api_url = '{}/composer/{}/pages/video/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
+    elif tld.domain == 'cnet' and ('/reviews/' in url or re.search(r'-review/?$', split_url.path)):
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('meta', attrs={"name": "postId"})
+        if not el:
+            logger.warning('unknown postId in ' + url)
+            return None
+        slug = el['content']
+        el = soup.find('link', attrs={"rel": "canonical"})
+        if el:
+            url = el['href']
+        api_url = '{}/reviews/{}/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
     else:
-        api_url = 'https://cmg-prod.apigee.net/v1/xapi/articles/{}/{}/web?apiKey={}&componentName=article&componentDisplayName=Article&componentType=Article'.format(tld.domain, slug, api_key)
+        api_url = '{}/composer/{}/pages/article/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
-    if api_json.get('fault'):
-        if api_json['fault']['faultstring'] == 'Invalid ApiKey' and not args.get('fault'):
-            page_html = utils.get_url_html(url)
-            m = re.search(r'apiKey=([^&]+)', page_html)
-            if m:
-                site_json['apiKey'] = m.group(1)
-                utils.update_sites(url, site_json)
-                retry_args = args.copy()
-                retry_args['fault'] = True
-                return get_content(url, retry_args, site_json, save_debug)
-        else:
-            logger.warning('{} getting content from {}'.format(api_json['fault']['faultstring'], url))
-            return None
+    if api_json.get('errors'):
+        logger.warning('error code {}: {}'.format(api_json['errors'][0]['code'], api_json['errors'][0]['message']))
+        return None
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
 
+    article_json = None
+    api_component = None
+    if api_json.get('components'):
+        for api_component in api_json['components']:
+            if api_component.get('data') and api_component['data'].get('id') and api_component['data']['id'] == slug:
+                article_json = api_component['data']['item']
+                break
+    else:
+        api_component = api_json
+        article_json = api_component['data']['item']
+    if not article_json:
+        logger.warning('article not found in ' + api_url)
+        return None
+
     article_soup = None
-    article_json = api_json['data']['item']
+
     item = {}
     item['id'] = article_json['id']
     item['url'] = utils.clean_url(url)
@@ -124,7 +138,7 @@ def get_content(url, args, site_json, save_debug=False):
     elif article_json.get('description'):
         item['summary'] = article_json['description']
 
-    if api_json['meta']['componentName'] == 'video':
+    if api_component['meta']['componentName'] == 'video':
         item['_image'] = resize_image(article_json['image']['path'], secret_key)
         if article_json.get('mp4Url'):
             item['_video'] = article_json['mp4Url']
@@ -144,7 +158,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<p>{}</p>'.format(re.sub(r'(https://\S+)', r'<a href="\1">\1</a>', article_json['description']))
         soup = None
 
-    elif api_json['meta']['componentName'] == 'gallery':
+    elif api_component['meta']['componentName'] == 'gallery':
         gallery_html = ''
         n = len(article_json['items'])
         for i, it in enumerate(article_json['items']):
@@ -162,7 +176,7 @@ def get_content(url, args, site_json, save_debug=False):
                 gallery_html += '<hr />'
             soup = BeautifulSoup(gallery_html, 'html.parser')
 
-    elif api_json['meta']['componentName'] == 'review':
+    elif api_component['meta']['componentName'] == 'review':
         if article_json.get('videos'):
             video_url = '{}://{}/videos/{}'.format(split_url.scheme, split_url.netloc, article_json['videos'][0]['slug'])
             if save_debug:
@@ -354,8 +368,8 @@ def get_content(url, args, site_json, save_debug=False):
             elif el['shortcode'] == 'cnetlisticle' or el['shortcode'] == 'cross_content_listicle':
                 if el.get('imagegroup'):
                     shortcode_json = json.loads(el['imagegroup'].replace('&quot;', '"'))
-                    #utils.write_file(shortcode_json, './debug/shortcode.json')
-                    if shortcode_json.get('imageData'):
+                    # utils.write_file(shortcode_json, './debug/shortcode.json')
+                    if shortcode_json.get('imageData') and shortcode_json['imageData'].get('id'):
                         img_src = resize_image(shortcode_json['imageData']['path'], secret_key)
                         captions = []
                         if shortcode_json.get('imageCaption'):
@@ -426,9 +440,9 @@ def get_content(url, args, site_json, save_debug=False):
 
             elif el['shortcode'] == 'commercepromo':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
-                #utils.write_file(shortcode_json, './debug/shortcode.json')
+                # utils.write_file(shortcode_json, './debug/shortcode.json')
                 new_html += '<table><tr><td><img src="{}" width="200px"/></td><td><strong>{}</strong><br/>'.format(resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key, 200), shortcode_json['hed'])
-                if shortcode_json.get('offerPrice'):
+                if shortcode_json.get('offerPrice') and shortcode_json['offerPrice'] != 'undefined':
                     new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(shortcode_json['offerUrl'], float(shortcode_json['offerPrice']), shortcode_json['offerMerchant'])
                 elif shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
                     promo_url = utils.get_redirect_url(shortcode_json['techProd']['resellers'][0]['url'])
@@ -482,6 +496,11 @@ def get_content(url, args, site_json, save_debug=False):
                 el.insert_after(BeautifulSoup(new_html, 'html.parser'))
                 el.decompose()
 
+        for el in soup.select('p > strong:-soup-contains("Also:")'):
+            it = el.find_parent('p')
+            if it:
+                it.decompose()
+
         item['content_html'] += str(soup)
         if item['content_html'].endswith('<hr/>'):
             item['content_html'] = item['content_html'][:-5]
@@ -489,42 +508,127 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    # https://www.cnet.com/rss/
     if '/rss' in args['url'] or '/feed' in args['url']:
         return rss.get_feed(url, args, site_json, save_debug, get_content)
 
     # TODO: CNET tag feeds
     # TODO: CNET author feeds
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    slug = paths[-1]
+    tld = tldextract.extract(url)
 
     feed = None
+    feed_title = ''
     urls = []
-    if args['url'].startswith('https://www.cnet.com/profiles/'):
-        split_url = urlsplit(args['url'])
-        paths = list(filter(None, split_url.path[1:].split('/')))
-        api_url = 'https://www.cnet.com/profiles/user/profile/ugc/?username={}&type=recent&limit=10&offset=0&_={}'.format(paths[1], int(datetime.timestamp(datetime.now())*1000))
-        headers = {
-            "accept": "application/json, text/javascript, */*; q=0.01",
-            "accept-language": "en-US,en;q=0.9,de;q=0.8",
-            "sec-ch-ua": "\".Not/A)Brand\";v=\"99\", \"Microsoft Edge\";v=\"103\", \"Chromium\";v=\"103\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        api_json = utils.get_url_json(api_url, headers=headers)
+
+    if False:
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('meta', attrs={"name": "postId"})
+        if not el:
+            logger.warning('unknown postId in ' + url)
+            return None
+        api_url = '{}/authors/{}/{}/search/recent/web?componentType=ContentList&componentName=author-recent&componentDisplayName=Recent&limit=10&apiKey={}'.format(site_json['api_path'], tld.domain, el['content'], site_json['api_key'])
+        api_json = utils.get_url_json(api_url)
         if not api_json:
             return None
-        soup = BeautifulSoup(api_json['html'], 'html.parser')
         if save_debug:
             utils.write_file(api_json, './debug/feed.json')
-            utils.write_file(str(soup), './debug/debug.html')
-        feed_title = 'CNET | ' + paths[1]
-        for el in soup.find_all('h3'):
-            if el.parent and el.parent.name == 'a':
-                urls.append('https://www.cnet.com' + el.parent['href'])
+        for it in api_json['data']['items']:
+            urls.append('{}://{}/{}/{}'.format(split_url.scheme, split_url.netloc, it['metaData']['section'], it['slug']))
+        feed_title = soup.title.get_text()
 
-    elif args['url'] == 'https://www.zdnet.com/pictures/':
+    if '/authors/' in url or '/profiles/' in url:
+        api_url = '{}/composer/{}/pages/author/{}/web?componentType=ContentList&componentName=author-recent&componentDisplayName=Recent&limit=10&apiKey={}'.format(site_json['api_path'], tld.domain, paths[1], site_json['api_key'])
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+        for component in api_json['components']:
+            if component['meta']['componentType'] == 'Author':
+                if component['data']['item'].get('byline'):
+                    feed_title = component['data']['item']['byline'] + ' | ' + split_url.netloc
+                elif component['data']['item'].get('profile') and component['data']['item']['profile'].get('byline'):
+                    feed_title = component['data']['item']['profile']['byline'] + ' | ' + split_url.netloc
+            elif component['meta']['componentType'] == 'ContentList' or component['meta']['componentType'] == 'AuthorList':
+                for it in component['data']['items']:
+                    it_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
+                    if it['type'] == 'content_article':
+                        it_url += '/{}/'.format(site_json['article_path'])
+                    elif it['type'] == 'content_video':
+                        it_url += '/videos/'
+                    elif it['type'] == 'content_gallery':
+                        it_url += '/pictures/'
+                    else:
+                        logger.warning('unhandled content type {} for ' + it['slug'])
+                        continue
+                    it_url += it['slug']
+                    if it_url not in urls:
+                        urls.append(it_url)
+    elif '/meet-the-team/' in url:
+        api_url = utils.clean_url(url)
+        if not api_url.endswith('/'):
+            api_url += '/'
+        api_url += 'xhr/?o=1&t=&topic=&d=&offset=0'
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+        for it in api_json['loadMore']['articles']:
+            urls.append('{}://{}/{}/{}'.format(split_url.scheme, split_url.netloc, it['typeLabel'], it['slug']))
+            if not feed_title:
+                feed_title = it['author']['username'] + ' | ' + split_url.netloc
+    elif '/topic/' in url:
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        feed_title = soup.title.get_text()
+        el = soup.find(attrs={"data-component": "loadMore"})
+        if not el:
+            logger.warning('unable to find loadMore in ' + url)
+            return None
+        data_load_more = json.loads(el['data-load-more-options'])
+        api_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, data_load_more['url'])
+        api_url += '?endpoint=' + quote_plus(data_load_more['data']['endpoint'])
+        for key, val in data_load_more['data']['params'].items():
+            api_url += '&params%5B{}%5D='.format(key)
+            if val:
+                api_url += val
+        api_url += '&view=river_alt&familyName=listing&typeName=dynamic_listing&offset=0&initialLimit=0&limit=15&lastAssetId=&disableOldContent=false'
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/feed.json')
+        soup = BeautifulSoup(api_json['loadMore']['html'], 'html.parser')
+        for el in soup.select('article > div > a'):
+            urls.append('{}://{}{}'.format(split_url.scheme, split_url.netloc, el['href']))
+    else:
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        m = re.search(r'meta:\{componentName:"([^"]+)",componentDisplayName:"[^"]*Latest[^"]*",componentType:"ContentList"\}', page_html)
+        if not m:
+            logger.warning('unable to find componentName in ' + url)
+            return None
+        api_url = '{0}/components/{1}/listing/filtered_listing/{2}/web?searchBy=id&fields=id,title,promoTitle,typeName,author(id,username,firstName,lastName,socialProfileIds,image,email,middleName,authorBio,title,suppressProfile,typeName,byline),datePublished,description,promoDescription,metaData(canonicalUrl,promoHeadline,label,url,slideCount,duration,typeTitle,hubTopicPathString,preferredProductName,rating,linkUrl,origin,reviewType),image(id,filename,dateCreated,alt,credits,caption,path,typeName,width,height,bucketPath,bucketType),slug,topic,primaryTopic,secondaryTopics,wordCount,content,filters&page=1&componentType=ContentList&componentName={2}&apiKey={3}'.format(site_json['api_path'], tld.domain, m.group(1), site_json['api_key'])
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        for it in api_json['data']['items']:
+            path = split_url.path
+            if not path.endswith('/'):
+                path += '/'
+            urls.append('{}://{}{}{}'.format(split_url.scheme, split_url.netloc, path, it['slug']))
+
+    if args['url'] == 'https://www.zdnet.com/pictures/':
         feed_title = 'ZDNet | Photo Galleries'
         page_html = utils.get_url_html(args['url'])
         if not page_html:
@@ -549,7 +653,8 @@ def get_feed(url, args, site_json, save_debug=False):
     if urls:
         n = 0
         feed = utils.init_jsonfeed(args)
-        feed['title'] = feed_title
+        if feed_title:
+            feed['title'] = feed_title
         feed_items = []
         for url in urls:
             if save_debug:
@@ -564,17 +669,3 @@ def get_feed(url, args, site_json, save_debug=False):
                             break
         feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
-
-
-def test_handler():
-    feeds = ['https://www.zdnet.com/news/rss.xml',
-             'https://www.zdnet.com/topic/reviews/rss.xml',
-             'https://www.zdnet.com/videos/rss.xml',
-             'https://www.zdnet.com/meet-the-team/palmsolo+%28aka+matthew+miller%29/rss.xml',
-             'https://www.zdnet.com/pictures/',
-             'https://www.cnet.com/rss/all/',
-             'https://www.cnet.com/rss/reviews/',
-             'https://feed.cnet.com/feed/roadshow/all',
-             'https://www.tvguide.com/news/']
-    for url in feeds:
-        get_feed({"url": url}, True)

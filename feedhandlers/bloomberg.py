@@ -37,6 +37,8 @@ def get_bb_url(url, get_json=False):
     else:
         headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
         content = utils.get_url_html(url, headers=headers, allow_redirects=False)
+        if not content:
+            content = utils.get_url_html('https://webcache.googleusercontent.com/search?q=cache:' + utils.clean_url(url), headers=headers, allow_redirects=False)
     if not content:
         # Try through browser
         try:
@@ -128,12 +130,15 @@ def format_content(content, images):
             content_html += '</a>'
         elif content['subType'] == 'security' and content['meta']['type'] == 'SecurityLink':
             keys = unquote_plus(content['data']['link']['destination']['bbg']).split('/')[3].split(' ')
-            keys.remove('Equity')
-            link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
-            content_html += '<a href="{}">'.format(link)
-            for c in content['content']:
-                content_html += format_content(c, images)
-            content_html += '</a>'
+            if 'Equity' in keys:
+                keys.remove('Equity')
+                link = 'https://www.bloomberg.com/quote/' + ':'.join(keys)
+                content_html += '<a href="{}">'.format(link)
+                for c in content['content']:
+                    content_html += format_content(c, images)
+                content_html += '</a>'
+            else:
+                logger.warning('unhandled entity security bbg link ' + content['data']['link']['destination']['bbg'])
         elif content['subType'] == 'person' and content['meta']['type'] == 'ProfileLink':
             # TODO
             for c in content['content']:
@@ -217,6 +222,45 @@ def format_content(content, images):
             content_html += utils.add_embed(content['href'])
         else:
             logger.warning('unhandled content media subtype ' + content['subType'])
+    elif content['type'] == 'embed':
+        if content.get('href'):
+            content_html += utils.add_embed(content['href'])
+        else:
+            logger.warning('unhandled embed content')
+    elif content['type'] == 'quote':
+        # Blockquote or pullquote?
+        quote = ''
+        for c in content['content']:
+            quote += format_content(c, images)
+        content_html += utils.add_blockquote(quote)
+    elif content['type'] == 'aside':
+        if content['data'].get('class') and content['data']['class'] == 'pullquote':
+            quote = ''
+            for c in content['content']:
+                quote += format_content(c, images)
+            content_html += utils.add_pullquote(quote)
+        else:
+            logger.warning('unhandled aside content')
+    elif content['type'] == 'footnoteRef':
+        m = re.search(r'footnote-(\d+)', content['data']['identifier'])
+        if m:
+            content_html += '[{}]'.format(m.group(1))
+        else:
+            logger.warning('unhandled footnoteRef content')
+    elif content['type'] == 'footnotes':
+        for c in content['content']:
+            content_html += format_content(c, images)
+    elif content['type'] == 'footnote':
+        footnote = ''
+        for c in content['content']:
+            footnote += format_content(c, images)
+        m = re.search(r'footnote-(\d+)', content['data']['identifier'])
+        if m:
+            content_html += re.sub('^<p>', '<p>[{}] '.format(m.group(1)), footnote)
+        else:
+            logger.warning('unhandled footnote content')
+    elif content['type'] == 'inline-recirc':
+        pass
     else:
         logger.warning('unhandled content type ' + content['type'])
     return content_html
@@ -302,10 +346,9 @@ def get_content(url, args, site_json, save_debug):
         return get_video_content(url, args, site_json, save_debug)
 
     page_html = get_bb_url(url)
-    if save_debug:
-        utils.write_file(page_html, './debug/debug.html')
-    # page_html = utils.read_file('./debug/debug.html')
     if page_html:
+        if save_debug:
+            utils.write_file(page_html, './debug/debug.html')
         soup = BeautifulSoup(page_html, 'html.parser')
         el = soup.find('script', id='__NEXT_DATA__')
         if el:
@@ -372,16 +415,17 @@ def get_item(story_json, args, site_json, save_debug):
         if not utils.check_age(item, args):
             return None
 
-    authors = []
-    for author in story_json['authors']:
-        authors.append(author['name'])
-    if authors:
-        item['author'] = {}
+    item['author'] = {}
+    if story_json.get('authors'):
+        authors = []
+        for author in story_json['authors']:
+            authors.append(author['name'])
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    elif story_json.get('byline'):
+        item['author']['name'] = story_json['byline']
 
     if story_json.get('mostRelevantTags'):
         item['tags'] = story_json['mostRelevantTags'].copy()
-
 
     if story_json.get('teaserBody'):
         item['summary'] = story_json['teaserBody']
@@ -398,6 +442,8 @@ def get_item(story_json, args, site_json, save_debug):
 
     if story_json.get('dek'):
         item['content_html'] += story_json['dek']
+    elif story_json.get('summaryHtml'):
+        item['content_html'] += story_json['summaryHtml']
 
     if story_json.get('abstract'):
         item['content_html'] += '<ul>'
@@ -598,6 +644,11 @@ def get_item(story_json, args, site_json, save_debug):
             item['content_html'] += '<hr/>'
             for content in story_json['footer']['content']:
                 item['content_html'] += format_content(content, story_json.get('imageAttachments'))
+
+    if story_json.get('footnotes') and story_json['footnotes'].get('content'):
+        item['content_html'] += '<hr/>'
+        for content in story_json['footnotes']['content']:
+            item['content_html'] += format_content(content, story_json.get('imageAttachments'))
 
     return item
 

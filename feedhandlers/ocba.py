@@ -16,7 +16,7 @@ def get_content(url, args, site_json, save_debug):
         if matchobj.group(1).startswith('column') or matchobj.group(1).startswith('row'):
             return ''
         elif matchobj.group(1) == 'single_image':
-            print(matchobj.group(0))
+            # print(matchobj.group(0))
             m = re.search(r'image=”(\d+)″', matchobj.group(0))
             if m:
                 media_json = utils.get_url_json('https://ohiocraftbeer.org/wp-json/wp/v2/media/' + m.group(1))

@@ -281,6 +281,9 @@ def get_guest_account():
 
 
 def get_tweet_detail(tweet_id, oauth1, by_rest_id=False):
+    if not oauth1:
+        oauth1 = OAuth1(TW_CONSUMER_KEY, TW_CONSUMER_SECRET, config.twitter_oauth_token, config.twitter_oauth_token_secret, realm='https://api.twitter.com/', signature_type="AUTH_HEADER", signature_method="HMAC-SHA1")
+
     if by_rest_id:
         variables = {
             "tweetId": tweet_id,
@@ -288,7 +291,7 @@ def get_tweet_detail(tweet_id, oauth1, by_rest_id=False):
             "includePromotedContent": False,
             "withVoice": False
         }
-        api_url = 'https://twitter.com/i/api/graphql/DJS3BdhUhcaEpZ7B7irJDg/TweetResultByRestId'
+        api_url = 'https://twitter.com/i/api/graphql/sITyJdhRPpvpEjg4waUmTA/TweetResultByIdQuery'
     else:
         variables = {
             "focalTweetId": tweet_id,
@@ -378,10 +381,7 @@ def get_content(url, args, site_json, save_debug=False):
         logger.debug('using twitter handler for ' + url)
         return twitter.get_content(url, args, site_json, save_debug)
     if save_debug:
-        if 'embed' in args:
-            utils.write_file(tweet_json, './debug/twitter.json')
-        else:
-            utils.write_file(tweet_json, './debug/debug.json')
+        utils.write_file(tweet_json, './debug/twitter.json')
 
     item = {}
     parents = ''

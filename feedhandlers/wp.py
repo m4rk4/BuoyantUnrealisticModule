@@ -23,7 +23,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         page_url = url
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
-    page_html = utils.get_url_html(page_url)
+    page_html = utils.get_url_html(page_url, site_json=site_json)
     if not page_html:
         return None
     soup = BeautifulSoup(page_html, 'html.parser')
@@ -196,6 +196,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['title'] = oembed_json['title']
         elif article_json and article_json.get('name'):
             item['title'] = article_json['name']
+    if not item.get('title'):
+        item['title'] = soup.title.get_text()
     item['title'] = item['title'].replace('&amp;', '&')
     if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
         item['title'] = html.unescape(item['title'])
@@ -208,7 +210,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             date = meta['article:published_time']
     elif article_json and article_json.get('datePublished'):
         date = article_json['datePublished']
-    else:
+    elif site_json.get('timezone'):
         el = soup.find('time', attrs={"datetime": True})
         if el:
             date = el['datetime']
@@ -353,7 +355,13 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['summary'] = meta['twitter:description']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><h4><a href="{}">{}</a></h4><p><small>{}</small></p></div></div>'.format(item['url'], item['_image'], item['url'], item['title'], item['summary'])
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin-left:8px; margin-right:8px;"><h4><a href="{}">{}</a></h4>'.format(item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p><small>{}</small></p>'.format(item['summary'])
+        item['content_html'] += '</div></div>'
         return item
 
     gallery = ''
@@ -432,11 +440,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if site_json.get('content'):
         contents = utils.get_soup_elements(site_json['content'], soup)
         for el in contents:
-            it = el.find('body')
-            if it:
-                item['content_html'] += wp_posts.format_content(it.decode_contents(), item, site_json, module_format_content)
-            else:
-                item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+            item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
     if gallery:
         item['content_html'] += '<h3>Gallery</h3>' + gallery
     return item

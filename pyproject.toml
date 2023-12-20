@@ -42,6 +42,7 @@ utils = "^1.0.1"
 config = "^0.5.1"
 playwright = "^1"
 image-utils = "^0"
+js2py = "^0.74"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

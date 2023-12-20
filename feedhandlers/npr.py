@@ -68,10 +68,17 @@ def get_content(url, args, site_json, save_debug=False):
     item['author'] = {}
     if ld_json.get('author'):
         if isinstance(ld_json['author'], list):
-            authors = ld_json['author']['name'].copy()
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            for it in ld_json['author']:
+                if isinstance(it['name'], str):
+                    item['author']['name'] = it['name']
+                elif isinstance(it['name'], list):
+                    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(it['name']))
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(ld_json['author']['name']))
         elif isinstance(ld_json['author'], dict):
-            item['author']['name'] = ld_json['author']['name']
+            if isinstance(ld_json['author']['name'], str):
+                item['author']['name'] = ld_json['author']['name']
+            elif isinstance(ld_json['author']['name'], list):
+                item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(ld_json['author']['name']))
         elif isinstance(ld_json['author'], str):
             item['author']['name'] = ld_json['author']
     elif ld_json.get('publisher') and ld_json['publisher'].get('name'):

@@ -82,7 +82,8 @@ def get_content(url, args, site_json, save_debug=False):
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
-            item['author'] = {"name": tn_json['tncms']['asset']['author']}
+            if tn_json['tncms']['asset'].get('author'):
+                item['author'] = {"name": tn_json['tncms']['asset']['author']}
             el = soup.find(id='asset-content')
             if el:
                 if tn_json['tncms']['asset']['type'] == 'image':

@@ -1,5 +1,7 @@
-import json, pytz, re
+import base64, js2py, json, pytz, re
 from bs4 import BeautifulSoup
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from datetime import datetime
 from markdown2 import markdown
 from urllib.parse import quote_plus, unquote_plus, urlsplit
@@ -272,6 +274,112 @@ def render_contents(contents, netloc, image_link=None):
     return content_html
 
 
+def decrypt_content(encryptedDocumentKey, encryptedDataHash):
+    # Seems like if x-original-url has a valid paywall token for any article, then the given encryptedDocumentKey is decrypted
+    # Tokes expire - some after about 7 days
+    # WSJ links free articles from their reddit account here: https://www.reddit.com/user/wsj/.json?sort=new
+    # or look here: https://www.reddit.com/domain/wsj.com/.json
+    # https://www.wsj.com/lifestyle/dog-owners-death-lessons-love-grief-53c77511?st=ycgues92xaxtr83
+    # https://www.wsj.com/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"119\", \"Chromium\";v=\"119\", \"Not?A_Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
+        "x-encrypted-document-key": encryptedDocumentKey,
+        "x-original-host": "www.wsj.com",
+        "x-original-referrer": "",
+        "x-original-url": "/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu"
+    }
+    # Seems like using wsj.com works for other wsj sites as well (Barrons, etc.)
+    client_json = utils.get_url_json('https://www.wsj.com/client', headers=headers)
+    if not client_json:
+        return None
+    if not client_json.get('documentKey'):
+        logger.warning('unable to get documentKey')
+        return None
+    document_key = client_json['documentKey']
+    key = base64.b64decode(document_key.encode())
+    iv = base64.b64decode(encryptedDataHash['iv'].encode())
+    content = base64.b64decode(encryptedDataHash['content'].encode())
+    decryptor = Cipher(algorithms.AES(key), modes.CTR(iv), backend=default_backend()).decryptor()
+    decrypted_content = decryptor.update(content) + decryptor.finalize()
+    b64_content = base64.b64encode(decrypted_content).decode('utf-8')
+    # TODO: convert this function to Python
+    decode_b64 = js2py.eval_js('''
+    function a(e) {
+        if ("string" !== typeof e)
+            return null;
+        if (0 === e.length)
+            return "";
+        const i = function() {
+            let e = 0
+              , i = ""
+              , t = 0
+              , l = 6;
+            return {
+                from: function(o) {
+                    if ("string" !== typeof o || o.length % 4 !== 0)
+                        throw new Error("Invalid base64 input.");
+                    const n = o.match(/=+/);
+                    n && (o = o.slice(0, n.index)),
+                    e = 6 * o.length,
+                    i = o,
+                    t = 0,
+                    l = 6
+                },
+                pop: function(o) {
+                    const s = {"0": 52, "1": 53, "2": 54, "3": 55, "4": 56, "5": 57, "6": 58, "7": 59, "8": 60, "9": 61, "A": 0, "B": 1, "C": 2, "D": 3, "E": 4, "F": 5, "G": 6, "H": 7, "I": 8, "J": 9, "K": 10, "L": 11, "M": 12, "N": 13, "O": 14, "P": 15, "Q": 16, "R": 17, "S": 18, "T": 19, "U": 20, "V": 21, "W": 22, "X": 23, "Y": 24, "Z": 25, "a": 26, "b": 27, "c": 28, "d": 29, "e": 30, "f": 31, "g": 32, "h": 33, "i": 34, "j": 35, "k": 36, "l": 37, "m": 38, "n": 39, "o": 40, "p": 41, "q": 42, "r": 43, "s": 44, "t": 45, "u": 46, "v": 47, "w": 48, "x": 49, "y": 50, "z": 51, "+": 62, "/": 63};
+                    if (e <= 0)
+                        return null;
+                    let n = 0
+                      , r = s[i.charAt(t)];
+                    if ("number" !== typeof r)
+                        throw new Error("Encounter invalid base64 symbol.");
+                    for (o = Math.min(o, e),
+                    e -= o; o > 0; ) {
+                        if (!(o >= l)) {
+                            n |= (r & (1 << l) - 1) >> l - o,
+                            l -= o;
+                            break
+                        }
+                        n |= (r & (1 << l) - 1) << (o -= l),
+                        t < i.length - 1 && (l = 6,
+                        t += 1,
+                        r = s[i.charAt(t)])
+                    }
+                    return n
+                }
+            }
+        }();
+        i.from(e);
+        const t = [];
+        let l, o, n = 2, a = 2, u = Math.pow(2, n) - 1, c = !0, d = 1 === i.pop(n) ? String.fromCharCode(i.pop(7)) : String.fromCharCode(i.pop(16)), v = d;
+        for (; c && (t[++a] = d,
+        c = !1),
+        a >= u && (n += 1,
+        u = Math.pow(2, n) - 1),
+        l = i.pop(n),
+        0 !== l; )
+            1 === l ? (o = String.fromCharCode(i.pop(7)),
+            c = !0) : 2 === l ? (o = String.fromCharCode(i.pop(16)),
+            c = !0) : o = t[l] ? t[l] : d + d.charAt(0),
+            t[++a] = d + o.charAt(0),
+            v += o,
+            d = o;
+        return v
+    }
+    ''')
+    return decode_b64(b64_content)
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     path = re.sub(r'\.html', '', split_url.path, flags=re.I)
@@ -527,7 +635,17 @@ def get_content(url, args, site_json, save_debug=False):
             if m:
                 item['_image'] = m.group(1)
 
-    item['content_html'] += render_contents(api_json['body'], split_url.netloc)
+    if api_json.get('body'):
+        item['content_html'] += render_contents(api_json['body'], split_url.netloc)
+
+    if api_json.get('encryptedDocumentKey'):
+        content = decrypt_content(api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
+        if content:
+            content_json = json.loads(content)
+            if save_debug:
+                utils.write_file(content_json, './debug/content.json')
+            item['content_html'] += render_contents(content_json, split_url.netloc)
+
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 

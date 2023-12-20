@@ -34,13 +34,22 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unable to determine body props in ' + url)
                 return None
-            item['id'] = body_props['document']['id']
-            item['url'] = body_props['sharing_buttons_props']['url']
-            item['title'] = body_props['document']['title']
-            item['author'] = {"name": body_props['document']['publisher_info']['name']}
-            item['_image'] = body_props['sharing_buttons_props']['thumbnail_url']
-            if body_props['document'].get('description'):
-                item['summary'] = body_props['document']['description']
+            if body_props.get('document'):
+                item['id'] = body_props['document']['id']
+                item['title'] = body_props['document']['title']
+                item['author'] = {"name": body_props['document']['publisher_info']['name']}
+                if body_props['document'].get('description'):
+                    item['summary'] = body_props['document']['description']
+            if body_props.get('sharing_buttons_props'):
+                item['id'] = body_props['sharing_buttons_props']['id']
+                item['url'] = body_props['sharing_buttons_props']['url']
+                item['title'] = body_props['sharing_buttons_props']['title']
+                if body_props['sharing_buttons_props'].get('thumbnail_url'):
+                    item['_image'] = body_props['sharing_buttons_props']['thumbnail_url']
+                elif body_props['sharing_buttons_props'].get('thumbnailUrl'):
+                    item['_image'] = body_props['sharing_buttons_props']['thumbnailUrl']
+                if body_props['sharing_buttons_props'].get('description'):
+                    item['summary'] = body_props['sharing_buttons_props']['description']
             content_url = item['url']
         else:
             el = soup.find('meta', attrs={"property": "og:image"})

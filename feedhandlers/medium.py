@@ -1,4 +1,5 @@
-import html, operator, re
+import html, json, operator, re
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
@@ -18,6 +19,40 @@ def add_image(image, caption='', width=1000):
     return utils.add_image(img_src, caption)
 
 
+def get_apollo_state_content(url):
+    page_html = utils.get_url_html(url, user_agent='googlecache')
+    if not page_html:
+        return None
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', string=re.compile(r'__APOLLO_STATE__'))
+    if not el:
+        return None
+    i = el.string.find('{')
+    j = el.string.rfind('}') + 1
+    apollo_state = json.loads(el.string[i:j])
+    post_id = 'Post:' + urlsplit(url).path.split('-')[-1]
+    if not apollo_state.get(post_id):
+        return None
+    utils.write_file(apollo_state, './debug/apollo.json')
+    post_json = apollo_state[post_id]
+    content_json = None
+    for key, val in post_json.items():
+        if key.startswith('content'):
+            content_json = val
+            break
+    if not content_json:
+        return None
+
+    def sub_refs(matchobj):
+        nonlocal apollo_state
+        ref = json.dumps(apollo_state[matchobj.group(1)])[1:-1]
+        return re.sub(r'"__ref": "([^"]+)"', sub_refs, ref)
+    paragraphs = re.sub(r'"__ref": "([^"]+)"', sub_refs, json.dumps(content_json['bodyModel']['paragraphs']))
+    utils.write_file(paragraphs, './debug/test.txt')
+    content_json['bodyModel']['paragraphs'] = json.loads(paragraphs)
+    return content_json
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     post_id = split_url.path.split('-')[-1]
@@ -25,7 +60,7 @@ def get_content(url, args, site_json, save_debug=False):
     data = {
         "operationName": "PostPageQuery",
         "variables": {
-            "postId":post_id,
+            "postId": post_id,
             "postMeteringOptions": {
                 "forceTruncation": False
             },
@@ -76,13 +111,27 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = post_json['previewContent']['subtitle']
 
     item['content_html'] = ''
-    for paragraph in post_json['content']['bodyModel']['paragraphs']:
+    if post_json['content']['isLockedPreviewOnly']:
+        # The googlecache version seems to have the full text
+        content_json = get_apollo_state_content(url)
+        if content_json:
+            if save_debug:
+                utils.write_file(content_json, './debug/content.json')
+        else:
+            content_json = post_json['content']
+    else:
+        content_json = post_json['content']
+    for paragraph in content_json['bodyModel']['paragraphs']:
         paragraph_type = paragraph['type'].lower()
         start_tag = ''
         if paragraph_type == 'p' or paragraph_type == 'h1' or paragraph_type == 'h2' or paragraph_type == 'h3' or paragraph_type == 'h4':
             start_tag += '<{}>'.format(paragraph_type)
-            end_tag = '</{}>'.format(paragraph_type)
-            paragraph_text = paragraph['text']
+            if paragraph.get('hasDropCap') and paragraph['hasDropCap']:
+                paragraph_text = '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(paragraph['text'][0], paragraph['text'][1:])
+                end_tag = '</{}><div style="clear:left;"></div>'.format(paragraph_type)
+            else:
+                paragraph_text = paragraph['text']
+                end_tag = '</{}>'.format(paragraph_type)
 
         elif paragraph_type == 'img':
             start_tag = add_image(paragraph['metadata'], paragraph['text'])

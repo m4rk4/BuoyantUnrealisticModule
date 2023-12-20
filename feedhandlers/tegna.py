@@ -1,9 +1,8 @@
-import json, pytz, re
+import pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
 
-import config, utils
+import utils
 from feedhandlers import rss
 
 import logging
@@ -86,9 +85,15 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='photo__credit')
                 if it and it.get_text().strip():
                     captions.append(it.get_text().strip())
+                img_src = ''
                 img = el.find(class_='lazy-image__image')
                 if img:
-                    img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+                    item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
+                else:
+                    img = el.find(class_='photo__main')
+                    if img:
+                        img_src = utils.image_from_srcset(img['srcset'], 1000)
+                if img_src:
                     item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
                 else:
                     logger.warning('unhandled lead asset photo in ' + item['url'])

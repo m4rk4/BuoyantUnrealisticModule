@@ -3,7 +3,7 @@ from datetime import datetime
 from urllib.parse import quote_plus, unquote, urlsplit
 
 import config, utils
-from feedhandlers import rss
+from feedhandlers import rss, twitter_api
 
 import logging
 
@@ -298,9 +298,29 @@ def make_card(card_json, tweet_json):
     return card_html
 
 
-def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
+def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_reply=0, has_parent=False):
     media_html = ''
+    quoted_html = ''
+    entities = tweet_json['entities']
     text_html = tweet_json['text'].strip()
+    i = tweet_json['display_text_range'][0]
+    j = tweet_json['display_text_range'][1]
+    if j > 0 and i < j and (text_html[i:j][-1] == '…' or (text_html[i:j][-1] == ' ' and text_html[i:j][-2] == '…')):
+        logger.warning('truncated text - getting tweet detail from api')
+        tweet_detail = twitter_api.get_tweet_detail(tweet_json['id_str'], None)
+        if tweet_detail:
+            utils.write_file(tweet_detail, './debug/tweet.json')
+            try:
+                for instruction in tweet_detail['data']['threaded_conversation_with_injections_v2']['instructions']:
+                    if instruction['type'] == 'TimelineAddEntries':
+                        for entry in instruction['entries']:
+                            if entry['entryId'] == 'tweet-' + tweet_json['id_str']:
+                                text_html = entry['content']['itemContent']['tweet_results']['result']['note_tweet']['note_tweet_results']['result']['text']
+                                entities = entry['content']['itemContent']['tweet_results']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
+                                break
+            except:
+                logger.warning('failed to get full text')
+                pass
 
     def replace_entity(matchobj):
         if matchobj.group(1) == '@':
@@ -316,12 +336,12 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
 
     text_html = re.sub(r'(@|#|\$)(\w+)', replace_entity, text_html, flags=re.I)
 
-    if tweet_json['entities'].get('media'):
-        for media in tweet_json['entities']['media']:
+    if entities.get('media'):
+        for media in entities['media']:
             text_html = text_html.replace(media['url'], '')
 
-    if tweet_json['entities'].get('urls'):
-        for url in tweet_json['entities']['urls']:
+    if entities.get('urls'):
+        for url in entities['urls']:
             if text_html.strip().endswith(url['url']):
                 if not 'twitter.com' in url['expanded_url']:
                     if tweet_json.get('card') and (url['url'] == tweet_json['card']['url']):
@@ -351,7 +371,7 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
                     media_html += utils.add_video(video['src'], 'video/mp4', tweet_json['video']['poster'], img_style='border-radius:10px;')
                     break
         else:
-            video_url = tweet_json['entities']['media'][0]['expanded_url']
+            video_url = entities['media'][0]['expanded_url']
             poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, tweet_json['video']['poster'])
             media_html += utils.add_image(poster, '', link=video_url, img_style='border-radius:10px;')
 
@@ -371,11 +391,11 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
         media_html += make_card(tweet_json['card'], tweet_json)
 
     dt = datetime.fromisoformat(tweet_json['created_at'].replace('Z', '+00:00'))
-    tweet_time = '{}:{} {}'.format(dt.strftime('%I').lstrip('0'), dt.minute, dt.strftime('%p'))
+    tweet_time = '{}:{:02d} {}'.format(dt.strftime('%I').lstrip('0'), dt.minute, dt.strftime('%p'))
     tweet_date = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
     if tweet_json.get('quoted_tweet'):
-        media_html += make_tweet(tweet_json['quoted_tweet'], is_quoted=True)
+        quoted_html += make_tweet(tweet_json['quoted_tweet'], ref_tweet_url, is_quoted=True)
 
     if tweet_json.get('birdwatch_pivot'):
         media_html += '<div style="border:1px solid black; border-radius:10px; padding:0.5em;">'
@@ -387,45 +407,68 @@ def make_tweet(tweet_json, is_parent=False, is_quoted=False, is_reply=0):
             media_html += '<div><small>' + replace_birdwatch_entities(tweet_json['birdwatch_pivot']['footer']).replace('\n', '<br/>') + '</small></div>'
         media_html += '</div>'
 
-    if tweet_json['user']['verified'] == True:
+    if tweet_json['user']['verified'] == True or tweet_json['user']['is_blue_verified'] == True:
         verified_icon = ' &#9989;'
     else:
         verified_icon = ''
 
     tweet_url = 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_json['id_str'])
+    if has_parent:
+        logo = ''
+    else:
+        logo = '<a href="{}"><img src="https://abs.twimg.com/responsive-web/client-web/icon-ios.77d25eba.png" style="width:100%;"/></a>'.format(ref_tweet_url)
 
     if is_parent or is_reply:
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
         border = ' border-left:2px solid rgb(196, 207, 214);'
         if is_reply == 1:
             border = ''
-        tweet_html = '<tr style="font-size:0.9em;"><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
-            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
-        tweet_html += '<tr><td colspan="2" style="padding:0 0 0 24px;">'
-        tweet_html += '<table style="font-size:0.9em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(border, text_html)
-        tweet_html += '<tr><td>{}</td></tr></table></tr></td>'.format(media_html)
+        tweet_html = '<tr style="font-size:0.95em;"><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td><td style="width:32px;">{6}</td></tr>'.format(
+            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date, logo)
+        tweet_html += '<tr><td colspan="3" style="padding:0 0 0 24px;">'
+        # tweet_html += '<table style="font-size:0.95em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(border, text_html)
+        tweet_html += '<table style="font-size:0.95em; padding:0 0 0 24px;{}">'.format(border)
+        tweet_html += '<tr><td style="padding:1em 0 0 0;">{}</td></tr>'.format(text_html)
+        if media_html:
+            tweet_html += '<tr><td style="padding:1em 0 0 0;">{}</td></tr>'.format(media_html)
+        if quoted_html:
+            tweet_html += '<tr><td style="padding:1em 0 0 0;">{}</td></tr>'.format(quoted_html)
+        tweet_html += '<tr><td>&nbsp;</td></tr></table></td></tr>'
     elif is_quoted:
         avatar = '{}/image?url={}&width=32&height=32&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
-        tweet_html = '<table style="font-size:0.9em; width:95%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td></tr>'.format(
+        tweet_html = '<table style="font-size:0.95em; width:100%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td><td></td></tr>'.format(
             avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
-        tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(text_html)
-        tweet_html += '<tr><td colspan="2">{}</td></tr></table>'.format(media_html)
+        tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(text_html)
+        if media_html:
+            tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(media_html)
+        if quoted_html:
+            tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(quoted_html)
+        tweet_html += '</table>'
     else:
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
-        tweet_html = '<tr><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3}<br /><small>@{1}</small></a></td></tr>'.format(
-            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon)
-        tweet_html += '<tr><td colspan="2" style="padding:0 0 1em 0;">{}</td></tr>'.format(text_html)
-        tweet_html += '<tr><td colspan="2">{}</td></tr>'.format(media_html)
-        tweet_html += '<tr><td colspan="2"><a style="text-decoration:none;" href="{}"><small>{} · {}</small></a></td></tr>'.format(tweet_url, tweet_time, tweet_date)
+        tweet_html = '<tr><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3}<br /><small>@{1}</small></a></td><td style="width:32px;">{4}</td></tr>'.format(
+            avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, logo)
+        tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(text_html)
+        if media_html:
+            tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(media_html)
+        if quoted_html:
+            tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(quoted_html)
+        tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;"><a style="text-decoration:none;" href="{}"><small>{} · {}</small></a></td></tr>'.format(tweet_url, tweet_time, tweet_date)
 
     return tweet_html
 
 
 def get_tweet_json(tweet_id):
-    n = basencode.Number(int(tweet_id) / 1e15 * math.pi)
-    token = n.repr_in_base(36, max_frac_places=8)
+    num = int(tweet_id) / 1e15 * math.pi
+    n = 8
+    m = re.search(r'e-(\d+)$', str(num))
+    if m:
+        n += int(m.group(1)) + 1
+    number = basencode.Number('{:.30f}'.format(num))
+    token = number.repr_in_base(36, max_frac_places=n)
     token = re.sub(r'(0+|\.)', '', token)
     tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?features=tfw_timeline_list%3A%3Btfw_follower_count_sunset%3Atrue%3Btfw_tweet_edit_backend%3Aon%3Btfw_refsrc_session%3Aon%3Btfw_fosnr_soft_interventions_enabled%3Aon%3Btfw_mixed_media_15897%3Atreatment%3Btfw_experiments_cookie_expiration%3A1209600%3Btfw_show_birdwatch_pivots_enabled%3Aon%3Btfw_duplicate_scribes_to_settings%3Aon%3Btfw_use_profile_image_shape_enabled%3Aon%3Btfw_video_hls_dynamic_manifests_15082%3Atrue_bitrate%3Btfw_legacy_timeline_sunset%3Atrue%3Btfw_tweet_edit_frontend%3Aon&id={}&lang=en&token={}'.format(tweet_id, token)
+    #print(tweet_url)
     #tweet_url = 'https://cdn.syndication.twimg.com/tweet-result?id={}&lang=en&token=0'.format(tweet_id)
     return utils.get_url_json(tweet_url)
 
@@ -464,7 +507,7 @@ def get_content(url, args, site_json, save_debug=False):
     if tweet_json['id_str'] != tweet_id:
         # Retweet
         item['title'] = '{} retweeted: {}'.format(tweet_user, tweet_json['text'])
-        content_html += '<tr><td colspan="2"><small>&#128257;&nbsp;<a style="text-decoration:none;" href="https://twitter.com/{0}">@{0}</a> retweeted</small></td></tr>'.format(tweet_user)
+        content_html += '<tr><td colspan="3"><small>&#128257;&nbsp;<a style="text-decoration:none;" href="https://twitter.com/{0}">@{0}</a> retweeted</small></td></tr>'.format(tweet_user)
 
         # Get the real tweet so we can get the reply thread
         tweet_json = get_tweet_json(tweet_json['id_str'])
@@ -499,6 +542,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = tweet_json['text']
 
+    has_parent = ''
     tweet_thread = []
     if tweet_json.get('parent'):
         parent = get_tweet_json(tweet_json['parent']['id_str'])
@@ -509,10 +553,11 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 parent = None
         for parent in tweet_thread:
-            content_html += make_tweet(parent, is_parent=True)
+            content_html += make_tweet(parent, item['url'], is_parent=True, has_parent=has_parent)
+            has_parent = True
     tweet_thread.append(tweet_json)
 
-    content_html += make_tweet(tweet_json)
+    content_html += make_tweet(tweet_json, item['url'], has_parent=has_parent)
     content_html += '</table><div>&nbsp;</div>'
     item['content_html'] = content_html
     return item

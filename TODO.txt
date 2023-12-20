@@ -1,6 +1,10 @@
-Fix spacing:
-https://twitter.com/RashidaTlaib/status/1714342122185191596
-https://twitter.com/coinbase/status/1704985637651095880
+Not working:
+WSJ sites
+mashable.com
+
+WIP: discovery networks
+foodnetwork.com
+hgtv.com
 
 Fix Facebook embed: https://www.hindustantimes.com/trending/lost-tortoise-returns-home-after-over-three-years-101698240995777.html
 
@@ -205,6 +209,7 @@ https://www.nhl.com/penguins/news/article-body/337863176
 
 
 NEXT_DATA sites:
+https://www.business-standard.com/_next/data/d08844e2773c0f2182c9282bf4df5f11c9a61b21/en-US/opinion/columns/mundra-port-25-trailblazing-entrepreneurship-123112101274_1.html.json
 https://www.scmagazine.com/news/ransomware/esxi-ransomware-babuk-code-increased-2023
 https://www.dailywire.com/_next/data/FbdFZl04V8AY_tDlsIZRw/news/senator-sinema-blasts-karine-jean-pierre-for-claiming-border-is-secure-factually-not-true.json
 https://www.scmagazine.com/_next/data/Vr8RIAYeXhYGyGsppUe6f/news/privacy/ftc-facebook-broke-terms-5b-data-privacy-settlement.json
@@ -291,6 +296,7 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.gameinformer.com/news/2023/12/07/pokemon-scarlet-and-violet-your-favorite-starters-and-legendaries-return-in-new?_wrapper_format=drupal_ajax
 Find content - https://www.psychologytoday.com/us/articles/202309/inside-the-mind-of-a-hero
 https://privacyinternational.org/long-read/5100/uk-governments-controversial-proposal-expand-surveillance-powers-what-you-need-know?_format=hal_json
 https://www.historytoday.com/archive/missing-pieces/lost-script-rapa-nui?_wrapper_format=drupal_ajax
@@ -314,6 +320,8 @@ https://www.al-monitor.com/
 https://gamersnexus.net/
 https://www.torquenews.com/
 https://www.elevenwarriors.com/ohio-state-football
+https://nltimes.nl/
+https://www.faena.com/aleph
 
 
 http://localhost:8080/content?debug&read&url=https%3A%2F%2Fwww.architecturaldigest.com%2Fgallery%2Femma-chamberlains-los-angeles-home
@@ -415,3 +423,24 @@ Texas Tribune
 https://www.texastribune.org/api/v2/articles/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url&limit=5&front_page=true
 https://www.texastribune.org/api/v2/articles/43737/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url,authors,tags,placeholders
 placeholders don't show element contents??
+
+
+TheTimes.co.uk
+gql_url = 'https://api.thetimes.co.uk/graphql'
+headers = {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "apollographql-client-name": "@times-components/ssr/client (cps-content-render)",
+    "cache-control": "no-cache",
+    "content-type": "application/x-www-form-urlencoded",
+    "pragma": "no-cache",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"119\", \"Chromium\";v=\"119\", \"Not?A_Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
+}
+query = 'query ArticleQuery($id: ID!) {\n  article(id: $id) {\n    backgroundColour {\n      rgba {\n        red\n        green\n        blue\n        alpha\n      }\n    }\n    commentsEnabled\n    content: paywalledContent\n    descriptionMarkup: summary(maxCharCount: 200)\n    dropcapsDisabled\n    expirableFlags {\n      type\n      expiryTime\n    }\n    keywords\n    leadAsset {\n      ... on Video {\n        id\n        title\n        brightcoveAccountId\n        brightcovePolicyKey\n        brightcoveVideoId\n        brightcovePlayerId\n        posterImage {\n          ...imageProps\n        }\n        is360\n      }\n      ... on Image {\n        ...imageProps\n      }\n    }\n    relatedArticleSlice {\n      sliceName: __typename\n      ... on StandardSlice {\n        items {\n          ...relatedProps\n        }\n      }\n      ... on LeadOneAndTwoSlice {\n        lead {\n          ...relatedProps\n        }\n        support1 {\n          ...relatedProps\n        }\n        support2 {\n          ...relatedProps\n        }\n      }\n      ... on OpinionOneAndTwoSlice {\n        opinion {\n          ...relatedProps\n        }\n        support1 {\n          ...relatedProps\n        }\n        support2 {\n          ...relatedProps\n        }\n      }\n    }\n    sharingEnabled\n    savingEnabled\n    standfirst\n    tiles(first: 5, desc: true) {\n      slices {\n        sections {\n          title\n        }\n      }\n    }\n    template\n    textColour {\n      rgba {\n        red\n        green\n        blue\n        alpha\n      }\n    }\n    topics(maxCount: 5) {\n      name\n      slug\n    }\n    ...articleProps\n  }\n}\n\nfragment imageProps on Image {\n  caption\n  credits\n  crop169: crop(ratio: "16:9") {\n    ratio\n    url\n  }\n  crop32: crop(ratio: "3:2") {\n    ratio\n    url\n  }\n  crop1251: crop(ratio: "1.25:1") {\n    ratio\n    url\n  }\n  crop11: crop(ratio: "1:1") {\n    ratio\n    url\n  }\n  crop45: crop(ratio: "4:5") {\n    ratio\n    url\n  }\n  crop23: crop(ratio: "2:3") {\n    ratio\n    url\n  }\n  crop2251: crop(ratio: "2.25:1") {\n    ratio\n    url\n  }\n  id\n  title\n}\n\nfragment articleProps on Article {\n  bylines {\n    ... on Byline {\n      ... on AuthorByline {\n        author {\n          image\n          jobTitle\n          twitter\n          slug\n          name\n        }\n        byline\n      }\n      byline\n      image {\n        id\n        caption\n        credits\n        title\n        crop(ratio: "1:1") {\n          ratio\n          url\n        }\n      }\n    }\n  }\n  hasVideo\n  headline\n  id\n  label\n  publicationName\n  publishedTime\n  updatedTime\n  section\n  shortIdentifier\n  shortHeadline\n  seoDescription\n  slug\n  url\n}\n\nfragment relatedProps on Tile {\n  leadAsset {\n    ... on Image {\n      crop169: crop(ratio: "16:9") {\n        url\n      }\n      crop32: crop(ratio: "3:2") {\n        url\n      }\n      id\n      title\n    }\n    ... on Video {\n      posterImage {\n        crop169: crop(ratio: "16:9") {\n          url\n        }\n        crop32: crop(ratio: "3:2") {\n          url\n        }\n        id\n        title\n      }\n    }\n  }\n  article {\n    leadAsset {\n      ... on Image {\n        crop169: crop(ratio: "16:9") {\n          url\n        }\n        crop32: crop(ratio: "3:2") {\n          url\n        }\n        id\n        title\n      }\n      ... on Video {\n        posterImage {\n          crop169: crop(ratio: "16:9") {\n            url\n          }\n          crop32: crop(ratio: "3:2") {\n            url\n          }\n          id\n          title\n        }\n      }\n    }\n    ...articleProps\n    ...summaries\n  }\n}\n\nfragment summaries on Article {\n  summary105: summary(maxCharCount: 105)\n  summary125: summary(maxCharCount: 125)\n  summary145: summary(maxCharCount: 145)\n  summary160: summary(maxCharCount: 160)\n  summary175: summary(maxCharCount: 175)\n  summary225: summary(maxCharCount: 225)\n}\n'
+Content is still paywalled

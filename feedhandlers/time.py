@@ -78,6 +78,8 @@ def get_content(url, args, site_json, save_debug):
     if post_json.get('primary_media'):
         if post_json['primary_media']['type'] == 'image':
             item['content_html'] += add_image(post_json['primary_media']['primary_image'])
+        elif post_json['primary_media']['type'] == 'hero-card-image':
+            item['content_html'] += add_image(post_json['primary_media']['data'])
         elif post_json['primary_media']['type'] == 'video-jw':
             item['content_html'] += utils.add_video(post_json['primary_media']['data']['url'], post_json['primary_media']['data']['video_type'], post_json['primary_media']['data']['poster_url'], post_json['primary_media']['data']['name'])
         else:

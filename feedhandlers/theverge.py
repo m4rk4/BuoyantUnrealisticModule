@@ -71,6 +71,7 @@ def get_next_data(url):
         return None
     return json.loads(el.string)
 
+
 def render_body_component(component):
     content_html = ''
     if component['__typename'] == 'EntryBodyParagraph':

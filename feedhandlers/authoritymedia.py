@@ -110,6 +110,9 @@ def format_block(block):
     elif block['resource'] == 'nc-embed-youtube':
         content_html += utils.add_embed('https://www.youtube.com/watch?v={}'.format(block['video']['youtubeId']))
 
+    elif block['resource'] == 'nc-twitter':
+        content_html += utils.add_embed('https://twitter.com/__/status/{}'.format(block['id']))
+
     elif block['resource'] == 'nc-audio':
         content_html += '<div style="display:flex; align-items:center; margin-left:2em;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Play</a></span></div>'.format(block['link'], config.server)
 

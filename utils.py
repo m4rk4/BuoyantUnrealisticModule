@@ -127,7 +127,10 @@ def get_module(url, handler=''):
   if url:
     site_json = get_site_json(url)
     if site_json:
-      module_name = '.{}'.format(site_json['module'])
+      if site_json.get('module'):
+        module_name = '.{}'.format(site_json['module'])
+      else:
+        return None, site_json
   if handler and not module_name:
     module_name = '.{}'.format(handler)
   if module_name:
@@ -167,6 +170,10 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
   elif user_agent == 'googlebot':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+  elif user_agent == 'googlecache':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+    url = 'https://webcache.googleusercontent.com/search?q=cache:' + url
   elif user_agent == 'chatgpt':
     # https://platform.openai.com/docs/plugins/bot
     ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
@@ -196,7 +203,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
     else:
       status_code = ''
     logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
-    if r != None and r.status_code == 403:
+    if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying cloudscraper')
       scraper = cloudscraper.create_scraper()
       #scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "android", "desktop": False}, delay=10)
@@ -253,8 +260,11 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
 def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
-
-  r = get_request(url, user_agent, headers, retries, allow_redirects)
+  if site_json and site_json.get('user_agent'):
+    ua = site_json['user_agent']
+  else:
+    ua = user_agent
+  r = get_request(url, ua, headers, retries, allow_redirects)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
@@ -277,6 +287,8 @@ def find_redirect_url(url):
     m = re.search(r'"redirect":"([^"]+)"', url_html)
     if m:
       return m.group(1)
+  elif 'play.podtrac.com' in split_url.netloc:
+    return 'https://' + '/'.join(paths[1:])
   elif split_url.netloc == 'www.hp.com' or split_url.netloc == 'www.amazon.com' or split_url.netloc == 'www.newegg.com' or 'www.t-mobile.com' in split_url.netloc:
     return clean_url(url)
   if split_url.query:
@@ -286,7 +298,7 @@ def find_redirect_url(url):
     elif split_url.netloc == 'go.skimresources.com' and query.get('url'):
       return query['url'][0]
     elif split_url.netloc == 'events.release.narrativ.com' and query.get('url'):
-      return query['url'][0]
+      return get_redirect_url(query['url'][0])
     elif split_url.netloc == 'www.anrdoezrs.net' and query.get('url'):
       return query['url'][0]
     elif split_url.netloc == 'www.dpbolvw.net' and query.get('url'):
@@ -324,6 +336,18 @@ def find_redirect_url(url):
     elif 'redirect.mp3' in paths:
       n = paths.index('redirect.mp3')
       return 'https://' + '/'.join(paths[n+1:])
+    elif '7tiv.net' in split_url.netloc:
+      return query['u'][0]
+    elif split_url.netloc == 'api.bam-x.com':
+      r = requests.get(url,
+                       headers={
+                         "Range": "bytes=0-100",
+                         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
+                       },
+                       allow_redirects=True,
+                       timeout=5)
+      if r.status_code == 200:
+        return get_redirect_url(r.url)
     elif split_url.netloc == 'howl.me':
       pass
     else:

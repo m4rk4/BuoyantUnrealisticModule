@@ -11,13 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, width=1000):
-    m = re.search(r'(\/width=\d+\/)', img_src)
-    if m:
-        img_src = img_src.replace(m.group(1), '/width={}/'.format(width))
-    elif img_src.startswith('https://cdn.theathletic.com/app/uploads/'):
-        img_src = img_src.replace('https://cdn.theathletic.com/', 'https://cdn.theathletic.com/cdn-cgi/image/width={}/'.format(width))
-    return img_src
+def resize_image(img_src, width=1024):
+    if img_src.startswith('https://cdn-media.theathletic.com/cdn-cgi/image/'):
+        return re.sub(r'(width=\d+)', 'width={}'.format(width), img_src)
+    else:
+        return 'https://cdn-media.theathletic.com/cdn-cgi/image/width={}%2cformat=auto%2cquality=75/{}'.format(width, img_src)
 
 
 def get_next_data(url):
@@ -209,11 +207,33 @@ def get_content(url, args, site_json, save_debug=False):
 
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    post_data = {"query": "\n  query ArticleViewQuery($id: ID!, $is_amp: Boolean = false, $is_preview: Boolean = false) {\n    articleById(id: $id, is_amp: $is_amp, is_preview: $is_preview) {\n      ...article\n    }\n  }\n\n  fragment article on Article {\n    article_body\n    article_body_desktop\n    article_body_mobile\n    authors {\n      author {\n        ... on Staff {\n          avatar_uri\n          bio\n          role\n          slug\n          twitter\n        }\n        first_name\n        name\n        id\n      }\n    }\n    byline_linkable {\n      ... on LinkableString {\n        raw_string\n        web_linked_string\n      }\n    }\n    chartbeat_authors {\n      author {\n        id\n        name\n        ... on Staff {\n          slug\n        }\n      }\n    }\n    chartbeat_sections\n    comment_count\n    disable_comments\n    entity_keywords\n    excerpt\n    featured\n    hide_upsell_text\n    id\n    image_uri\n    image_caption\n    inferred_league_ids\n    is_article_locked\n    is_teaser\n    is_premier\n    is_saved\n    is_unpublished\n    last_activity_at\n    league_ids\n    lock_comments\n    permalink\n    post_type_id\n    primary_tag\n    published_at\n    short_title\n    show_rating\n    subscriber_score\n    team_hex\n    team_ids\n    title\n    truncated_article_body\n  }\n",
-                 "variables": {"id": paths[0]}}
+
+    if 'live-blogs' in paths:
+        post_data = {
+            "operationName": "",
+            "variables": {
+                "postsPage": 0,
+                "postsPerPage": 20,
+                "includeAds": True,
+                "id": paths[2]
+            },
+            "query": "\n  query GetLiveBlogFull(\n    $id: ID!\n    $postsPage: Int = 0\n    $postsPerPage: Int = 100\n    $includeAds: Boolean = false\n    $initialPostId: ID\n  ) {\n    liveBlog(id: $id) {\n      ad_unit_path\n      ad_targeting_params {\n        auth\n        byline\n        coll\n        id\n        keywords\n        org\n        tags\n        typ\n      }\n      byline_linkable {\n        ... on LinkableString {\n          raw_string\n          web_linked_string\n        }\n      }\n      byline_authors {\n        avatar_uri\n        name\n      }\n      createdAt\n      description\n      game_id\n      is_unlocked\n      free_apron_state\n      id\n      images {\n        credits\n        imageCdnUri: image_cdn_uri\n        imageHeight: image_height\n        imageUri: image_uri\n        imageWidth: image_width\n      }\n      lastActivityAt\n      match_widgets\n      metadata {\n        about {\n          endDate\n          startDate\n        }\n      }\n      posts(\n        page: $postsPage\n        perPage: $postsPerPage\n        sort: { direction: desc, field: \"published_at\" }\n        includeAds: $includeAds\n        initialPostId: $initialPostId\n      ) {\n        items {\n          ... on LiveBlogPost {\n            permalink\n            articles {\n              id\n              permalink\n              short_title\n              title\n              imageUri: image_uri\n            }\n            body\n            createdAt\n            id\n            images {\n              alt_text\n              credits\n              imageCdnUri: image_cdn_uri\n              image_height\n              image_width\n            }\n            is_pinned\n            publishedAt\n            title\n            tweets: tweetsv2 {\n              html\n              url\n            }\n            type\n            updatedAt\n            user {\n              id\n              name\n              ... on Staff {\n                avatarUri: avatar_uri\n                fullDescription: full_description\n                slug\n              }\n            }\n          }\n          ... on LiveBlogPostSponsored {\n            article {\n              excerpt\n              image_uri\n              permalink\n              short_title\n              title\n            }\n            id\n            presented_by {\n              image {\n                ...imageFragment\n              }\n              label\n              sponsor_name\n              sponsor_uri\n            }\n            published_at\n            type\n          }\n          ... on LiveBlogPostInlineBanner {\n            description\n            desktop_image {\n              ...imageFragment\n            }\n            id\n            mobile_image {\n              ...imageFragment\n            }\n            published_at\n            sponsor_uri\n            type\n          }\n          ... on LiveBlogDropzone {\n            dropzone_id\n            id\n            type\n          }\n        }\n        pageInfo {\n          currentPage\n          hasNextPage\n          hasPreviousPage\n        }\n        total\n        numNewPosts\n      }\n      permalink\n      primaryLeague {\n        shortname\n      }\n      publishedAt\n      short_title\n      slug\n      sponsor {\n        cobranded_header {\n          background_color\n          description\n          desktop_image {\n            ...imageFragment\n          }\n          mobile_image {\n            ...imageFragment\n          }\n          sponsor_uri\n        }\n        presented_by {\n          image {\n            ...imageFragment\n          }\n          label\n          sponsor_name\n          sponsor_uri\n        }\n        tracking_uris\n      }\n      status\n      tags {\n        id\n        name\n        shortname\n        type\n      }\n      title\n      tweets: tweetsv2 {\n        html\n        url\n      }\n      type\n      updatedAt\n    }\n  }\n\n  fragment imageFragment on Image {\n    image_cdn_uri\n    image_height\n    image_uri\n    image_width\n    thumbnail_cdn_uri\n    thumbnail_height\n    thumbnail_uri\n    thumbnail_width\n  }\n"
+        }
+    else:
+        post_data = {
+            "operationName": "ArticleViewQuery",
+            "variables": {
+                "id": paths[0]
+            },
+            "query": "\n  query ArticleViewQuery($id: ID!, $is_amp: Boolean = false, $is_preview: Boolean = false) {\n    articleById(id: $id, is_amp: $is_amp, is_preview: $is_preview) {\n      ...article\n    }\n  }\n\n  fragment article on Article {\n    article_body\n    article_body_desktop\n    article_body_mobile\n    authors {\n      author {\n        ... on Staff {\n          avatar_uri\n          bio\n          role\n          slug\n          twitter\n        }\n        first_name\n        name\n        id\n      }\n    }\n    byline_linkable {\n      ... on LinkableString {\n        raw_string\n        web_linked_string\n      }\n    }\n    chartbeat_authors {\n      author {\n        id\n        name\n        ... on Staff {\n          slug\n        }\n      }\n    }\n    chartbeat_sections\n    comment_count\n    disable_comments\n    entity_keywords\n    excerpt\n    featured\n    hide_upsell_text\n    id\n    image_uri\n    image_caption\n    inferred_league_ids\n    is_article_locked\n    is_teaser\n    is_premier\n    is_saved\n    is_unpublished\n    last_activity_at\n    league_ids\n    lock_comments\n    permalink\n    post_type_id\n    primary_tag\n    published_at\n    short_title\n    show_rating\n    subscriber_score\n    team_hex\n    team_ids\n    title\n    truncated_article_body\n  }\n"
+        }
     gql_json = utils.post_url('https://theathletic.com/graphql', json_data=post_data)
     if gql_json:
-        article_json = gql_json['data']['articleById']
+        # utils.write_file(gql_json, './debug/debug.json')
+        if 'live-blogs' in paths:
+            article_json = gql_json['data']['liveBlog']
+        else:
+            article_json = gql_json['data']['articleById']
     else:
         next_data = get_next_data(url)
         if next_data['props']['pageProps'].get('article'):
@@ -231,12 +251,19 @@ def get_content(url, args, site_json, save_debug=False):
     item['title'] = article_json['title']
 
     tz_est = pytz.timezone('US/Eastern')
-    dt_est = datetime.fromtimestamp(article_json['published_at'] / 1000)
+    if article_json.get('published_at'):
+        dt_est = datetime.fromtimestamp(article_json['published_at'] / 1000)
+    elif article_json.get('publishedAt'):
+        dt_est = datetime.fromtimestamp(article_json['publishedAt'] / 1000)
     dt = tz_est.localize(dt_est).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt_est = datetime.fromtimestamp(article_json['last_activity_at'] / 1000)
+
+    if article_json.get('last_activity_at'):
+        dt_est = datetime.fromtimestamp(article_json['last_activity_at'] / 1000)
+    elif article_json.get('lastActivityAt'):
+        dt_est = datetime.fromtimestamp(article_json['lastActivityAt'] / 1000)
     dt = tz_est.localize(dt_est).astimezone(pytz.utc)
     item['date_modified'] = dt.isoformat()
 
@@ -266,17 +293,50 @@ def get_content(url, args, site_json, save_debug=False):
         for tag in re.findall(r'([^,]+)(,|$)\s?', article_json['chartbeat_sections']):
             if tag[0] not in item['tags']:
                 item['tags'].append(tag[0])
+    if article_json.get('tags'):
+        for tag in article_json['tags']:
+            if tag.get('name'):
+                item['tags'].append(tag['name'])
+            if tag.get('shortname'):
+                item['tags'].append(tag['shortname'])
     if not item.get('tags'):
         del item['tags']
 
-    item['summary'] = article_json['excerpt']
-
     item['content_html'] = ''
-    if article_json.get('image_uri'):
-        item['_image'] = article_json['image_uri']
-        item['content_html'] += utils.add_image(item['_image'], article_json['image_caption'])
 
-    item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item, site_json)
+    if article_json.get('excerpt'):
+        item['summary'] = article_json['excerpt']
+    elif article_json.get('description'):
+        item['summary'] = article_json['description']
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+
+    if article_json.get('image_uri'):
+        item['_image'] = resize_image(article_json['image_uri'])
+        item['content_html'] += utils.add_image(item['_image'], article_json['image_caption'])
+    elif article_json.get('images'):
+        item['_image'] = resize_image(article_json['images'][0]['imageCdnUri'])
+        item['content_html'] += utils.add_image(item['_image'], article_json.get('credits'))
+
+    if article_json.get('article_body_desktop'):
+        item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item, site_json)
+
+    if article_json.get('posts') and article_json['posts'].get('items'):
+        for i, post in enumerate(article_json['posts']['items']):
+            if post['type'] == 'liveBlogPost':
+                if i > 0:
+                    item['content_html'] += '<div>&nbsp;</div><hr/>'
+                dt_est = datetime.fromtimestamp(post['updatedAt'] / 1000)
+                dt = tz_est.localize(dt_est).astimezone(pytz.utc)
+                item['content_html'] += '<div>&nbsp;</div><div><a href="{}">Update: {}</a><br/>By: {}</div>'.format(post['permalink'], utils.format_display_date(dt), post['user']['name'])
+                if post.get('title'):
+                    item['content_html'] += '<h3>{}</h3>'.format(post['title'])
+                for it in post['images']:
+                    item['content_html'] += utils.add_image(resize_image(it['imageCdnUri']), it.get('credits'))
+                if post.get('body'):
+                    item['content_html'] += post['body']
+                for it in post['tweets']:
+                    item['content_html'] += utils.add_embed(it['url'])
+
     item['content_html'] = item['content_html'].replace(' class="ath_autolink"', '')
     item['content_html'] = item['content_html'].replace('<span class="Apple-converted-space">\u00a0</span>', '&nbsp;')
     return item

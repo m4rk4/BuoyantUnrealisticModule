@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 def get_deployment_value(url):
     page_html = utils.get_url_html(url)
-    m = re.search(r'Fusion\.deployment="([^"]+)"', page_html)
-    if m:
-        return int(m.group(1))
+    if page_html:
+        m = re.search(r'Fusion\.deployment="([^"]+)"', page_html)
+        if m:
+            return int(m.group(1))
     return -1
 
 
@@ -179,6 +180,25 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += audio_html
             else:
                 logger.warning('unhandled custom_embed inline_audio')
+        elif element['subtype'] == 'oovvuu-video':
+            video_json = utils.get_url_json('https://playback.oovvuu.media/embed/d3d3LnRoZXN0YXIuY29t/{}'.format(element['embed']['config']['embedId']))
+            if video_json:
+                utils.write_file(video_json, './debug/video.json')
+                # "data-key": "BCpkADawqM02UpPUkzc8xH5Bd3-cUq0R9yd9J44SrfoXNajUlAnL6l--3PUnKFaoBa2cWhTYVjtnL20g-dK2t5i2TPJSnXqImIvT_aNrKa4oZN4_ZI3PVVR4S1A-hxd2XgABF1ZBQI-7bQvzHnInuey3CFEvla5Awnx-tf5_iq_IS9XXNLt1w00d3PLm8cnKcX4Qmi2yRSQZimMQyGUhbXywrF6YTC5WaBPG5jqpO-_Ht4LrOZoVlKLkPRhqGh1Pq0Bmn4ucWl1J_hHRVIPBY9Pwd1b7IuenAaGcCg",
+                if element['embed']['config'].get('thumbnailImageUrl'):
+                    poster = utils.clean_url(element['embed']['config']['thumbnailImageUrl'])
+                else:
+                    poster = utils.clean_url(video_json['videos'][0]['video']['thumbnail']) + '?ixlib=js-2.3.2&w=1080&fit=crop&crop=entropy'
+                video_args = {
+                    "embed": True,
+                    "data-account": video_json['videos'][0]['brightcoveAccountId'],
+                    "data-video-id": video_json['videos'][0]['brightcoveVideoId'],
+                    "poster": poster,
+                    "title": 'Watch: ' + video_json['videos'][0]['video']['title']
+                }
+                element_html += utils.add_embed(video_json['playerScript'], video_args)
+            else:
+                logger.warning('unhandled oovvuu-video custom-embed')
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif element['subtype'] == 'flourish_visualisation':

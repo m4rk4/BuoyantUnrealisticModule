@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_img_src(image, width=1200, height=800):
-    if image.get('src'):
+    if image.get('src') and isinstance(image['src'], str) and image['src'].startswith('http'):
+        return image['src']
+    elif image.get('src') and isinstance(image['src'], dict):
         img_w = image['src']['width']
         img_h = image['src']['height']
         file_name = image['src']['file_name']
@@ -139,15 +141,23 @@ def get_content(url, args, site_json, save_debug=False):
     if content_json.get('seoDescription'):
         item['summary'] = content_json['seoDescription']
 
-    item['content_html'] = ''
-    for block in content_json['content']['blocks']:
+    item['content_html'] =  render_content_blocks(content_json['content']['blocks'], content_json['content']['entityMap'])
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+    return item
+
+
+def render_content_blocks(blocks, entity_map):
+    content_html = ''
+    for block in blocks:
         if block['type'] == 'unstyled':
             if block.get('text'):
-                item['content_html'] += '<p>' + apply_entity_styles(block, content_json['content']['entityMap']) + '</p>'
+                content_html += '<p>' + apply_entity_styles(block, entity_map) + '</p>'
         elif block['type'] == 'blockquote':
-            item['content_html'] += utils.add_blockquote(apply_entity_styles(block, content_json['content']['entityMap']))
+            content_html += utils.add_blockquote(apply_entity_styles(block, entity_map))
         elif block['type'] == 'unordered-list-item':
-            item['content_html'] += '<ul><li>' + apply_entity_styles(block, content_json['content']['entityMap']) + '</li></ul>'
+            content_html += '<ul><li>' + apply_entity_styles(block, entity_map) + '</li></ul>'
+        elif block['type'] == 'ordered-list-item':
+            content_html += '<ol><li>' + apply_entity_styles(block, entity_map) + '</li></ol>'
         elif 'header-' in block['type']:
             if block['type'] == 'header-one':
                 tag = 'h1'
@@ -161,21 +171,33 @@ def get_content(url, args, site_json, save_debug=False):
                 tag = 'h5'
             elif block['type'] == 'header-six':
                 tag = 'h6'
-            item['content_html'] += '<{0}>{1}</{0}>'.format(tag, block['text'])
+            content_html += '<{0}>{1}</{0}>'.format(tag, block['text'])
         elif block['type'] == 'atomic' and block.get('entityRanges'):
             for ent in block['entityRanges']:
-                entity = content_json['content']['entityMap'][str(ent['key'])]
+                entity = entity_map[str(ent['key'])]
                 if entity['type'] == 'wix-draft-plugin-image':
                     if entity['data'].get('metadata'):
                         caption = entity['data']['metadata'].get('caption')
                     else:
                         caption = ''
-                    item['content_html'] += utils.add_image(get_img_src(entity['data']), caption)
+                    content_html += utils.add_image(get_img_src(entity['data']), caption)
                 elif entity['type'] == 'wix-draft-plugin-gallery':
                     for it in entity['data']['items']:
-                        item['content_html'] += utils.add_image(get_img_src(it), it['metadata'].get('title'))
+                        content_html += utils.add_image(get_img_src(it), it['metadata'].get('title'))
+                elif entity['type'] == 'wix-draft-plugin-video':
+                    if entity['data'].get('src'):
+                        content_html += utils.add_embed(entity['data']['src'])
+                    else:
+                        logger.warning('unhandled wix-draft-plugin-video')
                 elif entity['type'] == 'wix-draft-plugin-divider':
-                    item['content_html'] += '<hr/>'
+                    content_html += '<hr/>'
+                elif entity['type'] == 'wix-draft-plugin-link-button':
+                    content_html += '<div style="text-align:center; padding:1em;"><span style="background-color:{}; padding:0.5em; border-radius:{}px;"><a href="{}" style="color:{};">&nbsp;{}&nbsp;</a></span></div>'.format(entity['data']['button']['design']['background'], entity['data']['button']['design']['borderRadius'], entity['data']['button']['settings']['url'], entity['data']['button']['design']['color'], entity['data']['button']['settings']['buttonText'])
+                elif entity['type'] == 'wix-rich-content-plugin-collapsible-list':
+                    for it in entity['data']['pairs']:
+                        title = render_content_blocks(it['title']['blocks'], it['title']['entityMap'])
+                        title = re.sub(r'^<p>(.*)</p>$', r'\1', title)
+                        content_html += '<details><summary>{}</summary>{}</details>'.format(title, render_content_blocks(it['content']['blocks'], it['content']['entityMap']))
                 elif entity['type'] == 'wix-draft-plugin-html':
                     if 'adsbygoogle' in entity['data']['src']:
                         continue
@@ -183,23 +205,23 @@ def get_content(url, args, site_json, save_debug=False):
                     if entity_soup.blockquote and entity_soup.blockquote.get('class'):
                         if 'twitter-tweet' in entity_soup.blockquote['class']:
                             links = entity_soup.find_all('a')
-                            item['content_html'] += utils.add_embed(links[-1]['href'])
+                            content_html += utils.add_embed(links[-1]['href'])
                         elif 'instagram-media' in entity_soup.blockquote['class']:
-                            item['content_html'] += utils.add_embed(entity_soup.blockquote['data-instgrm-permalink'])
+                            content_html += utils.add_embed(entity_soup.blockquote['data-instgrm-permalink'])
                         else:
-                            logger.warning('unhandled wix-draft-plugin-html blockquote class {} in {}'.format(entity_soup.blockquote['class'], item['url']))
+                            logger.warning('unhandled wix-draft-plugin-html blockquote class ' +  entity_soup.blockquote['class'])
                     elif entity_soup.iframe:
-                        item['content_html'] += utils.add_embed(entity_soup.iframe['src'])
+                        content_html += utils.add_embed(entity_soup.iframe['src'])
                     else:
-                        logger.warning('unhandled wix-draft-plugin-html in ' + item['url'])
+                        logger.warning('unhandled wix-draft-plugin-html')
                 else:
-                    logger.warning('unhandled entity type {} in {}'.format(entity['type'], item['url']))
+                    logger.warning('unhandled entity type ' + entity['type'])
         else:
-            logger.warning('unhandled block type {} in {}'.format(block['type'], item['url']))
+            logger.warning('unhandled block type ' + block['type'])
 
-    item['content_html'] = item['content_html'].replace('</ul><ul>', '')
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
-    return item
+    # Fix lists
+    content_html = re.sub(r'</(ol|ul)><(ol|ul)>', '', content_html)
+    return content_html
 
 
 def get_feed(url, args, site_json, save_debug=False):

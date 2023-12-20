@@ -73,6 +73,7 @@ def add_fcplayer_video(video_src, split_url, page_layer):
                 return utils.add_embed(video_url, args)
     return ''
 
+
 def format_body(body, url, page_layer):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))

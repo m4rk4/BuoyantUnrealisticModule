@@ -313,7 +313,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(episode_json['release_date'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+        item['_display_date'] = utils.format_display_date(dt)
 
         item['author'] = {}
         item['author']['name'] = episode_json['show']['publisher']
@@ -326,20 +326,15 @@ def get_content(url, args, site_json, save_debug=False):
             playback_url = utils.get_redirect_url(episode_json['audio_preview_url'])
         item['_audio'] = playback_url
 
-        # minutes = math.ceil(episode_json['duration_ms'] / 1000 / 60)
-        duration = []
-        t = math.floor(float(episode_json['duration_ms']) / 3600000)
-        if t >= 1:
-            duration.append('{} hr'.format(t))
-        t = math.ceil((float(episode_json['duration_ms']) - 3600000 * t) / 60)
-        if t > 0:
-            duration.append('{} min.'.format(t))
-
-        poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a><br/>by {}</small>'.format(
-            item['url'], item['title'], episode_json['show']['external_urls']['spotify'], episode_json['show']['name'],
-            item['author']['name'], ', '.join(duration))
-        item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div>{}</div><div style="clear:left;"><blockquote><small>{}</small></blockquote></div>'.format(item['_audio'], poster, desc, item['summary'])
+        duration = utils.calc_duration(float(episode_json['duration_ms']) / 1000)
+        poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
+        item['content_html'] = '<table><tr><td><a href="{}"><img src="{}"/></a></td>'.format(item['_audio'], poster)
+        item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+        item['content_html'] += '<div><a href="{}">{}</a></div>'.format(episode_json['show']['external_urls']['spotify'], episode_json['show']['name'])
+        item['content_html'] += '<div style="font-size:0.8em;">{} &bull; {}</div></td></tr></table>'.format(utils.format_display_date(dt, False), duration)
+        if 'embed' in args or '/embed/' in url:
+            return item
+        item['content_html'] += item['summary']
     return item
 
 

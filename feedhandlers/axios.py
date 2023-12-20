@@ -251,18 +251,15 @@ def get_next_data(url, site_json):
         query = '?year={}&month={}&day={}&slug={}'.format(paths[0], paths[1], paths[2], paths[3])
     path += '.json'
     next_url = '{}://{}/_next/data/{}{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, query)
-    print(next_url)
-    next_data = utils.get_url_json(next_url, user_agent='chatgpt')
-    # scraper = cloudscraper.create_scraper(delay=10)
-    # r = scraper.get(next_url)
-    # print(r.status_code)
-    # if r.status_code == 200:
-    #     next_data = r.json()
+    # print(next_url)
+    next_data = utils.get_url_json(next_url, user_agent='googlebot')
     if not next_data:
         #logger.debug('scraper error {} - getting NEXT_DATA from {}'.format(r.status_code, url))
         page_html = utils.get_url_html(url)
         if not page_html:
-            return None
+            page_html = utils.get_url_html(url, user_agent='googlecache')
+            if not page_html:
+                return None
         soup = BeautifulSoup(page_html, 'lxml')
         el = soup.find('script', id='__NEXT_DATA__')
         if el:
