@@ -24,7 +24,8 @@ def add_image(image, desc='', width=1024):
         captions.append(image['agency'])
     return utils.add_image(resize_image(image['uri'], width), ' | '.join(captions), desc=desc)
 
-def get_content_by_category(key):
+
+def get_content_by_category(key, edition='US'):
     query = '''
     query CONTENT_BY_CATEGORY(
 		$categoryKey: String!
@@ -52,14 +53,17 @@ def get_content_by_category(key):
 		}
 	}
     '''
-    variables = {"categoryKey": key, "edition": "US" }
+    variables = {
+        "categoryKey": key,
+        "edition": edition
+    }
     gql_json = utils.post_url('https://api-aggregate.eonline.com/graphql', json_data={"query": query, "variables": variables})
     if not gql_json:
         return None
     return gql_json['data']['articles']['nodes']
 
 
-def get_content_linkables(key, content_types):
+def get_content_linkables(key, content_types, edition='US'):
     query = '''
     query CONTENT_LINKABLES(
 		$contentTypes: [CONTENT_TYPE]
@@ -105,14 +109,18 @@ def get_content_linkables(key, content_types):
 		}
 	}
     '''
-    variables = {"contentTypes": content_types, "categoryKey": key, "edition": "US" }
+    variables = {
+        "contentTypes": content_types,
+        "categoryKey": key,
+        "edition": edition
+    }
     gql_json = utils.post_url('https://api-aggregate.eonline.com/graphql', json_data={"query": query, "variables": variables})
     if not gql_json:
         return None
     return gql_json['data']['contentLinkables']['nodes']
 
 
-def get_video(id):
+def get_video(id, edition='US'):
     query = '''
     query VIDEO_DETAIL_BY_ID($id: ID!, $edition: EDITIONKEY!) {
 		video(id: $id, edition: $edition) {
@@ -183,14 +191,17 @@ def get_video(id):
 		}
 	}
     '''
-    variables = {"id": id, "edition": "US" }
+    variables = {
+        "id": id,
+        "edition": edition
+    }
     gql_json = utils.post_url('https://api-aggregate.eonline.com/graphql', json_data={"query": query, "variables": variables})
     if not gql_json:
         return None
     return gql_json['data']['video']
 
 
-def get_gallery(id):
+def get_gallery(id, edition='US'):
     query = '''
     query GALLERY($id: ID!, $skip: Skip, $limit: Limit, $edition: EDITIONKEY!) {
 		gallery(id: $id) {
@@ -275,14 +286,17 @@ def get_gallery(id):
 		}
 	}
     '''
-    variables = {"id": id, "edition": "US" }
+    variables = {
+        "id": id,
+        "edition": edition
+    }
     gql_json = utils.post_url('https://api-aggregate.eonline.com/graphql', json_data={"query": query, "variables": variables})
     if not gql_json:
         return None
     return gql_json['data']['gallery']
 
 
-def get_article(id):
+def get_article(id, edition='US'):
     query = '''
     query ARTICLE($id: ID!, $edition: EDITIONKEY!, $sanitizer: SANITIZATION_TYPE, $limit: Limit) {
 		article(id: $id) {
@@ -483,7 +497,10 @@ def get_article(id):
 		}
 	}
 	'''
-    variables = {"id": id, "edition": "US" }
+    variables = {
+        "id": id,
+        "edition": edition
+    }
     gql_json = utils.post_url('https://api-aggregate.eonline.com/graphql', json_data={"query": query, "variables": variables})
     if not gql_json:
         return None
@@ -493,13 +510,22 @@ def get_article(id):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if paths[0] == 'news':
-        article_json = get_article(paths[1])
-    elif paths[0] == 'photos':
-        article_json = get_gallery(paths[1])
-    elif paths[0] == 'videos':
-        article_json = get_video(paths[1])
-
+    if paths[0] == 'news' or paths[0] == 'photos' or paths[0] == 'videos':
+        edition = 'US'
+        page_type = paths[0]
+        page_id = paths[1]
+    else:
+        edition = paths[0].upper()
+        page_type = paths[1]
+        page_id = paths[2]
+    if page_type == 'news':
+        article_json = get_article(page_id, edition)
+    elif page_type == 'photos':
+        article_json = get_gallery(page_id, edition)
+    elif page_type == 'videos':
+        article_json = get_video(page_id, edition)
+    else:
+        article_json = None
     if not article_json:
         return None
     if save_debug:

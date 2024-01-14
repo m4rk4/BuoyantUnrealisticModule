@@ -132,227 +132,243 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     else:
         oembed_json = None
 
-    item = {}
-
-    el = soup.find('link', attrs={"rel": "shortlink"})
-    if el:
-        item['url'] = el['href']
-        m = re.search(r'p=(\d+)', urlsplit(el['href']).query)
-        if m:
-            item['id'] = m.group(1)
+    if site_json.get('wpjson_path'):
+        args_copy = args.copy()
+        args_copy['embed'] = True
+        item = wp_posts.get_content(page_url, args_copy, site_json, save_debug)
+    else:
+        item = {}
 
     if not item.get('id'):
-        el = soup.find(id=re.compile(r'post-\d+'))
+        el = soup.find('link', attrs={"rel": "shortlink"})
         if el:
-            m = re.search(r'post-(\d+)', el['id'])
+            item['url'] = el['href']
+            m = re.search(r'p=(\d+)', urlsplit(el['href']).query)
             if m:
                 item['id'] = m.group(1)
 
-    if not item.get('id'):
-        m = re.search(r'"articleId","(\d+)"', page_html)
-        if m:
-            item['id'] = m.group(1)
+        if not item.get('id'):
+            el = soup.find(id=re.compile(r'post-\d+'))
+            if el:
+                m = re.search(r'post-(\d+)', el['id'])
+                if m:
+                    item['id'] = m.group(1)
 
-    if not item.get('id') and article_json and article_json.get('@id'):
-        item['id'] = article_json['@id']
+        if not item.get('id'):
+            m = re.search(r'"articleId","(\d+)"', page_html)
+            if m:
+                item['id'] = m.group(1)
 
-    if meta and meta.get('og:url'):
-        item['url'] = meta['og:url']
-    elif article_json and article_json.get('url'):
-        item['url'] = article_json['url']
-    elif article_json and article_json.get('mainEntityOfPage'):
-        if isinstance(article_json['mainEntityOfPage'], str):
-            item['url'] = article_json['mainEntityOfPage']
-        elif isinstance(article_json['mainEntityOfPage'], dict):
-            item['url'] = article_json['mainEntityOfPage']['@id']
-    else:
-        el = soup.find('link', attrs={"rel": "canonical"})
-        if el:
-            item['url'] = el['href']
+        if not item.get('id') and article_json and article_json.get('@id'):
+            item['id'] = article_json['@id']
+
+    if not item.get('url'):
+        if meta and meta.get('og:url'):
+            item['url'] = meta['og:url']
+        elif article_json and article_json.get('url'):
+            item['url'] = article_json['url']
+        elif article_json and article_json.get('mainEntityOfPage'):
+            if isinstance(article_json['mainEntityOfPage'], str):
+                item['url'] = article_json['mainEntityOfPage']
+            elif isinstance(article_json['mainEntityOfPage'], dict):
+                item['url'] = article_json['mainEntityOfPage']['@id']
         else:
-            item['url'] = page_url
+            el = soup.find('link', attrs={"rel": "canonical"})
+            if el:
+                item['url'] = el['href']
+            else:
+                item['url'] = page_url
 
     if not item.get('id') and item.get('url'):
         item['id'] = item['url']
 
-    if site_json.get('title'):
-        el = soup.find(site_json['title']['tag'], attrs=site_json['title']['attrs'])
-        if el:
-            item['title'] = el.get_text().strip()
     if not item.get('title'):
-        if article_json and article_json.get('headline'):
-            item['title'] = article_json['headline']
-        elif meta and meta.get('og:title'):
-            if isinstance(meta['og:title'], list):
-                item['title'] = meta['og:title'][0]
-            else:
-                item['title'] = meta['og:title']
-        elif meta and meta.get('twitter:title'):
-            if isinstance(meta['twitter:title'], list):
-                item['title'] = meta['twitter:title'][0]
-            else:
-                item['title'] = meta['twitter:title']
-        elif oembed_json and oembed_json['title']:
-            item['title'] = oembed_json['title']
-        elif article_json and article_json.get('name'):
-            item['title'] = article_json['name']
-    if not item.get('title'):
-        item['title'] = soup.title.get_text()
-    item['title'] = item['title'].replace('&amp;', '&')
-    if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
-        item['title'] = html.unescape(item['title'])
+        if site_json.get('title'):
+            el = soup.find(site_json['title']['tag'], attrs=site_json['title']['attrs'])
+            if el:
+                item['title'] = el.get_text().strip()
+        if not item.get('title'):
+            if article_json and article_json.get('headline'):
+                item['title'] = article_json['headline']
+            elif meta and meta.get('og:title'):
+                if isinstance(meta['og:title'], list):
+                    item['title'] = meta['og:title'][0]
+                else:
+                    item['title'] = meta['og:title']
+            elif meta and meta.get('twitter:title'):
+                if isinstance(meta['twitter:title'], list):
+                    item['title'] = meta['twitter:title'][0]
+                else:
+                    item['title'] = meta['twitter:title']
+            elif oembed_json and oembed_json['title']:
+                item['title'] = oembed_json['title']
+            elif article_json and article_json.get('name'):
+                item['title'] = article_json['name']
+        if not item.get('title'):
+            item['title'] = soup.title.get_text()
+        item['title'] = item['title'].replace('&amp;', '&')
+        if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
+            item['title'] = html.unescape(item['title'])
+        if site_json.get('site_title') and site_json['site_title'] in item['title']:
+            item['title'] = re.sub(r'(.*)\s+[–-]\s+{}'.format(site_json['site_title']), r'\1', item['title'])
 
-    date = ''
-    if meta and meta.get('article:published_time'):
-        if isinstance(meta['article:published_time'], list):
-            date = meta['article:published_time'][0]
-        else:
-            date = meta['article:published_time']
-    elif article_json and article_json.get('datePublished'):
-        date = article_json['datePublished']
-    elif site_json.get('timezone'):
-        el = soup.find('time', attrs={"datetime": True})
-        if el:
-            date = el['datetime']
-            if not re.search(r'[+\-]\d{2}:?\d{2}', date):
-                dt_loc = datetime.fromisoformat(date)
-                tz_loc = pytz.timezone(site_json['timezone'])
-                dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-                date = dt.isoformat()
-    if date:
-        try:
+    if not item.get('date_published'):
+        date = ''
+        if meta and meta.get('article:published_time'):
+            if isinstance(meta['article:published_time'], list):
+                date = meta['article:published_time'][0]
+            else:
+                date = meta['article:published_time']
+        elif article_json and article_json.get('datePublished'):
+            date = article_json['datePublished']
+        elif site_json.get('timezone'):
+            el = soup.find('time', attrs={"datetime": True})
+            if el:
+                date = el['datetime']
+                if not re.search(r'[+\-]\d{2}:?\d{2}', date):
+                    dt_loc = datetime.fromisoformat(date)
+                    tz_loc = pytz.timezone(site_json['timezone'])
+                    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                    date = dt.isoformat()
+        if date:
+            try:
+                dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
+            except:
+                dt = dateutil.parser.parse(date)
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+        elif site_json.get('date'):
+            # This is for displaying content, the real date to be substituted from the rss feed
+            for el in utils.get_soup_elements(site_json['date'], soup):
+                item['_display_date'] = el.get_text()
+                break
+
+    if not item.get('date_modified'):
+        date = ''
+        if meta and meta.get('article:modified_time'):
+            if isinstance(meta['article:modified_time'], list):
+                date = meta['article:modified_time'][0]
+            else:
+                date = meta['article:modified_time']
+        elif article_json and article_json.get('dateModified'):
+            date = article_json['dateModified']
+        if date:
             dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
-        except:
-            dt = dateutil.parser.parse(date)
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt)
-    elif site_json.get('date'):
-        # This is for displaying content, the real date to be substituted from the rss feed
-        for el in utils.get_soup_elements(site_json['date'], soup):
-            item['_display_date'] = el.get_text()
-            break
+            item['date_modified'] = dt.isoformat()
 
-    date = ''
-    if meta and meta.get('article:modified_time'):
-        if isinstance(meta['article:modified_time'], list):
-            date = meta['article:modified_time'][0]
-        else:
-            date = meta['article:modified_time']
-    elif article_json and article_json.get('dateModified'):
-        date = article_json['dateModified']
-    if date:
-        dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
-        item['date_modified'] = dt.isoformat()
-
-    authors = []
-    if site_json.get('author'):
-        for el in utils.get_soup_elements(site_json['author'], soup):
-            author = ''
-            if el.name == 'meta':
-                author = el['content']
-            elif el.name == 'a':
-                author = el.get_text().strip()
-            else:
-                for it in el.find_all('a', href=re.compile(r'author|correspondents|staff')):
-                    author = it.get_text().strip()
+    if not item.get('author'):
+        authors = []
+        if site_json.get('author'):
+            for el in utils.get_soup_elements(site_json['author'], soup):
+                author = ''
+                if el.name == 'meta':
+                    author = el['content']
+                elif el.name == 'a':
+                    author = el.get_text().strip()
+                else:
+                    for it in el.find_all('a', href=re.compile(r'author|correspondents|staff')):
+                        author = it.get_text().strip()
+                        if author not in authors:
+                            authors.append(author)
+                if not authors and el.get_text().strip():
+                    author = re.sub(r'^By ', '', el.get_text().strip(), flags=re.I)
+                if author:
+                    author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
                     if author not in authors:
                         authors.append(author)
-            if not authors and el.get_text().strip():
-                author = re.sub(r'^By ', '', el.get_text().strip(), flags=re.I)
-            if author:
-                author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
-                if author not in authors:
-                    authors.append(author)
-            if authors and not site_json['author'].get('multi'):
-                break
-    elif article_json and article_json.get('author'):
-        if isinstance(article_json['author'], dict):
-            if article_json['author'].get('name'):
-                authors.append(article_json['author']['name'].replace(',', '&#44;'))
-        elif isinstance(article_json['author'], list):
-            for it in article_json['author']:
-                if it.get('name'):
+                if authors and not site_json['author'].get('multi'):
+                    break
+        elif article_json and article_json.get('author'):
+            if isinstance(article_json['author'], dict):
+                if article_json['author'].get('name'):
+                    authors.append(article_json['author']['name'].replace(',', '&#44;'))
+            elif isinstance(article_json['author'], list):
+                for it in article_json['author']:
+                    if it.get('name'):
+                        authors.append(it['name'].replace(',', '&#44;'))
+        if not authors and ld_people:
+            if ld_people:
+                for it in ld_people:
                     authors.append(it['name'].replace(',', '&#44;'))
-    if not authors and ld_people:
-        if ld_people:
-            for it in ld_people:
-                authors.append(it['name'].replace(',', '&#44;'))
-    if not authors and meta:
-        if meta.get('author'):
-            authors.append(meta['author'].replace(',', '&#44;'))
-        elif meta.get('citation_author'):
-            authors.append(meta['citation_author'].replace(',', '&#44;'))
-        elif meta.get('parsely-author'):
-            authors.append(meta['parsely-author'].replace(',', '&#44;'))
-    if not authors and oembed_json and oembed_json.get('author_name'):
-            authors.append(oembed_json['author_name'].replace(',', '&#44;'))
-    if not authors and site_json.get('authors'):
-        authors.append(site_json['authors']['default'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
-    elif site_json.get('authors'):
-        item['author'] = {"name": site_json['authors']['default']}
+        if not authors and meta:
+            if meta.get('author'):
+                authors.append(meta['author'].replace(',', '&#44;'))
+            elif meta.get('citation_author'):
+                authors.append(meta['citation_author'].replace(',', '&#44;'))
+            elif meta.get('parsely-author'):
+                authors.append(meta['parsely-author'].replace(',', '&#44;'))
+        if not authors and oembed_json and oembed_json.get('author_name'):
+                authors.append(oembed_json['author_name'].replace(',', '&#44;'))
+        if not authors and site_json.get('authors'):
+            authors.append(site_json['authors']['default'])
+        if authors:
+            item['author'] = {}
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
+        elif site_json.get('authors'):
+            item['author'] = {"name": site_json['authors']['default']}
 
-    item['tags'] = []
-    if site_json.get('tags'):
-        for el in utils.get_soup_elements(site_json['tags'], soup):
-            if el.name == 'a':
-                item['tags'].append(el.get_text().strip())
-            else:
-                for it in el.find_all('a'):
-                    item['tags'].append(it.get_text().strip())
-    elif article_json and article_json.get('keywords'):
-        if isinstance(article_json['keywords'], list):
-            item['tags'] = article_json['keywords'].copy()
-        elif isinstance(article_json['keywords'], str):
-            # Split & remove whitespace: https://stackoverflow.com/questions/4071396/split-by-comma-and-strip-whitespace-in-python
-            item['tags'] = list(map(str.strip, article_json['keywords'].split(',')))
-    elif meta and meta.get('article:tag'):
-        if isinstance(meta['article:tag'], list):
-            item['tags'] = meta['article:tag'].copy()
-        elif isinstance(meta['article:tag'], str):
-            item['tags'] = list(map(str.strip, meta['article:tag'].split(',')))
-    elif meta and meta.get('parsely-tags'):
-        item['tags'] = list(map(str.strip, meta['parsely-tags'].split(',')))
-    elif meta and meta.get('keywords'):
-        item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
     if not item.get('tags'):
-        del item['tags']
-    else:
-        # Remove duplicates (case-insensitive)
-        item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
-
-    if ld_images:
-        item['_image'] = ld_images[0]['url']
-    if not item.get('_image') and article_json:
-        if article_json.get('image'):
-            if isinstance(article_json['image'], dict):
-                if article_json['image'].get('url'):
-                    item['_image'] = article_json['image']['url']
-            elif isinstance(article_json['image'], str):
-                item['_image'] = article_json['image']
-        if not item.get('_image') and article_json.get('thumbnailUrl'):
-            item['_image'] = article_json['thumbnailUrl']
-    if not item.get('_image') and meta and meta.get('og:image'):
-        if isinstance(meta['og:image'], str):
-            item['_image'] = meta['og:image']
+        item['tags'] = []
+        if site_json.get('tags'):
+            for el in utils.get_soup_elements(site_json['tags'], soup):
+                if el.name == 'a':
+                    item['tags'].append(el.get_text().strip())
+                else:
+                    for it in el.find_all('a'):
+                        item['tags'].append(it.get_text().strip())
+        elif article_json and article_json.get('keywords'):
+            if isinstance(article_json['keywords'], list):
+                item['tags'] = article_json['keywords'].copy()
+            elif isinstance(article_json['keywords'], str):
+                # Split & remove whitespace: https://stackoverflow.com/questions/4071396/split-by-comma-and-strip-whitespace-in-python
+                item['tags'] = list(map(str.strip, article_json['keywords'].split(',')))
+        elif meta and meta.get('article:tag'):
+            if isinstance(meta['article:tag'], list):
+                item['tags'] = meta['article:tag'].copy()
+            elif isinstance(meta['article:tag'], str):
+                item['tags'] = list(map(str.strip, meta['article:tag'].split(',')))
+        elif meta and meta.get('parsely-tags'):
+            item['tags'] = list(map(str.strip, meta['parsely-tags'].split(',')))
+        elif meta and meta.get('keywords'):
+            item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
+        if not item.get('tags'):
+            del item['tags']
         else:
-            item['_image'] = meta['og:image'][0]
-    elif oembed_json and oembed_json.get('thumbnail_url'):
-        item['_image'] = oembed_json['thumbnail_url']
+            # Remove duplicates (case-insensitive)
+            item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
 
-    if article_json and article_json.get('description'):
-        item['summary'] = article_json['description']
-    elif oembed_json and oembed_json.get('description'):
-        item['summary'] = oembed_json['description']
-    elif meta and meta.get('description'):
-        item['summary'] = meta['description']
-    elif meta and meta.get('og:description'):
-        item['summary'] = meta['og:description']
-    elif meta and meta.get('twitter:description'):
-        item['summary'] = meta['twitter:description']
+    if not item.get('_image'):
+        if ld_images:
+            item['_image'] = ld_images[0]['url']
+        if not item.get('_image') and article_json:
+            if article_json.get('image'):
+                if isinstance(article_json['image'], dict):
+                    if article_json['image'].get('url'):
+                        item['_image'] = article_json['image']['url']
+                elif isinstance(article_json['image'], str):
+                    item['_image'] = article_json['image']
+            if not item.get('_image') and article_json.get('thumbnailUrl'):
+                item['_image'] = article_json['thumbnailUrl']
+        if not item.get('_image') and meta and meta.get('og:image'):
+            if isinstance(meta['og:image'], str):
+                item['_image'] = meta['og:image']
+            else:
+                item['_image'] = meta['og:image'][0]
+        elif oembed_json and oembed_json.get('thumbnail_url'):
+            item['_image'] = oembed_json['thumbnail_url']
+
+    if item.get('summary'):
+        if article_json and article_json.get('description'):
+            item['summary'] = article_json['description']
+        elif oembed_json and oembed_json.get('description'):
+            item['summary'] = oembed_json['description']
+        elif meta and meta.get('description'):
+            item['summary'] = meta['description']
+        elif meta and meta.get('og:description'):
+            item['summary'] = meta['og:description']
+        elif meta and meta.get('twitter:description'):
+            item['summary'] = meta['twitter:description']
 
     if 'embed' in args:
         item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
@@ -434,7 +450,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         if it:
                             item['content_html'] += utils.add_embed(it['src'])
                             lede = True
-        if not lede:
+        if not lede and item.get('_image'):
             item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
     if site_json.get('content'):

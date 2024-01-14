@@ -866,6 +866,19 @@ def get_content(url, args, site_json, save_debug=False):
             elif 'list' in el['class']:
                 el.unwrap()
                 continue
+            elif 'pull-quote' in el['class']:
+                it = el.find(class_='pull-quote__text')
+                if it and it.get_text().strip():
+                    quote = it.get_text().strip()
+                else:
+                    quote = ''
+                it = el.find(class_='pull-quote__attribution')
+                if it and it.get_text().strip():
+                    author = it.get_text().strip()
+                else:
+                    author = ''
+                if quote:
+                    new_html = utils.add_pullquote(quote, author)
             elif 'highlights' in el['class']:
                 new_html = utils.add_blockquote(el.decode_contents())
             elif 'editor-note' in el['class'] or 'correction' in el['class']:

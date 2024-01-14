@@ -90,6 +90,19 @@ def get_content(url, args, site_json, save_debug=False):
         ld_json = None
 
     if not ld_json:
+        article_html = utils.get_url_html(url, user_agent='googlecache')
+        if article_html:
+            soup = BeautifulSoup(article_html, 'html.parser')
+        for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
+            try:
+                ld_json = json.loads(el.string)
+                if re.search(r'NewsArticle|VideoObject', ld_json['@type']):
+                    break
+            except:
+                logger.warning('unable to load ld+json data in ' + url)
+            ld_json = None
+
+    if not ld_json:
         el = soup.find('script', id='page-kit-app-context')
         if el:
             context_json = json.loads(el.string)

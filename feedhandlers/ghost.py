@@ -53,7 +53,8 @@ def get_item(post_json, args, site_json, save_debug):
 
     item['content_html'] = ''
     if post_json.get('html'):
-        content_html = post_json['html'].replace('<!--kg-card-begin: html-->', '<div class="kg-card-begin">').replace('<!--kg-card-end: html-->', '</div>')
+        content_html = re.sub(r'\n*<!--kg-card-begin: html-->\n*<div class="content_hint"></div>\n*<!--kg-card-end: html-->\n*', '', post_json['html'])
+        content_html = content_html.replace('<!--kg-card-begin: html-->', '<div class="kg-card-begin">').replace('<!--kg-card-end: html-->', '</div>')
         soup = BeautifulSoup(content_html, 'html.parser')
         if save_debug:
             utils.write_file(str(soup), './debug/debug.html')
@@ -227,7 +228,15 @@ def get_item(post_json, args, site_json, save_debug):
                     new_html = utils.add_embed(it['cite'])
             elif el.find('iframe'):
                 it = el.find('iframe')
-                new_html = utils.add_embed(it['src'])
+                if it['src'].startswith('https://www.kapwing.com/e/'):
+                    iframe_html = utils.get_url_html(it['src'])
+                    if iframe_html:
+                        iframe_soup = BeautifulSoup(iframe_html, 'lxml')
+                        it = iframe_soup.find('video')
+                        if it:
+                            new_html = utils.add_video(it['src'], 'video/mp4', it.get('poster'))
+                else:
+                    new_html = utils.add_embed(it['src'])
             elif el.find('script', attrs={"src": re.compile(r'www\.buzzsprout\.com')}):
                 it = el.find('script', attrs={"src": re.compile(r'www\.buzzsprout\.com')})
                 new_html = utils.add_embed(it['src'])

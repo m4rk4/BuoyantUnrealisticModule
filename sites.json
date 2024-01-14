@@ -477,7 +477,7 @@
         "module": "nine"
     },
     "aftermath": {
-        "buildId": "3ABiJdCQ7tWWjXSsuPi6H",
+        "buildId": "qSbahSptS1Wy0jhbyHVXb",
         "feeds": [
             "https://aftermath.site/feed"
         ],
@@ -1106,7 +1106,7 @@
         "wpjson_path": "https://awfulannouncing.com/wp-json"
     },
     "axios": {
-        "buildId": "5r2Sw3C9D8SrcWKPGLAu6",
+        "buildId": "AI5Dm-LlhBsU1c-18rqtv",
         "feeds": [
             "https://api.axios.com/feed/",
             "https://api.axios.com/feed/technology/"
@@ -1237,9 +1237,11 @@
         "module": "wix"
     },
     "bbc": {
+        "buildId": "dCJabykGuggM2_aFCxhLJ",
         "module": "bbc"
     },
     "bbci": {
+        "buildId": "dCJabykGuggM2_aFCxhLJ",
         "module": "bbc"
     },
     "beaconjournal": {
@@ -1550,6 +1552,16 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://blocksandfiles.com/wp-json"
     },
+    "blockworks": {
+        "buildId": "pnJ-hNiLMy1vkFalT-ONF",
+        "decompose": [
+            {
+                "parent": "p",
+                "selector": "p > strong:-soup-contains(\"Read more:\")"
+            }
+        ],
+        "module": "blockworks"
+    },
     "blogs": [
         {
             "nwn.blogs.com": {
@@ -1569,6 +1581,7 @@
             "https://image-sensors-world.blogspot.com/feeds/posts/default",
             "http://justthesocialfacts.blogspot.com/feeds/posts/default",
             "https://mybeerbuzz.blogspot.com/feeds/posts/default",
+            "https://oldvcr.blogspot.com/feeds/posts/default",
             "https://pyfound.blogspot.com/feeds/posts/default",
             "https://richg42.blogspot.com/feeds/posts/default",
             "https://zandarvts.blogspot.com/feeds/posts/default"
@@ -1600,6 +1613,25 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://bluevirginia.us/wp-json"
+    },
+    "bnnbreaking": {
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "xs_social_share_widget",
+                        "pld-like-dislike-wrap"
+                    ]
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://bnnbreaking.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://bnnbreaking.com/wp-json"
     },
     "boilingsteam": {
         "args": {
@@ -1680,6 +1712,77 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "http://booktwo.org/wp-json"
+    },
+    "boredbat": {
+        "args": {
+            "add_lede_img": true,
+            "add_subtitle": true
+        },
+        "author": {
+            "attrs": {
+                "rel": "author"
+            },
+            "tag": "a"
+        },
+        "content": {
+            "attrs": {
+                "class": "entry"
+            },
+            "tag": "div"
+        },
+        "date": {
+            "attrs": {
+                "class": "post-date"
+            },
+            "tag": "span"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "code-block",
+                        "tptn_counter",
+                        "clearfix"
+                    ]
+                },
+                "tag": "div"
+            },
+            {
+                "attrs": {
+                    "class": "tmnf_posttag"
+                },
+                "tag": "p"
+            },
+            {
+                "attrs": {
+                    "itemprop": "dateModified"
+                },
+                "tag": "p"
+            }
+        ],
+        "lede_img": {
+            "attrs": {
+                "class": [
+                    "entryhead",
+                    "page-header-image"
+                ]
+            },
+            "tag": "div"
+        },
+        "module": "wp",
+        "site_title": "BoredBat",
+        "subtitle": {
+            "selector": "div.page-header > div.container div.tmnf_excerpt > p"
+        },
+        "tags": {
+            "attrs": {
+                "rel": [
+                    "tag",
+                    "category tag"
+                ]
+            },
+            "tag": "a"
+        }
     },
     "borncity": {
         "args": {
@@ -2265,6 +2368,24 @@
     "carbuzz": {
         "module": "carbuzz"
     },
+    "carnewschina": {
+        "args": {
+            "add_lede_img": true
+        },
+        "content": {
+            "selector": "div.td-post-content > div.tdb-block-inner"
+        },
+        "lede_img": {
+            "selector": "div.tdb_single_featured_image > div.tdb-block-inner"
+        },
+        "module": "wp",
+        "tags": {
+            "attrs": {
+                "class": "tdb-tags"
+            },
+            "tag": "ul"
+        }
+    },
     "carolinapublicpress": {
         "args": {
             "add_subtitle": true
@@ -2525,6 +2646,14 @@
         "imager": "https://media1.citybeat.com/citybeat/imager",
         "module": "foundation"
     },
+    "citylimits": {
+        "feeds": [
+            "https://citylimits.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://citylimits.org/wp-json"
+    },
     "cjr": {
         "args": {
             "add_lede_img": true
@@ -2605,7 +2734,7 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1190,
+        "deployment": 1198,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -3074,7 +3203,7 @@
             },
             "source": "article"
         },
-        "deployment": 221,
+        "deployment": 319,
         "homepage_feed": {
             "query": {
                 "arc-site": "cleveland"
@@ -4513,6 +4642,15 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://dig.watch/wp-json"
     },
+    "digger": {
+        "data-api": "https://digger.ghost.io/ghost/api/content/",
+        "data-key": "b89c13cb075f20feaff3cbf2f6",
+        "feeds": [
+            "https://blog.digger.dev/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
     "digiday": {
         "feeds": [
             "https://digiday.com/feed"
@@ -5560,6 +5698,9 @@
     "fastcompany": {
         "module": "fastcompany"
     },
+    "fastly": {
+        "module": null
+    },
     "fedi": {
         "decompose": [
             {
@@ -5646,6 +5787,14 @@
             "https://www.fiercewireless.com/rss/xml"
         ],
         "module": "drupal_json"
+    },
+    "filfre": {
+        "feeds": [
+            "https://www.filfre.net/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.filfre.net/wp-json"
     },
     "filmfreakcentral": {
         "blogid": "6a0168ea36d6b2970c016304416a2e970d",
@@ -6817,8 +6966,36 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://grist.org/wp-json"
     },
+    "ground": {
+        "bias": [],
+        "module": "ground_news"
+    },
     "groupninemedia": {
         "module": "pinnacle"
+    },
+    "growbyginkgo": {
+        "args": {
+            "add_subtitle": true
+        },
+        "feeds": [
+            "https://www.growbyginkgo.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "grow-wordpress-block",
+                        "block-content",
+                        "block-wrapper",
+                        "content-wrapper"
+                    ]
+                },
+                "tag": "div"
+            }
+        ],
+        "wpjson_path": "https://www.growbyginkgo.com/wp-json"
     },
     "grubstreet": {
         "module": "nymag"
@@ -7130,6 +7307,9 @@
         "next_data_path": "https://www.history.com/editorial/_next/data/"
     },
     "hollywoodlife": {
+        "args": {
+            "add_subtitle": true
+        },
         "feeds": [
             "https://hollywoodlife.com/feed"
         ],
@@ -7224,6 +7404,17 @@
     },
     "houstonchronicle": {
         "module": "hearstnews"
+    },
+    "houstonpublicmedia": {
+        "args": {
+            "add_subtitle": true
+        },
+        "feeds": [
+            "https://www.houstonpublicmedia.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.houstonpublicmedia.org/wp-json"
     },
     "howstuffworks": {
         "feeds": [
@@ -8121,6 +8312,15 @@
         ],
         "module": "mcclatchy"
     },
+    "kapwing": {
+        "data-api": "https://www.kapwing.com/blog/ghost/api/content/",
+        "data-key": "6f9c4cb9f523927839d390041e",
+        "feeds": [
+            "https://www.kapwing.com/blog/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
     "kare11": {
         "module": "tegna"
     },
@@ -8131,6 +8331,9 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://katiecouric.com/wp-json"
+    },
+    "katv": {
+        "module": "sinclair"
     },
     "kavin": {
         "module": "piped"
@@ -8374,6 +8577,14 @@
             "https://ww2.kqed.org/news/feed/"
         ],
         "module": "kqed"
+    },
+    "krdo": {
+        "feeds": [
+            "https://krdo.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://krdo.com/wp-json"
     },
     "krebsonsecurity": {
         "authors": {
@@ -8955,6 +9166,10 @@
         "api_url": "https://api.livenowfox.com/fts/prod/",
         "module": "fox_local"
     },
+    "liverpoolfc": {
+        "api_path": "https://backend.liverpoolfc.com/lfc-rest-api",
+        "module": "lfc"
+    },
     "livescience": {
         "feeds": [
             "https://www.livescience.com/feeds/all"
@@ -9045,6 +9260,14 @@
     },
     "local21news": {
         "module": "sinclair"
+    },
+    "localnews8": {
+        "feeds": [
+            "https://localnews8.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://localnews8.com/wp-json"
     },
     "locusmag": {
         "args": {
@@ -10001,6 +10224,11 @@
         ],
         "module": "valnetinc"
     },
+    "mprnews": {
+        "buildId": "atzZ3L2zXNQ-XacfOX39j",
+        "contentAreaSlug": "mprnews",
+        "module": "mpr"
+    },
     "mrsspacecadet": {
         "blog_app_def_id": "14bcded7-0066-7c35-14d7-466cb3f09103",
         "feeds": [
@@ -10060,6 +10288,26 @@
             "https://www.musicradar.com/feeds/all"
         ],
         "module": "future"
+    },
+    "musicrow": {
+        "content": {
+            "attrs": {
+                "class": "entry-content"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "abh_box_business"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://musicrow.com/feed"
+        ],
+        "module": "wp"
     },
     "musictech": {
         "feeds": [
@@ -10301,6 +10549,26 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.nbcwashington.com/wp-json"
     },
+    "necn": {
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "recirc-module"
+                },
+                "tag": "div"
+            },
+            {
+                "parent": "blockquote",
+                "selector": "blockquote > a[href*=\"mailto:tips@nbcboston.com\"]"
+            }
+        ],
+        "feeds": [
+            "https://www.necn.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.necn.com/wp-json"
+    },
     "neil-clarke": {
         "feeds": [
             "http://neil-clarke.com/feed"
@@ -10527,6 +10795,22 @@
         ],
         "module": "mcclatchy"
     },
+    "newsone": {
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "post-playlist-cover"
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://newsone.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://newsone.com/wp-json"
+    },
     "newsoveraudio": {
         "module": "newsoveraudio"
     },
@@ -10634,6 +10918,9 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://nflspinzone.com/wp-json"
+    },
+    "nhk": {
+        "module": "nhk"
     },
     "nicenews": {
         "feeds": [
@@ -10972,6 +11259,9 @@
     "npr": {
         "module": "npr"
     },
+    "ntd": {
+        "module": "ntd"
+    },
     "nugs": {
         "feeds": [
             "https://blog.nugs.net/feed"
@@ -11178,6 +11468,10 @@
             "https://www.oliviaandlaura.com/blog-feed.xml"
         ],
         "module": "wix"
+    },
+    "olympics": {
+        "buildId": "chGfxZurXMOyx7FJcHg6L",
+        "module": "olympics"
     },
     "om": {
         "feeds": [
@@ -11523,6 +11817,15 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://outsider.com/wp-json"
+    },
+    "overkill": {
+        "data-api": "https://overkill.wtf/ghost/api/content/",
+        "data-key": "dce6a3ea9caacc631fa98b24eb",
+        "feeds": [
+            "https://overkill.wtf/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
     },
     "oxen": {
         "data-api": "https://oxen.ghost.io/ghost/api/content/",
@@ -11928,11 +12231,38 @@
         "imager": "https://media1.pghcitypaper.com/pittsburgh/imager",
         "module": "foundation"
     },
+    "phl17": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://phl17.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://phl17.com/wp-json"
+    },
     "phoenix": {
         "feeds": [
             "https://www.phoenix.org/search/?f=rss&t=article&l=10&s=start_time&sd=desc"
         ],
         "module": "tncms"
+    },
+    "physiqonomics": {
+        "feeds": [
+            "https://physiqonomics.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": {
+            "default": "/wp/v2/posts",
+            "physiqonomics-weekly": "/wp/v2/pages"
+        },
+        "unwrap": [
+            {
+                "selector": "p.has-background"
+            }
+        ],
+        "wpjson_path": "https://physiqonomics.com/wp-json"
     },
     "pimylifeup": {
         "content": {
@@ -11959,6 +12289,9 @@
             "https://pimylifeup.com/feed"
         ],
         "module": "wp"
+    },
+    "pinecast": {
+        "module": "pinecast"
     },
     "piped": {
         "module": "piped"
@@ -12049,6 +12382,20 @@
         ],
         "module": "medium"
     },
+    "pluggedin": {
+        "content": {
+            "attrs": {
+                "class": "review-content"
+            },
+            "tag": "section"
+        },
+        "feeds": [
+            "https://www.pluggedin.com/feed"
+        ],
+        "module": "wp",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.pluggedin.com/wp-json"
+    },
     "pluralistic": {
         "feeds": [
             "https://pluralistic.net/feed"
@@ -12090,6 +12437,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://pokejungle.net/wp-json"
+    },
+    "politicalwire": {
+        "feeds": [
+            "https://politicalwire.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://politicalwire.com/wp-json"
     },
     "politico": [
         {
@@ -12367,6 +12722,10 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://protos.com/wp-json"
+    },
+    "providencejournal": {
+        "module": "gannett",
+        "site_code": "NPRJ"
     },
     "psu": {
         "feeds": [
@@ -12933,6 +13292,14 @@
         ],
         "module": "wix"
     },
+    "resilience": {
+        "feeds": [
+            "https://www.resilience.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.resilience.org/wp-json"
+    },
     "respectfulinsolence": {
         "feeds": [
             "https://www.respectfulinsolence.com/feed"
@@ -12997,6 +13364,17 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://retractionwatch.com/wp-json"
     },
+    "retrofun": {
+        "args": {
+            "add_lede_img": true
+        },
+        "feeds": [
+            "https://retrofun.pl/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://retrofun.pl/wp-json"
+    },
     "reuters": {
         "api_url": "https://www.reuters.com/pf/api/v3/content/fetch/",
         "arc_site": "reuters",
@@ -13020,7 +13398,7 @@
             },
             "source": "article-by-id-or-url-v1"
         },
-        "deployment": 165,
+        "deployment": 168,
         "homepage_feed": {
             "query": {
                 "arc-site": "reuters",
@@ -13406,7 +13784,7 @@
         "feeds": [
             "https://www.sandiegouniontribune.com/index.rss"
         ],
-        "module": "latimes"
+        "module": "brightspot"
     },
     "santafenewmexican": {
         "feeds": [
@@ -13611,6 +13989,14 @@
         },
         "module": "wp"
     },
+    "searchenginejournal": {
+        "feeds": [
+            "https://www.searchenginejournal.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.searchenginejournal.com/wp-json"
+    },
     "searchengineland": {
         "decompose": [
             {
@@ -13626,6 +14012,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://searchengineland.com/wp-json"
+    },
+    "seattlemedium": {
+        "feeds": [
+            "https://seattlemedium.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://seattlemedium.com/wp-json"
     },
     "seattlepi": {
         "module": "hearstnews"
@@ -13781,6 +14175,38 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://shkspr.mobi/blog/wp-json"
+    },
+    "siliconangle": {
+        "args": {
+            "add_lede_img": true
+        },
+        "author": {
+            "attrs": {
+                "class": "author"
+            },
+            "tag": "span"
+        },
+        "content": {
+            "attrs": {
+                "class": "single-post-content"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "silic-after-content"
+                },
+                "tag": "div"
+            }
+        ],
+        "lede_img": {
+            "attrs": {
+                "class": "single-post-thumbnail"
+            },
+            "tag": "div"
+        },
+        "module": "wp"
     },
     "silive": {
         "api_url": "https://www.silive.com/pf/api/v3/content/fetch/",
@@ -14089,6 +14515,51 @@
     "smartnews": {
         "module": "smartnews"
     },
+    "smartprix": {
+        "args": {
+            "add_lede_img": true,
+            "add_subtitle": true
+        },
+        "content": {
+            "attrs": {
+                "class": "wp-content"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "parent": "p",
+                "selector": "p > strong > em:-soup-contains(\"Jump To\")"
+            },
+            {
+                "parent": "ul",
+                "selector": "ul > li > strong > a[href=\"#1\"]"
+            }
+        ],
+        "lede_img": {
+            "attrs": {
+                "alt": "Main Image"
+            },
+            "tag": "img"
+        },
+        "module": "wp",
+        "subtitle": {
+            "attrs": {
+                "class": "pg-bap-subtitle"
+            },
+            "tag": "p"
+        },
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "wp-block-columns",
+                        "wp-block-column"
+                    ]
+                }
+            }
+        ]
+    },
     "smh": {
         "feeds": [
             "https://www.smh.com.au/rss/feed.xml"
@@ -14213,6 +14684,51 @@
         "module": "wp",
         "user_agent": "googlecache"
     },
+    "spiked-online": {
+        "content": {
+            "attrs": {
+                "id": "article-main"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "post-sharing",
+                        "post-sharing-related",
+                        "post-categories ",
+                        "post-tags",
+                        "dianomi_context",
+                        "article-overflow"
+                    ]
+                },
+                "tag": "div"
+            },
+            {
+                "attrs": {
+                    "id": [
+                        "comments-wrap",
+                        "inline-nudge-sell"
+                    ]
+                },
+                "tag": "div"
+            }
+        ],
+        "feeds": [
+            "https://www.spiked-online.com/feed"
+        ],
+        "module": "wp",
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": "mar-b-"
+                },
+                "regex": "attrs",
+                "tag": "div"
+            }
+        ]
+    },
     "spin": {
         "feeds": [
             "https://www.spin.com/feed"
@@ -14297,6 +14813,14 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://spy.com/wp-json"
+    },
+    "srituhobby": {
+        "feeds": [
+            "https://srituhobby.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://srituhobby.com/wp-json"
     },
     "sspnet": {
         "feeds": [
@@ -14550,6 +15074,7 @@
     },
     "substack": {
         "feeds": [
+            "https://aella.substack.com/feed",
             "https://annehelen.substack.com/feed",
             "https://antonhowes.substack.com/feed",
             "https://aramse.substack.com/feed",
@@ -14560,6 +15085,7 @@
             "https://billym2k.substack.com/feed",
             "https://bitecode.substack.com/feed",
             "https://bnet.substack.com/feed",
+            "https://cbuck.substack.com/feed",
             "https://charleshughsmith.substack.com/feed",
             "https://chrisscullion.substack.com/feed",
             "https://cintra.substack.com/feed",
@@ -14844,7 +15370,7 @@
             },
             "source": "content-api-v4"
         },
-        "deployment": 485,
+        "deployment": 548,
         "homepage_feed": {
             "query": {
                 "excludeSections": "/centro",
@@ -15326,6 +15852,18 @@
         ],
         "module": "nine"
     },
+    "theanalyst": [
+        {
+            "theanalyst.com": {
+                "feeds": [
+                    "https://theanalyst.com/feed"
+                ],
+                "module": "wp_posts",
+                "posts_path": "/wp/v2/posts",
+                "wpjson_path": "https://theanalyst.com/wp-json"
+            }
+        }
+    ],
     "theankler": {
         "feeds": [
             "https://theankler.news/feed"
@@ -15732,6 +16270,14 @@
         "module": "ghost",
         "post_filters": []
     },
+    "thegatewaypundit": {
+        "feeds": [
+            "https://www.thegatewaypundit.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.thegatewaypundit.com/wp-json"
+    },
     "theglobeandmail": {
         "api_url": "https://www.theglobeandmail.com/pf/api/v3/content/fetch/",
         "arc_site": "tgam",
@@ -15754,7 +16300,7 @@
             },
             "source": "content-by-canonical-url"
         },
-        "deployment": 449,
+        "deployment": 468,
         "homepage_feed": {
             "query": {
                 "feature": "simple-list",
@@ -15940,6 +16486,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://thelandcle.org/wp-json"
     },
+    "them": {
+        "feeds": [
+            "https://www.them.us/feed/rss"
+        ],
+        "module": "cne"
+    },
     "themarginalian": {
         "args": {
             "add_subtitle": true,
@@ -16058,6 +16610,17 @@
         ],
         "module": "themessenger"
     },
+    "themichiganstar": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://themichiganstar.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://themichiganstar.com/wp-json"
+    },
     "thenationalnews": {
         "api_url": "https://www.thenationalnews.com/pf/api/v3/content/fetch/",
         "arc_site": "the-national",
@@ -16151,6 +16714,17 @@
             "https://www.theodysseyonline.com/feeds/feed.rss"
         ],
         "module": "rebelmouse"
+    },
+    "theohiostar": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://theohiostar.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://theohiostar.com/wp-json"
     },
     "theolympian": {
         "feeds": [
@@ -16305,6 +16879,19 @@
         ],
         "module": "thescore"
     },
+    "theshaderoom": {
+        "decompose": [
+            {
+                "selector": "h5:-soup-contains(\"RELATED:\")"
+            }
+        ],
+        "feeds": [
+            "https://theshaderoom.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://theshaderoom.com/wp-json"
+    },
     "thesixthaxis": {
         "feeds": [
             "https://www.thesixthaxis.com/feed",
@@ -16415,6 +17002,12 @@
             "http://www.thestar.com/content/thestar/feed.RSSManagerServlet.articles.news.canada.rss"
         ],
         "module": "torontostar"
+    },
+    "thestate": {
+        "feeds": [
+            "https://feeds.mcclatchy.com/thestate/stories"
+        ],
+        "module": "mcclatchy"
     },
     "thestreamingadvisor": {
         "args": {
@@ -16868,6 +17461,9 @@
     "townandcountrymag": {
         "module": "hearstmags"
     },
+    "tpr": {
+        "module": "brightspot"
+    },
     "tractionnews": {
         "feeds": [
             "http://www.tractionnews.com/feed"
@@ -16881,6 +17477,14 @@
             "https://services.tradewindsnews.com/api/feed/rss"
         ],
         "module": "dnmedia"
+    },
+    "traffictechnologytoday": {
+        "feeds": [
+            "https://www.traffictechnologytoday.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.traffictechnologytoday.com/wp-json"
     },
     "trailofbits": {
         "feeds": [
@@ -17265,6 +17869,9 @@
             "https://www.upworthy.com/feeds/feed.rss"
         ],
         "module": "rebelmouse"
+    },
+    "uri": {
+        "module": "flourish"
     },
     "usatoday": {
         "feeds": [
@@ -17835,6 +18442,9 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://waytoomany.games/wp-json"
     },
+    "wbez": {
+        "module": "wbez"
+    },
     "wbrc": {
         "api_url": "https://www.wbrc.com/pf/api/v3/content/fetch/",
         "arc_site": "wbrc",
@@ -17971,6 +18581,13 @@
             "https://www.wesmirch.com/feed.xml"
         ],
         "module": "techmeme"
+    },
+    "westword": {
+        "feeds": [
+            "https://www.westword.com/denver/Rss.xml"
+        ],
+        "imager": "https://media1.westword.com/den/imager",
+        "module": "foundation"
     },
     "wfaa": {
         "module": "tegna"
@@ -18176,11 +18793,15 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.wkbn.com/wp-json"
     },
+    "wkbw": {
+        "module": "brightspot"
+    },
     "wksu": {
         "module": "brightspot"
     },
     "wkyc": {
-        "module": "tegna"
+        "module": "tegna",
+        "timezone": "US/Eastern"
     },
     "wmar2news": {
         "feeds": [
@@ -18190,6 +18811,14 @@
     },
     "wnep": {
         "module": "tegna"
+    },
+    "wnewsj": {
+        "feeds": [
+            "https://www.wnewsj.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.wnewsj.com/wp-json"
     },
     "wnyc": {
         "module": "wnyc"
@@ -18470,6 +19099,16 @@
             }
         ],
         "wpjson_path": "https://worldsensorium.com/wp-json"
+    },
+    "worldsoccertalk": {
+        "buildId": "jklv_yW4pBLmIggNk-CFc",
+        "feeds": [
+            "https://worldsoccertalk.com/rss/feed/world-soccer-news/"
+        ],
+        "module": "worldsoccertalk"
+    },
+    "wosu": {
+        "module": "brightspot"
     },
     "wowktv": {
         "args": {
@@ -18754,6 +19393,17 @@
     "wtol": {
         "module": "tegna"
     },
+    "wtop": {
+        "args": {
+            "skip_wp_user": true
+        },
+        "feeds": [
+            "https://wtop.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://wtop.com/wp-json"
+    },
     "wtov9": {
         "module": "sinclair"
     },
@@ -18767,6 +19417,10 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.wtrf.com/wp-json"
+    },
+    "wtsp": {
+        "module": "tegna",
+        "timezone": "US/Eastern"
     },
     "wusa9": {
         "module": "tegna"
@@ -18792,6 +19446,9 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/pages",
         "wpjson_path": "https://wynnworlds.com/wp-json"
+    },
+    "wxxinews": {
+        "module": "brightspot"
     },
     "wyso": {
         "module": "brightspot"
@@ -18952,13 +19609,5 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ztgd.com/wp-json"
-    },
-    "mprnews": {
-        "contentAreaSlug": "mprnews",
-        "buildId": "atzZ3L2zXNQ-XacfOX39j",
-        "module": "mpr"
-    },
-    "uri": {
-        "module": "flourish"
     }
 }

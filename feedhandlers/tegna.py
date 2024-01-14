@@ -1,7 +1,9 @@
 import pytz, re
+import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+import config
 import utils
 from feedhandlers import rss
 
@@ -27,19 +29,24 @@ def get_content(url, args, site_json, save_debug=False):
 
         el = soup.find('meta', attrs={"itemprop": "datePublished"})
         if el:
-            # 9:42 AM EDT September 27, 2022
-            if re.search(r'EST|EDT', el['content']):
-                dt_loc = datetime.strptime(el['content'].replace('EST', 'EDT'), '%I:%M %p EDT %B %d, %Y')
-                tz_loc = pytz.timezone('US/Eastern')
-            elif re.search(r'CST|CDT', el['content']):
-                dt_loc = datetime.strptime(el['content'].replace('CST', 'CDT'), '%I:%M %p CDT %B %d, %Y')
-                tz_loc = pytz.timezone('US/Central')
-            elif re.search(r'MST|MDT', el['content']):
-                dt_loc = datetime.strptime(el['content'].replace('MST', 'MDT'), '%I:%M %p MDT %B %d, %Y')
-                tz_loc = pytz.timezone('US/Mountain')
-            elif re.search(r'PST|PDT', el['content']):
-                dt_loc = datetime.strptime(el['content'].replace('PST', 'PDT'), '%I:%M %p PDT %B %d, %Y')
-                tz_loc = pytz.timezone('US/Mountain')
+            tz_loc = None
+            it = soup.find(class_='article__published')
+            if it:
+                date = it.get_text()
+                if 'EST' in date:
+                    tz_loc = pytz.timezone('US/Eastern')
+                elif 'CST' in date:
+                    tz_loc = pytz.timezone('US/Central')
+                elif 'MST' in date:
+                    tz_loc = pytz.timezone('US/Mountain')
+                elif 'PST' in date:
+                    tz_loc = pytz.timezone('US/Pacific')
+            if not tz_loc:
+                if site_json.get('timezone'):
+                    tz_loc = pytz.timezone(site_json['timezone'])
+                else:
+                    tz_loc = pytz.timezone(config.local_tz)
+            dt_loc = dateutil.parser.parse(el['content'])
             dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
@@ -112,9 +119,9 @@ def get_content(url, args, site_json, save_debug=False):
                         el.decompose()
 
                     elif 'article__section_type_text' in el['class']:
-                        if el.find(class_='cms__embed-related-story'):
+                        if el.find(class_=re.compile(r'cms__embed-related-story')):
                             el.decompose()
-                        elif re.search(r'<p><strong>(MORE HEADLINES|RELATED|SUBSCRIBE):', el.decode_contents()):
+                        elif re.search(r'<(h3|strong)[^>]*>(MORE HEADLINES|More from \w+|RELATED|SUBSCRIBE):', el.decode_contents()):
                             el.decompose()
                         else:
                             el.unwrap()
@@ -127,9 +134,14 @@ def get_content(url, args, site_json, save_debug=False):
                         it = el.find(class_='photo__credit')
                         if it and it.get_text().strip():
                             captions.append(it.get_text().strip())
-                        img = el.find(class_='lazy-image__image')
+                        img_src = ''
+                        img = el.find(class_=['lazy-image__image', 'photo__main'])
                         if img:
-                            img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+                            if img.get('data-srcset'):
+                                img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+                            elif img.get('srcset'):
+                                img_src = utils.image_from_srcset(img['srcset'], 1000)
+                        if img_src:
                             new_html = utils.add_image(img_src, ' | '.join(captions))
                             new_el = BeautifulSoup(new_html, 'html.parser')
                             el.insert_after(new_el)
@@ -188,11 +200,20 @@ def get_content(url, args, site_json, save_debug=False):
                         else:
                             logger.warning('unhandled article section embed in ' + item['url'])
 
+                    elif 'article__section_type_video' in el['class']:
+                        it = el.find(class_='video__endslate-heading')
+                        if it and 'more videos' in it.get_text().lower():
+                            el.decompose()
+
                     elif 'article__section_type_ad' in el['class'] or 'related-stories' in el['class']:
                             el.decompose()
 
                     else:
                         logger.warning('unhandled article section {} in {}'.format(el['class'], item['url']))
+
+        # for el in article_body.select('p > strong:-soup-contains("SUBSCRIBE")'):
+        #     it = el.find_parent('p')
+        #     it.decompose()
 
         item['content_html'] += article_body.decode_contents()
     return item

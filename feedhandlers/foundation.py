@@ -1,9 +1,9 @@
 import json, pytz, re
 from bs4 import BeautifulSoup, NavigableString, Tag
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from datetime import datetime
+from urllib.parse import urlsplit
 
-import config, utils
+import utils
 from feedhandlers import rss
 
 import logging
@@ -141,7 +141,7 @@ def get_content(url, args, site_json, save_debug=False):
                 img_src = img['src']
             img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
             if 'imager' in img_paths:
-                img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                img_src = '{}/u/magnum/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
             item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
         else:
             logger.warning('unhandled fdn-content-header-image-block in ' + item['url'])
@@ -163,7 +163,7 @@ def get_content(url, args, site_json, save_debug=False):
                 img_src = img['src']
             img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
             if 'imager' in img_paths:
-                img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                img_src = '{}/u/magnum/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
             item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
         else:
             logger.warning('unhandled fdn-magnum-block in ' + item['url'])
@@ -252,13 +252,25 @@ def get_content(url, args, site_json, save_debug=False):
                     img_src = img['src']
                 img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
                 if 'imager' in img_paths:
-                    img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                    img_src = '{}/u/magnum/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
                 new_html = utils.add_image(img_src, ' | '.join(captions))
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
                 logger.warning('unhandled fdn-content-image in ' + item['url'])
+
+        for el in body.find_all(class_='fdn-pullquote-block'):
+            it = el.find(class_='fdn-pull-quote-twitter-link')
+            if it:
+                it.decompose()
+                it = el.find('a', href=re.compile(r'twitter\.com/intent/tweet'))
+                if it:
+                    it.unwrap()
+            new_html = utils.add_pullquote(el.decode_contents())
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
 
         for el in body.find_all(class_='twitter-tweet'):
             links = el.find_all('a', href=re.compile(r'twitter\.com/[^/]+/status'))
@@ -368,7 +380,7 @@ def get_content(url, args, site_json, save_debug=False):
                     img_src = img['src']
                 img_paths = list(filter(None, urlsplit(img_src).path.split('/')))
                 if 'imager' in img_paths:
-                    img_src = '{}/u/original/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
+                    img_src = '{}/u/magnum/{}/{}'.format(site_json['imager'], img_paths[-2], img_paths[-1])
                 item['content_html'] += utils.add_image(img_src, ' | '.join(captions))
             else:
                 logger.warning('unhandled slideshow-image-block in ' + item['url'])

@@ -739,6 +739,12 @@ def get_item(article_json, args, site_json, save_debug):
     for el in soup.find_all('script'):
         el.decompose()
 
+    for el in soup.find_all('ul', class_='inline-related-links'):
+        el.decompose()
+
+    for el in soup.select('p > b:-soup-contains("SEE MORE:")'):
+        el.decompose()
+
     content_html = str(soup)
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', content_html)
     return item

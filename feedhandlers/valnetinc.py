@@ -396,6 +396,7 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_=re.compile(r'display-card-link'))
                 if it:
                     for link in it.find_all('a'):
+                        # print(link['href'])
                         new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
                 new_html += '</div></div><div>&nbsp;</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')

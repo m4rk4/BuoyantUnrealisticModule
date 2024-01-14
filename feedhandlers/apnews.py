@@ -52,13 +52,15 @@ def get_item(content_data, args, site_json, save_debug=False):
     if not utils.check_age(item, args):
         return None
 
+    item['author'] = {}
     if content_data.get('bylines'):
-        item['author'] = {}
         m = re.search(r'^By\s(.*)', content_data['bylines'], flags=re.I)
         if m:
             item['author']['name'] = m.group(1).title().replace('And', 'and')
         else:
             item['author']['name'] = content_data['bylines'].title().replace('And', 'and')
+    else:
+        item['author']['name'] = 'AP News'
 
     if content_data.get('tagObjs'):
         item['tags'] = []
@@ -155,8 +157,8 @@ def get_item(content_data, args, site_json, save_debug=False):
         media = next((it for it in content_data['media'] if it['id'] == content_data['leadPhotoId']), None)
         if media:
             item['content_html'] = add_media(media)
-    else:
-        item['content_html'] = utils.add_image(item['image'])
+    elif item.get('_image'):
+        item['content_html'] = utils.add_image(item['_image'])
 
     item['content_html'] += str(story_soup)
 
@@ -173,9 +175,8 @@ def get_item(content_data, args, site_json, save_debug=False):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    if save_debug:
-        logger.debug('getting content for ' + url)
-    m = re.search('([0-9a-f]+)\/?$', url)
+    split_url = urlsplit(url)
+    m = re.search('([0-9a-f]+)\/?$', split_url.path)
     if not m:
         logger.warning('unable to parse article id from ' + url)
         return None

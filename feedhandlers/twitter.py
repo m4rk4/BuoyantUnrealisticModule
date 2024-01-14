@@ -191,8 +191,9 @@ def make_card(card_json, tweet_json):
             if card_desc:
                 card_html += '<br/>' + card_desc
             card_html += '</div></figure>'
-        elif unified_card['type'] == 'image_website':
+        elif unified_card['type'] == 'image_website' or unified_card['type'] == 'video_website':
             images = []
+            videos = []
             destinations = []
             for component in unified_card['components']:
                 object = unified_card['component_objects'][component]
@@ -200,6 +201,12 @@ def make_card(card_json, tweet_json):
                     media = unified_card['media_entities'][object['data']['id']]
                     if media['type'] == 'photo':
                         images.append(media['media_url_https'])
+                    if media['type'] == 'video':
+                        poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, media['media_url_https'])
+                        for video in media['video_info']['variants']:
+                            if 'mp4' in video['content_type']:
+                                videos.append({"src": video['url'], "poster": poster})
+                                break
                     else:
                         logger.warning('unhandled unified card media type ' + media['type'])
                 elif object['type'] == 'details' and object['data'].get('destination'):
@@ -208,6 +215,10 @@ def make_card(card_json, tweet_json):
             for i, image in enumerate(images):
                 card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
                 card_html += '<a href="{}"><img src={} style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(destinations[i]['url'], image)
+                card_html += '<div style="margin:8px;"><small><a href="{}">{}</a></small></div></figure>'.format(destinations[i]['url'], destinations[i]['vanity'])
+            for i, video in enumerate(videos):
+                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
+                card_html += '<a href="{}"><img src={} style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(video['src'], video['poster'])
                 card_html += '<div style="margin:8px;"><small><a href="{}">{}</a></small></div></figure>'.format(destinations[i]['url'], destinations[i]['vanity'])
         else:
             logger.warning('unhandled unified card type ' + unified_card['type'])

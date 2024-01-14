@@ -171,6 +171,14 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             logger.warning('unhandled twitter-tweet in ' + url)
 
+    for el in soup.find_all(class_='instagram-media'):
+        if el.get('data-instgrm-permalink'):
+            new_html = utils.add_embed(el['data-instgrm-permalink'])
+            el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+            el.decompose()
+        else:
+            logger.warning('unhandled instagram-media in ' + url)
+
     for el in soup.find_all(class_='pullquote'):
         new_html = utils.add_pullquote(el.get_text())
         el.insert_after(BeautifulSoup(new_html, 'html.parser'))

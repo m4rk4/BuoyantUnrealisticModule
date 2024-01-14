@@ -59,7 +59,7 @@ def get_author_info(channel_id):
     #print(channel_url)
     channel_json = utils.get_url_json(channel_url, headers=headers)
     if channel_json:
-        utils.write_file(channel_json, './debug/channel.json')
+        # utils.write_file(channel_json, './debug/channel.json')
         if isinstance(channel_json, list):
             channel_response = next((it for it in channel_json if it.get('response')), None)
         elif isinstance(channel_json, dict) and channel_json.get('response'):
@@ -132,7 +132,6 @@ def get_content(url, args, site_json, save_debug=False):
             return None
         if save_debug:
             utils.write_file(player_response, './debug/youtube.json')
-        utils.write_file(player_response, './debug/youtube.json')
         if not player_response.get('videoDetails'):
             if player_response['playabilityStatus'].get('errorScreen') and player_response['playabilityStatus']['errorScreen'].get('playerErrorMessageRenderer'):
                 reasons = []
@@ -302,6 +301,8 @@ def get_content(url, args, site_json, save_debug=False):
                 item['author']['url'] = 'https://www.youtube.com' + playlist_header['ownerText']['runs'][0]['navigationEndpoint']['browseEndpoint']['canonicalBaseUrl']
                 item['author']['avatar'] = '{}/image?height=32&width=32&mask=ellipse'.format(config.server)
             item['_image'] = re.sub(r'/[^/]+\.jpg', '/maxresdefault.jpg', utils.clean_url(playlist_header['playlistHeaderBanner']['heroPlaylistThumbnailRenderer']['thumbnail']['thumbnails'][0]['url']))
+            if not utils.url_exists(item['_image']):
+                item['_image'] = re.sub(r'/[^/]+\.jpg', '/hqdefault.jpg', utils.clean_url(playlist_header['playlistHeaderBanner']['heroPlaylistThumbnailRenderer']['thumbnail']['thumbnails'][0]['url']))
             if not video_id:
                 heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
                 caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
@@ -315,11 +316,17 @@ def get_content(url, args, site_json, save_debug=False):
             video_list = playlist_info['response']['contents']['singleColumnBrowseResultsRenderer']['tabs'][0]['tabRenderer']['content']['sectionListRenderer']['contents'][0]['itemSectionRenderer']['contents'][0]['playlistVideoListRenderer']['contents']
 
     if video_list:
-        item['content_html'] += '<h3>Playlist</h3>'
+        item['content_html'] += '<h3><a href="https://www.youtube.com/embed/videoseries?list={}">Playlist</a></h3>'.format(playlist_id)
         video_args = {
             "author": item['author']
         }
-        for playlist_video in video_list:
+        if 'embed' in args:
+            n = 3
+        else:
+            n = -1
+        for i, playlist_video in enumerate(video_list):
+            if i == n:
+                break
             if playlist_video.get('playlistVideoRenderer'):
                 video = playlist_video['playlistVideoRenderer']
                 it = get_content('https://www.youtube.com/watch?v={}'.format(video['videoId']), video_args, site_json, False)

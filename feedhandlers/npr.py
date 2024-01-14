@@ -26,6 +26,7 @@ def get_program_details(program):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -161,6 +162,14 @@ def get_content(url, args, site_json, save_debug=False):
                     if it and it.get_text().strip():
                         caption = it.get_text().strip()
                     new_html = utils.add_image(img_src, caption)
+            elif 'graphic' in el['class']:
+                it = el.find('img')
+                if it:
+                    if it['src'].startswith('/'):
+                        img_src = '{}://{}{}'.format(split_url.scheme, split_url.netloc, it['src'])
+                    else:
+                        img_src = it['src']
+                    new_html = utils.add_image(img_src)
             elif 'pullquote' in el['class']:
                 it = el.find(class_='byline')
                 if it:
@@ -170,12 +179,17 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='bucket')
                 new_html = utils.add_pullquote(it.decode_contents().strip(), author)
             elif 'statichtml' in el['class']:
-                it = el.find('blockquote')
-                if it:
-                    if 'tiktok-embed' in it['class']:
-                        new_html = utils.add_embed(it['cite'])
-                    elif 'instagram-media' in it['class']:
-                        new_html = utils.add_embed(it['data-instgrm-permalink'])
+                if el.find(class_='DC-note-container'):
+                    m = re.search(r'nprdc.embedNote\("([^"]+)"', str(el))
+                    if m:
+                        new_html = utils.add_embed(m.group(1))
+                else:
+                    it = el.find('blockquote')
+                    if it:
+                        if 'tiktok-embed' in it['class']:
+                            new_html = utils.add_embed(it['cite'])
+                        elif 'instagram-media' in it['class']:
+                            new_html = utils.add_embed(it['data-instgrm-permalink'])
                 if not new_html:
                     logger.warning('unhandled bucketwrap statichtml in ' + item['url'])
             elif 'internallink' in el['class'] and 'insettwocolumn' in el['class'] or 'twitter' in el['class'] or 'youtube-video' in el['class']:

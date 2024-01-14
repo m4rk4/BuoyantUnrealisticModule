@@ -41,10 +41,12 @@ def get_caption(props, credit_only=False):
     return ' | '.join(captions)
 
 
-def get_image_src(image, width=1000):
+def get_image_src(image, width=1200):
     sources = []
     if image.get('sources'):
         for key, val in image['sources'].items():
+            if val.get('aspectRatio') and val['aspectRatio'] == '1:1':
+                continue
             sources.append(val)
     elif image.get('segmentedSources'):
         for key, val in image['segmentedSources'].items():

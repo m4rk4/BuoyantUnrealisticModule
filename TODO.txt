@@ -1,5 +1,9 @@
+403 on replit
+reddit.com
+medium.com
+autoworld.com
+
 Not working:
-WSJ sites
 mashable.com
 
 WIP: discovery networks
@@ -296,6 +300,7 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.eff.org/deeplinks
 https://www.gameinformer.com/news/2023/12/07/pokemon-scarlet-and-violet-your-favorite-starters-and-legendaries-return-in-new?_wrapper_format=drupal_ajax
 Find content - https://www.psychologytoday.com/us/articles/202309/inside-the-mind-of-a-hero
 https://privacyinternational.org/long-read/5100/uk-governments-controversial-proposal-expand-surveillance-powers-what-you-need-know?_format=hal_json

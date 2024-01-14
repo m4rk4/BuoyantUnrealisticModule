@@ -56,7 +56,7 @@ def add_widget(model_name, widget_type, ffte):
         #widget_url = '{}/widget.php?model_name={}&article_type={}&article_category=retail&language={}&site={}&filter_product_types=deals%2Ccontracts%2Csubscriptions%2Cbroadband&device=mobile&origin=widgets-clientside'.format(ffte['regionUrl'].replace('www.', 'hawk.'), model_name, widget_type, ffte['lang'], ffte['site'].upper())
         widget_url = 'https://search-api.fie.futurecdn.net/widget.php?model_name={}&article_type={}&article_category=retail&language={}&site={}&filter_product_types=deals%2Ccontracts%2Csubscriptions%2Cbroadband&device=mobile&origin=widgets-clientside'.format(model_name.replace('_', '%20'), widget_type, ffte['lang'], ffte['site'].upper())
         widget_json = utils.get_url_json(widget_url)
-        utils.write_file(widget_json, './debug/widget.json')
+        # utils.write_file(widget_json, './debug/widget.json')
         if widget_json and widget_json['widget']['data'].get('offers'):
             if widget_json['widget']['data']['offers'][0].get('image'):
                 img_src = widget_json['widget']['data']['offers'][0]['image']

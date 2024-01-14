@@ -274,13 +274,15 @@ def render_contents(contents, netloc, image_link=None):
     return content_html
 
 
-def decrypt_content(encryptedDocumentKey, encryptedDataHash):
+def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     # Seems like if x-original-url has a valid paywall token for any article, then the given encryptedDocumentKey is decrypted
     # Tokes expire - some after about 7 days
     # WSJ links free articles from their reddit account here: https://www.reddit.com/user/wsj/.json?sort=new
     # or look here: https://www.reddit.com/domain/wsj.com/.json
     # https://www.wsj.com/lifestyle/dog-owners-death-lessons-love-grief-53c77511?st=ycgues92xaxtr83
     # https://www.wsj.com/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04
+    # https://www.wsj.com/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu
+    # Adding mod=djemalertNEWS seems to bypass the need for a token
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
@@ -296,7 +298,7 @@ def decrypt_content(encryptedDocumentKey, encryptedDataHash):
         "x-encrypted-document-key": encryptedDocumentKey,
         "x-original-host": "www.wsj.com",
         "x-original-referrer": "",
-        "x-original-url": "/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu"
+        "x-original-url": urlsplit(url).path + "?mod=djemalertNEWS"
     }
     # Seems like using wsj.com works for other wsj sites as well (Barrons, etc.)
     client_json = utils.get_url_json('https://www.wsj.com/client', headers=headers)
@@ -639,7 +641,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += render_contents(api_json['body'], split_url.netloc)
 
     if api_json.get('encryptedDocumentKey'):
-        content = decrypt_content(api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
+        content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
         if content:
             content_json = json.loads(content)
             if save_debug:

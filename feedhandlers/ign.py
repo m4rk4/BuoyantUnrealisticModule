@@ -565,5 +565,3 @@ def get_feed(url, args, site_json, save_debug=False):
                         break
     feed['items'] = items.copy()
     return feed
-
-

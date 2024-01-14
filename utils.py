@@ -341,13 +341,15 @@ def find_redirect_url(url):
     elif split_url.netloc == 'api.bam-x.com':
       r = requests.get(url,
                        headers={
-                         "Range": "bytes=0-100",
                          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0"
                        },
-                       allow_redirects=True,
-                       timeout=5)
-      if r.status_code == 200:
-        return get_redirect_url(r.url)
+                       allow_redirects=False)
+      if r and r.text:
+        soup = BeautifulSoup(r.text, 'lxml')
+        if soup.title and 'Redirecting' in soup.title.string:
+          link = soup.find('a')
+          if link:
+            return get_redirect_url(link['href'])
     elif split_url.netloc == 'howl.me':
       pass
     else:

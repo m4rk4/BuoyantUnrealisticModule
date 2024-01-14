@@ -111,6 +111,8 @@ def get_content(url, args, site_json, save_debug=False):
                 content_html = it['content_html'] + content_html
 
     soup = BeautifulSoup(content_html, 'html.parser')
+    for el in soup.find_all(class_=["ad", "ad-wrapper"]):
+        el.decompose()
 
     for el in soup.find_all('figure'):
         if not el.get('class'):
@@ -154,10 +156,14 @@ def get_content(url, args, site_json, save_debug=False):
         new_html = ''
         it = el.find('iframe')
         if it:
-            if it['src'].startswith('https://products.gobankingrates.com'):
+            if it.get('data-src'):
+                src = it['data-src']
+            else:
+                src = it['src']
+            if src.startswith('https://products.gobankingrates.com'):
                 el.decompose()
                 continue
-            new_html = utils.add_embed(it['src'])
+            new_html = utils.add_embed(src)
         else:
             it = el.find('blockquote')
             if it and it.get('class'):
@@ -201,6 +207,15 @@ def get_content(url, args, site_json, save_debug=False):
             el.decompose()
         else:
             logger.warning('unhandled iframe in ' + item['url'])
+
+    for el in soup.find_all('es-blockquote'):
+        if el.get('data-source-updated') and el['data-source-updated'] == 'true':
+            new_html = utils.add_pullquote(el.get('data-quote'), el.get('data-source'))
+        else:
+            new_html = utils.add_pullquote(el.get('data-quote'))
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
 
     for el in soup.find_all(class_='product-card'):
         link = el.find('a', attrs={"data-analytics-product-id": True})

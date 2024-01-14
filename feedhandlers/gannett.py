@@ -211,13 +211,18 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
 
     soup = BeautifulSoup(article_html, 'html.parser')
 
+    item['content_html'] = ''
+
+    el = soup.find('h2', class_='gnt_ar_shl')
+    if el:
+        # Subheadline
+        item['content_html'] += '<p><em>{}</em></p>'.format(el.decode_contents())
+
     if article_json['type'] == 'video':
-        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
+        item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'])
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
-
     elif article_json['type'] == 'gallery':
-        item['content_html'] = get_gallery_content(item['id'], site_code)
-
+        item['content_html'] += get_gallery_content(item['id'], site_code)
     else:
         # article_json['type'] == 'text'
         article = soup.find(class_='gnt_ar_b')
@@ -299,6 +304,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all('aside'):
             new_html = ''
             if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
+                print('skipping aside ' + str(el['class']))
                 el.decompose()
                 continue
             elif 'gnt_em_vp__tp' in el['class']:
@@ -327,6 +333,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                         new_html = utils.add_embed(it['data-v-pdfurl'])
                     else:
                         new_html = utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(it['data-v-pdfurl']))
+            if 'gnt_em_gm' in el['class']:
+                # Google Map
+                print(el.iframe)
+                new_html = utils.add_embed(el.iframe['src'])
             elif el.has_attr('data-gl-method'):
                 if el['data-gl-method'] == 'loadTwitter':
                     new_html = utils.add_embed(utils.get_twitter_url(el['data-v-id']))
@@ -373,7 +383,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all(re.compile(r'\b(h\d|li|ol|p|span|ul)\b'), class_=True):
             el.attrs = {}
 
-        item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
+        item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
 
     if not item.get('_image'):
         el = soup.find('meta', attrs={"property": "og:image"})

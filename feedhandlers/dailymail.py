@@ -1,10 +1,9 @@
 import json, re
-from bs4 import BeautifulSoup, Comment
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from bs4 import BeautifulSoup
+from datetime import datetime
 
 import utils
-from feedhandlers import rss, wp_posts
+from feedhandlers import rss
 
 import logging
 
@@ -56,6 +55,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     if ld_json.get('keywords'):
         item['tags'] = ld_json['keywords'].copy()
+    else:
+        el = soup.find(class_='articleTopicsRow')
+        if el:
+            item['tags'] = []
+            for it in el.find_all('a'):
+                item['tags'].append(it.get_text())
 
     if ld_json.get('image'):
         item['_image'] = ld_json['image']['url']
@@ -78,7 +83,7 @@ def get_content(url, args, site_json, save_debug=False):
         if save_debug:
             utils.write_file(str(body), './debug/debug.html')
 
-        for el in body.find_all(class_=['molads_ff', 'fff-inline', 'perform-player']):
+        for el in body.find_all(class_=['art-ins', 'molads_ff', 'fff-inline', 'perform-player']):
             # perform-player seems to be unrelated videos
             el.decompose()
 

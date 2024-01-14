@@ -88,7 +88,7 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'raw_html':
         # Filter out ad content
-        if not re.search(r'adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
+        if element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
             raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
             #print(raw_soup.contents[0].name)
             if raw_soup.iframe:
@@ -605,7 +605,12 @@ def get_content_html(content, url, site_json, save_debug):
         content_html += '<h3>Related Videos</h3>'
         for video in content['related_content']['videos']:
             caption = '<b>{}</b> &mdash; {}'.format(video['title'], video['description'])
-            content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption)
+            if video['source'].get('mp4'):
+                content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption)
+            elif video['source'].get('hls'):
+                content_html += utils.add_video(video['source']['hls'], 'application/x-mpegURL', video['thumbnail']['renditions']['original']['480w'], caption)
+            else:
+                logger.warning('unhandled related content video in ' + url)
 
     if content.get('subtype'):
         if content['subtype'] == 'audio':
@@ -803,6 +808,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     if content.get('result'):
         return get_item(content['result'], url, args, site_json, save_debug)
+    elif content.get('content'):
+        return get_item(content['content'], url, args, site_json, save_debug)
     return get_item(content, url, args, site_json, save_debug)
 
 

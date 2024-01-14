@@ -365,8 +365,9 @@ def screenshot():
         context = browser.new_context(viewport={"width": width, "height": height}, ignore_https_errors=True)
         page = context.new_page()
         page.goto(args['url'])
-        #page.goto(args['url'], wait_until="networkidle")
-        #page.waitForLoadState('domcontentloaded')
+        if args.get('networkidle'):
+            page.goto(args['url'], wait_until="networkidle")
+        # page.waitForLoadState('domcontentloaded')
         if args.get('locator'):
             ss = page.locator(args['locator']).screenshot()
         else:

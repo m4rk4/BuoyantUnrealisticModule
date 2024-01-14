@@ -359,7 +359,7 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
         return authors
 
     if wp_post:
-        if wp_post.get('yoast_head_json') and wp_post['yoast_head_json'].get('twitter_misc') and wp_post['yoast_head_json']['twitter_misc'].get('Written by'):
+        if wp_post.get('yoast_head_json') and wp_post['yoast_head_json'].get('twitter_misc') and wp_post['yoast_head_json']['twitter_misc'].get('Written by') and wp_post['yoast_head_json']['twitter_misc']['Written by'].lower() != 'administrator':
             authors.append(wp_post['yoast_head_json']['twitter_misc']['Written by'])
             return authors
 
@@ -376,8 +376,12 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
             return authors
 
         if wp_post.get('author_info'):
-            authors.append(wp_post['author_info']['display_name'])
-            return authors
+            if wp_post['author_info'].get('display_name'):
+                authors.append(wp_post['author_info']['display_name'])
+                return authors
+            elif wp_post['author_info'].get('name'):
+                authors.append(wp_post['author_info']['name'])
+                return authors
 
         if wp_post.get('byline'):
             for it in wp_post['byline']:
@@ -669,14 +673,22 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                     if link_json['media_type'] == 'image':
                         if link_json.get('media_details') and link_json['media_details'].get('sizes'):
                             image = None
-                            # Filter image sizes
-                            images = []
-                            for key, val in link_json['media_details']['sizes'].items():
-                                if any(it in key for it in ['thumb', 'small', 'tiny', 'landscape', 'portrait', 'square', 'logo', 'footer', 'archive', 'column', 'author', 'sponsor', 'hero']):
-                                    continue
-                                images.append(val)
-                            if images:
-                                image = utils.closest_dict(images, 'width', 1000)
+                            if link_json['media_details']['sizes'].get('full'):
+                                image = link_json['media_details']['sizes']['full']
+                            else:
+                                # Filter image sizes
+                                images = []
+                                landscape = []
+                                for key, val in link_json['media_details']['sizes'].items():
+                                    if any(it in key for it in ['thumb', 'small', 'tiny', 'landscape', 'portrait', 'square', 'logo', 'footer', 'archive', 'column', 'author', 'sponsor', 'hero']):
+                                        continue
+                                    images.append(val)
+                                    if val['width'] >= val['height']:
+                                        landscape.append(val)
+                                if landscape:
+                                    image = utils.closest_dict(landscape, 'width', 1000)
+                                elif images:
+                                    image = utils.closest_dict(images, 'width', 1000)
                             if image and image.get('source_url'):
                                 item['_image'] = image['source_url']
                             elif image and image.get('url'):
@@ -1247,6 +1259,8 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_html = ''
         if el['data-icon'] == 'clock':
             new_html = '<span>&#128337;</span>'
+        elif el['data-icon'] == 'long-arrow-alt-right':
+            new_html = '<span>&#10230;</span>'
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
@@ -1289,6 +1303,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         el.attrs = {}
         el['style'] = 'width:100%;'
 
+    for el in soup.find_all(class_='has-text-align-center'):
+        el['style'] = 'text-align:center;'
+
     for el in soup.find_all(class_='summary__title'):
         new_html = '<h2>{}</h2>'.format(el.get_text())
         new_el = BeautifulSoup(new_html, 'html.parser')
@@ -1298,6 +1315,38 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(class_='wp-block-group'):
         if el.find(id='mc_embed_signup'):
             el.decompose()
+        elif split_url.netloc == 'www.smartprix.com':
+            it = el.find(class_='wp-block-group__inner-container')
+            if it:
+                kbds = it.find_all('kbd')
+                ratings = it.find_all('div', class_='wp-block-jetpack-rating-star')
+                n = len(ratings)
+                new_html = '<table>'
+                for i, kbd in enumerate(kbds):
+                    new_html += '<tr><td>{}</td><td>'.format(str(kbd))
+                    if i < n:
+                        rating = ratings[i].find(attrs={"itemprop": "ratingValue"})
+                        if rating:
+                            val = float(rating['content'])
+                            for j in range(math.floor(val)):
+                                new_html += '&#9733;'
+                            if val % 1:
+                                new_html += '&#x00BD;'
+                    new_html += '</td></tr>'
+                new_html += '</table>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+
+    for el in soup.find_all(class_='wp-block-buttons'):
+        it = el.find(class_='wp-block-button__link')
+        if it:
+            new_html = '<div><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; text-transform:uppercase; border:1px solid rgb(5, 125, 188);">{}</span></a></div>'.format(it['href'], it.get_text())
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled wp-block-buttons in ' + item['url'])
 
     for el in soup.find_all(class_='wp-block-prc-block-subtitle'):
         new_html = '<p><em>{}</em></p>'.format(el.decode_contents())
@@ -2005,6 +2054,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             it = el.find('blockquote')
             if it:
                 new_html = utils.add_embed(it['data-instgrm-permalink'])
+            else:
+                m = re.search(r'https://www\.instagram\.com/p/[^/]+/', str(el))
+                if m:
+                    new_html = utils.add_embed(m.group(0))
         elif 'wp-block-embed-tiktok' in el['class']:
             it = el.find('blockquote')
             if it:
@@ -2449,6 +2502,17 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all('figure', id=re.compile(r'media-\d+')):
         add_image(el, None, base_url, site_json)
 
+    for el in soup.find_all('div', class_='cover-image-wrapper'):
+        # https://www.growbyginkgo.com/2024/01/09/getting-under-the-skin/
+        it = el.find('video')
+        if it and it.get('src'):
+            new_html = utils.add_video(it['src'], 'video/mp4')
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_before(new_el)
+            el.decompose()
+        else:
+            logger.warning('unhandled cover-image-wrapper in ' + item['url'])
+
     for el in soup.find_all('div', class_='box'):
         if el.find(class_='box-image'):
             add_image(el, None, base_url, site_json)
@@ -2763,39 +2827,45 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all('iframe'):
         if el.name == None:
             continue
+        new_html = ''
         el_parent = el
-        it = el.find_parent(class_='embed')
-        if it:
-            el_parent = it
+        if el.get('src') and 'dataviz.theanalyst.com' in el['src']:
+            new_html = utils.add_image('{}/screenshot?url={}&locator=body&networkidle=1'.format(config.server, quote_plus(el['src'])), link=el['src'])
         else:
-            for it in reversed(el.find_parents()):
-                if it.name == 'p':
-                    has_str = False
-                    for c in it.contents:
-                        if isinstance(c, bs4.element.NavigableString):
-                            has_str = True
-                    if not has_str:
+            it = el.find_parent(class_='embed')
+            if it:
+                el_parent = it
+            else:
+                for it in reversed(el.find_parents()):
+                    if it.name == 'p':
+                        has_str = False
+                        for c in it.contents:
+                            if isinstance(c, bs4.element.NavigableString):
+                                has_str = True
+                        if not has_str:
+                            el_parent = it
+                            break
+                    elif not it.find('p'):
                         el_parent = it
                         break
-                elif not it.find('p'):
-                    el_parent = it
-                    break
 
-        if el.get('src'):
-            src = el['src']
-        elif el.get('data-src'):
-            src = el['data-src']
+            if el.get('src'):
+                src = el['src']
+            elif el.get('data-src'):
+                src = el['data-src']
+            else:
+                src = ''
+            if src:
+                if not re.search(r'amazon-adsystem\.com', src):
+                    new_html = utils.add_embed(src)
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el_parent.insert_after(new_el)
+            el_parent.decompose()
         else:
-            src = ''
-        if src:
-            if not re.search(r'amazon-adsystem\.com', src):
-                new_el = BeautifulSoup(utils.add_embed(src), 'html.parser')
-                el_parent.insert_after(new_el)
-                el_parent.decompose()
-        else:
-            logger.warning('unknown iframe src in ' + item['url'])
+            logger.warning('unhandled iframe in ' + item['url'])
 
-    for el in soup.find_all(class_=['twitter-tweet', 'twitter-video']):
+    for el in soup.find_all(class_=['twitter-tweet', 'twitter-video', 'twitter-quote']):
         links = el.find_all('a')
         new_el = BeautifulSoup(utils.add_embed(links[-1]['href']), 'html.parser')
         el.insert_after(new_el)
@@ -2929,6 +2999,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
+        elif el.find(class_='wp-block-file__button'):
+            it = el.find(class_='wp-block-file__button')
+            it.string = ' ⭳ '
         else:
             logger.warning('unhandled wp-block-file in ' + item['url'])
 
@@ -3082,6 +3155,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     page_soup = None
     post = None
+    posts_path = ''
     post_url = ''
     if site_json.get('posts_path'):
         if isinstance(site_json['posts_path'], str):
@@ -3091,7 +3165,13 @@ def get_content(url, args, site_json, save_debug=False):
             if key:
                 posts_path = site_json['posts_path'][list(key)[0]]
             else:
-                posts_path = site_json['posts_path']['default']
+                for key, val in site_json['posts_path'].items():
+                    for path in paths:
+                        if key in path:
+                            posts_path = val
+                            break
+                if not posts_path:
+                    posts_path = site_json['posts_path']['default']
 
         if site_json['wpjson_path'].startswith('/'):
             wpjson_path = '{}://{}{}'.format(split_url.scheme, split_url.netloc, site_json['wpjson_path'])

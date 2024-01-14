@@ -121,7 +121,6 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     if ig_data:
         if save_debug:
             utils.write_file(ig_data, './debug/instagram.json')
-        utils.write_file(ig_data, './debug/instagram.json')
         if ig_data.get('owner'):
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['owner']['profile_pic_url']))
             users.append(ig_data['owner']['username'])

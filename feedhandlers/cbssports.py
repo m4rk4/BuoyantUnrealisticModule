@@ -45,7 +45,7 @@ def get_content(url, args, site_json, save_debug=False):
     article_body = soup.find(id='Article-body')
 
     item['content_html'] = ''
-    el = article_body.find(class_='Article-subline')
+    el = soup.find(class_='Article-subline')
     if el:
         item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())
 
@@ -204,7 +204,7 @@ def get_content(url, args, site_json, save_debug=False):
         el.attrs  = {}
         el['href'] = href
 
-    item['content_html'] += re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', body_content.decode_contents())
+    item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', body_content.decode_contents())
     return item
 
 

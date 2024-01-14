@@ -96,18 +96,31 @@ def get_content(url, args, site_json, save_debug=False):
             item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
             item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
         elif 'place' in paths and query.get('q'):
+            lat = ''
+            lon = ''
             # https://www.google.com/maps/embed/v1/place?key=API_KEY&q=Space+Needle,Seattle+WA
             osm_search = utils.get_url_json('https://nominatim.openstreetmap.org/search?q={}&format=json'.format(quote_plus(query['q'][0])))
-            if not osm_search:
+            if osm_search:
+                lat = osm_search[0]['lat']
+                lon = osm_search[0]['lon']
+                title = osm_search[0]['display_name']
+            else:
+                page_html = utils.get_url_html(url)
+                if page_html:
+                    m = re.search(r'\[(-?\d+\.\d+),(-?\d+\.\d+)\]', page_html)
+                    if m:
+                        lat = m.group(1)
+                        lon = m.group(2)
+                        title = unquote_plus(query['q'][0])
+            if lat and lon:
+                item = {}
+                item['title'] = title
+                item['url'] = 'https://www.google.com/maps/search/{}/@{},{},15z'.format(quote_plus(query['q'][0]), lat, lon)
+                item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
+                item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
+            else:
                 logger.warning('unable to find place {} in {}'.format(query['q'][0], url))
                 return None
-            lat = osm_search[0]['lat']
-            lon = osm_search[0]['lon']
-            item = {}
-            item['title'] = osm_search[0]['display_name']
-            item['url'] = 'https://www.google.com/maps/search/{}/@{},{},15z'.format(quote_plus(query['q'][0]), lat, lon)
-            item['_image'] = '{}/map?lat={}&lon={}'.format(config.server, lat, lon)
-            item['content_html'] = utils.add_image(item['_image'], item['title'], link=item['url'])
     return item
 
 
