@@ -74,15 +74,23 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = article_json['summary']
 
     for node in article_json['bodyNodes']:
-        if re.search(r'^<p[^>]*><img', node):
+        if re.search(r'<img', node):
+            node_html = node
             m = re.search(r'<cite>(.+?)</cite>', node)
             if m:
+                node_html = node_html.replace(m.group(0), '')
                 caption = m.group(1)
             else:
                 caption = ''
-            m = re.search(r'src="([^"]+)"', node)
+            m = re.search(r'<img.*?src="([^"]+)"[^>]*>', node)
             if m:
-                item['content_html'] += utils.add_image(m.group(1), caption)
+                node_html = node_html.replace(m.group(0), '')
+                img_src = m.group(1)
+            m = re.search(r'^<p[^>]*>.*?</p>$', node_html)
+            if m:
+                item['content_html'] += node_html + utils.add_image(img_src, caption)
+            else:
+                item['content_html'] += utils.add_image(img_src, caption)
         elif re.search(r'^<p[^>]*><iframe', node):
             m = re.search(r'src="([^"]+)"', node)
             if m:
@@ -103,6 +111,10 @@ def get_content(url, args, site_json, save_debug=False):
                         content_html = utils.add_embed(m[-1])
             elif re.search(r'class="tiktok-embed"', node):
                 m = re.search(r'cite="([^"]+)"', node)
+                if m:
+                    content_html = utils.add_embed(m.group(1))
+            elif re.search(r'class="reddit-embed-bq"', node):
+                m = re.search(r'href="(https://www.reddit.com/[^"]+)"', node)
                 if m:
                     content_html = utils.add_embed(m.group(1))
             elif re.search(r'class="apester-media"', node):

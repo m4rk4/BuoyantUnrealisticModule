@@ -192,7 +192,10 @@ def get_content(url, args, site_json, save_debug=False):
     for el in soup.find_all(class_='iframe-container'):
         it = el.find('iframe')
         if it:
-            new_html = utils.add_embed(it['src'])
+            if it.get('data-src'):
+                new_html = utils.add_embed(it['data-src'])
+            else:
+                new_html = utils.add_embed(it['src'])
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()

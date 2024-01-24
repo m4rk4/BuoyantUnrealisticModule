@@ -16,7 +16,7 @@ def resize_image(img_src, width=1200):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    #print(url)
+    # print(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     m = re.search(r'([^_]+)_([0-91-f\-]+)\.html?', paths[-1])
@@ -86,7 +86,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['author'] = {"name": tn_json['tncms']['asset']['author']}
             el = soup.find(id='asset-content')
             if el:
-                if tn_json['tncms']['asset']['type'] == 'image':
+                if tn_json['tncms']['asset'].get('type') and tn_json['tncms']['asset']['type'] == 'image':
                     it = el.find('img')
                     if it:
                         if it.get('data-srcset'):
@@ -103,12 +103,18 @@ def get_content(url, args, site_json, save_debug=False):
                         item['content_html'] = utils.add_image(item['_image'], ' | '.join(captions))
                     else:
                         logger.warning('unhandled image asset-content in ' + item['url'])
-                elif tn_json['tncms']['asset']['type'] == 'video' and tn_json['tncms']['asset']['subtype'] == 'youtube':
+                elif tn_json['tncms']['asset'].get('type') and tn_json['tncms']['asset']['type'] == 'video' and tn_json['tncms']['asset']['subtype'] == 'youtube':
                     it = el.find('iframe')
                     if it:
                         item['content_html'] = utils.add_embed(it['src'])
                     else:
                         logger.warning('unhandled youtube asset-content in ' + item['url'])
+                elif el.find(class_='html-content'):
+                    it = el.find('iframe')
+                    if it:
+                        item['content_html'] = utils.add_embed(it['src'])
+                    else:
+                        logger.warning('unhandled to find asset-content in ' + item['url'])
             else:
                 logger.warning('unable to find asset-content in ' + item['url'])
             return item
@@ -231,7 +237,7 @@ def get_content(url, args, site_json, save_debug=False):
                             img_src = resize_image(it['src'])
                         captions = []
                         it = photo.find(class_='caption-text')
-                        if it:
+                        if it and it.get_text().strip():
                             captions.append(re.sub('^<p>(.*)</p>$', r'\1', it.decode_contents()))
                         it = photo.find(class_='tnt-byline')
                         if it:
@@ -252,11 +258,12 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('preview') and article_json['preview'].get('url'):
         item['_image'] = resize_image(article_json['preview']['url'])
         if not lede_img and article_json['type'] != 'image' and article_json['type'] != 'collection':
-            embed_item = get_content('{}://{}/image_{}.html'.format(split_url.scheme, split_url.netloc, article_json['preview']['uuid']), {"embed": True}, site_json, False)
-            if embed_item and embed_item.get('content_html'):
-                lede_img += embed_item['content_html']
-            else:
-                lede_img += utils.add_image(item['_image'])
+            if article_json['preview']['uuid'] != item['id']:
+                embed_item = get_content('{}://{}/image_{}.html'.format(split_url.scheme, split_url.netloc, article_json['preview']['uuid']), {"embed": True}, site_json, False)
+                if embed_item and embed_item.get('content_html'):
+                    lede_img += embed_item['content_html']
+                else:
+                    lede_img += utils.add_image(item['_image'])
 
     content_html = ''
     for content in article_json['content']:
@@ -281,6 +288,10 @@ def get_content(url, args, site_json, save_debug=False):
             elif re.search(r'inline-editorial-article', content):
                 # Generally related articles
                 continue
+        elif content.startswith('<p><img'):
+            m = re.search(r'src="([^"]+)"', content)
+            content_html += utils.add_image(m.group(1))
+            continue
         elif content.startswith('<blockquote'):
             if re.search(r'twitter-tweet', content):
                 m = re.findall(r'href="([^"]+)"', content)

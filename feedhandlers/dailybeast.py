@@ -93,6 +93,9 @@ def render_card(card, conversion_cards):
     elif card[0] == 'pt-video-card':
         if card[1]['class'] == 'youtube':
             card_html = utils.add_embed(card[1]['content'])
+        elif card[1]['class'] == 'JW':
+            m = re.search(r'src="([^"]+)"', card[1]['content'])
+            card_html = utils.add_embed(m.group(1))
         elif card[1]['class'] == 'other':
             m = re.search(r'^<iframe.*src="([^"]+)"', card[1]['content'])
             if m:

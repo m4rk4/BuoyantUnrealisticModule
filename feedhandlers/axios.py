@@ -65,6 +65,9 @@ def format_styles(block, entities):
             # This is a bit hacky to avoid duplicate matches
             style_text = '{}{}{}'.format(pre_text, block['text'][i:j], post_text)
             style_html = '{}<a href="{}">{}</a>{}'.format(pre_text, href, block['text'][i:j], post_text)
+            print('!' + block_html + '!')
+            print('!' + style_text + '!')
+            print('!' + style_html + '!')
             block_html = block_html.replace(style_text, style_html)
         else:
             logger.warning('unhandled entity type ' + entity['type'])

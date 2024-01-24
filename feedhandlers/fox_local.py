@@ -98,75 +98,85 @@ def get_article_content(article_json, args, site_json, save_debug=False):
         if article_json.get('description'):
             item['content_html'] += '<p>{}</p>'.format(article_json['description'])
     else:
-        for component in article_json['components']:
-            item['content_html'] += render_component(component)
+        item['content_html'] += render_components(article_json['components'])
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
-def render_component(component):
+def render_components(components):
+    skip_list = False
+    n = len(components)
     component_html = ''
-    if component['content_type'] == 'text':
-        component_html += component['content']['text']
-    elif component['content_type'] == 'heading':
-        component_html += '<h{0}>{1}</h{0}>'.format(component['content']['rank'], component['content']['text'])
-    elif component['content_type'] == 'image':
-        captions = []
-        if component['content'].get('caption').strip():
-            captions.append(component['content']['caption'].strip())
-        if component['content'].get('copyright').strip():
-            captions.append(component['content']['copyright'].strip())
-        component_html += utils.add_image(component['content']['url'], ' | '.join(captions))
-    elif component['content_type'] == 'image_gallery':
-        for it in component['content']['images']:
+    for i, component in enumerate(components):
+        if component['content_type'] == 'text':
+            # Skip related/suggested content
+            if component['content']['text'].startswith('<p><strong>RELATED:</strong>'):
+                continue
+            elif component['content']['text'].startswith('<p><strong>SUGGESTED:</strong>') and i+1 < n and components[i+1]['content_type'] == 'list':
+                skip_list = True
+                continue
+            component_html += component['content']['text']
+        elif component['content_type'] == 'heading':
+            component_html += '<h{0}>{1}</h{0}>'.format(component['content']['rank'], component['content']['text'])
+        elif component['content_type'] == 'image':
             captions = []
-            if it.get('caption').strip():
-                captions.append(it['caption'].strip())
-            if it.get('copyright').strip():
-                captions.append(it['copyright'].strip())
-            component_html += utils.add_image(it['url'], ' | '.join(captions))
-    elif component['content_type'] == 'akta_video':
-        component_html += utils.add_video(component['content']['media_url'], 'application/x-mpegURL', component['content']['snapshot'], component['content'].get('description'))
-    elif component['content_type'] == 'live_video':
-        key_json = {
-            "v": component['content']['live_id'],
-            "token": component['content']['token'],
-            "accessKey": component['content']['access_key']
-        }
-        key = base64.b64encode(json.dumps(key_json, separators=(',', ':')).encode())
-        lura_url = 'https://w3.mp.lura.live/player/prod/v3/anvload.html?key=' + key.decode()
-        component_html += utils.add_embed(lura_url)
-    elif component['content_type'] == 'twitter_tweet' or component['content_type'] == 'instagram_media' or component['content_type'] == 'facebook_post' or component['content_type'] == 'youtube_video' or component['content_type'] == 'tiktok_video':
-        component_html += utils.add_embed(component['content']['url'])
-    elif component['content_type'] == 'pdf':
-        component_html += utils.add_embed('https://docs.google.com/gview?url=' + quote_plus(component['content']['url']))
-    elif component['content_type'] == 'pull_quote':
-        component_html += utils.add_pullquote(component['content']['text'], component['content'].get('credit'))
-    elif component['content_type'] == 'list':
-        if component['content']['ordered']:
-            tag = 'ol'
+            if component['content'].get('caption').strip():
+                captions.append(component['content']['caption'].strip())
+            if component['content'].get('copyright').strip():
+                captions.append(component['content']['copyright'].strip())
+            component_html += utils.add_image(component['content']['url'], ' | '.join(captions))
+        elif component['content_type'] == 'image_gallery':
+            for it in component['content']['images']:
+                captions = []
+                if it.get('caption').strip():
+                    captions.append(it['caption'].strip())
+                if it.get('copyright').strip():
+                    captions.append(it['copyright'].strip())
+                component_html += utils.add_image(it['url'], ' | '.join(captions))
+        elif component['content_type'] == 'akta_video':
+            component_html += utils.add_video(component['content']['media_url'], 'application/x-mpegURL', component['content']['snapshot'], component['content'].get('description'))
+        elif component['content_type'] == 'live_video':
+            key_json = {
+                "v": component['content']['live_id'],
+                "token": component['content']['token'],
+                "accessKey": component['content']['access_key']
+            }
+            key = base64.b64encode(json.dumps(key_json, separators=(',', ':')).encode())
+            lura_url = 'https://w3.mp.lura.live/player/prod/v3/anvload.html?key=' + key.decode()
+            component_html += utils.add_embed(lura_url)
+        elif component['content_type'] == 'twitter_tweet' or component['content_type'] == 'instagram_media' or component['content_type'] == 'facebook_post' or component['content_type'] == 'youtube_video' or component['content_type'] == 'tiktok_video':
+            component_html += utils.add_embed(component['content']['url'])
+        elif component['content_type'] == 'pdf':
+            component_html += utils.add_embed('https://docs.google.com/gview?url=' + quote_plus(component['content']['url']))
+        elif component['content_type'] == 'pull_quote':
+            component_html += utils.add_pullquote(component['content']['text'], component['content'].get('credit'))
+        elif component['content_type'] == 'list':
+            if skip_list:
+                skip_list = False
+                continue
+            if component['content']['ordered']:
+                tag = 'ol'
+            else:
+                tag = 'ul'
+            component_html += '<{}>'.format(tag)
+            component_html += render_components(component['content']['items'])
+            component_html += '</{}>'.format(tag)
+        elif component['content_type'] == 'list_item':
+            component_html += '<li>' + component['content']['title'] + '</li>'
+        elif component['content_type'] == 'article':
+            component_html += '<div style="width:90%; max-width:540px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;">'
+            if component['content'].get('thumbnail'):
+                component_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(component['content']['url'], component['content']['thumbnail'])
+            component_html += '<div style="padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="http://{}">{}</a></div>'.format(component['content']['url'], component['content']['title'])
+            if component['content'].get('dek'):
+                component_html += '<p>{}</p>'.format(component['content']['dek'])
+            component_html += '</div></div>'
+        elif component['content_type'] == 'credible':
+            # These are ad widgets for credible.com
+            pass
         else:
-            tag = 'ul'
-        component_html += '<{}>'.format(tag)
-        for it in component['content']['items']:
-            component_html += render_component(it)
-        component_html += '</{}>'.format(tag)
-    elif component['content_type'] == 'list_item':
-        component_html += '<li>' + component['content']['title'] + '</li>'
-    elif component['content_type'] == 'article':
-        component_html += '<div style="width:90%; max-width:540px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;">'
-        if component['content'].get('thumbnail'):
-            component_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(component['content']['url'], component['content']['thumbnail'])
-        component_html += '<div style="padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="http://{}">{}</a></div>'.format(component['content']['url'], component['content']['title'])
-        if component['content'].get('dek'):
-            component_html += '<p>{}</p>'.format(component['content']['dek'])
-        component_html += '</div></div>'
-    elif component['content_type'] == 'credible':
-        # These are ad widgets for credible.com
-        pass
-    else:
-        logger.warning('unhandled content type ' + component['content_type'])
+            logger.warning('unhandled content type ' + component['content_type'])
     return component_html
 
 

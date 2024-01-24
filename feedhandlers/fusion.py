@@ -199,6 +199,40 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(video_json['playerScript'], video_args)
             else:
                 logger.warning('unhandled oovvuu-video custom-embed')
+        elif element['subtype'] == 'Video Playlist':
+            # https://www.atlantanewsfirst.com/2024/01/15/read-fulton-county-da-fani-willis-improper-relationship-charges/
+            video_pls = utils.get_url_json('https://gray-config-prod.api.arc-cdn.net/video/v1/ans/playlists/findByPlaylist?name=' + quote_plus(element['embed']['id']))
+            if video_pls:
+                video = video_pls['playlistItems'][0]
+                streams_mp4 = []
+                streams_ts = []
+                for stream in video['streams']:
+                    if stream.get('stream_type'):
+                        if stream['stream_type'] == 'mp4':
+                            streams_mp4.append(stream)
+                        elif stream['stream_type'] == 'ts':
+                            streams_ts.append(stream)
+                    else:
+                        if re.search(r'\.mp4', stream['url']):
+                            streams_mp4.append(stream)
+                        elif re.search(r'\.m3u8', stream['url']):
+                            streams_ts.append(stream)
+                stream = None
+                if streams_mp4:
+                    if streams_mp4[0].get('height'):
+                        stream = utils.closest_dict(streams_mp4, 'height', 720)
+                    else:
+                        stream = streams_mp4[0]
+                    stream_type = 'video/mp4'
+                elif streams_ts:
+                    if streams_ts[0].get('height'):
+                        stream = utils.closest_dict(streams_ts, 'height', 720)
+                    else:
+                        stream = streams_ts[0]
+                    stream_type = 'application/x-mpegURL'
+                if stream:
+                    poster = video['promo_image']['url']
+                    element_html += utils.add_video(stream['url'], stream_type, poster, video['headlines']['basic'])
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif element['subtype'] == 'flourish_visualisation':
@@ -269,6 +303,13 @@ def process_content_element(element, url, site_json, save_debug):
                 embed_html += '<div style="font-size:1.1em; font-weight:bold">{}</div>'.format(element['embed']['config']['headline'])
             embed_html += element['embed']['config']['content']
             element_html += utils.add_blockquote(embed_html)
+        elif element['subtype'] == 'section-info':
+            # https://www.dlnews.com/articles/markets/gbtc-could-see-billions-leave-its-bitcoin-etf-says-jpmorgan/
+            element_html += '<ul>'
+            for it in element['embed']['config']['text'].split('\n'):
+                if it.strip():
+                    element_html += '<li>' + it + '</li>'
+            element_html += '</ul>'
         elif re.search(r'iframe', element['subtype'], flags=re.I):
             embed_html = base64.b64decode(element['embed']['config']['base64HTML']).decode('utf-8')
             m = re.search(r'src="([^"]+)"', embed_html)
@@ -276,7 +317,7 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled custom_embed iframe')
-        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
             pass
         else:
             logger.warning('unhandled custom_embed ' + element['subtype'])
@@ -501,6 +542,10 @@ def process_content_element(element, url, site_json, save_debug):
             for it in element['items']:
                 element_html += '<li>{}</li>'.format(it['content'])
             element_html += '</ul>'
+        elif element['subtype'] == 'button/btn_btn-primary/1':
+            # https://www.atlantanewsfirst.com/2024/01/15/read-fulton-county-da-fani-willis-improper-relationship-charges/
+            for it in element['items']:
+                element_html += '<div style="width:80%; margin-left:auto; margin-right:auto;"><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; color:white; background-color:#0072ed; border:1px solid #0072ed;">{}</span></a></div>'.format(it['url'], it['content'])
         elif element['subtype'] == 'link-list' or element['subtype'] == 'splash-story-bullet':
             pass
         else:
@@ -695,7 +740,8 @@ def get_item(content, url, args, site_json, save_debug):
     authors = []
     if content.get('credits') and content['credits'].get('by'):
         for author in content['credits']['by']:
-            authors.append(author['name'])
+            if author['type'] == 'author':
+                authors.append(author['name'])
     elif content.get('authors'):
         for author in content['authors']:
             authors.append(author['name'])
@@ -833,7 +879,14 @@ def get_feed(url, args, site_json, save_debug=False):
             source = site_json['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
         elif re.search(r'about|author|people|staff|team', paths[0]) or (len(paths) > 1 and paths[1].lower() == 'author'):
-            if paths[0] == 'about':
+            author = ''
+            if split_url.netloc == 'www.dlnews.com':
+                authors_json = utils.get_url_json('https://api.dlnews.com/authors')
+                if authors_json:
+                    author_data = next((it for it in authors_json['data'] if it['slug'] == paths[1]), None)
+                    if author_data:
+                        author = author_data['id']
+            elif paths[0] == 'about':
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
                 author = paths[-1]
             elif len(paths) > 1:
@@ -851,8 +904,9 @@ def get_feed(url, args, site_json, save_debug=False):
                 else:
                     logger.warning('unhandled author url ' + args['url'])
                     return None
-            source = site_json['author_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(site_json['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
+            if author:
+                source = site_json['author_feed']['source']
+                query = re.sub(r'\s', '', json.dumps(site_json['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
         elif paths[0] == 'tags' or paths[0] == 'tag' or paths[0] == 'topics' or (paths[0] == 'topic' and 'thebaltimorebanner' not in split_url.netloc):
             tag = paths[1]
             source = site_json['tag_feed']['source']

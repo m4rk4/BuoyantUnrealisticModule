@@ -505,7 +505,7 @@ def image_from_srcset(srcset, target):
   srcset = srcset.strip()
   if srcset.endswith(','):
     srcset = srcset[:-1]
-  #print(srcset)
+  # print(srcset)
   if srcset.endswith('w'):
     ss = list(filter(None, re.split(r'\s(\d+)w', srcset)))
     for i in range(0, len(ss), 2):
@@ -520,6 +520,7 @@ def image_from_srcset(srcset, target):
       images.append(image)
   elif re.search(r'\s([\d\.]+)x?$', srcset):
     ss = list(filter(None, re.split(r'\s([\d\.]+)x?', srcset)))
+    # print(ss)
     for i in range(0, len(ss), 2):
       image = {}
       if ss[i].startswith(','):
@@ -528,7 +529,7 @@ def image_from_srcset(srcset, target):
         image['src'] = ss[i].strip()
       if image['src'].startswith('//'):
         image['src'] = 'https:' + image['src']
-      image['width'] = int(ss[i + 1])
+      image['width'] = float(ss[i + 1])
       if i == 0 and image['width'] > 1.0:
           if image['src'].count(',') == 1:
             m = re.search(r'(.*?),\s?(.*)', image['src'])
@@ -688,15 +689,15 @@ def close_pullquote(author=''):
   return end_html
 
 def add_pullquote(quote, author=''):
-  if quote.startswith('<p>'):
-    quote = quote.replace('<p>', '')
-    quote = quote.replace('</p>', '<br/><br/>')
-    if quote.endswith('<br/><br/>'):
-      quote = quote[:-10]
-  # Strip quotes
+  # Remove styling
+  quote = re.sub(r'</?(em|strong|b)>', '', quote)
+  quote = re.sub(r'<(p|h\d)>', '', quote)
+  quote = re.sub(r'</(p|h\d)>', '<br/><br/>', quote)
+  quote = re.sub('(<br/>)+$', '', quote)
   quote = quote.strip()
-  if (quote.startswith('"') or quote.startswith('“') or quote.startswith('‘')) and (quote.endswith('"') or quote.endswith('”') or quote.endswith('’')):
-    quote = quote[1:-1]
+  m = re.search(r'^("|“|‘)(.*)("|”|’)$', quote)
+  if m:
+    quote = m.group(2)
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 

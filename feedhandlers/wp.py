@@ -132,7 +132,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     else:
         oembed_json = None
 
-    if site_json.get('wpjson_path'):
+    if site_json.get('wpjson_path') and 'embed' not in args:
         args_copy = args.copy()
         args_copy['embed'] = True
         item = wp_posts.get_content(page_url, args_copy, site_json, save_debug)
@@ -221,15 +221,18 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 date = meta['article:published_time']
         elif article_json and article_json.get('datePublished'):
             date = article_json['datePublished']
-        elif site_json.get('timezone'):
+        else:
             el = soup.find('time', attrs={"datetime": True})
             if el:
                 date = el['datetime']
                 if not re.search(r'[+\-]\d{2}:?\d{2}', date):
-                    dt_loc = datetime.fromisoformat(date)
-                    tz_loc = pytz.timezone(site_json['timezone'])
-                    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-                    date = dt.isoformat()
+                    if site_json.get('timezone'):
+                        dt_loc = datetime.fromisoformat(date)
+                        tz_loc = pytz.timezone(site_json['timezone'])
+                        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                        date = dt.isoformat()
+                    else:
+                        date += '+00:00'
         if date:
             try:
                 dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
@@ -453,12 +456,32 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if not lede and item.get('_image'):
             item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
+    if site_json.get('add_content'):
+        for it in site_json['add_content']:
+            if it['position'] == 'top':
+                contents = utils.get_soup_elements(it, soup)
+                for el in contents:
+                    item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+                if it.get('separator'):
+                    item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
+
     if site_json.get('content'):
         contents = utils.get_soup_elements(site_json['content'], soup)
         for el in contents:
             item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+
+    if site_json.get('add_content'):
+        for it in site_json['add_content']:
+            if it['position'] != 'top':
+                contents = utils.get_soup_elements(it, soup)
+                if contents and it.get('separator'):
+                    item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
+                for el in contents:
+                    item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+
     if gallery:
         item['content_html'] += '<h3>Gallery</h3>' + gallery
+
     return item
 
 

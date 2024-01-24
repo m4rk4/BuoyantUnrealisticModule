@@ -1,4 +1,4 @@
-import math
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -19,6 +19,8 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(clean_url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
 
     soup = BeautifulSoup(page_html, 'lxml')
 
@@ -35,16 +37,7 @@ def get_content(url, args, site_json, save_debug=False):
         attachment['mime_type'] = el['type']
         item['attachments'] = []
         item['attachments'].append(attachment)
-        duration = []
-        s = int(el['data-duration'])
-        if s > 3600:
-            h = s / 3600
-            duration.append('{} hr'.format(math.floor(h)))
-            m = (s % 3600) / 60
-            duration.append('{} min'.format(math.ceil(m)))
-        else:
-            m = s / 60
-            duration.append('{} min'.format(math.ceil(m)))
+        duration = utils.calc_duration(int(el['data-duration']))
 
     el = soup.find('meta', attrs={"property": "og:url"})
     if el:
@@ -60,10 +53,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     el = soup.find(class_='window__info-details')
     if el:
-        dt = datetime.strptime(el.get_text().strip(), '%b %d, %Y').replace(tzinfo=timezone.utc)
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        m = re.search(r'\w+ \d?\d, \d{4}', el.get_text().strip())
+        if m:
+            dt = datetime.strptime(m.group(0), '%b %d, %Y').replace(tzinfo=timezone.utc)
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt, False)
 
     el = soup.find(class_='episode__podcast-title')
     if el:
@@ -85,7 +80,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = '<div style="margin-top:1em;"><a href="{}"><img src="{}/image?url={}&width=128&overlay=audio" style="float:left; margin-right:8px; width:128px;"/></a><div style="overflow:hidden;">'.format(item['_audio'], config.server, quote_plus(item['_image']))
     item['content_html'] += '<a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a>'.format(item['url'], item['title'])
     item['content_html'] += '<br/><a href="{}">{}</a>'.format(author_url, item['author']['name'])
-    item['content_html'] += '<br/><small>{}&nbsp;&bull;&nbsp;{}</small>'.format(item['_display_date'], ', '.join(duration))
+    item['content_html'] += '<br/><small>{}&nbsp;&bull;&nbsp;{}</small>'.format(item['_display_date'], duration)
     item['content_html'] += '</div><div style="clear:left;">&nbsp;</div></div>'
     return item
 

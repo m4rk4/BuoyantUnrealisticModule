@@ -364,10 +364,12 @@ def screenshot():
         browser = engine.launch()
         context = browser.new_context(viewport={"width": width, "height": height}, ignore_https_errors=True)
         page = context.new_page()
-        page.goto(args['url'])
         if args.get('networkidle'):
             page.goto(args['url'], wait_until="networkidle")
-        # page.waitForLoadState('domcontentloaded')
+        else:
+            page.goto(args['url'])
+        if args.get('waitfor'):
+            page.wait_for_selector(args['waitfor'])
         if args.get('locator'):
             ss = page.locator(args['locator']).screenshot()
         else:

@@ -113,7 +113,7 @@ def get_item(article_json, args, site_json, save_debug):
         if el:
             item['_image'] = el['src']
 
-    if article_json.get('reviewStars'):
+    if article_json.get('reviewStars') and article_json['reviewStars']['score'] != '0.0':
         el = soup.find('figure')
         new_el = BeautifulSoup('<h2>Rating: {} out of 5</h2>'.format(article_json['reviewStars']['score']), 'html.parser')
         el.insert_after(new_el)

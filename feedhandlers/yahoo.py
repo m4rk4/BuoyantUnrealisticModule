@@ -1,7 +1,7 @@
 import json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import unquote_plus
+from urllib.parse import quote_plus, unquote_plus
 
 import config
 from feedhandlers import rss
@@ -40,7 +40,12 @@ def get_image(image_wrapper):
         figcap = image_wrapper.find('figcaption')
         if figcap:
             caption = figcap.get_text()
-    return utils.add_image(get_full_image(img_src), caption)
+    it = image_wrapper.find('a', class_='link')
+    if it:
+        link = it['href']
+    else:
+        link = ''
+    return utils.add_image(get_full_image(img_src), caption, link=link)
 
 
 def get_video(video_wrapper):
@@ -55,12 +60,13 @@ def get_video(video_wrapper):
     else:
         logger.warning('unknown video id in ' + str(yvideo))
         return ''
-    video_json = utils.get_url_json(
-        'https://video-api.yql.yahoo.com/v1/video/sapi/streams/{}?protocol=http&format=mp4,webm,m3u8'.format(video_id))
+    video_json = utils.get_url_json('https://video-api.yql.yahoo.com/v1/video/sapi/streams/{}?protocol=http&format=mp4,webm,m3u8'.format(video_id))
     if not video_json:
         return ''
-    utils.write_file(video_json, './debug/video.json')
+    # utils.write_file(video_json, './debug/video.json')
     video = utils.closest_dict(video_json['query']['results']['mediaObj'][0]['streams'], 'height', 360)
+    if not video:
+        video = video_json['query']['results']['mediaObj'][0]['streams'][0]
     caption = []
     if video_json['query']['results']['mediaObj'][0]['meta'].get('title'):
         caption.append(video_json['query']['results']['mediaObj'][0]['meta']['title'])
@@ -85,6 +91,7 @@ def get_iframe(iframe_wrapper):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    clean_url = utils.clean_url(url)
     for i in range(3):
         # Need to load the article page first to set appropriate cookies otherwise some embedded content is restricted
         # Sometimes need to do this multiple times
@@ -100,30 +107,38 @@ def get_content(url, args, site_json, save_debug=False):
             cookies.append('{}={}'.format(key, val))
         headers['cookie'] = '; '.join(cookies)
         article_html = r.text
-        m = re.search(r'"pstaid":"([^"]+)"', article_html)
-        if not m:
-            logger.warning('unable to find post-id in ' + url)
-            return None
-        post_id = m.group(1)
-        caas_url = 'https://www.yahoo.com/caas/content/article/?uuid=' + post_id
-        caas_json = utils.get_url_json(caas_url, headers=headers)
+        caas_json = None
+        if 'www.autoblog.com' not in url:
+            caas_url = 'https://www.yahoo.com/caas/content/article/?url=' + quote_plus(clean_url)
+            caas_json = utils.get_url_json(caas_url, headers=headers)
         if not caas_json:
-            return None
+            m = re.search(r'"pstaid":"([^"]+)"', article_html)
+            if not m:
+                m = re.search(r'pstaid:\s*\'([^\']+)\'', article_html)
+                if not m:
+                    m = re.search(r'data-post-uuid="([^"]+)"', article_html)
+                    if not m:
+                        logger.warning('unable to find post-id in ' + url)
+                        return None
+            caas_url = 'https://www.yahoo.com/caas/content/article/?uuid=' + m.group(1)
+            caas_json = utils.get_url_json(caas_url, headers=headers)
+            if not caas_json:
+                return None
         if not re.search(r'caas-3p-blocked', caas_json['items'][0]['markup']):
             break
-
-    if re.search(r'caas-3p-blocked', caas_json['items'][0]['markup']):
-        logger.warning('caas-3p-blocked content in ' + url)
 
     if save_debug:
         utils.write_file(article_html, './debug/debug.html')
         utils.write_file(caas_json, './debug/debug.json')
 
+    if re.search(r'caas-3p-blocked', caas_json['items'][0]['markup']):
+        logger.warning('caas-3p-blocked content in ' + url)
+
     article_json = caas_json['items'][0]['schema']['default']
     data_json = caas_json['items'][0]['data']['partnerData']
 
     item = {}
-    item['id'] = post_id
+    item['id'] = data_json['uuid']
 
     if data_json.get('canonicalUrl'):
         item['url'] = data_json['canonicalUrl']
@@ -159,14 +174,17 @@ def get_content(url, args, site_json, save_debug=False):
 
     caas_soup = BeautifulSoup(caas_json['items'][0]['markup'], 'html.parser')
     caas_body = caas_soup.find(class_='caas-body')
-    if save_debug:
-        utils.write_file(str(caas_body), './debug/debug.html')
+    # utils.write_file(str(caas_body), './debug/debug.html')
 
     for el in caas_body.find_all('figure'):
         new_html = get_image(el)
         if new_html:
-            el.insert_after(BeautifulSoup(new_html, 'html.parser'))
-            el.decompose()
+            if re.search(r'https://www\.autoblog\.com/cars-for-sale/', new_html):
+                # Ad
+                el.decompose()
+            else:
+                el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+                el.decompose()
 
     for el in caas_body.find_all(class_='caas-carousel'):
         new_html = ''
@@ -273,6 +291,42 @@ def get_content(url, args, site_json, save_debug=False):
         el.insert_after(new_el)
         el.decompose()
 
+    gallery_html = ''
+    for el in caas_body.find_all('a', attrs={"data-ylk": re.compile(r'Full Image Gallery', flags=re.I)}):
+        page_html = utils.get_url_html(el['href'])
+        if page_html:
+            gallery_soup = BeautifulSoup(page_html, 'lxml')
+            gallery_html += '<h2><a href="{}">{}</a></h2>'.format(el['href'], gallery_soup.title.get_text())
+            for slide in gallery_soup.find_all(class_='splide__slide'):
+                if 'splide__default__slide' in slide['class'] or 'splide__thumbnail' in slide['class']:
+                    continue
+                img = slide.find('img')
+                if img:
+                    if img.get('data-splide-lazy'):
+                        img_src = img['data-splide-lazy']
+                    else:
+                        img_src = img['src']
+                    captions = []
+                    it = slide.find(class_='splide__slide__content')
+                    if it:
+                        for li in it.find_all('li'):
+                            captions.append(li.get_text())
+                    gallery_html += utils.add_image(img_src, ' | '.join(captions))
+            for it in caas_body.find_all('a', href=el['href']):
+                if not it.get_text() and not it.find_parent('figure'):
+                    parent = it.find_parent('p')
+                    if parent:
+                        parent.decompose()
+            parent = el.find_parent('p')
+            if parent:
+                parent.decompose()
+
+    for el in caas_body.find_all('ul', class_='caas-list-bullet'):
+        it = el.find_previous_sibling()
+        if it and re.search(r'Related\.\.\.|You Might Also Like', it.get_text()):
+            it.decompose()
+            el.decompose()
+
     for el in caas_body.find_all('a'):
         href = el.get('href')
         if href:
@@ -285,59 +339,75 @@ def get_content(url, args, site_json, save_debug=False):
     for el in caas_body.find_all(class_='caas-readmore'):
         el.decompose()
 
-    content_html = caas_body.decode_contents()
-
     article_soup = BeautifulSoup(article_html, 'lxml')
+    content_html = ''
+    el = caas_soup.find(class_='caas-subheadline')
+    if el:
+        content_html += '<p><em>{}</em></p>'.format(el.get_text().strip())
+    else:
+        el = article_soup.find('h2', class_='subheadline')
+        if el:
+            content_html += '<p><em>{}</em></p>'.format(el.get_text().strip())
+
+    el = caas_soup.find(class_=re.compile(r'caas-cover|caas-hero'))
+    if el:
+        if 'caas-figure' in el['class']:
+            content_html += get_image(el)
+        elif 'caas-carousel' in el['class']:
+            # Slideshow - add lead image and remaining slides to end
+            for i, slide in enumerate(el.find_all(class_='caas-carousel-slide')):
+                gallery_html += '<h3>Gallery</h3>'
+                new_html = get_image(slide)
+                if new_html:
+                    if i == 0:
+                        content_html += new_html
+                    gallery_html += new_html
+        elif 'yvideo' in el['class']:
+            content_html += get_video(el)
+        elif 'caas-iframe' in el['class']:
+            content_html += get_iframe(el)
+        else:
+            logger.debug('unhandled caas-cover element type with classes {}'.format(str(el['class'])))
+
     el = article_soup.find(attrs={"data-component": "ProsCons"})
     if el:
-        new_html = ''
         for it in el.find_all('div', recursive=False):
             if it.find('ul'):
-                new_html += '<h3>{}</h3><ul>'.format(it.h2.get_text())
+                content_html += '<h3>{}</h3><ul>'.format(it.h2.get_text())
                 for li in it.find_all('li'):
-                    new_html += '<li>{}</li>'.format(li.get_text())
-                new_html += '</ul>'
-        content_html = new_html + content_html
+                    content_html += '<li>{}</li>'.format(li.get_text())
+                content_html += '</ul>'
 
     el = article_soup.find(attrs={"data-component": "ProductScores"})
     if el:
         for it in el.find_all('div'):
             score = it.get_text().strip()
             if score.isnumeric():
-                content_html = '<h3>Review score: {}</h3>'.format(score) + content_html
+                content_html += '<h3>Review score: {}</h3>'.format(score)
                 break
 
-    el = caas_soup.find(class_=re.compile(r'caas-cover|caas-hero'))
-    if el:
-        if 'caas-figure' in el['class']:
-            new_html = get_image(el)
-            if new_html:
-                content_html = new_html + content_html
-        elif 'caas-carousel' in el['class']:
-            # Slideshow - add lead image and remaining slides to end
-            for i, slide in enumerate(el.find_all(class_='caas-carousel-slide')):
-                content_html += '<h3>Gallery</h3>'
-                new_html = get_image(slide)
-                if new_html:
-                    if i == 0:
-                        content_html = new_html + content_html
-                    content_html += new_html
-        elif 'yvideo' in el['class']:
-            new_html = get_video(el)
-            if new_html:
-                content_html = new_html + content_html
-        elif 'caas-iframe' in el['class']:
-            new_html = get_iframe(el)
-            if new_html:
-                content_html = new_html + content_html
+    for el in article_soup.find_all('ul', class_='vital-stats-list'):
+        new_html = '<table>'
+        for li in el.find_all('li'):
+            it = li.find(class_='stat-title')
+            if it:
+                title = it.decode_contents()
+            else:
+                title = ''
+            it = li.find(class_='vital-val')
+            if it:
+                val = it.decode_contents()
+            else:
+                val = ''
+            new_html += '<tr><td>{}</td><td>{}</td></tr>'.format(title, val)
+        new_html += '</table>'
+        if caas_body.contents[0].name == 'figure':
+            caas_body.contents[0].insert_after(BeautifulSoup(new_html, 'html.parser'))
         else:
-            logger.debug('unhandled caas-cover element type with classes {}'.format(str(el['class'])))
+            content_html += new_html
 
-    el = caas_soup.find(class_='caas-subheadline')
-    if el:
-        content_html = '<p><em>{}</em></p>'.format(el.get_text().strip()) + content_html
-
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', content_html)
+    content_html += caas_body.decode_contents() + gallery_html
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', content_html)
     return item
 
 

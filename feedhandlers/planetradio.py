@@ -11,6 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+gb_channels = None
+
 
 def add_image(image, gallery=None, width=1000):
     img_src = 'https://cdn.apollo.audio/{}/{}?quality=80&format=jpg&width={}'.format(image['image']['path'], image['image']['name'], width)
@@ -85,34 +87,153 @@ def get_player_content(url, args, site_json, save_debug):
         item['content_html'] += utils.add_blockquote(item['summary'])
     return item
 
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if paths[1] == 'player':
         return get_player_content(url, args, site_json, save_debug)
 
-    api_url = 'https://api.publish.apollo.audio/one/articles/?filter=%7B%22publications.furl%22:%22{}%22,%22hiddenArticle%22:false,%22categories.parent.furl%22:%22{}%22,%22published.state%22:%22published%22,%22urls%22:%7B%22$regex%22:%22{}%22%7D,%22categories.furl%22:%22{}%22%7D&page=1&count=5&sort=%7B%22publicationDate%22:-1%7D'.format(paths[0], paths[1], paths[-1], paths[2])
+    if 'podcasts' in paths:
+        if len(paths) > 2:
+            # Single episode
+            episode_id = ''
+            if 'listen' in paths:
+                episode_id = paths[paths.index('listen') + 1]
+            else:
+                m = re.search(r'id-(\d+)', url)
+                if m:
+                    episode_id = m.group(1)
+            if not episode_id:
+                logger.warning('unknown podcast episode id in ' + url)
+                return None
+            return get_podcast_episode(paths[1], episode_id, args, site_json, save_debug)
+        else:
+            return get_podcast(paths[1], args, site_json, save_debug)
+    elif 'news' in paths:
+        api_url = 'https://api.publish.apollo.audio/one/articles/?filter=%7B%22publications.furl%22:%22{}%22,%22hiddenArticle%22:false,%22categories.parent.furl%22:%22{}%22,%22published.state%22:%22published%22,%22urls%22:%7B%22$regex%22:%22{}%22%7D,%22categories.furl%22:%22news%22%7D&page=1&count=12&sort=%7B%22publicationDate%22:-1%7D'.format(paths[0], paths[1], '%2F'.join(paths))
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/debug.json')
+        return get_article(api_json['results'][0], url, args, site_json, save_debug)
+    return None
+
+
+def get_podcast(channel_slug, args, site_json, save_debug):
+    global gb_channels
+    if not gb_channels:
+        gb_channels = utils.get_url_json('https://listenapi.planetradio.co.uk/api9.2/podcastchannelsregion/GB')
+    channel = next((it for it in gb_channels if it['PodcastChannelSlug'] == channel_slug), None)
+    if not channel:
+        logger.warning('unable to find podcast channel info for ' + channel_slug)
+        return None
+    if save_debug:
+        utils.write_file(channel, './debug/channel.json')
+
+    item = {}
+    item['id'] = channel['PodcastChannelId']
+    item['url'] = 'https://planetradio.co.uk/podcasts/' + channel['PodcastChannelSlug']
+    item['title'] = channel['PodcastChannelTitle']
+
+    dt = datetime.fromisoformat(channel['UpdatedAt']).replace(tzinfo=timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt, False)
+
+    item['author'] = {}
+    item['author']['name'] = channel['PodcastChannelTitle']
+    item['author']['url'] = 'https://planetradio.co.uk/podcasts/' + channel['PodcastChannelSlug']
+
+    item['summary'] = channel['PodcastChannelDescription']
+
+    item['_image'] = channel['PodcastChannelImageUrl']
+    poster = item['_image'].split('?')[0] + '?auto=compress&h=128&w=128'
+
+    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"></a></td>'.format(item['url'], poster)
+    item['content_html'] += '<td><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div></td></tr></table>'.format(item['url'], item['title'])
+
+    api_url = 'https://listenapi.planetradio.co.uk/api9.2/audibles?RegionCode=GB&podcast_episode.PodcastChannelId%5B%5D={}&_p=1&_pp=12&premium=1'.format(channel['PodcastChannelId'])
     api_json = utils.get_url_json(api_url)
+    if api_json:
+        if save_debug:
+            utils.write_file(api_json, './debug/debug.json')
+        item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;">Episodes:</div><table>'
+        if 'embed' in args:
+            n = 3
+        else:
+            n = -1
+        for i, ep in enumerate(api_json):
+            if i == n:
+                break
+            episode = ep['podcast_episode']
+            item['content_html'] += '<tr><td><a href="{}"><img src="{}/static/play_button-48x48.png"/></a></td>'.format(episode['PodcastExtMediaUrl'], config.server)
+            duration = utils.calc_duration(episode['PodcastDuration'])
+            dt = datetime.fromisoformat(episode['PodcastPublishDate']).replace(tzinfo=timezone.utc)
+            item['content_html'] += '<td><div><a href="{}"><b>{}</b></a></div><div><small>{} &bull; {}</small></div></td></tr>'.format(ep['url'], episode['PodcastTitle'], utils.format_display_date(dt, False), duration)
+        item['content_html'] += '</table>'
+    return item
+
+
+def get_podcast_episode(channel_slug, episode_id, args, site_json, save_debug):
+    global gb_channels
+    if not gb_channels:
+        gb_channels = utils.get_url_json('https://listenapi.planetradio.co.uk/api9.2/podcastchannelsregion/GB')
+    channel = next((it for it in gb_channels if it['PodcastChannelSlug'] == channel_slug), None)
+    if not channel:
+        logger.warning('unable to find podcast channel info for ' + channel_slug)
+        return None
+    if save_debug:
+        utils.write_file(channel, './debug/channel.json')
+    api_json = utils.get_url_json('https://listenapi.planetradio.co.uk/api9.2/audibles?RegionCode=GB&latest=0&podcast_episode.PodcastChannelId%5B%5D={}&premium=1&_filter%5Bpodcast_episode.PodcastRadioplayId%5D={}'.format(channel['PodcastChannelId'], episode_id))
     if not api_json:
         return None
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
-    if len(api_json['results']) == 0:
-        logger.warning('unable to find article for ' + url)
-        return None
+    episode = api_json[0]['podcast_episode']
 
-    article_json = None
-    for it in api_json['results']:
-        if it['furl'] == paths[-1]:
-            article_json = it
-            break
-    if not article_json:
-        logger.warning('unable to find article for ' + url)
-        return None
-    return get_item(article_json, url, args, site_json, save_debug)
+    item = {}
+    item['id'] = episode['PodcastRadioplayId']
+    item['url'] = api_json[0]['url']
+    item['title'] = episode['PodcastTitle']
+
+    dt = datetime.fromisoformat(episode['PodcastPublishDate']).replace(tzinfo=timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt, False)
+    dt = datetime.fromisoformat(episode['PodcastUpdatedAt']).replace(tzinfo=timezone.utc)
+    item['date_modified'] = dt.isoformat()
+
+    item['author'] = {}
+    item['author']['name'] = channel['PodcastChannelTitle']
+    item['author']['url'] = 'https://planetradio.co.uk/podcasts/' + channel['PodcastChannelSlug']
+
+    item['summary'] = episode['PodcastDescription']
+
+    item['_image'] = episode['PodcastImageUrl']
+    poster = item['_image'].split('?')[0] + '?auto=compress&h=128&w=128'
+    poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(poster))
+
+    item['_audio'] = episode['PodcastExtMediaUrl']
+    attachment = {}
+    attachment['url'] = item['_audio']
+    attachment['mime_type'] = 'audio/mpeg'
+    item['attachments'] = []
+    item['attachments'].append(attachment)
+
+    duration = utils.calc_duration(episode['PodcastDuration'])
+
+    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"></a></td>'.format(item['_audio'], poster)
+    item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold; padding-bottom:8px;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+    item['content_html'] += '<div style="padding-bottom:8px;">By <a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
+    item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div></td></tr></table>'.format(item['_display_date'], duration)
+    if not 'embed' in args and item.get('summary'):
+        item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    return item
 
 
-def get_item(article_json, url, args, site_json, save_debug):
+def get_article(article_json, url, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['_id']
     item['url'] = url
@@ -212,7 +333,7 @@ def get_feed(url, args, site_json, save_debug=False):
         article_url = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, article['urls'][0])
         if save_debug:
             logger.debug('getting content for ' + article_url)
-        item = get_item(article, article_url, args, site_json, save_debug)
+        item = get_article(article, article_url, args, site_json, save_debug)
         if item:
             if utils.filter_item(item, args) == True:
                 feed_items.append(item)
@@ -225,3 +346,10 @@ def get_feed(url, args, site_json, save_debug=False):
     feed['title'] = feed_title
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
+
+
+# Radio
+# How to lookup station_code from url?
+# https://planetradio.co.uk/absolute-radio/play/ : station_code = abr
+# https://planetradio.co.uk/absolute-radio-acoustic/play/ : station_code = aba
+# 'https://listenapi.planetradio.co.uk/api9.2/initweb/' + station_code

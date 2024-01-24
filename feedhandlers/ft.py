@@ -1,7 +1,7 @@
-import json, re
+import base64, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import utils
 from feedhandlers import rss
@@ -83,7 +83,7 @@ def get_content(url, args, site_json, save_debug=False):
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
         try:
             ld_json = json.loads(el.string)
-            if re.search(r'NewsArticle|VideoObject', ld_json['@type']):
+            if re.search(r'Article|VideoObject', ld_json['@type']):
                 break
         except:
             logger.warning('unable to load ld+json data in ' + url)
@@ -150,8 +150,15 @@ def get_content(url, args, site_json, save_debug=False):
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     elif ld_json.get('publisher') and ld_json['publisher'].get('name'):
         item['author']['name'] = ld_json['publisher']['name']
-    else:
-        item['author']['name'] = 'Financial Times'
+    if not item['author'].get('name') or item['author']['name'] == 'Staff Writer':
+        el = soup.find(attrs={"data-trackable": "byline"})
+        if el:
+            item['author']['name'] = el.get_text()
+    if not item['author'].get('name'):
+        if ld_json.get('publisher'):
+            item['author']['name'] = ld_json['publisher']['name']
+        else:
+            item['author']['name'] = urlsplit(url).netloc
 
     if ld_json.get('image'):
         if isinstance(ld_json['image'], dict):
@@ -162,7 +169,51 @@ def get_content(url, args, site_json, save_debug=False):
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
 
-    if ld_json['@type'] == 'VideoObject':
+    el = soup.find('meta', attrs={"name": "keywords"})
+    if el:
+        item['tags'] = list(map(str.strip, el['content'].split(',')))
+
+    if 'asia.nikkei.com' in item['url']:
+        body_url = 'https://asia.nikkei.com/__service/v1/piano/article_access/' + base64.b64encode(urlsplit(url).path.encode()).decode()
+        body_json = utils.get_url_json(body_url)
+        if body_json:
+            item['content_html'] = ''
+            if ld_json.get('alternativeHeadline'):
+                item['content_html'] += '<p><em>{}</em></p>'.format(ld_json['alternativeHeadline'])
+            el = soup.find(attrs={"data-trackable": "image-main"})
+            if el:
+                img_src = resize_image(el.img['full'])
+                it = el.find_next_sibling()
+                if it and it.get('class') and 'article__caption' in it['class']:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                item['content_html'] += utils.add_image(img_src, caption)
+            if save_debug:
+                utils.write_file(body_json, './debug/content.json')
+            body = BeautifulSoup(body_json['body'], 'html.parser')
+            for el in body.find_all(class_='o-ads'):
+                el.decompose()
+            for el in body.find_all(id='AdAsia'):
+                el.decompose()
+            for el in body.find_all(class_='ez-embed-type-image'):
+                img_src = resize_image(el.img['full'])
+                it = el.find(class_='article__caption')
+                if it:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                new_html = utils.add_image(img_src, caption)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            if body.contents[0].name == 'div' and body.contents[0].get('class') and 'ezrichtext-field' in body.contents[0]['class']:
+                body.contents[0].unwrap()
+            item['content_html'] += str(body)
+        else:
+            logger.warning('unable to get body content for ' + item['url'])
+
+    elif ld_json['@type'] == 'VideoObject':
         item['_video'] = ld_json['contentUrl']
         caption = '<a href="{}">{}</a>. {}'.format(item['url'], item['title'], item['summary'])
         item['content_html'] = utils.add_video(item['_video'], 'video/mp4', resize_image(ld_json['thumbnailUrl']), caption)
@@ -277,7 +328,9 @@ def get_content(url, args, site_json, save_debug=False):
             elif item.get('_image'):
                 item['content_html'] += utils.add_image(resize_image(item['_image']))
 
-        item['content_html'] += re.sub(r'</figure>\s*<figure', '</figure><br/><figure', article_body.decode_contents())
+        item['content_html'] += article_body.decode_contents()
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

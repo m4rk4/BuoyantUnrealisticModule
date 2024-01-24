@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -149,6 +149,27 @@ def get_item(post_json, args, site_json, save_debug):
                     it = el.find('iframe')
                     if it:
                         new_html = utils.add_embed(it['src'])
+            elif 'kg-audio-card' in el['class']:
+                it = el.find('audio')
+                if it:
+                    item['_audio'] = it['src']
+                    attachment = {}
+                    attachment['url'] = item['_audio']
+                    attachment['mime_type'] = 'audio/mpeg'
+                    item['attachments'] = []
+                    item['attachments'].append(attachment)
+                    it = el.find('img', class_='kg-audio-thumbnail')
+                    if it:
+                        poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(it['src']))
+                    else:
+                        poster = '{}/static/play_button-48x48.png'.format(config.server)
+                    new_html += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td><div style="font-size:1.1em; font-weight:bold;">'.format(item['_audio'], poster)
+                    it = el.find(class_='kg-audio-title')
+                    if it:
+                        new_html += it.decode_contents()
+                    else:
+                        new_html += 'Listen'
+                    new_html += '</div></td></tr></table>'
             elif 'kg-callout-card' in el['class']:
                 new_html = '<div style="margin-top:1em; background:rgba(124,139,154,.13);">'
                 it = el.find(class_='kg-callout-emoji')
@@ -157,7 +178,7 @@ def get_item(post_json, args, site_json, save_debug):
                 it = el.find(class_='kg-callout-text')
                 if it:
                     new_html += '<div style="overflow:hidden;">{}</div>'.format(it.decode_contents())
-                new_html += '<div style="clear:left;"></div></div>'
+                new_html += '<div style="clear:left;"></div></div><div>&nbsp;</div>'
             elif 'kg-bookmark-card' in el['class']:
                 link = el.find('a', class_='kg-bookmark-container')
                 new_html = '<table style="margin-left:1em; width:100%;"><tr>'
@@ -280,10 +301,26 @@ def get_item(post_json, args, site_json, save_debug):
             elif el.find('a', attrs={"href": re.compile(r'api\.addthis\.com')}):
                 el.decompose()
                 continue
-            elif el.find(id='footnotes') or el.find(class_='footnotes') or el.find('a', class_='footnote-anchor'):
+            elif el.find(class_='gh-group-with-header'):
+                it = el.find('header')
+                it.name = 'div'
+                new_html += str(it)
+                it = el.find(class_='gh-group-with-header-body')
+                new_html += utils.add_blockquote(it.decode_contents())
+            elif el.find(id='footnotes') or el.find(class_='footnotes') or el.find(class_='footnote-anchor') or el.find(id='references') or el.find(class_='references') or el.find(class_='reference-anchor'):
                 el.unwrap()
                 continue
             elif el.find('pre'):
+                el.unwrap()
+                continue
+            elif el.find('dl'):
+                for it in soup.find_all('dt'):
+                    el['style'] = 'margin-top:1em; font-weight:bold;'
+                el.unwrap()
+                continue
+            elif el.find(class_='gh-image-credit'):
+                it = el.find(class_='gh-image-credit')
+                it['style'] = 'font-size:0.9em; font-style:italic;'
                 el.unwrap()
                 continue
 

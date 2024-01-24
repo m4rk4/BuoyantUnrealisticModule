@@ -296,15 +296,19 @@ def get_content(url, args, site_json, save_debug=False):
     soup = BeautifulSoup(article_html, 'lxml')
 
     if split_url.netloc == 'ix.cnn.io' and 'dailygraphics' in paths:
+        item = {}
+        item['id'] = url
+        item['url'] = url
         el = soup.find(id='g-ai2html-graphic-desktop')
         if el:
             m = re.search(r'max-width:(\d+)px;.*max-height:(\d+)px', el['style'])
-            item = {}
-            item['id'] = url
-            item['url'] = url
             item['_image'] = '{}/screenshot?url={}&width={}&height={}&locator=%23g-ai2html-graphic-desktop'.format(config.server, quote_plus(url), m.group(1), m.group(2))
-            item['content_html'] = utils.add_image(item['_image'], link=url)
-            return item
+        elif soup.find(id='root'):
+            item['_image'] = '{}/screenshot?url={}&locator=%23root&networkidle=true'.format(config.server, quote_plus(url))
+        else:
+            item['_image'] = '{}/screenshot?url={}'.format(config.server, quote_plus(url))
+        item['content_html'] = utils.add_image(item['_image'], link=url)
+        return item
 
     ld_json = []
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
@@ -771,6 +775,10 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html = utils.add_embed(it['data-instgrm-permalink'])
             elif 'map' in el['class']:
                 new_html = utils.add_image('{}/screenshot?url={}&locator={}'.format(config.server, quote_plus(item['url']), quote_plus('[data-id="{}"]'.format(el['data-id']))))
+            elif 'graphic' in el['class']:
+                it = el.find(class_='graphic__anchor')
+                if it:
+                    new_html = utils.add_embed(it['data-url'])
             elif 'html-embed' in el['class']:
                 it = el.find('iframe')
                 if it:

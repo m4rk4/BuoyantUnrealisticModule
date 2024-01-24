@@ -294,20 +294,24 @@ def get_content(url, args, site_json, save_debug=False):
             item['id'] = playlist_id
             item['url'] = 'https://www.youtube.com/playlist?list=' + playlist_id
             item['title'] = playlist_header['title']['runs'][0]['text']
-            item['author'] = get_author_info(playlist_header['ownerText']['runs'][0]['navigationEndpoint']['browseEndpoint']['browseId'])
-            if not item.get('author'):
-                item['author'] = {}
-                item['author']['name'] = playlist_header['ownerText']['runs'][0]['text']
-                item['author']['url'] = 'https://www.youtube.com' + playlist_header['ownerText']['runs'][0]['navigationEndpoint']['browseEndpoint']['canonicalBaseUrl']
-                item['author']['avatar'] = '{}/image?height=32&width=32&mask=ellipse'.format(config.server)
+            if playlist_header.get('ownerText'):
+                item['author'] = get_author_info(playlist_header['ownerText']['runs'][0]['navigationEndpoint']['browseEndpoint']['browseId'])
+                if not item.get('author'):
+                    item['author'] = {}
+                    item['author']['name'] = playlist_header['ownerText']['runs'][0]['text']
+                    item['author']['url'] = 'https://www.youtube.com' + playlist_header['ownerText']['runs'][0]['navigationEndpoint']['browseEndpoint']['canonicalBaseUrl']
+                    item['author']['avatar'] = '{}/image?height=32&width=32&mask=ellipse'.format(config.server)
             item['_image'] = re.sub(r'/[^/]+\.jpg', '/maxresdefault.jpg', utils.clean_url(playlist_header['playlistHeaderBanner']['heroPlaylistThumbnailRenderer']['thumbnail']['thumbnails'][0]['url']))
             if not utils.url_exists(item['_image']):
                 item['_image'] = re.sub(r'/[^/]+\.jpg', '/hqdefault.jpg', utils.clean_url(playlist_header['playlistHeaderBanner']['heroPlaylistThumbnailRenderer']['thumbnail']['thumbnails'][0]['url']))
             if not video_id:
-                heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+                if item.get('author'):
+                    heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+                else:
+                    heading = ''
                 caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
                 link = 'https://www.youtube-nocookie.com/embed/videoseries?list=' + playlist_id
-                if playlist_header['descriptionText'].get('runs'):
+                if playlist_header.get('descriptionText') and playlist_header['descriptionText'].get('runs'):
                     item['summary'] = playlist_header['descriptionText']['runs'][0]['text']
                     desc = '<p>{}</p>'.format(item['summary'])
                 else:
@@ -317,9 +321,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     if video_list:
         item['content_html'] += '<h3><a href="https://www.youtube.com/embed/videoseries?list={}">Playlist</a></h3>'.format(playlist_id)
-        video_args = {
-            "author": item['author']
-        }
+        video_args = {}
+        if item.get('author'):
+            video_args['author'] = item['author']
         if 'embed' in args:
             n = 3
         else:

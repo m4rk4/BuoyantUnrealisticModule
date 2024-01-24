@@ -40,7 +40,7 @@ def get_content(url, args, site_json, save_debug=False):
         item = utils.get_content(redirect_url, args, save_debug)
         return item
 
-    page_html = utils.get_url_html(url)
+    page_html = utils.get_url_html(url, user_agent=site_json.get('user_agent'))
     if not page_html:
         return None
     if save_debug:
@@ -155,13 +155,3 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://www.autonews.com/section/rss',
-             'https://www.plasticsnews.com/section/rss',
-             'https://www.rubbernews.com/section/rss',
-             'https://www.tirebusiness.com/section/rss',
-             'https://www.crainscleveland.com/section/rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

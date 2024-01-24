@@ -46,6 +46,7 @@ def get_articles_by_category(category):
         return None
     return next_data['data']['getArticlesByCategoryWithMetaData']['articles']
 
+
 def get_articles_by_subcategory(category, subcategory):
     post_data = {
         "variables":{"category": category, "subCategory": subcategory, "count": 10, "page": 1, "section": "subCategory-{}-{}".format(category, subcategory), "brand": "empire", "hostname":"https://www.empireonline.com"},
