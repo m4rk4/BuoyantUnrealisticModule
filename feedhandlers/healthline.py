@@ -56,7 +56,11 @@ def format_content(content, item):
                     img_src = ''
                     it = el.find('img')
                     if it:
-                        img_src = utils.clean_url('https:' + it['src']) + '?w=1000'
+                        if it['src'].startswith('/'):
+                            img_src = 'https:' + it['src']
+                        else:
+                            img_src = it['src']
+                        img_src = utils.clean_url(img_src) + '?w=1000'
                     else:
                         it = el.find('lazy-image')
                         if it:

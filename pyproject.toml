@@ -43,6 +43,8 @@ config = "^0.5.1"
 playwright = "^1"
 image-utils = "^0"
 js2py = "^0.74"
+undetected-chromedriver = "^3.5.4"
+cfsession = "^1.5.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

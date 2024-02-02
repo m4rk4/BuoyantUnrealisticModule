@@ -215,6 +215,7 @@ __all__ = [
     'rollingstone',
     'rss',
     'rumble',
+    'runrepeat',
     'sciam',
     'scmp',
     'scribd',

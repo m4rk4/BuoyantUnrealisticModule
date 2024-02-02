@@ -378,6 +378,10 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
                         authors.append(it['name'])
             return authors
 
+        if wp_post.get('author') and isinstance(wp_post['author'], dict):
+            authors.append(wp_post['author']['name'])
+            return authors
+
         if wp_post.get('author_info'):
             if wp_post['author_info'].get('display_name'):
                 authors.append(wp_post['author_info']['display_name'])
@@ -587,7 +591,10 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
         utils.write_file(yoast_json, './debug/yoast.json')
 
     item = {}
-    item['id'] = post['guid']['rendered']
+    if isinstance(post['guid'], str):
+        item['id'] = post['guid']
+    else:
+        item['id'] = post['guid']['rendered']
 
     if site_json.get('replace_netloc'):
         item['url'] = post['link'].replace(site_json['replace_netloc'][0], site_json['replace_netloc'][1])
@@ -597,7 +604,10 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     paths = list(filter(None, split_url.path.split('/')))
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
-    item['title'] = BeautifulSoup('<p>{}</p>'.format(post['title']['rendered']), 'html.parser').get_text()
+    if isinstance(post['title'], str):
+        item['title'] = post['title']
+    else:
+        item['title'] = BeautifulSoup('<p>{}</p>'.format(post['title']['rendered']), 'html.parser').get_text()
     if re.search(r'&[#\w]+;', item['title']):
         item['title'] = html.unescape(item['title'])
 
@@ -629,7 +639,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             item['author']['name'] = urlsplit(item['url']).netloc
 
     item['tags'] = []
-    if not 'skip_wp_terms' in args:
+    if post.get('_links') and 'skip_wp_terms' not in args:
         if 'wp:term' in post['_links']:
             for link in post['_links']['wp:term']:
                 if link.get('taxonomy') and link['taxonomy'] != 'author' and link['taxonomy'] != 'channel' and link['taxonomy'] != 'contributor' and link['taxonomy'] != 'site-layouts' and link['taxonomy'] != 'lineup':
@@ -656,6 +666,13 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
         item['tags'] = post['parsely']['meta']['keywords'].copy()
     elif post.get('parselyMeta') and post['parselyMeta'].get('parsely-tags'):
         item['tags'] = post['parselyMeta']['parsely-tags'].split(',')
+    elif post.get('terms'):
+        if post['terms'].get('category'):
+            for it in post['terms']['category']:
+                item['tags'].append(it['name'])
+        if post['terms'].get('post_tag'):
+            for it in post['terms']['post_tag']:
+                item['tags'].append(it['name'])
     if item.get('tags'):
         # Remove duplicate tags - case insensitive
         # https://stackoverflow.com/questions/24983172/how-to-eliminate-duplicate-list-entries-in-python-while-preserving-case-sensitiv
@@ -666,7 +683,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
 
     caption = ''
     if 'skip_wp_media' not in args:
-        if post['_links'].get('wp:featuredmedia'):
+        if post.get('_links') and post['_links'].get('wp:featuredmedia'):
             for link in post['_links']['wp:featuredmedia']:
                 if site_json.get('replace_links_path'):
                     link_json = utils.get_url_json(link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1]))
@@ -702,7 +719,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                         if link_json.get('description'):
                             if isinstance(link_json['description'], str):
                                 captions.append(link_json['description'])
-                            else:
+                            elif link_json['description'].get('rendered'):
                                 soup = BeautifulSoup(link_json['description']['rendered'], 'html.parser')
                                 if not soup.find('img'):
                                     caption = soup.get_text().strip()
@@ -730,7 +747,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                                 if not re.search(r'\w(_|-)\w|\w\d+$', caption):
                                     captions.append(caption)
                         caption = ' | '.join(captions)
-        if not item.get('_image') and post['_links'].get('wp:attachment'):
+        if not item.get('_image') and post.get('_links') and post['_links'].get('wp:attachment'):
             for link in post['_links']['wp:attachment']:
                 if not item.get('_image'):
                     if site_json.get('replace_links_path'):
@@ -800,18 +817,22 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     if item.get('_image'):
         item['_image'] = resize_image(item['_image'], site_json)
 
-    if post.get('excerpt') and post['excerpt'].get('rendered') and isinstance(post['excerpt']['rendered'], str):
-        item['summary'] = BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text()
-    elif post.get('yoast_head_json'):
-        if post['yoast_head_json'].get('description'):
-            item['summary'] = post['yoast_head_json']['description']
-        elif post['yoast_head_json'].get('og_description'):
-            item['summary'] = post['yoast_head_json']['og_description']
-    elif post.get('meta'):
-        if post['meta'].get('summary'):
-            item['summary'] = post['meta']['summary']
-        elif post['meta'].get('long_summary'):
-            item['summary'] = post['meta']['long_summary']
+    if post.get('excerpt'):
+        if isinstance(post['excerpt'], str):
+            item['summary'] = post['excerpt']
+        elif post['excerpt'].get('rendered') and isinstance(post['excerpt']['rendered'], str):
+            item['summary'] = BeautifulSoup(post['excerpt']['rendered'], 'html.parser').get_text()
+    if not item.get('summary'):
+        if post.get('yoast_head_json'):
+            if post['yoast_head_json'].get('description'):
+                item['summary'] = post['yoast_head_json']['description']
+            elif post['yoast_head_json'].get('og_description'):
+                item['summary'] = post['yoast_head_json']['og_description']
+        elif post.get('meta'):
+            if post['meta'].get('summary'):
+                item['summary'] = post['meta']['summary']
+            elif post['meta'].get('long_summary'):
+                item['summary'] = post['meta']['long_summary']
     if not item.get('summary') and yoast_json:
         it = next((it for it in yoast_json['@graph'] if it.get('description')), None)
         if it:
@@ -826,12 +847,14 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     #     logger.debug('getting structured content...')
     #     item['content_html'] = content_html + render_content(post['content']['structured'], item['url'])
     #     return item
-    if post.get('content') and post['content'].get('rendered'):
+    if post.get('content') and isinstance(post['content'], str):
+        content_html += post['content']
+    elif post.get('content') and post['content'].get('rendered'):
         if 'remove_vc_entities' in args:
             content_html += re.sub(r'\[(/?vc_[^\]]+)\]', '', post['content']['rendered'])
         else:
             content_html += post['content']['rendered']
-        utils.write_file(content_html, './debug/debug.html')
+        # utils.write_file(content_html, './debug/debug.html')
     elif post.get('acf'):
         for module in post['acf']['article_modules']:
             if module['acf_fc_layout'] == 'text_block':
@@ -876,41 +899,42 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 subtitles.append(el.get_text())
             if subtitles:
                 subtitle = '<br/>'.join(subtitles)
-    elif post.get('subtitle'):
-        subtitle = post['subtitle']
-    elif post.get('sub_headline'):
-        subtitle = post['sub_headline']['raw']
-    elif post.get('rayos_subtitle'):
-        subtitle = post['rayos_subtitle']
-    elif post.get('meta'):
-        if post['meta'].get('sub_title'):
-            subtitle = post['meta']['sub_title']
-        elif post['meta'].get('nbc_subtitle'):
-            subtitle = post['meta']['nbc_subtitle']
-        elif post['meta'].get('sub_heading'):
-            subtitle = post['meta']['sub_heading']
-        elif post['meta'].get('subheadline'):
-            subtitle = post['meta']['subheadline']
-        elif post['meta'].get('dek'):
-            subtitle = post['meta']['dek']
-        elif post['meta'].get('lux_article_dek_field'):
-            subtitle = post['meta']['lux_article_dek_field']
-        elif post['meta'].get('long_summary'):
-            subtitle = post['meta']['long_summary']
-        elif post['meta'].get('multi_title'):
-            multi_title = json.loads(post['meta']['multi_title'])
-            if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
-                subtitle = multi_title['titles']['headline']['additional']['headline_subheadline']
-        elif post['meta'].get('rappler-three-point-summary'):
-            subtitle = '<ul>'
-            for it in re.findall(r'"(.*?)"', ' '.join(post['meta']['rappler-three-point-summary'])):
-                subtitle += '<li>' + it + '</li>'
-            subtitle += '</ul>'
-    elif post.get('cmb2'):
-        if post['cmb2'].get('articles_metabox') and post['cmb2']['articles_metabox'].get('_cmb_standfirst'):
-            subtitle = '<p><em>{}</em></p>'.format(post['cmb2']['articles_metabox']['_cmb_standfirst'])
-    if not subtitle and 'add_subtitle' in args and item.get('summary'):
-        subtitle = item['summary']
+    else:
+        if post.get('subtitle'):
+            subtitle = post['subtitle']
+        elif post.get('sub_headline'):
+            subtitle = post['sub_headline']['raw']
+        elif post.get('rayos_subtitle'):
+            subtitle = post['rayos_subtitle']
+        elif post.get('meta'):
+            if post['meta'].get('sub_title'):
+                subtitle = post['meta']['sub_title']
+            elif post['meta'].get('nbc_subtitle'):
+                subtitle = post['meta']['nbc_subtitle']
+            elif post['meta'].get('sub_heading'):
+                subtitle = post['meta']['sub_heading']
+            elif post['meta'].get('subheadline'):
+                subtitle = post['meta']['subheadline']
+            elif post['meta'].get('dek'):
+                subtitle = post['meta']['dek']
+            elif post['meta'].get('lux_article_dek_field'):
+                subtitle = post['meta']['lux_article_dek_field']
+            elif post['meta'].get('long_summary'):
+                subtitle = post['meta']['long_summary']
+            elif post['meta'].get('multi_title'):
+                multi_title = json.loads(post['meta']['multi_title'])
+                if multi_title['titles']['headline'].get('additional') and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
+                    subtitle = multi_title['titles']['headline']['additional']['headline_subheadline']
+            elif post['meta'].get('rappler-three-point-summary'):
+                subtitle = '<ul>'
+                for it in re.findall(r'"(.*?)"', ' '.join(post['meta']['rappler-three-point-summary'])):
+                    subtitle += '<li>' + it + '</li>'
+                subtitle += '</ul>'
+        elif post.get('cmb2'):
+            if post['cmb2'].get('articles_metabox') and post['cmb2']['articles_metabox'].get('_cmb_standfirst'):
+                subtitle = '<p><em>{}</em></p>'.format(post['cmb2']['articles_metabox']['_cmb_standfirst'])
+        if not subtitle and 'add_subtitle' in args and item.get('summary'):
+            subtitle = item['summary']
     if subtitle:
         lede += '<p><em>{}</em></p>'.format(subtitle)
 
@@ -1020,6 +1044,8 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 el = page_soup.find('video', attrs={"data-video-id-pending": post['meta']['featured_bc_video_id']['id']})
                 if el:
                     video_lede = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el['data-account'], el['data-player'], el['data-video-id-pending']))
+        elif post.get('you_tube_id'):
+            video_lede = utils.add_embed('https://www.youtube.com/watch?v=' + post['you_tube_id'])
         elif site_json.get('lede_video'):
             if not page_soup:
                 page_html = utils.get_url_html(item['url'])
@@ -1046,9 +1072,9 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 if page_html:
                     page_soup = BeautifulSoup(page_html, 'lxml')
             if page_soup:
-                el = page_soup.find(site_json['lede_img']['tag'], attrs=site_json['lede_img']['attrs'])
-                if el:
-                    lede += add_image(el, el, base_url, site_json)
+                elements = utils.get_soup_elements(site_json['lede_img'], page_soup)
+                if elements:
+                    lede += add_image(elements[0], elements[0], base_url, site_json)
 
     if post.get('acf') and post['acf'].get('post_hero') and post['acf']['post_hero'].get('number_one_duration'):
         # https://www.stereogum.com/2211784/the-number-ones-chamillionaires-ridin-feat-krayzie-bone/columns/the-number-ones/
@@ -2603,7 +2629,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled photowrap')
 
-    for el in soup.find_all(class_=re.compile(r'bp-embedded-image|c-figure|captioned-image-container|entry-image|featured-media-img|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-ups-image|wp-caption|wp-image-\d+|wp-block-media|img-container')):
+    for el in soup.find_all(class_=re.compile(r'bp-embedded-image|c-figure|captioned-image-container|custom-image-block|entry-image|featured-media-img|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-ups-image|wp-caption|wp-image-\d+|wp-block-media|img-container')):
         add_image(el, None, base_url, site_json)
 
     for el in soup.find_all('figure', id=re.compile(r'media-\d+')):
@@ -3316,7 +3342,7 @@ def get_content(url, args, site_json, save_debug=False):
             for it in paths:
                 if it.isnumeric() and len(it) > 4:
                     post_url = '{}{}/{}'.format(wpjson_path, posts_path, it)
-                elif '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
+                elif 'no_slug' not in args and '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
                     slug = it.split('.')[0]
                     m = re.search(r'-(\d{5,}$)', slug)
                     if m and 'www.thedailymash.co.uk' in url:
@@ -3450,6 +3476,7 @@ def get_content_v2(url, args, site_json, save_debug=False):
 
         if page_soup:
             post_url, post_id = find_post_url(page_soup, wpjson_path)
+            print(post_id)
             if post_url:
                 wp_post = utils.get_url_json(post_url)
 
@@ -3463,7 +3490,7 @@ def get_content_v2(url, args, site_json, save_debug=False):
                     # Try number as the post id (exclude possible date values: YYYY, MM, DD)
                     post_url = '{}/{}'.format(wpjson_path, it)
                     wp_post = utils.get_url_json(post_url)
-                elif '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
+                if 'no_slug' not in args and '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
                     # Try path as slug
                     slug = it.split('.')[0]
                     m = re.search(r'-(\d{5,}$)', slug)
@@ -3781,6 +3808,13 @@ def get_content_v2(url, args, site_json, save_debug=False):
                     for it in link_json:
                         if it.get('name'):
                             item['tags'].append(it['name'])
+    elif wp_post.get('terms'):
+        if wp_post['terms'].get('category'):
+            for it in wp_post['terms']['category']:
+                item['tags'].append(it['name'])
+        if wp_post['terms'].get('post_tag'):
+            for it in wp_post['terms']['post_tag']:
+                item['tags'].append(it['name'])
     if item.get('tags'):
         # Remove duplicate tags - case insensitive
         # https://stackoverflow.com/questions/24983172/how-to-eliminate-duplicate-list-entries-in-python-while-preserving-case-sensitiv

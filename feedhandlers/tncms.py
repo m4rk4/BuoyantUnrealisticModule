@@ -58,7 +58,7 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             n = 5
         search_url = '{}://{}/search/?f=json&t={}&l={}&sort=date&k=&b=&sd=desc&q={}'.format(split_url.scheme, split_url.netloc, article_type, n, quote_plus(title))
-        #print(search_url)
+        # print(search_url)
         search_json = utils.get_url_json(search_url)
         if not search_json:
             continue
@@ -186,6 +186,8 @@ def get_content(url, args, site_json, save_debug=False):
 
             if article_json['type'] == 'video':
                 el = soup.find(class_='asset-content', attrs={"data-asset-uuid": item['id']})
+                if not el:
+                    el = soup.find(id='asset-content', attrs={"data-asset-uuid": item['id']})
             else:
                 el = soup.find(id='asset-video-primary')
             if el:
@@ -212,6 +214,7 @@ def get_content(url, args, site_json, save_debug=False):
                     # https://www.fox23.com/news/body-camera-video-shows-zach-bryan-being-put-in-handcuffs-after-being-pulled-over-days/article_aac4fc36-5874-11ee-bf4c-9325fd988ebb.html
                     videos = el.find_all('video', class_='tnt-video')
                     for video in videos:
+                        # print(video)
                         it = video.find('source', attrs={"type": "video/mp4"})
                         if not it:
                             it = video.find('source', attrs={"type": "application/x-mpegURL"})
@@ -336,7 +339,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += utils.add_blockquote(el.decode_contents())
 
     if content_html and 'embed' in args:
-        if article_json['type'] != 'image':
+        if article_json['type'] != 'image' and article_json['type'] != 'video':
             item['content_html'] += utils.add_blockquote(content_html)
     else:
         item['content_html'] += content_html

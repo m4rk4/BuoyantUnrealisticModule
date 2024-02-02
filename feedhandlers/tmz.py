@@ -179,6 +179,8 @@ def get_content(url, args, site_json, save_debug):
                 item['content_html'] += utils.add_embed('https://www.instagram.com/p/{}/'.format(block['id']))
             elif 'block:facebook-post-block' in block['_schema']:
                 item['content_html'] += utils.add_embed(block['href'])
+            elif 'block:divider-block' in block['_schema']:
+                item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
             elif 'block:code-block' in block['_schema']:
                 code = BeautifulSoup(block['code'], 'html.parser')
                 if code.iframe:

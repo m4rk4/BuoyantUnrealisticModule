@@ -93,12 +93,15 @@ def get_post(post_json, args, site_json, save_debug):
             item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}"/></a><span>&nbsp;<a href="{0}">Listen now ({2})</a></span></div>'.format(item['_audio'], poster, ', '.join(duration))
 
     if post_json.get('body_html'):
+        # utils.write_file(post_json['body_html'], './debug/debug.html')
         soup = BeautifulSoup(post_json['body_html'], 'html.parser')
 
         for el in soup.find_all(class_='subscription-widget-wrap'):
             el.decompose()
 
-        for el in soup.find_all('p', class_='button-wrapper'):
+        for el in soup.find_all(class_=re.compile('button-wrap')):
+            if el.name == None:
+                continue
             if el.get('data-attrs'):
                 data_json = json.loads(el['data-attrs'])
                 if re.search(r'comment|follow|learn more|schedule|share|subscribe|subscription', data_json['text'], flags=re.I) or re.search(r'subscribe', data_json['url']):

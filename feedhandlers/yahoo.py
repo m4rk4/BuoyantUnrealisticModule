@@ -165,6 +165,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['author'] = {}
     item['author']['name'] = article_json['author']['name']
+    if data_json.get('providerBrand') and data_json['providerBrand'].get('displayName') and data_json['providerBrand']['displayName'] not in item['author']['name'] and data_json['providerBrand']['brandId'] not in item['url']:
+        item['author']['name'] += ' ({})'.format(data_json['providerBrand']['displayName'])
 
     item['tags'] = article_json['keywords'].copy()
 
@@ -246,7 +248,7 @@ def get_content(url, args, site_json, save_debug=False):
         if it:
             new_html += '<h3>{}</h3>'.format(it.get_text().strip())
         for it in el.find_all(class_='list-item'):
-            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
+            new_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;"><div style="display:flex; flex-wrap:wrap; gap:1em;">'
             info = el.find(class_=['edit-label', 'editor-label'])
             if info:
                 new_html += '<div style="flex:0 0 100%;"><span style="color:#9a58b5;; font-weight:bold;">{}</span></div>'.format(info.get_text().strip())
@@ -286,7 +288,27 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<p><small>{}</small></p>'.format(info.get_text())
                 for info in it.find_all(class_='cta-btn'):
                     new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#9a58b5; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(info['href']), info.get_text())
-            new_html += '</div></div><div>&nbsp;</div>'
+            new_html += '</div></div>'
+            if it.find(class_='commerce-score'):
+                new_html += '<div style="font-weight:bold; text-align:center; padding-bottom:8px;">'
+                score = it.find(class_='commerce-score-val')
+                if score:
+                    new_html += '<span style="font-size:2em; line-height:1em; vertical-align:middle;">{}</span>'.format(
+                        score.get_text())
+                score = it.find(class_='commerce-score-total')
+                if score:
+                    new_html += ' / ' + score.get_text()
+                score = it.find(class_='commerce-score-text')
+                if score:
+                    new_html += ' ({})'.format(score.get_text())
+                new_html += '</div>'
+            info = el.find(class_='pros-cons')
+            if info:
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                for ul in info.find_all('ul'):
+                    new_html += '<div style="flex:1; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;">{}</div>{}</div>'.format(ul.find_previous_sibling(class_='title').get_text(), str(ul))
+                new_html += '</div>'
+            new_html += '</div><div>&nbsp;</div>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()
@@ -323,7 +345,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in caas_body.find_all('ul', class_='caas-list-bullet'):
         it = el.find_previous_sibling()
-        if it and re.search(r'Related\.\.\.|You Might Also Like', it.get_text()):
+        if it and re.search(r'Related\.\.\.|You Might Also Like|Most Read from', it.get_text()):
             it.decompose()
             el.decompose()
 
@@ -337,6 +359,9 @@ def get_content(url, args, site_json, save_debug=False):
                 el['href'] = href
 
     for el in caas_body.find_all(class_='caas-readmore'):
+        el.decompose()
+
+    for el in caas_body.find_all('p', string=re.compile(r'^Read More:')):
         el.decompose()
 
     article_soup = BeautifulSoup(article_html, 'lxml')

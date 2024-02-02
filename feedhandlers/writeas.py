@@ -1,10 +1,10 @@
-import re
+import feedparser, re, tldextract
 import dateutil.parser
 from bs4 import BeautifulSoup
 from markdown2 import markdown
 from urllib.parse import urlsplit
 
-import config, utils
+import utils
 from feedhandlers import rss
 
 import logging
@@ -13,19 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    page_html = utils.get_url_html(url)
-    if not page_html:
-        return None
-    m = re.search(r'"/api/collections/([^/]+)/posts/([^/]+)/stat"', page_html)
-    if not m:
-        logger.warning('unable to determine post id in ' + url)
-    user_name = m.group(1)
-    post_id = m.group(2)
-
     split_url = urlsplit(url)
-    #paths = list(filter(None, split_url.path.split('/')))
-
-    api_url = '{}://{}/api/posts/{}'.format(split_url.scheme, split_url.netloc, post_id)
+    paths = list(filter(None, split_url.path.split('/')))
+    if 'a' in paths:
+        api_url = '{}/posts/{}'.format(site_json['api_path'], paths[-1])
+        alias = ''
+    else:
+        if site_json.get('collection_alias'):
+            alias = site_json['collection_alias']
+        elif site_json.get('collection_is_path'):
+            alias = paths[0]
+        elif site_json.get('collection_is_subdomain'):
+            tld = tldextract.extract(url)
+            alias = tld.subdomain
+        api_url = '{}/collections/{}/posts/{}'.format(site_json['api_path'], alias, paths[-1])
     api_json = utils.get_url_json(api_url,  headers={"Content-Type":"application/json"})
     if not api_json:
         return None
@@ -47,12 +48,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = dateutil.parser.parse(api_json['data']['updated'])
     item['date_modified'] = dt.isoformat()
 
-    soup = BeautifulSoup(page_html, 'lxml')
-    el = soup.find('meta', attrs={"name": "author"})
-    if el:
-        item['author'] = {"name": el['content']}
-    else:
-        item['author'] = {"name": user_name}
+    item['author'] = {"name": alias}
 
     if api_json['data'].get('tags'):
         item['tags'] = api_json['data']['tags'].copy()
@@ -83,4 +79,31 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    return rss.get_feed(url, args, site_json, save_debug, get_content)
+    try:
+        d = feedparser.parse(url)
+    except:
+        logger.warning('Feedparser error ' + url)
+        return None
+    if save_debug:
+        utils.write_file(str(d), './debug/feed.txt')
+    n = 0
+    feed_items = []
+    for entry in d.entries:
+        if save_debug:
+            logger.debug('getting content for ' + entry['link'])
+        item = get_content(entry['guid'], args, site_json, save_debug)
+        if item:
+            if utils.filter_item(item, args) == True:
+                item['url'] = entry['link']
+                if entry.get('author'):
+                    item['author']['name'] = entry['author']
+                feed_items.append(item)
+                n += 1
+                if 'max' in args:
+                    if n == int(args['max']):
+                        break
+    feed = utils.init_jsonfeed(args)
+    if d.feed.get('title'):
+        feed['title'] = d.feed['title']
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+    return feed

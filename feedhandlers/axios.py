@@ -27,51 +27,50 @@ def add_image(image):
 
 
 def format_styles(block, entities):
-    n = 0
-    block_html = block['text']
-    for style in block['inlineStyleRanges']:
-        i = style['offset']
-        j = i + style['length']
-        style_text = block['text'][i:j]
-        style_html = ''
-        if style['style'] == 'BOLD':
-            style_html = '<b>{}</b>'.format(style_text)
-        elif style['style'] == 'ITALIC':
-            style_html = '<i>{}</i>'.format(style_text)
-        else:
-            logger.warning('unhandled style type ' + style['style'])
-        if style_html:
-            block_html = block_html.replace(style_text, style_html)
-
-    for style in block['entityRanges']:
-        i = style['offset']
-        j = i + style['length']
-        if i == 0:
-            pre_text = ''
-        else:
-            pre_text = block['text'][i-1]
-        if j == len(block['text']):
-            post_text = ''
-        else:
-            post_text = block['text'][j]
-        entity = entities[style['key']]
-        if entity['type'] == 'LINK':
-            if entity['data'].get('href'):
-                href = entity['data']['href']
+    ranges = []
+    if block.get('inlineStyleRanges'):
+        for rng in block['inlineStyleRanges']:
+            if rng['style'] == 'BOLD':
+                rng['tag'] = '<b>'
+                ranges.append(rng.copy())
+                rng['tag'] = '</b>'
+                rng['offset'] += rng['length']
+                ranges.append(rng.copy())
+            elif rng['style'] == 'ITALIC':
+                rng['tag'] = '<i>'
+                ranges.append(rng.copy())
+                rng['tag'] = '</i>'
+                rng['offset'] += rng['length']
+                ranges.append(rng.copy())
             else:
-                href = entity['data']['url']
-            if 'link.axios.com' in href:
-                href = utils.get_redirect_url(href)
-            # This is a bit hacky to avoid duplicate matches
-            style_text = '{}{}{}'.format(pre_text, block['text'][i:j], post_text)
-            style_html = '{}<a href="{}">{}</a>{}'.format(pre_text, href, block['text'][i:j], post_text)
-            print('!' + block_html + '!')
-            print('!' + style_text + '!')
-            print('!' + style_html + '!')
-            block_html = block_html.replace(style_text, style_html)
-        else:
-            logger.warning('unhandled entity type ' + entity['type'])
-    return block_html
+                logger.warning('unhandled style type ' + rng['style'])
+                continue
+    if block.get('entityRanges'):
+        for rng in block['entityRanges']:
+            entity = entities[rng['key']]
+            if entity['type'] == 'LINK':
+                if entity['data'].get('href'):
+                    href = entity['data']['href']
+                else:
+                    href = entity['data']['url']
+                if 'link.axios.com' in href:
+                    href = utils.get_redirect_url(href)
+                rng['tag'] = '<a href="{}">'.format(href)
+                ranges.append(rng.copy())
+                rng['tag'] = '</a>'
+                rng['offset'] += rng['length']
+                ranges.append(rng.copy())
+            else:
+                logger.warning('unhandled entity type ' + entity['type'])
+                continue
+    ranges = sorted(ranges, key=lambda x: x['offset'])
+    x = 0
+    text = ''
+    for rng in ranges:
+        text += block['text'][x:rng['offset']] + rng['tag']
+        x = rng['offset']
+    text += block['text'][x:]
+    return text
 
 
 def format_blocks(blocks):

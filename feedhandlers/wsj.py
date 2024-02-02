@@ -558,16 +558,27 @@ def get_content(url, args, site_json, save_debug=False):
     api_url = site_json['articles_api'] + paths[-1]
     api_json = utils.get_url_json(api_url)
     if not api_json:
-        return None
+        page_html = utils.get_url_html(url)
+        if not page_html:
+            return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            return None
+        next_data = json.loads(el.string)
+        api_json = next_data['props']['pageProps']
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
 
     article_json = api_json['articleData']['attributes']
 
     item = {}
-    item['id'] = api_json['id']
-    item['url'] = api_json['articleUrl']
-    item['title'] = api_json['headline']
+    # item['id'] = api_json['id']
+    # item['url'] = api_json['articleUrl']
+    # item['title'] = api_json['headline']
+    item['id'] = article_json['upstream_origin_id']
+    item['url'] = article_json['source_url']
+    item['title'] = article_json['headline']['text']
 
     dt = datetime.fromisoformat(article_json['published_datetime_utc'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()

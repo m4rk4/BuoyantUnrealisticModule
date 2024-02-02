@@ -666,9 +666,15 @@ def bs_get_inner_html(soup):
 
 def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
   quote = quote.strip()
-  if quote.startswith('<p>'):
-    quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
-    quote = re.sub(r'</?p>', '', quote)
+  if quote.startswith('<p'):
+    soup = BeautifulSoup(quote, 'html.parser')
+    quote = ''
+    for i, el in enumerate(soup.find_all('p')):
+      if i > 0:
+        quote += '<br/><br/>'
+      quote += el.decode_contents()
+    # quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
+    # quote = re.sub(r'</?p>', '', quote)
   if pullquote_check:
     #if re.search(r'^["“‘]', quote) and re.search(r'["”’]$', quote):
     if re.search(r'^["“].*["”]$', quote) and len(re.findall(r'["“"”]', quote)) == 2:

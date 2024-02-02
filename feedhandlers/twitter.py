@@ -255,11 +255,11 @@ def make_card(card_json, tweet_json):
             else:
                 style = ''
                 color = 'lightgrey'
-            pct = int(count / total_count * 100)
+            pct = float(count / total_count * 100)
             if pct >= 50:
-                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {}%, white {}%);"><p{}>{}</p><p{}>{}%</p></div>'.format(color, pct, 100 - pct, style, label, style, pct)
+                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {:.0f}%, white {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(color, pct, 100 - pct, style, label, style, pct)
             else:
-                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {}%, {} {}%);"><p{}>{}</p><p{}>{}%</p></div>'.format(100 - pct, color, pct, style, label, style, pct)
+                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {:.0f}%, {} {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(100 - pct, color, pct, style, label, style, pct)
         card_html += '</div><div><small>'
         if binding_values['counts_are_final']['boolean_value'] == True:
             card_html += 'Final results'
