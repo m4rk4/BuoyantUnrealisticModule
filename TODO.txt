@@ -1,3 +1,16 @@
+Add WSJ cookies to bypass captcha
+headers = {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache",
+    "cookie": "datadome=wY9bf7lbrisIc3GfKrdMGlq11YhtDbivm3Hltcv9ZFSN3b5auZMMX4QGBO98Z3DgXfE54n8gKyemC4x1A4OQt96OC1HyYbd4EGXYpD0DkYJlnO3cBPRbmESiitj2~u2x",
+    "pragma": "no-cache",
+    "upgrade-insecure-requests": "1"
+}
+
+nc-audio-chart
+https://www.soundguys.com/bose-quietcomfort-45-review-60657/
+
 403 on replit
 reddit.com
 medium.com
@@ -293,6 +306,11 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.understandingwar.org/
+https://www.bridgemi.com/
+https://greenfleet.net/
+https://www.gpb.org/
+https://fstoppers.com/
 https://nltimes.nl/
 https://news.cnrs.fr/
 https://www.eff.org/deeplinks
@@ -462,3 +480,32 @@ driver = uc.Chrome(user_data_dir=browser_user_data_path,
                    headless=True)
 driver.get('https://nowsecure.nl')
 driver.save_screenshot('./debug/nowsecure.png')
+
+
+https://github.com/yifeikong/curl_cffi
+
+import certifi
+from curl_cffi import requests
+r = requests.get(url, impersonate="chrome110", headers=headers, verify=certifi.where())
+r = requests.get(url, impersonate="chrome110", headers=headers, verify="C:\\Users\\mark.arigo\\AppData\\Roaming\\pip\\mcafee_uce.pem")
+proxies = {"https": "http://192.168.1.xxx:xxxx"}
+r = requests.get(url, impersonate="chrome110", headers=headers, proxies=proxies)
+
+Works for crain sites instead of using bing cache
+Works for axios instead of cloudscraper
+
+buffer = BytesIO()
+c = Curl()
+c.setopt(CurlOpt.CAINFO, 'C:\\Users\\mark.arigo\\AppData\\Roaming\\pip\\mcafee_uce.pem')
+c.setopt(CurlOpt.PROXY, b'http://192.168.1.xxx:8118'
+c.setopt(CurlOpt.URL, b'https://tls.browserleaks.com/json')
+c.setopt(CurlOpt.WRITEDATA, buffer)
+c.impersonate("chrome110")
+c.perform()
+c.close()
+body = buffer.getvalue()
+print(body.decode())
+
+
+Twitter guest accounts
+https://github.com/zedeus/nitter/issues/983

@@ -2,10 +2,8 @@ import io, re, requests
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
 
 import utils
-from feedhandlers import rss
 
 import logging
 

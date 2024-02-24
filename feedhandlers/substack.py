@@ -47,8 +47,9 @@ def get_post(post_json, args, site_json, save_debug):
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     if post_json.get('postTags'):
-        logger.warning('unhandled postTags in ' + item['url'])
-        #item['tags'] = []
+        item['tags'] = []
+        for it in post_json['postTags']:
+            item['tags'].append(it['name'])
 
     if post_json.get('cover_image'):
         item['_image'] = post_json['cover_image']
@@ -302,6 +303,13 @@ def get_post(post_json, args, site_json, save_debug):
             it = el.find(class_='footnote-content')
             note = re.sub(r'^<p>(.*)</p>$', r'\1', it.decode_contents().replace('</p><p>', '<br/><br/>'))
             new_html += '<td style="vertical-align:top;">{}</td></tr></table>'.format(note)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
+        for el in soup.find_all('span', class_='mention-wrap'):
+            data_json = json.loads(el['data-attrs'])
+            new_html = '<a href="https://open.substack.com/users/{}-{}?utm_source=mentions">{}</a>'.format(data_json['id'], data_json['name'].replace(' ', '-'), data_json['name'])
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()

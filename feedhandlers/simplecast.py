@@ -1,4 +1,4 @@
-import math, re
+import re
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 

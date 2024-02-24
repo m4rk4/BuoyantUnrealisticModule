@@ -14,8 +14,8 @@ feedparser = "^6"
 install-playwright = "^0"
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml
 lxml = [
-    {path = "lib/lxml-4.9.0-cp311-cp311-win_amd64.whl",  markers = "sys_platform == 'win32'"},
-    {version = "=4.9.0",  markers = "sys_platform != 'win32'"}
+    {path = "lib/lxml-5.1.0-cp311-cp311-win_amd64.whl",  markers = "sys_platform == 'win32'"},
+    {version = "=5.1.0",  markers = "sys_platform != 'win32'"}
 ]
 markdown2 = "^2"
 netifaces = [
@@ -24,7 +24,7 @@ netifaces = [
 ]
 Pillow = "^9"
 pycryptodome = "^3"
-pytest-playwright = "^0"
+pytest-playwright = "^0.4"
 python-dateutil = "^2"
 pytz = "*"
 requests = "^2"
@@ -37,14 +37,14 @@ staticmap = "^0.5"
 pytube = "^15"
 basencode = "^2"
 requests-oauthlib = "^1"
-cryptography = "^41"
+cryptography = "^42"
 utils = "^1.0.1"
 config = "^0.5.1"
 playwright = "^1"
 image-utils = "^0"
 js2py = "^0.74"
-undetected-chromedriver = "^3.5.4"
-cfsession = "^1.5.0"
+curl-cffi = "^0.5.10"
+certifi = "^2024.2.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

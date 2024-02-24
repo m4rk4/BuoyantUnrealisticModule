@@ -275,7 +275,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         if author not in authors:
                             authors.append(author)
                 if not authors and el.get_text().strip():
-                    author = re.sub(r'^By ', '', el.get_text().strip(), flags=re.I)
+                    author = re.sub(r'^By:?\s*', '', el.get_text().strip(), flags=re.I)
                 if author:
                     author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
                     if author not in authors:
@@ -442,11 +442,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 if el:
                     if el.find(class_='rslides'):
                         it = el.find('li')
-                        item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, add_caption)
+                        item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, add_caption=add_caption)
                         lede = True
                         gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
                     elif el.find('img'):
-                        item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption)
+                        item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption=add_caption)
                         lede = True
                     else:
                         it = el.find('iframe')

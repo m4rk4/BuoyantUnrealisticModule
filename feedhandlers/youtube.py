@@ -118,6 +118,8 @@ def get_content(url, args, site_json, save_debug=False):
             video_id = paths[1]
         elif 'watch' in paths and query.get('v'):
             video_id = query['v'][0]
+        elif 'shorts' in paths:
+            video_id = paths[1]
         if query.get('list'):
             playlist_id = query['list'][0]
 

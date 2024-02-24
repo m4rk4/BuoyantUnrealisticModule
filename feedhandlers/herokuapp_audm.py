@@ -21,5 +21,5 @@ def get_content(url, args, site_json, save_debug=False):
     attachment['mime_type'] = 'audio/mpeg'
     item['attachments'] = []
     item['attachments'].append(attachment)
-    item['content_html'] = '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a></span></div>'.format(item['_audio'], config.server)
+    item['content_html'] = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a></span></div>'.format(item['_audio'], config.server)
     return item

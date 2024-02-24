@@ -299,8 +299,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     if page_json.get('authors'):
         authors = []
-        for it in page_json['authors']:
-            authors.append(it['name'])
+        if page_json['authors'].get('authoredBy'):
+            for it in page_json['authors']['authoredBy']:
+                authors.append(it['name'])
+        if page_json['authors'].get('reviewedBy'):
+            for it in page_json['authors']['reviewedBy']:
+                authors.append(it['name'])
         if authors:
             item['author'] = {}
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))

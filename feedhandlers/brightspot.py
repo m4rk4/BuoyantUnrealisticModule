@@ -90,7 +90,11 @@ def add_image(image):
             for caption in image['credit']:
                 for it in caption['items']:
                     captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it))
-    return utils.add_image(image['image']['src'], ' | '.join(captions))
+    if image.get('url'):
+        link = image['url'][0]['href']
+    else:
+        link = ''
+    return utils.add_image(image['image']['src'], ' | '.join(captions), link=link)
 
 
 def render_content(content, skip_promos=True):
@@ -144,7 +148,17 @@ def render_content(content, skip_promos=True):
                 logger.warning('unhandled Link content')
                 # print(content)
         elif '/quote/Quote.hbs' in content['_template'] or '/quote/QuoteEnhancement.hbs' in content['_template']:
-            content_html += utils.add_pullquote(content['quote'], content.get('attribution'))
+            if len(re.findall(r'["“"”]', content['quote'])) > 0:
+                m = re.search(r'(.+?["”])<br/?>(.+?[^"”]$)', content['quote'])
+                if m:
+                    quote = m.group(1)
+                    author = m.group(2)
+                else:
+                    quote = content['quote']
+                    author = content.get('attribution')
+                content_html += utils.add_pullquote(quote, author)
+            else:
+                content_html += utils.add_blockquote(content['quote'])
         elif '/pullquote/PullQuote.hbs' in content['_template']:
             quote = ''
             for it in content['quote']:
@@ -346,6 +360,10 @@ def render_content(content, skip_promos=True):
                 content_html += utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(src))
             else:
                 content_html += utils.add_embed(src)
+        elif '/audio/AudioEnhancement.hbs' in content['_template']:
+            content_html += render_content(content['player'][0], skip_promos)
+        elif '/audio/HTML5AudioPlayer.hbs' in content['_template']:
+            content_html += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen ({2})</a></span></div><div>&nbsp;</div>'.format(content['sources'][0]['src'], config.server, content['duration'])
         elif '/externalcontent/ExternalContent.hbs' in content['_template']:
             new_html = ''
             if content['oEmbed'].startswith('<iframe'):
@@ -455,6 +473,9 @@ def render_content(content, skip_promos=True):
                 paths = list(filter(None, urlsplit(m.group(1)).path[1:].split('/')))
                 link = 'https://www.emailmeform.com/builder/embed/' + paths[-1]
                 content_html += '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(link)
+            elif content['html'].startswith('<iframe'):
+                m = re.search(r'src="([^"]+)"', content['html'])
+                content_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled PymInteractive content')
         elif '/htmlmodule/HtmlModule.hbs' in content['_template'] or '/module/HtmlModule.hbs' in content['_template']:
@@ -692,7 +713,7 @@ def get_item(article_json, args, site_json, save_debug):
             for content in article_json['body']:
                 content_html += render_content(content)
 
-        if 'PodcastEpisodePage.hbs' in article_json['_template'] and article_json['audio'][0].get('transcripts'):
+        if 'PodcastEpisodePage.hbs' in article_json['_template'] and article_json.get('audio') and article_json['audio'][0].get('transcripts'):
             content_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div><h3>Transcript</h3>'
             for it in article_json['audio'][0]['transcripts']:
                 content_html += render_content(it)

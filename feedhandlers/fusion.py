@@ -1,7 +1,7 @@
 import base64, hashlib, hmac, json, math, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit, unquote_plus, quote_plus
+from urllib.parse import parse_qs, urlsplit, unquote_plus, quote_plus
 
 import config, utils
 from feedhandlers import rss
@@ -741,12 +741,17 @@ def get_item(content, url, args, site_json, save_debug):
     if content.get('credits') and content['credits'].get('by'):
         for author in content['credits']['by']:
             if author['type'] == 'author':
-                authors.append(author['name'])
+                if author.get('name'):
+                    authors.append(author['name'])
+                elif author.get('org'):
+                    authors.append(author['org'])
     elif content.get('authors'):
         for author in content['authors']:
             authors.append(author['name'])
     elif content.get('distributor'):
         authors.append(content['distributor']['name'])
+    elif content.get('source'):
+        authors.append(content['source']['name'])
     if authors:
         item['author'] = {}
         if len(authors) == 1:
@@ -798,7 +803,7 @@ def get_item(content, url, args, site_json, save_debug):
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
 
-    if 'embed' in args:
+    if 'embed' in args and content['type'] != 'video':
         item['content_html'] = '<div style="display:flex; flex-wrap:wrap; border:1px solid black;">'
         if item.get('_image'):
             item['content_html'] += '<div style="flex:1; min-width:400px; margin:auto;"><img src="{}" style="display:block; width:100%;"/></div>'.format(item['_image'])
@@ -821,6 +826,17 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         path = split_url.path
     paths = list(filter(None, split_url.path[1:].split('/')))
+
+    if split_url.netloc == 'gray.video-player.arcpublishing.com':
+        params = parse_qs(split_url.query)
+        if not params.get('uuid'):
+            logger.warning('unhandled url ' + url)
+            return None
+        api_url = 'https://gray-config-prod.api.arc-cdn.net/video/v1/ansvideos/findByUuid?uuid=' + params['uuid'][0]
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        return get_item(api_json[0], url, args, site_json, save_debug)
 
     for n in range(2):
         query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)

@@ -220,8 +220,11 @@ def get_content(url, args, site_json, save_debug=False):
         for it in el.find_all('p'):
             if quote:
                 quote += '<br/><br/>'
-            quote += utils.bs_get_inner_html(it)
-        new_html = utils.add_pullquote(quote)
+            quote += it.decode_contents()
+        if re.search(r'^["“].*["”]$', quote) and len(re.findall(r'["“"”]', quote)) == 2:
+            new_html = utils.add_pullquote(quote[1:-1])
+        else:
+            new_html = utils.add_blockquote(quote)
         el.insert_after(BeautifulSoup(new_html, 'html.parser'))
         el.decompose()
 

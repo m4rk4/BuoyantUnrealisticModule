@@ -124,6 +124,6 @@ def get_content(url, args, site_json, save_debug=False):
         poster = '{}/image?url={}&width=1200&overlay=video'.format(config.server, quote_plus(item['_image']))
         item['content_html'] = utils.add_image(poster, item['title'], link=item['url'])
 
-    if not 'embed' in args:
+    if not 'embed' in args or 'add_summary' in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])
     return item

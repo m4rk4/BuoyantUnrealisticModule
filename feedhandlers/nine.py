@@ -105,14 +105,18 @@ def add_imagebar_gallery(url):
 
 
 def get_article_json(tld, article_id):
-    return utils.get_url_json('https://api.{}.{}/api/content/v0/assets/{}'.format(tld.domain, tld.suffix, article_id))
+    api_url = 'https://api.{}.{}/api/content/v0/assets/{}'.format(tld.domain, tld.suffix, article_id)
+    # print(api_url)
+    return utils.get_url_json(api_url)
 
 
 def get_article_url(article_json, domain, netloc):
     if article_json['urls'].get('canonical'):
         return 'https://{}{}'.format(netloc, article_json['urls']['canonical']['path'])
-    elif article_json['urls']['published'].get(domain):
+    elif article_json['urls'].get('published') and article_json['urls']['published'].get(domain):
         return 'https://{}{}'.format(netloc, article_json['urls']['published'][domain]['path'])
+    elif article_json['urls'].get('external'):
+        return article_json['urls']['external']
     else:
         logger.warning('unknown article url')
         return article_json['urls']['webslug']
@@ -121,6 +125,21 @@ def get_article_url(article_json, domain, netloc):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     tld = tldextract.extract(url)
+    query = parse_qs(split_url.query)
+
+    if 'embed' in args and 'photo-gallery' in url and query.get('configUrl'):
+        config_json = utils.get_url_json(query['configUrl'][0])
+        if config_json:
+            item = {}
+            item['content_html'] = '<h3>{}</h3><table>'.format(config_json['config']['name'])
+            for data in config_json['data']:
+                captions = []
+                if data.get('caption'):
+                    captions.append(data['caption'])
+                if data.get('credit'):
+                    captions.append(data['credit'])
+                item['content_html'] += utils.add_image(data['image'], ' | '.join(captions))
+            return item
 
     m = re.search(r'-(\w+?)(\.html)?$', split_url.path)
     if not m:
@@ -209,7 +228,9 @@ def get_content(url, args, site_json, save_debug=False):
                 elif val['type'] == 'omny':
                     new_html = utils.add_embed(val['data']['src'])
                 elif val['type'] == 'iframe':
-                    if '/super-quiz' in val['data']['url']:
+                    if 'nakedPointer.html' in val['data']['url']:
+                        continue
+                    elif '/super-quiz' in val['data']['url']:
                         new_html = add_super_quiz(val['data']['url'])
                     elif '/imagebar-gallery' in val['data']['url']:
                         new_html = add_imagebar_gallery(val['data']['url'])
@@ -229,13 +250,15 @@ def get_content(url, args, site_json, save_debug=False):
                     if link_json:
                         new_html = '<a href="{}">{}</a>'.format(get_article_url(link_json, tld.domain, split_url.netloc), val['data']['text'])
                 elif val['type'] == 'relatedStory':
-                    link_json = get_article_json(tld, val['data']['id'])
-                    if link_json:
-                        new_html = '<p><strong>Related Article:</strong> <a href="{}">{}</a></p>'.format(get_article_url(link_json, tld.domain, split_url.netloc), link_json['asset']['headlines']['headline'])
+                    continue
+                    # link_json = get_article_json(tld, val['data']['id'])
+                    # if link_json:
+                    #     new_html = '<p><strong>Related Article:</strong> <a href="{}">{}</a></p>'.format(get_article_url(link_json, tld.domain, split_url.netloc), link_json['asset']['headlines']['headline'])
                 if new_html:
                     item['content_html'] = re.sub(r'<x-placeholder id="{}"></x-placeholder>'.format(key), new_html, item['content_html'])
                 else:
                     logger.warning('unhandled body placeholder type {} in {}'.format(val['type'], item['url']))
+
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 

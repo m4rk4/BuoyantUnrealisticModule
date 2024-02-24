@@ -176,6 +176,9 @@ def render_content(content):
     elif content['type'] == 'TikTok':
         content_html += utils.add_embed('https://www.tiktok.com/embed/v2/{}?lang=en-US'.format(content['id']))
 
+    elif content['type'] == 'DataWrapper':
+        content_html += utils.add_embed(content['url'])
+
     elif content['type'] == 'Iframe':
         if content['source'].startswith('https://platform.twitter.com/embed'):
             m = re.search(r'&id=(\d+)', content['source'])

@@ -47,8 +47,13 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
 
     if 'feedburner_origlink' in entry:
       entry_link = entry.feedburner_origlink
-    else:
+    elif entry.get('link'):
       entry_link = entry.link
+    elif entry.get('links'):
+      for link in entry['links']:
+        if link.get('type') and link['type'] == 'text/html' and link.get('href'):
+          entry_link = link['href']
+          break
 
     #if not 'youtube' in entry_link:
     if site_json['module'] != 'youtube' and site_json['module'] != 'piped':

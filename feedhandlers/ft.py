@@ -90,7 +90,8 @@ def get_content(url, args, site_json, save_debug=False):
         ld_json = None
 
     if not ld_json:
-        article_html = utils.get_url_html(url, user_agent='googlecache')
+        # article_html = utils.get_url_html(url, user_agent='googlecache')
+        article_html = utils.get_bing_cache(url)
         if article_html:
             soup = BeautifulSoup(article_html, 'html.parser')
         for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
@@ -172,6 +173,12 @@ def get_content(url, args, site_json, save_debug=False):
     el = soup.find('meta', attrs={"name": "keywords"})
     if el:
         item['tags'] = list(map(str.strip, el['content'].split(',')))
+    else:
+        item['tags'] = []
+        for el in soup.find_all('a', class_='concept-list__concept'):
+            item['tags'].append(el.get_text().strip())
+        if not item.get('tags'):
+            del item['tags']
 
     if 'asia.nikkei.com' in item['url']:
         body_url = 'https://asia.nikkei.com/__service/v1/piano/article_access/' + base64.b64encode(urlsplit(url).path.encode()).decode()
@@ -320,6 +327,9 @@ def get_content(url, args, site_json, save_debug=False):
 
         item['content_html'] = ''
         if article_body.find().name != 'figure':
+            el = soup.find(class_='o-topper__standfirst')
+            if el:
+                item['content_html'] += '<p><em>' + el.decode_contents() + '</em></p>'
             el = soup.find(class_='o-topper__visual')
             if not el:
                 el = soup.find(class_='main-image')

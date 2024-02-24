@@ -37,8 +37,9 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(ld_json['dateModified'])
-    item['date_modified'] = dt.isoformat()
+    if ld_json.get('dateModified'):
+        dt = datetime.fromisoformat(ld_json['dateModified'])
+        item['date_modified'] = dt.isoformat()
 
     authors = []
     if ld_json.get('author'):

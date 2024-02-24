@@ -126,12 +126,8 @@ def get_content(url, args, site_json, save_debug=False):
         start_tag = ''
         if paragraph_type == 'p' or paragraph_type == 'h1' or paragraph_type == 'h2' or paragraph_type == 'h3' or paragraph_type == 'h4':
             start_tag += '<{}>'.format(paragraph_type)
-            if paragraph.get('hasDropCap') and paragraph['hasDropCap']:
-                paragraph_text = '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(paragraph['text'][0], paragraph['text'][1:])
-                end_tag = '</{}><div style="clear:left;"></div>'.format(paragraph_type)
-            else:
-                paragraph_text = paragraph['text']
-                end_tag = '</{}>'.format(paragraph_type)
+            paragraph_text = paragraph['text']
+            end_tag = '</{}>'.format(paragraph_type)
 
         elif paragraph_type == 'img':
             start_tag = add_image(paragraph['metadata'], paragraph['text'])
@@ -248,6 +244,13 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             markup_text = paragraph_text
         markup_text = markup_text.replace('\n', '<br />')
+
+        if paragraph_type == 'p' and paragraph.get('hasDropCap') and paragraph['hasDropCap']:
+            if not markup_text.startswith('<'):
+                markup_text = '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(markup_text[0], markup_text[1:])
+                end_tag += '<div style="clear:left;"></div>'
+            else:
+                logger.warning('unhandled DropCap in ' + item['url'])
 
         item['content_html'] += start_tag + markup_text + end_tag
 

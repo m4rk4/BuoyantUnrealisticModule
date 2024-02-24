@@ -280,9 +280,10 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     # WSJ links free articles from their reddit account here: https://www.reddit.com/user/wsj/.json?sort=new
     # or look here: https://www.reddit.com/domain/wsj.com/.json
     # https://www.wsj.com/lifestyle/dog-owners-death-lessons-love-grief-53c77511?st=ycgues92xaxtr83
-    # https://www.wsj.com/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04
-    # https://www.wsj.com/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu
+    original_url = '/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04'
+    # original_url = '/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu'
     # Adding mod=djemalertNEWS seems to bypass the need for a token
+    # original_url = urlsplit(url).path + "?mod=djemalertNEWS"
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
@@ -298,12 +299,13 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
         "x-encrypted-document-key": encryptedDocumentKey,
         "x-original-host": "www.wsj.com",
         "x-original-referrer": "",
-        "x-original-url": urlsplit(url).path + "?mod=djemalertNEWS"
+        "x-original-url": original_url
     }
     # Seems like using wsj.com works for other wsj sites as well (Barrons, etc.)
     client_json = utils.get_url_json('https://www.wsj.com/client', headers=headers)
     if not client_json:
         return None
+    # print(client_json)
     if not client_json.get('documentKey'):
         logger.warning('unable to get documentKey')
         return None
@@ -555,8 +557,16 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
         return item
 
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "en-US,en;q=0.9",
+        "cache-control": "no-cache",
+        "cookie": "datadome=" + config.wsj_datadome,
+        "pragma": "no-cache",
+        "upgrade-insecure-requests": "1"
+    }
     api_url = site_json['articles_api'] + paths[-1]
-    api_json = utils.get_url_json(api_url)
+    api_json = utils.get_url_json(api_url, headers=headers)
     if not api_json:
         page_html = utils.get_url_html(url)
         if not page_html:

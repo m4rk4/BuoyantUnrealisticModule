@@ -261,7 +261,7 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<h4>{}</h4>'.format(elm.get_text())
                 new_html += '<ul>'
                 for elm in it.find_all(class_='hawk-merchant-link-widget-item-wrapper'):
-                    link = elm.find(class_='hawk-affiliate-link-merchantlink-transparent-label')
+                    link = elm.find(class_=['hawk-affiliate-link-merchantlink-transparent-label', 'hawk-affiliate-link-merchantlink-price'])
                     new_html += '<li><a href="{}">'.format(utils.get_redirect_url(link['href']))
                     price = elm.find(class_='hawk-display-price-price')
                     if price:

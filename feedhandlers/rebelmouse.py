@@ -23,6 +23,7 @@ def resize_image(img_src, width=1000):
 def render_content(content):
     content_html = ''
     end_tag = ''
+    has_dropcap = False
     if content['type'] == 'text':
         def rebelmouse_proxy_image(matchobj):
             return utils.add_image(matchobj.group(1))
@@ -32,7 +33,7 @@ def render_content(content):
     elif content['type'] == 'tag':
         if content['name'] == 'p':
             if content.get('attributes') and content['attributes'].get('class'):
-                classes = content['attributes']['class'].split(' ')
+                # classes = content['attributes']['class'].split(' ')
                 if re.search(r'shortcode-media-rebelmouse-image', content['attributes']['class']):
                     img_src = ''
                     img_link = ''
@@ -100,6 +101,9 @@ def render_content(content):
                         quote = m.group(1)
                         author = m.group(2)
                     return utils.add_pullquote(quote, author)
+
+                elif re.search(r'drop-caps', content['attributes']['class']):
+                    has_dropcap = True
 
             content_html += '<p>'
             end_tag = 'p'
@@ -222,8 +226,9 @@ def render_content(content):
                     elif child['name'] == 'particle-media':
                         if child.get('children'):
                             for nino in child['children']:
-                                if nino.get('text') and re.search(r'shortcode-Ad', nino['text'], flags=re.I):
+                                if nino.get('text') and re.search(r'shortcode-Ad|embed-dontmiss|embed-latest|embed-mostread', nino['text'], flags=re.I):
                                     continue
+                                # print(nino)
                                 if nino['name'] == 'rebelmouse-image':
                                     crop_info = json.loads(unquote_plus(nino['attributes']['crop_info']))
                                     images = []
@@ -335,10 +340,17 @@ def render_content(content):
             end_tag = content['name']
 
     if content.get('children'):
+        child_content = ''
         for child in content['children']:
-            content_html += render_content(child)
+            child_content += render_content(child)
+        if has_dropcap:
+            if not child_content.startswith('<'):
+                child_content = '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(child_content[0], child_content[1:])
+        content_html += child_content
     if end_tag:
         content_html += '</{}>'.format(end_tag)
+        if has_dropcap:
+            content_html += '<div style="clear:left;">'
     return content_html
 
 
@@ -392,7 +404,13 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
-    item['tags'] = post_json['public_tags'].copy()
+    item['tags'] = []
+    if post_json.get('section'):
+        item['tags'].append(post_json['section']['title'])
+    if post_json.get('public_tags'):
+        item['tags'] += post_json['public_tags'].copy()
+    if not item.get('tags'):
+        del item['tags']
 
     item['summary'] = post_json['description']
 
@@ -424,6 +442,11 @@ def get_content(url, args, site_json, save_debug=False):
             query = parse_qs(urlsplit(post_json['video']).query)
             if query.get('jwplayer_video_url'):
                 item['content_html'] += utils.add_embed(query['jwplayer_video_url'][0])
+            elif query.get('video_url'):
+                embed_args = {}
+                if post_json.get('photo_caption'):
+                    embed_args['caption'] = re.sub(r'</?p>', '', post_json['photo_caption'])
+                item['content_html'] += utils.add_embed(query['video_url'][0], embed_args)
             else:
                 logger.warning('unhandled video {} in {}'.format(post_json['video'], item['url']))
     else:

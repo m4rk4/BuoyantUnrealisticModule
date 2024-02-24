@@ -158,6 +158,10 @@ def get_content_html(content_uri):
     elif '/errata/' in content_uri:
         content_html = content_json['text']
 
+    elif '/clay-ceros/' in content_uri and content_json['html'].startswith('<iframe'):
+        m = re.search(r'src="([^"]+)"', content_json['html'])
+        content_html += utils.add_embed(m.group(1))
+
     elif '/product/' in content_uri:
         caption = []
         if content_json.get('imageCaption'):
@@ -265,6 +269,9 @@ def get_content(url, args, site_json, save_debug=False, page_uri=''):
         item['summary'] = article_json['dek']
 
     item['content_html'] = ''
+
+    if article_json.get('displayTeaser') and article_json['hideTeaser'] == False:
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['displayTeaser'])
 
     if article_json.get('ledeUrl'):
         item['_image'] = article_json['ledeUrl']

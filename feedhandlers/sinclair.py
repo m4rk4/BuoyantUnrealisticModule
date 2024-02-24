@@ -45,7 +45,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['summary'] = article_json['summary']
 
     item['content_html'] = article_json['richText'].replace('{&nbsp;}', '&nbsp;')
-    item['content_html'] = re.sub(r'{(/?(a|blockquote|em|h\d|p|strong))}', r'<\1>', item['content_html'])
+    item['content_html'] = re.sub(r'{(/?(a|blockquote|em|h\d|li|p|strong|ul))}', r'<\1>', item['content_html'])
     item['content_html'] = item['content_html'].replace('<blockquote>', '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">')
     item['content_html'] = re.sub(r'{(br|hr)}', r'<\1/>', item['content_html'])
     item['content_html'] = re.sub(r'{a href="([^"]+)"[^}]*}', r'<a href="\1">', item['content_html'])

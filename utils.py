@@ -1,4 +1,4 @@
-import basencode, cloudscraper, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import basencode, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
 from PIL import ImageFile
@@ -8,7 +8,6 @@ from urllib3.util import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
-import utils
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
@@ -67,7 +66,7 @@ def get_site_json(url):
         site_json['args'] = {"skip_wp_user": True}
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
-      utils.write_file(sites_json, './sites.json')
+      write_file(sites_json, './sites.json')
     elif url_exists('{}://{}/tncms/webservice/'.format(split_url.scheme, split_url.netloc)):
       site_json = {
         "feeds": [
@@ -77,7 +76,7 @@ def get_site_json(url):
       }
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
-      utils.write_file(sites_json, './sites.json')
+      write_file(sites_json, './sites.json')
     elif url_exists('{}://{}/rest/carbon/filter/main/'.format(split_url.scheme, split_url.netloc)):
       site_json = {
         "feeds": [
@@ -87,7 +86,7 @@ def get_site_json(url):
       }
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
-      utils.write_file(sites_json, './sites.json')
+      write_file(sites_json, './sites.json')
     elif url_exists('https://concertads-configs.vox-cdn.com/sbn/sbn/{}/config.json'.format(tld.domain)):
       site_json = {
         "feeds": [
@@ -97,7 +96,7 @@ def get_site_json(url):
       }
       logger.debug('adding site ' + tld.domain)
       sites_json[tld.domain] = site_json
-      utils.write_file(sites_json, './sites.json')
+      write_file(sites_json, './sites.json')
     else:
       dt = datetime.utcnow()
       if url_exists('{}://{}/sitemap/{}/{}/{}/'.format(split_url.scheme, split_url.netloc, dt.year, dt.strftime('%B').lower(), dt.day)):
@@ -111,14 +110,14 @@ def get_site_json(url):
             }
             logger.debug('adding site ' + tld.domain)
             sites_json[tld.domain] = site_json
-            utils.write_file(sites_json, './sites.json')
+            write_file(sites_json, './sites.json')
   return site_json
 
 def update_sites(url, site_json):
   tld = tldextract.extract(url)
-  sites_json = utils.read_json_file('./sites.json')
+  sites_json = read_json_file('./sites.json')
   sites_json[tld.domain] = site_json
-  utils.write_file(sites_json, './sites.json')
+  write_file(sites_json, './sites.json')
 
 def get_module(url, handler=''):
   site_json = {}
@@ -423,6 +422,11 @@ def post_url(url, data=None, json_data=None, headers=None, r_text=False):
         r = requests.post(url, json=json_data, headers=headers)
       else:
         r = requests.post(url, json=json_data)
+    else:
+      if headers:
+        r = requests.post(url, headers=headers)
+      else:
+        r = requests.post(url)
     r.raise_for_status()
   except requests.exceptions.HTTPError as e:
     status_code = e.response.status_code
@@ -665,14 +669,18 @@ def bs_get_inner_html(soup):
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
 def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
-  quote = quote.strip()
+  quote = html.unescape(quote.strip())
+  # print(quote)
   if quote.startswith('<p'):
     soup = BeautifulSoup(quote, 'html.parser')
     quote = ''
     for i, el in enumerate(soup.find_all('p')):
       if i > 0:
         quote += '<br/><br/>'
-      quote += el.decode_contents()
+      p = el.decode_contents()
+      if p.startswith('<em>') and p.endswith('</em>'):
+        p = p[4:-5]
+      quote += p
     # quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
     # quote = re.sub(r'</?p>', '', quote)
   if pullquote_check:
@@ -794,7 +802,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     else:
       video_src = video_url
 
-  elif video_type == 'application/x-mpegURL' or video_type == 'audio/mp4':
+  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
@@ -868,7 +876,7 @@ def get_youtube_id(ytstr):
       yt_list_id = query['list'][0]
 
   if yt_list_id and not yt_video_id:
-    list_json = utils.get_url_json('https://pipedapi.kavin.rocks/playlists/' + yt_list_id, user_agent='googlebot')
+    list_json = get_url_json('https://pipedapi.kavin.rocks/playlists/' + yt_list_id, user_agent='googlebot')
     if list_json:
       yt_video_id, yt_list_id = get_youtube_id('https://www.youtube.com{}&list={}'.format(list_json['relatedStreams'][0]['url'], yt_list_id))
 
@@ -985,7 +993,7 @@ def add_embed(url, args={}, save_debug=False):
   if 'twitter.com' in embed_url:
     embed_url = clean_url(embed_url)
   elif '/t.co/' in embed_url:
-    embed_url = utils.get_redirect_url(embed_url)
+    embed_url = get_redirect_url(embed_url)
   elif 'youtube.com/embed' in embed_url:
     if 'list=' not in embed_url:
       embed_url = clean_url(embed_url)
@@ -999,7 +1007,7 @@ def add_embed(url, args={}, save_debug=False):
     if params.get('src'):
       embed_url = params['src'][0]
   elif 'cdn.iframe.ly' in embed_url:
-    embed_html = utils.get_url_html(embed_url)
+    embed_html = get_url_html(embed_url)
     if embed_html:
       m = re.search(r'"linkUri":"([^"]+)"', embed_html)
       if m:
@@ -1122,3 +1130,46 @@ def calc_duration(s):
     m = s / 60
     duration.append('{} min'.format(math.ceil(m)))
   return ', '.join(duration)
+
+
+def get_bing_cache(url, slug=-1):
+  split_url = urlsplit(url)
+  paths = list(filter(None, split_url.path[1:].split('/')))
+  bing_url = 'https://www.bing.com/search?q={}+site%3A{}'.format(paths[slug], split_url.netloc.replace('www.', ''))
+  # print(bing_url)
+  bing_html = get_url_html(bing_url)
+  # write_file(bing_html, './debug/bing.html')
+  if not bing_html:
+    return ''
+  soup = BeautifulSoup(bing_html, 'lxml')
+  for el in soup.select('ol#b_results > li.b_algo'):
+    link = el.find(class_='tilk')
+    if link:
+      if url in link['href'] or link['href'] in url:
+        attrib = link.find(class_='b_attribution', attrs={"u": True})
+        if attrib:
+          u = attrib['u'].split('|')
+          cache_url = 'https://cc.bingj.com/cache.aspx?q={}+site%3A{}&d={}&mkt=en-US&setlang=en-US&w={}'.format(paths[slug], split_url.netloc, u[2], u[3])
+          cache_html = get_url_html(cache_url)
+          return cache_html
+        else:
+          logger.warning('no Bing cache found for ' + url)
+          return ''
+  logger.warning('no bing search result found for ' + url)
+  return ''
+  # cite = None
+  # for el in soup.find_all('cite'):
+  #   if url in el.string:
+  #     cite = el
+  #     break
+  # if not cite:
+  #   logger.warning('url not found')
+  #   return ''
+  # el = cite.find_parent(class_='b_attribution', attrs={"u": True})
+  # if not el:
+  #   logger.warning('no Bing cache found')
+  #   return ''
+  # u = el['u'].split('|')
+  # cache_url = 'https://cc.bingj.com/cache.aspx?q={}+site%3A{}&d={}&mkt=en-US&setlang=en-US&w={}'.format(paths[slug], split_url.netloc, u[2], u[3])
+  # cache_html = get_url_html(cache_url)
+  # return cache_html
