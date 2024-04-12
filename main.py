@@ -83,15 +83,6 @@ def feed():
     return jsonify(feed)
 
 
-@app.route('/test', methods=['GET'])
-def test():
-    args = request.args
-    feed = utils.read_json_file('./debug/test.json')
-    if 'read' in args:
-        return render_template('feed.html', title=feed['title'], link=feed['home_page_url'], items=feed['items'])
-    return jsonify(feed)
-
-
 @app.route('/test_handler', methods=['GET'])
 def test_handler():
     args = request.args
@@ -142,6 +133,38 @@ def content():
         args_copy.update(site_json['args'])
 
     content = module.get_content(url, args_copy, site_json, save_debug)
+    if 'read' in args:
+        return render_template('content.html', content=content)
+
+    return jsonify(content)
+
+
+@app.route('/test', methods=['GET'])
+def test():
+    args = request.args
+    if 'debug' in args:
+        save_debug = True
+    else:
+        save_debug = False
+
+    if args.get('feedhandler'):
+        handler = args['feedhandler']
+    elif args.get('feedtype'):
+        handler = args['feedtype']
+    else:
+        handler = ''
+
+    url = args.get('url')
+
+    module, site_json = utils.get_module(url, handler)
+    if not module:
+        return 'content handler not found'
+
+    args_copy = args.copy()
+    if site_json.get('args'):
+        args_copy.update(site_json['args'])
+
+    content = module.test(url, args_copy, site_json, save_debug)
     if 'read' in args:
         return render_template('content.html', content=content)
 

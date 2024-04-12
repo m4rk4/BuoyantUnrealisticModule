@@ -77,21 +77,34 @@ def get_post(post_json, args, site_json, save_debug):
         #item['content_html'] += '<div><a href="{}"><img src="{}/static/play_button-48x48.png" style="float:left;" /><span>&nbsp;Listen to article</span></a></div><div style="clear:left;">&nbsp;</div>'.format(item['_audio'], config.server)
         item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a></span></div>'.format(item['_audio'], config.server)
 
-    if post_json.get('podcastUpload'):
-            item['_audio'] = post_json['podcast_url']
+    if post_json['type'] == 'podcast':
+        if post_json.get('videoUpload'):
+            item['_video'] = utils.get_redirect_url('https://{}/api/v1/video/upload/{}/src?override_publication_id={}&type=hls&preview=false'.format(split_url.netloc, post_json['videoUpload']['id'], post_json['videoUpload']['publication_id']))
+            link = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_video']), quote_plus('application/x-mpegURL'), quote_plus(post_json['cover_image']))
+            caption = '{}. <a href="{}">Watch</a>'.format(item['title'],link)
+            if post_json.get('podcast_url'):
+                item['_audio'] = post_json['podcast_url']
+                attachment = {}
+                attachment['url'] = item['_audio']
+                attachment['mime_type'] = 'audio/mpeg'
+                item['attachments'] = []
+                item['attachments'].append(attachment)
+                link = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(post_json['cover_image']))
+                caption += ' | <a href="{}">Listen</a>'.format(link)
+            caption += ' ({})'.format(utils.calc_duration(post_json['podcast_duration']))
+            item['content_html'] += utils.add_video(item['_video'], 'application/x-mpegURL', post_json['cover_image'], caption)
+        elif post_json.get('podcastUpload'):
+            item['_audio'] = utils.get_redirect_url(post_json['podcast_url'])
             attachment = {}
             attachment['url'] = item['_audio']
             attachment['mime_type'] = 'audio/mpeg'
             item['attachments'] = []
             item['attachments'].append(attachment)
-            duration = []
-            if post_json['podcast_duration'] >= 3600:
-                duration.append('{:.0f} hr'.format(post_json['podcast_duration'] / 3600))
-                duration.append('{:.0f} min'.format((post_json['podcast_duration'] % 3600) / 60))
-            else:
-                duration.append('{:.0f} min.'.format(post_json['podcast_duration'] / 60))
-            poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(post_json['podcast_episode_image_url']))
-            item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}"/></a><span>&nbsp;<a href="{0}">Listen now ({2})</a></span></div>'.format(item['_audio'], poster, ', '.join(duration))
+            link = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(post_json['cover_image']))
+            poster = '{}/image?url={}&height=540&overlay=audio'.format(config.server, quote_plus(post_json['podcast_episode_image_url']))
+            # item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}"/></a><span>&nbsp;<a href="{0}">Listen now ({2})</a></span></div>'.format(item['_audio'], poster, duration)
+            caption = '<a href="{}">Listen: {} ({})</a>'.format(link, item['title'], utils.calc_duration(post_json['podcast_duration']))
+            item['content_html'] += utils.add_image(poster, caption, link=link)
 
     if post_json.get('body_html'):
         # utils.write_file(post_json['body_html'], './debug/debug.html')
@@ -111,8 +124,37 @@ def get_post(post_json, args, site_json, save_debug):
         for el in soup.find_all('h5'):
             el.name = 'h2'
 
+        for el in soup.find_all(class_='digest-post-embed'):
+            new_html = ''
+            if el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                authors = []
+                for it in data_json['publishedBylines']:
+                    authors.append(it['name'])
+                it = el.find_next_sibling()
+                if it and it.name == 'blockquote':
+                    new_html += '<div>&nbsp;</div><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(data_json['canonical_url'], data_json['title'])
+                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), False))
+                    new_html += utils.add_image(data_json['cover_image'])
+                    new_html += utils.add_blockquote(it.decode_contents(), False)
+                    it.decompose()
+                else:
+                    new_html += '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                    new_html += '<div style="flex:1; min-width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></div>'.format(data_json['canonical_url'], data_json['cover_image'])
+                    new_html += '<div style="flex:2; min-width:320px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(data_json['canonical_url'], data_json['title'])
+                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), False))
+                    new_html += '<p><a href="{}" style="text-decoration:none;">Read full story &rarr;</a></p></div></div>'.format(data_json['canonical_url'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled digest-post-embed in ' + item['url'])
+
         for el in soup.find_all('blockquote'):
-            if not el.get('class'):
+            if el.get('style'):
+                # likely from above
+                continue
+            elif not el.get('class'):
                 new_html = utils.add_blockquote(el.decode_contents())
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -127,7 +169,9 @@ def get_post(post_json, args, site_json, save_debug):
             el.insert_after(new_el)
             el.decompose()
 
-        for el in soup.find_all(class_='captioned-image-container'):
+        for el in soup.find_all(class_=['captioned-image-container', 'image-link']):
+            if el.name == None:
+                continue
             it = el.find('img')
             if not it:
                 it = el.find('source')
@@ -136,11 +180,14 @@ def get_post(post_json, args, site_json, save_debug):
                     img_src = utils.image_from_srcset(it['srcset'], 1000)
                 else:
                     img_src = it['src']
-                it = el.find(class_='image-link')
-                if it:
-                    link = it['href']
+                if 'image-link' in el['class']:
+                    link = el['href']
                 else:
-                    link = ''
+                    it = el.find(class_='image-link')
+                    if it:
+                        link = it['href']
+                    else:
+                        link = ''
                 it = el.find('figcaption')
                 if it:
                     caption = it.decode_contents()
@@ -314,10 +361,21 @@ def get_post(post_json, args, site_json, save_debug):
             el.insert_after(new_el)
             el.decompose()
 
+        for el in soup.find_all('p', class_='button-wrapper'):
+            data_json = json.loads(el['data-attrs'])
+            new_html = utils.add_button(data_json['url'], data_json['text'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
         for el in soup.find_all(class_=True):
             logger.warning('unhandled class {} in {}'.format(el['class'], item['url']))
 
-        item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(soup))
+        item['content_html'] += str(soup)
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+    item['content_html'] = re.sub(r'<div><hr/></div>\s*<div><hr/></div>', '<hr/>', item['content_html'])
+    item['content_html'] = re.sub(r'<hr/>', '<div>&nbsp;</div><hr/><div>&nbsp;</div>', item['content_html'])
     return item
 
 

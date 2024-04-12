@@ -548,6 +548,8 @@ def image_from_srcset(srcset, target):
       if image['width'] == 1.0 and image['src'].startswith('http'):
         base_width = get_image_width(image['src'])
       images.append(image)
+  elif srcset.count('http') == 1:
+    return srcset
 
   if base_width > 0:
     for image in images:
@@ -674,13 +676,16 @@ def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
   if quote.startswith('<p'):
     soup = BeautifulSoup(quote, 'html.parser')
     quote = ''
-    for i, el in enumerate(soup.find_all('p')):
-      if i > 0:
-        quote += '<br/><br/>'
-      p = el.decode_contents()
-      if p.startswith('<em>') and p.endswith('</em>'):
-        p = p[4:-5]
-      quote += p
+    for i, el in enumerate(soup.find_all(['p', 'ol', 'ul'], recursive=False)):
+      if el.name == 'p':
+        if i > 0:
+          quote += '<br/><br/>'
+        p = el.decode_contents()
+        if p.startswith('<em>') and p.endswith('</em>'):
+          p = p[4:-5]
+        quote += p
+      else:
+        quote += str(el)
     # quote = re.sub(r'</p>\s*<p>', '<br/><br/>', quote)
     # quote = re.sub(r'</?p>', '', quote)
   if pullquote_check:
@@ -709,19 +714,22 @@ def add_pullquote(quote, author=''):
   quote = re.sub(r'</(p|h\d)>', '<br/><br/>', quote)
   quote = re.sub('(<br/>)+$', '', quote)
   quote = quote.strip()
+  while re.search(r'<br/?>$', quote):
+    quote = re.sub(r'<br/?>$', '', quote)
   m = re.search(r'^("|“|‘)(.*)("|”|’)$', quote)
   if m:
     quote = m.group(2)
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
-def get_image_width(img_src):
+def get_image_width(img_src, param_check_only=False):
+  width = -1
   query = parse_qs(urlsplit(img_src).query)
   if query.get('w'):
     width = int(query['w'][0])
   elif query.get('width'):
     width = int(query['width'][0])
-  else:
+  elif not param_check_only:
     width, height = get_image_size(img_src)
   return width
 
@@ -970,6 +978,16 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
     graph_html += '<div><small>{}</small></div>'.format(caption)
   graph_html += '</div>'
   return graph_html
+
+def add_button(link, text, button_color='gray', text_color='white', center=True, border=True, border_color="black", font_size='1em'):
+  style = 'display:inline-block; min-width:180px; text-align:center; padding:0.5em; background-color:{}; color:{}; font-size:{}; border-radius:10px;'.format(button_color, text_color, font_size)
+  if border:
+    style += ' border:1px solid {};'.format(border_color)
+  button = '<div style="margin:0.5em;'
+  if center:
+    button += ' text-align:center;'
+  button += '"><a href="{} style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
+  return button
 
 def add_audio_track(track_info):
   desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>'.format(track_info['url'], track_info['title'])

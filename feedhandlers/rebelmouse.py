@@ -328,6 +328,9 @@ def render_content(content):
                     content_html += '<hr/>'
             return content_html
 
+        elif content['name'] == 'center' and content.get('children') and content['children'][0]['type'] == 'tag' and content['children'][0]['name'] == 'iframe':
+            pass
+
         elif content['name'] == 'script':
             pass
 

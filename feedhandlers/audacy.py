@@ -197,6 +197,7 @@ def get_podcast_content(url, args, site_json, save_debug):
             item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
     return item
 
+
 def get_content(url, args, site_json, save_debug=False):
     if '/podcasts/' in url:
         return get_podcast_content(url, args, site_json, save_debug)
@@ -262,6 +263,7 @@ def get_content(url, args, site_json, save_debug=False):
             for content in slide['description']:
                 item['content_html'] += render_content(content)
 
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

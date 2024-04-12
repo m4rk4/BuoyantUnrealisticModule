@@ -1,5 +1,6 @@
 import json, math, re
 from bs4 import BeautifulSoup
+from curl_cffi import requests
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, unquote_plus, urlsplit
 
@@ -15,38 +16,44 @@ def resize_image(img_src):
 
 
 def get_bb_url(url, get_json=False):
-    #print(url)
-    headers = {
-        "accept-encoding": "gzip, deflate, br",
-        "accept-language": "en-US,en;q=0.9,de;q=0.8",
-        "cache-control": "max-age=0",
-        "sec-ch-ua": "\"Chromium\";v=\"106\", \"Microsoft Edge\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "none",
-        "sec-fetch-user": "?1",
-        "sec-gpc": "1",
-        "upgrade-insecure-requests": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edg/106.0.1370.47"
-    }
+    # print(url)
+    r = requests.get(url, impersonate="chrome110")
+    if r.status_code != 200:
+        return None
     if get_json:
-        headers['accept'] = 'application/json'
-        content = utils.get_url_json(url, headers=headers, allow_redirects=False)
-    else:
-        headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
-        content = utils.get_url_html(url, headers=headers, allow_redirects=False)
-        if not content:
-            content = utils.get_url_html('https://webcache.googleusercontent.com/search?q=cache:' + utils.clean_url(url), headers=headers, allow_redirects=False)
-    if not content:
-        # Try through browser
-        try:
-            content = utils.get_browser_request(url, get_json)
-        except:
-            logger.warning('get_browser_request exception for ' + url)
-            return None
-    return content
+        return r.json()
+    return r.text
+    # headers = {
+    #     "accept-encoding": "gzip, deflate, br",
+    #     "accept-language": "en-US,en;q=0.9,de;q=0.8",
+    #     "cache-control": "max-age=0",
+    #     "sec-ch-ua": "\"Chromium\";v=\"106\", \"Microsoft Edge\";v=\"106\", \"Not;A=Brand\";v=\"99\"",
+    #     "sec-ch-ua-mobile": "?0",
+    #     "sec-ch-ua-platform": "\"Windows\"",
+    #     "sec-fetch-dest": "document",
+    #     "sec-fetch-mode": "navigate",
+    #     "sec-fetch-site": "none",
+    #     "sec-fetch-user": "?1",
+    #     "sec-gpc": "1",
+    #     "upgrade-insecure-requests": "1",
+    #     "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36 Edg/106.0.1370.47"
+    # }
+    # if get_json:
+    #     headers['accept'] = 'application/json'
+    #     content = utils.get_url_json(url, headers=headers, allow_redirects=False)
+    # else:
+    #     headers['accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9'
+    #     content = utils.get_url_html(url, headers=headers, allow_redirects=False)
+    #     if not content:
+    #         content = utils.get_url_html('https://webcache.googleusercontent.com/search?q=cache:' + utils.clean_url(url), headers=headers, allow_redirects=False)
+    # if not content:
+    #     # Try through browser
+    #     try:
+    #         content = utils.get_browser_request(url, get_json)
+    #     except:
+    #         logger.warning('get_browser_request exception for ' + url)
+    #         return None
+    # return content
 
 
 def add_video(video_id):
@@ -431,8 +438,14 @@ def get_item(story_json, args, site_json, save_debug):
         item['summary'] = story_json['teaserBody']
     elif story_json.get('summary'):
         item['summary'] = story_json['summary']
+    elif story_json.get('summaryHtml'):
+        item['summary'] = story_json['summaryHtml']
+    elif story_json.get('summaryText'):
+        item['summary'] = story_json['summaryText']
     elif story_json.get('socialDescription'):
         item['summary'] = story_json['socialDescription']
+    if item.get('summary') and item['summary'].startswith('<p>'):
+        item['summary'] = re.sub(r'^<p>(.*)</p>$', r'\1', item['summary']).replace('</p><p>', '<br/><br/>')
 
     item['content_html'] = ''
 
@@ -442,8 +455,8 @@ def get_item(story_json, args, site_json, save_debug):
 
     if story_json.get('dek'):
         item['content_html'] += story_json['dek']
-    elif story_json.get('summaryHtml'):
-        item['content_html'] += story_json['summaryHtml']
+    elif item.get('summary'):
+        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
 
     if story_json.get('abstract'):
         item['content_html'] += '<ul>'
@@ -515,6 +528,21 @@ def get_item(story_json, args, site_json, save_debug):
             lede += utils.add_image(resize_image(item['_image']), caption)
     if lede:
         item['content_html'] += lede
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        if story_json.get('abstract'):
+            item['content_html'] += '<ul style="font-size:0.9em;">'
+            for it in story_json['abstract']:
+                item['content_html'] += '<li>{}</li>'.format(it)
+            item['content_html'] += '</ul>'
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     if body:
         for el in body.find_all(attrs={"data-ad-placeholder": "Advertisement"}):

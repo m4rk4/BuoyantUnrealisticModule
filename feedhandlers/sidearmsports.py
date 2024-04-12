@@ -80,6 +80,11 @@ def add_game_stats(game, sport, netloc, team):
         content_html += '</table>'
     else:
         content_html = '<table style="margin-left:auto; margin-right:auto;"><tr style="text-align:center; padding:8px;">'
+        if game.get('dateUtc'):
+            content_html += '<td colspan="5"><small>' + utils.format_display_date(datetime.fromisoformat(game['dateUtc']))
+            if game.get('location'):
+                content_html += ', ' + game['location']
+            content_html += '</small></td><tr style="text-align:center; padding:8px;">'
         if game['locationIndicator'] == 'A':
             content_html += '<td><b>{}</b></td>'.format(team)
             logo = 'https://{}/images/logos/site/site.png'.format(netloc)
@@ -94,6 +99,7 @@ def add_game_stats(game, sport, netloc, team):
                 logo = '{}/image?width=64&height=64'.format(config.server)
             content_html += '<td><img src="{}" style="width:64px;" /></td>'.format(logo)
             content_html += '<td style="text-align:center; padding:8px;"><b>{}</b></td>'.format(game['opponent']['title'])
+
         else:
             content_html += '<td style="text-align:center; padding:8px;"><b>{}</b></td>'.format(game['opponent']['title'])
             if game['opponent'].get('image'):
@@ -210,6 +216,9 @@ def get_content(url, args, site_json, save_debug=False):
         if not api_json['content'].startswith('<p'):
             item['content_html'] += '<div>&nbsp;</div>'
         item['content_html'] += api_json['content']
+        def sub_iframe(match_obj):
+            return utils.add_embed(match_obj.group(1)) + '<div>&nbsp;</div>'
+        item['content_html'] = re.sub(r'<iframe[^>]+src="([^"]+)"[^>]*>.*?</iframe>', sub_iframe, item['content_html'])
     elif api_json.get('blocks'):
         item['content_html'] += render_blocks(api_json['blocks'], split_url.netloc, site_json['bg_color'])
 

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -180,6 +180,27 @@ def get_content(url, args, site_json, save_debug=False):
         if not item.get('tags'):
             del item['tags']
 
+    if ld_json['@type'] == 'VideoObject':
+        item['_video'] = ld_json['contentUrl']
+        caption = '<a href="{}">{}</a>. {}'.format(item['url'], item['title'], item['summary'])
+        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', resize_image(ld_json['thumbnailUrl']), caption)
+        if 'embed' not in args:
+            el = soup.find(id='description')
+            if el and el.p:
+                item['content_html'] += str(el.p)
+            el = soup.find(id='transcript')
+            if el:
+                item['content_html'] += el.decode_contents()
+        return item
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
+
+
     if 'asia.nikkei.com' in item['url']:
         body_url = 'https://asia.nikkei.com/__service/v1/piano/article_access/' + base64.b64encode(urlsplit(url).path.encode()).decode()
         body_json = utils.get_url_json(body_url)
@@ -219,18 +240,6 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += str(body)
         else:
             logger.warning('unable to get body content for ' + item['url'])
-
-    elif ld_json['@type'] == 'VideoObject':
-        item['_video'] = ld_json['contentUrl']
-        caption = '<a href="{}">{}</a>. {}'.format(item['url'], item['title'], item['summary'])
-        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', resize_image(ld_json['thumbnailUrl']), caption)
-        if 'embed' not in args:
-            el = soup.find(id='description')
-            if el and el.p:
-                item['content_html'] += str(el.p)
-            el = soup.find(id='transcript')
-            if el:
-                item['content_html'] += el.decode_contents()
 
     elif ld_json.get('articleBody'):
         article_body = soup.find(['article', 'div'], attrs={"data-attribute": "article-content-body"})

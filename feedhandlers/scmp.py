@@ -1,8 +1,8 @@
 import re
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -14,7 +14,7 @@ def render_content(block, images):
     start_tag = ''
     end_tag = ''
     if block['type'] == 'text':
-        return block['data']
+        return block['data'].strip()
     elif block['type'] == 'a':
         start_tag = '<a href="{}">'.format(block['attribs']['href'])
         end_tag = '</a>'
@@ -153,6 +153,12 @@ def get_content(url, args, site_json, save_debug=False):
         for block in content_json['subHeadline']:
             item['content_html'] += render_content(block, None)
 
+    lede = False
+    if content_json.get('multimediaEmbed') and content_json['multimediaEmbed'][0].get('attribs') and content_json['multimediaEmbed'][0]['attribs'].get('class') and 'hero-video' in content_json['multimediaEmbed'][0]['attribs']['class']:
+        lede = True
+        for block in content_json['multimediaEmbed'][0]['children']:
+            item['content_html'] += render_content(block, None)
+
     if content_json.get('images'):
         images = content_json['images']
         for it in images:
@@ -168,11 +174,19 @@ def get_content(url, args, site_json, save_debug=False):
                         img_src = it['size_1200x800']['url']
                     else:
                         img_src = it['url']
-                    item['content_html'] += utils.add_image(img_src, caption)
+                    if not lede:
+                        item['content_html'] += utils.add_image(img_src, caption)
                     if not item.get('_image'):
                         item['_image'] = img_src
     else:
         images = None
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     for block in content_json['body']:
         item['content_html'] += render_content(block, images)

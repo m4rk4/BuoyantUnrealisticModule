@@ -1,10 +1,7 @@
-import html, json, pytz, re
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
+import re
+from datetime import datetime
 
-import config, utils
-from feedhandlers import rss, wp_posts
+import utils
 
 import logging
 
@@ -89,24 +86,7 @@ def get_item(article_json, args, site_json, save_debug):
         item['content_html'] += add_image(article_json['image'])
 
     if article_json.get('body'):
-        for body in article_json['body']:
-            if isinstance(body, str):
-                item['content_html'] += body
-            elif isinstance(body, dict):
-                if body.get('template'):
-                    if re.search(r'/ads/|gallery-enhancement|related-link', body['template']):
-                        continue
-                    elif '/image-enhancement' in body['template']:
-                        if body.get('alignment') and (body['alignment'] == 'right' or body['alignment'] == 'left'):
-                            continue
-                        else:
-                            item['content_html'] += add_image(body)
-                    else:
-                        logger.warning('unhandled body template {} in {}'.format(body['template'], item['url']))
-                elif body.get('macro') and body['macro'] == 'slideshow_builder':
-                    continue
-                else:
-                    logger.warning('unhandled body section ' + item['url'])
+        item['content_html'] += render_content(article_json['body'])
     elif article_json.get('args') and article_json['args'].get('slides'):
         for i, slide in enumerate(article_json['args']['slides']):
             if slide.get('image'):
@@ -125,6 +105,42 @@ def get_item(article_json, args, site_json, save_debug):
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
+
+
+def render_content(contents):
+    content_html = ''
+    for content in contents:
+        if isinstance(content, str):
+            if content.startswith('<iframe'):
+                m = re.search(r'data-src="([^"]+)"', content)
+                content_html += utils.add_embed(m.group(1))
+            else:
+                content_html += content
+        elif isinstance(content, dict):
+            if content.get('template'):
+                if re.search(r'/ads/|gallery-enhancement|related-|HtmlPartnerWidget\.js', content['template']):
+                    continue
+                elif '/image-enhancement' in content['template']:
+                    if content.get('alignment') and (content['alignment'] == 'right' or content['alignment'] == 'left'):
+                        continue
+                    else:
+                        content_html += add_image(content)
+                elif content['template'] == 'grid':
+                    content_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                    for it in content['items']:
+                        if it['desktop_width'] == 12:
+                            content_html += '<div style="flex:1; min-width:100%;">'
+                        else:
+                            content_html += '<div style="flex:1; min-width:240px;">'
+                        content_html += render_content(it['content']) + '</div>'
+                    content_html += '</div>'
+                else:
+                    logger.warning('unhandled content template ' + content['template'])
+            elif content.get('macro') and content['macro'] == 'slideshow_builder':
+                continue
+            else:
+                logger.warning('unhandled content section ' + content)
+    return content_html
 
 
 def get_feed(url, args, site_json, save_debug=False):

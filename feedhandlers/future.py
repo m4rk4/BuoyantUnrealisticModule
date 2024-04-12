@@ -297,11 +297,18 @@ def get_content(url, args, site_json, save_debug=False):
         for el in body.find_all(class_=['ad-unit', 'newsletter-signup', 'remixd-audioplayer__container', 'table__instruction', 'van_vid_carousel']):
             el.decompose()
 
+        for el in body.find_all(id='blueconic-article-kiplinger'):
+            el.decompose()
+
         for el in body.find_all('aside'):
+            el.decompose()
+
+        for el in body.find_all('template', class_='newsletter-inbodyContent-slice'):
             el.decompose()
 
         for el in body.find_all('script', id=re.compile('vanilla-slice-person-\d+-hydrate')):
             el.decompose()
+
         for el in body.find_all(id=re.compile(r'slice-container-person-\d+')):
             el.decompose()
 

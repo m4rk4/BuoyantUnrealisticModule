@@ -1,9 +1,9 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import unquote_plus, urlsplit
+from urllib.parse import quote_plus
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -42,8 +42,6 @@ def format_blocks(blocks):
                             src = iframe['attribs']['src']
                             if src.startswith('/'):
                                 src = 'https://www.economist.com' + src
-                                block_html += '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(src)
-                            elif 'economist.com' in src:
                                 block_html += '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(src)
                             elif src.startswith('https://'):
                                 block_html += utils.add_embed(src)
@@ -98,6 +96,11 @@ def format_blocks(blocks):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    if '/infographics.economist.com/' in url:
+        item = {}
+        item['_image'] = '{}/screenshot?url={}&locator=%23g-index-box'.format(config.server, quote_plus(url))
+        item['content_html'] = utils.add_image(item['_image'], link=url)
+        return item
     page_html = utils.get_url_html(url)
     soup = BeautifulSoup(page_html, 'html.parser')
     next_data = soup.find('script', id='__NEXT_DATA__')

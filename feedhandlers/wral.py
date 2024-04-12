@@ -1,8 +1,6 @@
-import html, json, pytz, re
-from bs4 import BeautifulSoup
+import re
 from datetime import datetime, timezone
-from playwright.sync_api import sync_playwright
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -76,16 +74,20 @@ def get_content(url, args, site_json, save_debug):
 
     item['content_html'] = ''
     if story_json.get('abstract'):
+        item['summary'] = story_json['abstract']
         item['content_html'] += '<p><em>' + story_json['abstract'] + '</em></p>'
 
     if story_json['type'] == 'video':
         item['_image'] = resize_image(story_json['videoParams']['poster'])
         item['content_html'] += utils.add_video(story_json['videoParams']['sources']['hls']['src'], story_json['videoParams']['sources']['hls']['type'], item['_image'], story_json['videoParams']['title'])
-        if story_json.get('transcript'):
+        if 'embed' not in args and story_json.get('transcript'):
             item['content_html'] += '<h3>Transcript</h3><div>' + story_json['transcript'] + '</div>'
+        return item
     elif story_json['type'] == 'image_gallery':
         for it in story_json['relatedAssets']:
             if it['type'] == 'image':
+                if not item.get('_image'):
+                    item['_image'] = resize_image(it['image']['default']['url'])
                 item['content_html'] += utils.add_image(resize_image(it['image']['default']['url']), it['abstract'])
     else:
         if story_json.get('relatedAssets') and (story_json['relatedAssets'][0]['type'] == 'image' or story_json['relatedAssets'][0]['type'] == 'video'):
@@ -114,6 +116,16 @@ def get_content(url, args, site_json, save_debug):
                 continue
             else:
                 logger.warning('unhandled body content type {} in {}'.format(content['type'], item['url']))
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item

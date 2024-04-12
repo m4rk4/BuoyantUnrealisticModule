@@ -8,6 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def resize_image(img_src, width=1000):
     split_url = urlsplit(img_src)
     if split_url.netloc == 'img.bleacherreport.net':
@@ -24,6 +25,7 @@ def resize_image(img_src, width=1000):
         paths = split_url.path.split('/')
         img_src = 'https://media.bleacherreport.com/image/upload/w_{},c_fill/{}/{}'.format(width, paths[-2], paths[-1])
     return img_src
+
 
 def format_element(element):
     content_html = ''
@@ -211,6 +213,7 @@ def get_track_content(track, args, site_json, save_debug=False):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
 
     return item
+
 
 def get_content(url, args, site_json, save_debug=False):
     if '/post/' in url:

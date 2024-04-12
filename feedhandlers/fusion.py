@@ -88,7 +88,14 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'raw_html':
         # Filter out ad content
-        if element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
+        if element['content'].startswith('<span data-dsid-content='):
+            raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
+            for el in raw_soup.find_all('a'):
+                link = utils.get_redirect_url(el['href'])
+                el.attrs = {}
+                el['href'] = link
+            element_html = str(raw_soup)
+        elif element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
             raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
             #print(raw_soup.contents[0].name)
             if raw_soup.iframe:
@@ -233,6 +240,38 @@ def process_content_element(element, url, site_json, save_debug):
                 if stream:
                     poster = video['promo_image']['url']
                     element_html += utils.add_video(stream['url'], stream_type, poster, video['headlines']['basic'])
+        elif element['subtype'] == 'syncbak-graph-livestream':
+            # https://www.wbay.com/pf/api/v3/content/fetch/syncbak-default-request-placeholder?query=%7B%22excludeStreamUrls%22%3Atrue%2C%22queryString%22%3A%22%7B%5C%22query%5C%22%3A%5C%22%20query%20GrayWebAppsLiveChannelData(%20%24liveChannelId%3A%20ID!)%20%7B%20liveChannel%20(id%3A%20%24liveChannelId%2C%20orEquivalent%3A%20true)%7B%20id%20title%20description%20callsign%20listImages%20%7B%20type%20url%20size%20%7D%20posterImages%20%7B%20type%20url%20size%20%7D%20isNew%20type%20status%20onNow%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20onNext%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20isNielsenEnabled%20isClosedCaptionEnabled%20location%20networkAffiliation%20taxonomy%20%7B%20facet%20terms%20%7D%20%7D%20liveChannels%20%7B%20id%20title%20description%20callsign%20listImages%20%7B%20type%20url%20size%20%7D%20posterImages%20%7B%20type%20url%20size%20%7D%20isNew%20type%20status%20onNow%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20onNext%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20isNielsenEnabled%20isClosedCaptionEnabled%20location%20networkAffiliation%20taxonomy%20%7B%20facet%20terms%20%7D%20%7D%20%7D%5C%22%2C%5C%22variables%5C%22%3A%7B%5C%22liveChannelId%5C%22%3A%5C%229AsMpiBNm%5C%22%7D%7D%22%2C%22websiteOverride%22%3A%22wbay%22%7D&d=396&_website=wbay
+            # Need proper device_id
+            device_id = "Ic2CQjCXmyCaPFetDNFx_duwEX6SRTXKnpIND9lv2kgonDtpFp"
+            # device_id = ''
+            api_url = '{}syncbak-get-tokens?query=%7B%22deviceId%22:%22{}%22,%22queryString%22:%22%7B%5C%22query%5C%22:%5C%22+query+GrayWebAppsLiveChannelData($expirationSeconds:+Int,+$liveChannelId:+ID!)+%7B+liveChannel+(id:+$liveChannelId,+orEquivalent:+true)%7B+id+title+description+callsign+listImages+%7B+type+url+size+%7D+posterImages+%7B+type+url+size+%7D+isNew+type+status+onNow+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+onNext+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+isNielsenEnabled+isClosedCaptionEnabled+location+networkAffiliation+taxonomy+%7B+facet+terms+%7D+streamUrl(expiresIn:+$expirationSeconds)+%7D+liveChannels+%7B+id+title+description+callsign+listImages+%7B+type+url+size+%7D+posterImages+%7B+type+url+size+%7D+isNew+type+status+onNow+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+onNext+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+isNielsenEnabled+isClosedCaptionEnabled+location+networkAffiliation+taxonomy+%7B+facet+terms+%7D+%7D+%7D%5C%22,%5C%22variables%5C%22:%7B%5C%22expirationSeconds%5C%22:300,%5C%22liveChannelId%5C%22:%5C%22{}%5C%22%7D%7D%22,%22websiteOverride%22:%22{}%22%7D&_website={}'.format(site_json['api_url'], device_id, element['embed']['config']['channelId'], element['embed']['config']['website'], element['embed']['config']['website'])
+            api_json = utils.get_url_json(api_url)
+            if api_json:
+                headers = {
+                    "accept": "application/json, text/plain, */*",
+                    "accept-language": "en-US,en;q=0.9",
+                    "api-token": api_json['apiToken'],
+                    "cache-control": "no-cache",
+                    "content-type": "application/json",
+                    "pragma": "no-cache",
+                    "query-signature-token": api_json['querySignatureToken'],
+                    "sec-ch-ua": "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Microsoft Edge\";v=\"122\"",
+                    "sec-ch-ua-mobile": "?0",
+                    "sec-ch-ua-platform": "\"Windows\"",
+                    "sec-fetch-dest": "empty",
+                    "sec-fetch-mode": "cors",
+                    "sec-fetch-site": "cross-site",
+                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
+                }
+                gql_json = utils.post_url('https://graphql-api.aws.syncbak.com/graphql', json_data=json.loads(api_json['query']), headers=headers)
+                if gql_json:
+                    utils.write_file(gql_json, './debug/video.json')
+                    if gql_json['data']['liveChannel'].get('streamUrl'):
+                        element_html += utils.add_video(gql_json['data']['liveChannel']['streamUrl'], 'application/x-mpegURL', gql_json['data']['liveChannel']['posterImages'][0]['url'], gql_json['data']['liveChannel']['title'])
+                    else:
+                        logger.warning('unable to get syncbak-graph-livestream streamUrl')
+                        element_html += utils.add_image(gql_json['data']['liveChannel']['posterImages'][0]['url'], 'Live stream: ' + gql_json['data']['liveChannel']['title'])
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif element['subtype'] == 'flourish_visualisation':
@@ -317,7 +356,7 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled custom_embed iframe')
-        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag':
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag' or element['subtype'] == 'Alternate Headlines':
             pass
         else:
             logger.warning('unhandled custom_embed ' + element['subtype'])
@@ -497,6 +536,7 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += utils.add_embed(links[-1]['href'])
 
     elif element['type'] == 'reference':
+        print(element)
         if element.get('referent') and element['referent'].get('id'):
             if element['referent']['type'] == 'image':
                 captions = []
@@ -506,6 +546,8 @@ def process_content_element(element, url, site_json, save_debug):
                     for it in element['referent']['referent_properties']['vanity_credits']['by']:
                         captions.append(it['name'])
                 img_src = '{}{}.jpg'.format(site_json['referent_image_path'], element['referent']['id'])
+                if element['referent'].get('auth'):
+                    img_src += '?auth=' + element['referent']['auth']['1']
                 element_html += utils.add_image(img_src, ' | '.join(captions))
             elif element['referent']['id'].startswith('http'):
                 element_html += utils.add_embed(element['referent']['id'])
@@ -516,36 +558,41 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'story':
         # This may be Wapo specific
-        headline = element['headlines']['basic']
-        if '<' in headline:
-            # Couple of cases of unclosed html tags in the headline, just use the text
-            headline = BeautifulSoup(headline, 'html.parser').get_text()
-        element_html += '<hr><h2>{}</h2>'.format(headline)
-        authors = []
-        for author in element['credits']['by']:
-            if author.get('name'):
-                authors.append(author['name'])
-        tz_est = pytz.timezone('US/Eastern')
-        dt = datetime.fromisoformat(element['display_date'].replace('Z', '+00:00')).astimezone(tz_est)
-        date = utils.format_display_date(dt)
-        #date = '{}. {}, {} {}'.format(dt.strftime('%b'), dt.day, dt.year, dt.strftime('%I:%M %p').lstrip('0'))
-        if authors:
-            byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-            element_html += '<p>by {} (updated {})</p>'.format(byline, date)
-        else:
-            element_html += '<p>updated {}</p>'.format(date)
-        element_html += get_content_html(element, url, site_json, save_debug)
+        if site_json.get('add_story'):
+            headline = element['headlines']['basic']
+            if '<' in headline:
+                # Couple of cases of unclosed html tags in the headline, just use the text
+                headline = BeautifulSoup(headline, 'html.parser').get_text()
+            element_html += '<hr><h2>{}</h2>'.format(headline)
+            authors = []
+            for author in element['credits']['by']:
+                if author.get('name'):
+                    authors.append(author['name'])
+            tz_est = pytz.timezone('US/Eastern')
+            dt = datetime.fromisoformat(element['display_date'].replace('Z', '+00:00')).astimezone(tz_est)
+            date = utils.format_display_date(dt)
+            #date = '{}. {}, {} {}'.format(dt.strftime('%b'), dt.day, dt.year, dt.strftime('%I:%M %p').lstrip('0'))
+            if authors:
+                byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                element_html += '<p>by {} (updated {})</p>'.format(byline, date)
+            else:
+                element_html += '<p>updated {}</p>'.format(date)
+            element_html += get_content_html(element, url, site_json, save_debug)
 
     elif element['type'] == 'link_list':
         if element['subtype'] == 'key-moments':
-            element_html += '<h3>{}</h3><ul>'.format(element['title'])
+            if element.get('title'):
+                element_html += '<h3>{}</h3>'.format(element['title'])
+            element_html += '<ul>'
             for it in element['items']:
                 element_html += '<li>{}</li>'.format(it['content'])
             element_html += '</ul>'
         elif element['subtype'] == 'button/btn_btn-primary/1':
             # https://www.atlantanewsfirst.com/2024/01/15/read-fulton-county-da-fani-willis-improper-relationship-charges/
+            if element.get('title'):
+                element_html += '<h3>{}</h3>'.format(element['title'])
             for it in element['items']:
-                element_html += '<div style="width:80%; margin-left:auto; margin-right:auto;"><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; color:white; background-color:#0072ed; border:1px solid #0072ed;">{}</span></a></div>'.format(it['url'], it['content'])
+                element_html += '<div style="width:80%; margin-left:auto; margin-right:auto; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; color:white; background-color:#0072ed; border:1px solid #0072ed;">{}</span></a></div>'.format(it['url'], it['content'])
         elif element['subtype'] == 'link-list' or element['subtype'] == 'splash-story-bullet':
             pass
         else:
@@ -631,8 +678,12 @@ def get_content_html(content, url, site_json, save_debug):
         if not content.get('content_elements') or content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
 
-    for element in content['content_elements']:
-        content_html += process_content_element(element, url, site_json, save_debug)
+    if content.get('content_elements'):
+        for element in content['content_elements']:
+            content_html += process_content_element(element, url, site_json, save_debug)
+    if content.get('elements'):
+        for element in content['elements']:
+            content_html += process_content_element(element, url, site_json, save_debug)
 
     if content.get('related_content') and content['related_content'].get('galleries'):
         for gallery in content['related_content']['galleries']:
@@ -711,6 +762,8 @@ def get_item(content, url, args, site_json, save_debug):
         date = content['published_time']
     elif content.get('display_date'):
         date = content['display_date']
+    elif content.get('displayDate'):
+        date = content['displayDate']
     if date:
         dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
         item['date_published'] = dt.isoformat()
@@ -722,6 +775,8 @@ def get_item(content, url, args, site_json, save_debug):
     date = ''
     if content.get('last_updated_date'):
         date = content['last_updated_date']
+    elif content.get('lastUpdatedDate'):
+        date = content['lastUpdatedDate']
     elif content.get('updated_time'):
         date = content['updated_time']
     elif content.get('display_date'):
@@ -745,13 +800,19 @@ def get_item(content, url, args, site_json, save_debug):
                     authors.append(author['name'])
                 elif author.get('org'):
                     authors.append(author['org'])
-    elif content.get('authors'):
-        for author in content['authors']:
-            authors.append(author['name'])
-    elif content.get('distributor'):
-        authors.append(content['distributor']['name'])
-    elif content.get('source'):
-        authors.append(content['source']['name'])
+    if content.get('credits') and content['credits'].get('host_talent'):
+        if content['credits'].get('host_talent'):
+            for author in content['credits']['host_talent']:
+                if author.get('name'):
+                    authors.append(author['name'])
+    if not authors:
+        if content.get('authors'):
+            for author in content['authors']:
+                authors.append(author['name'])
+        elif content.get('source'):
+            authors.append(content['source']['name'])
+        elif content.get('distributor'):
+            authors.append(content['distributor']['name'])
     if authors:
         item['author'] = {}
         if len(authors) == 1:
@@ -796,21 +857,25 @@ def get_item(content, url, args, site_json, save_debug):
                 item['_image'] = utils.closest_dict(content['content_elements'][0]['imageResizerUrls'], 'width', 1000)
             elif content['content_elements'][0].get('promo_image'):
                 item['_image'] = resize_image(content['content_elements'][0]['promo_image'], site_json)
+    elif content.get('image'):
+        item['_image'] = resize_image(content['image'], site_json)
 
     if content.get('description'):
         if isinstance(content['description'], str):
             item['summary'] = content['description']
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
+    elif content.get('subheadlines') and content['subheadlines'].get('basic'):
+        item['summary'] = content['subheadlines']['basic']
 
     if 'embed' in args and content['type'] != 'video':
-        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; border:1px solid black;">'
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
-            item['content_html'] += '<div style="flex:1; min-width:400px; margin:auto;"><img src="{}" style="display:block; width:100%;"/></div>'.format(item['_image'])
-        item['content_html'] += '<div style="flex:1; min-width:256px; margin:auto; padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>By {}</div><div>{}</div>'.format(item['url'], item['title'], item['author']['name'], item['_display_date'])
-        if content.get('subheadlines') and content['subheadlines'].get('basic'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(content['subheadlines']['basic'])
-        item['content_html'] += '</div></div>'
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] = get_content_html(content, url, site_json, save_debug)
@@ -836,13 +901,29 @@ def get_content(url, args, site_json, save_debug=False):
         api_json = utils.get_url_json(api_url)
         if not api_json:
             return None
+        if save_debug:
+            utils.write_file(api_json[0], './debug/debug.json')
+        return get_item(api_json[0], url, args, site_json, save_debug)
+    elif split_url.netloc == 'www.washingtonpost.com' and '_video.html' in split_url.path:
+        m = re.search(r'/([^/]+)_video.html$', split_url.path)
+        api_url = 'https://video-api.washingtonpost.com/api/v1/ansvideos/findByUuid?uuid={}&domain=www.washingtonpost.com'.format(m.group(1))
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json[0], './debug/debug.json')
         return get_item(api_json[0], url, args, site_json, save_debug)
 
     for n in range(2):
-        query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
-        if re.search(r'ajc\.com|daytondailynews\.com', split_url.netloc):
-            query = query.replace('ID', paths[-1])
-        api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
+        if split_url.netloc == 'www.washingtonpost.com' and '_story.html' in split_url.path:
+            query = re.sub(r'\s', '', json.dumps(site_json['story']['query'])).replace('PATH', path)
+            query = query.replace('"ALL_PATHS"', json.dumps({"all": paths}).replace(' ', ''))
+            api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['story']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
+        else:
+            query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
+            if re.search(r'ajc\.com|daytondailynews\.com', split_url.netloc):
+                query = query.replace('ID', paths[-1])
+            api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:
             logger.debug('getting content from ' + api_url)
         api_json = utils.get_url_json(api_url)

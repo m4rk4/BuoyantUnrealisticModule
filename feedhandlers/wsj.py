@@ -4,7 +4,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from datetime import datetime
 from markdown2 import markdown
-from urllib.parse import quote_plus, unquote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -274,13 +274,51 @@ def render_contents(contents, netloc, image_link=None):
     return content_html
 
 
+def find_signed_url():
+    reddit_posts = []
+    reddit_json = utils.get_url_json('https://www.reddit.com/user/wsj/submitted.json?sort=new')
+    if reddit_json:
+        for child in reddit_json['data']['children']:
+            if child.get('data'):
+                reddit_posts.append(child['data'])
+    reddit_json = utils.get_url_json('https://www.reddit.com/user/wsj/comments.json?sort=new')
+    if reddit_json:
+        for child in reddit_json['data']['children']:
+            if child.get('data'):
+                reddit_posts.append(child['data'])
+    if not reddit_json:
+        return ''
+    signed_url = ''
+    reddit_posts = sorted(reddit_posts, key=lambda i: i['created_utc'], reverse=True)
+    for post in reddit_posts:
+        if post.get('url'):
+            params = parse_qs(urlsplit(post['url']).query)
+            if 'st' in params:
+                signed_url = post['url']
+        if not signed_url and post.get('link_url'):
+            params = parse_qs(urlsplit(post['link_url']).query)
+            if 'st' in params:
+                signed_url = post['link_url']
+        if not signed_url and post.get('url_overridden_by_dest'):
+            params = parse_qs(urlsplit(post['url_overridden_by_dest']).query)
+            if 'st' in params:
+                signed_url = post['url_overridden_by_dest']
+        if signed_url:
+            break
+    return signed_url
+
+
 def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     # Seems like if x-original-url has a valid paywall token for any article, then the given encryptedDocumentKey is decrypted
     # Tokes expire - some after about 7 days
-    # WSJ links free articles from their reddit account here: https://www.reddit.com/user/wsj/.json?sort=new
+    # WSJ links free articles from their reddit account:
+    #     Search for links with "st=" in body (markdown), body_html, selftext (markdown), selftext_html, url, link_url, url_overridden_by_dest
+    #     https://www.reddit.com/user/wsj/submitted.json?sort=new
+    #     https://www.reddit.com/user/wsj/comments.json?sort=new
     # or look here: https://www.reddit.com/domain/wsj.com/.json
     # https://www.wsj.com/lifestyle/dog-owners-death-lessons-love-grief-53c77511?st=ycgues92xaxtr83
-    original_url = '/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04'
+    # original_url = '/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04'
+    original_url = 'https://www.wsj.com/world/europe/ukraine-withdraws-from-besieged-city-as-russia-advances-554644c0?st=g2h1gd2v9orwuhm'
     # original_url = '/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu'
     # Adding mod=djemalertNEWS seems to bypass the need for a token
     # original_url = urlsplit(url).path + "?mod=djemalertNEWS"

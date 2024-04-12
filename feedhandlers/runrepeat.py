@@ -134,7 +134,7 @@ def add_comparison(product_ids, best_text=[]):
     if not comparison:
         return ''
 
-    utils.write_file(comparison, './debug/comparison.json')
+    # utils.write_file(comparison, './debug/comparison.json')
 
     content_html = '<h2>Comparison</h2><div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse;"><tr style="line-height:2em;"><th style="white-space:nowrap; text-align:center; padding:0 8px 0 8px; border:1px solid black;"></th>'
     for it in comparison:

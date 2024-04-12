@@ -142,7 +142,10 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('authors'):
         authors = []
         for it in article_json['authors']:
-            authors.append(it['screen_name'])
+            if it.get('full_name'):
+                authors.append(it['full_name'])
+            else:
+                authors.append(it['screen_name'])
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     elif article_json.get('byline'):
         if re.search(r'<|>', article_json['byline']):

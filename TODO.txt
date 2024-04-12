@@ -1,3 +1,30 @@
+Weather Underground
+https://dsx.weather.com/cms/v4/assets/en_US?q=source_guid%3A%24in(%272024-03-12-severe-thunderstorm-heavy-rain-flooding-plains-south%27)&api=7bb1c920-7027-4289-9c96-ae5e263980bc
+https://dsx.weather.com/cms/v4/assets/en_US?q=type%3A%24in(%27article%27)%3Btags.keyword%3A%24in(%27wunderground%27)&api=7bb1c920-7027-4289-9c96-ae5e263980bc&pg=0%2C20&sort=-publishdate
+
+Only works for weekly review posts
+    "harpers": {
+        "args": {
+            "add_subtitle": true,
+            "no_slug": true
+        },
+        "feeds": [
+            "https://harpers.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "unwrap": [
+            {
+                "attrs": {
+                    "style": "font-weight: 400;"
+                },
+                "tag": "span"
+            }
+        ],
+        "wpjson_path": "https://harpers.org/wp-json"
+    },
+
+
 Add WSJ cookies to bypass captcha
 headers = {
     "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -15,6 +42,7 @@ https://www.soundguys.com/bose-quietcomfort-45-review-60657/
 reddit.com
 medium.com
 autoworld.com
+https://nwn.blogs.com/nwn/
 
 Not working:
 mashable.com
@@ -107,6 +135,9 @@ https://www.brewersjournal.info/91-new-beginnings/
 
 Can't fetch data unless going through Playwright:
 https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-new-highs-foundation-says/
+
+Ghost - unknown data-key
+http://www.whatimade.today/
 
 WP
 https://www.positive.news/environment/agriculture/fixing-the-food-chain/
@@ -306,6 +337,10 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://labornotes.org/
+https://www.cam.ac.uk/stories/
+https://www.agweb.com/
+https://www.newsweek.com
 https://www.understandingwar.org/
 https://www.bridgemi.com/
 https://greenfleet.net/
@@ -373,6 +408,8 @@ https://www.hydrogeninsight.com/policy/a-campaign-built-on-dishonesty-hydrogen-h
 https://www.rechargenews.com/wind/avangrid-doubles-down-on-power-deal-pull-out-as-economic-gales-hit-us-offshore-wind/2-1-1392327
 
 Hugo-based blogs (https://github.com/gohugoio/hugo)
+https://badgerbadgerbadgerbadger.dev/
+https://brainbaking.com/
 https://jimmyislive.dev/
 https://notes.ghed.in/
 https://palant.info/
@@ -383,6 +420,7 @@ https://foosel.net/
 https://ahelwer.ca/
 https://rubenerd.com/
 https://justingarrison.com/blog/
+https://brainbaking.com/
 
 https://m.arenaev.com/reallife_test_reveals_how_much_range_evs_and_phevs_lose_during_winter-news-1308.php
 https://m.gsmarena.com/

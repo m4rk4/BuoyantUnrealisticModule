@@ -30,6 +30,7 @@ def get_api_json(api_path, data_type, id, filters=''):
         api_url += '?{}'.format(filters)
     # headers = {"cache-control": "max-age=0"}
     # print(api_url)
+    logger.debug('get_api_json: ' + api_url)
     api_json = utils.get_url_json(api_url)
     return api_json
 

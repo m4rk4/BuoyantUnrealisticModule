@@ -1,69 +1,60 @@
-import re, tldextract
+import json, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from datetime import datetime
+from urllib.parse import urlsplit
 
-import config, utils
-from feedhandlers import rss, wp_posts
+import utils
+from feedhandlers import wp_posts
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def get_build_id(url):
-    page_html = utils.get_url_html(url)
-    m = re.search(r'"buildId":"([^"]+)"', page_html)
-    if not m:
-        return ''
-    return m.group(1)
-
-
-def get_next_json(url):
-    tld = tldextract.extract(url)
+def get_next_data(url, site_json):
     split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path[1:].split('/')))
-    if split_url.path.endswith('/'):
-        path = split_url.path[:-1]
-    else:
-        path = split_url.path
-    if path:
-        path += '.json'
-    else:
-        path = '/index.json'
-
-    sites_json = utils.read_json_file('./sites.json')
+    paths = list(filter(None, split_url.path.split('/')))
     if paths[0] == 'news' or paths[0] == 'watch':
         prefix = ''
-        build_id = sites_json[tld.domain]['buildId']
+        build_id = site_json['buildId']
     else:
         prefix = '/_teams'
-        build_id = sites_json[tld.domain]['teams_buildId']
-
+        build_id = site_json['teams_buildId']
+    if len(paths) == 0:
+        path = '/index'
+    else:
+        if split_url.path.endswith('/'):
+            path = split_url.path[:-1]
+        else:
+            path = split_url.path
+    path += '.json'
     next_url = '{}://{}{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, prefix, build_id, path)
-    next_json = utils.get_url_json(next_url, retries=1)
-    if not next_json:
-        # Try updating the build id
-        logger.debug('updating buildId for ' + url)
-        new_build_id = get_build_id(url)
-        if new_build_id != build_id:
-            if prefix:
-                sites_json[tld.domain]['teams_buildId'] = new_build_id
+    print(next_url)
+    next_data = utils.get_url_json(next_url, retries=1)
+    if not next_data:
+        page_html = utils.get_url_html(url)
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            logger.warning('unable to find __NEXT_DATA__ in ' + url)
+            return None
+        next_data = json.loads(el.string)
+        if next_data['buildId'] != build_id:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
+            if paths[0] == 'news' or paths[0] == 'watch':
+                site_json['buildId'] = next_data['buildId']
             else:
-                sites_json[tld.domain]['buildId'] = new_build_id
-            utils.write_file(sites_json, './sites.json')
-            next_url = '{}://{}{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, prefix, new_build_id, path)
-            next_json = utils.get_url_json(next_url, retries=1)
-    return next_json
+                site_json['teams_buildId'] = next_data['buildId']
+            utils.update_sites(url, site_json)
+        return next_data['props']
+    return next_data
 
 
 def get_content(url, args, site_json, save_debug=False):
+    next_data = None
     split_url = urlsplit(url)
-    sites_json = utils.read_json_file('./sites.json')
-    tld = tldextract.extract(url)
-
-    next_json = None
     if split_url.netloc == 'watch.nba.com':
+        # TODO
         if split_url.path.startswith('/embed'):
             page_html = utils.get_url_html(url)
             m = re.search(r'seoName:"([^"]+)"', page_html)
@@ -74,18 +65,18 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             logger.warning('unhandled url ' + url)
     else:
-        next_json = get_next_json(url)
-    if not next_json:
+        next_data = get_next_data(url, site_json)
+    if not next_data:
         return None
+    if save_debug:
+        utils.write_file(next_data, './debug/debug.json')
 
     if split_url.path.startswith('/news'):
-        article_json = next_json['pageProps']['article']
+        article_json = next_data['pageProps']['article']
     elif split_url.path.startswith('/watch'):
-        article_json = next_json['pageProps']['video']
+        article_json = next_data['pageProps']['video']
     else:
-        article_json = next_json['pageProps']['pageObject']
-    if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
+        article_json = next_data['pageProps']['pageObject']
 
     item = {}
     if article_json.get('id'):
@@ -212,3 +203,14 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
+
+
+def get_feed(url, args, site_json, save_debug=False):
+    # https://content-api-prod.nba.com/public/1/leagues/nba/content?page=1&count=10&types=post&region=united-states
+    # https://www.nba.com/cavaliers/api/content/category/news?page=1
+
+    next_data = get_next_data(url, site_json)
+    if not next_data:
+        return None
+    if save_debug:
+        utils.write_file(next_data, './debug/feed.json')

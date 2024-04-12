@@ -1,7 +1,7 @@
 import json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, unquote_plus
+from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config
 from feedhandlers import rss
@@ -124,6 +124,12 @@ def get_content(url, args, site_json, save_debug=False):
             caas_json = utils.get_url_json(caas_url, headers=headers)
             if not caas_json:
                 return None
+        # utils.write_file(caas_json, './debug/debug.json')
+        if caas_json.get('redirectRequestUUID'):
+            caas_url = 'https://www.yahoo.com/caas/content/article/?uuid=' + caas_json['redirectRequestUUID']
+            caas_json = utils.get_url_json(caas_url, headers=headers)
+            if not caas_json:
+                return None
         if not re.search(r'caas-3p-blocked', caas_json['items'][0]['markup']):
             break
 
@@ -173,6 +179,16 @@ def get_content(url, args, site_json, save_debug=False):
     item['_image'] = article_json['image']['url']
 
     item['summary'] = article_json['description']
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     caas_soup = BeautifulSoup(caas_json['items'][0]['markup'], 'html.parser')
     caas_body = caas_soup.find(class_='caas-body')

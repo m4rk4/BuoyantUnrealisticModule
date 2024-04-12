@@ -72,6 +72,11 @@ def get_content(url, args, site_json, save_debug=False):
         for tag in content_json['relationships']['categories']['data']:
             item['tags'].append(tag['attributes']['label'])
 
+    if content_json['attributes'].get('description'):
+        item['summary'] = content_json['attributes']['description']
+        if content_json['attributes']['format'] == 'story' and 'Discourse' in content_json['attributes']['categories']:
+            content_html += '<p><em>' + item['summary'] + '</p></em>'
+
     #if content_json.get('summaryList'):
     #    content_html += content_json['summaryList']
 
@@ -81,8 +86,6 @@ def get_content(url, args, site_json, save_debug=False):
             content_html += add_image(content_json['attributes']['hero'])
     elif content_json['relationships']['images'].get('data'):
         item['_image'] = content_json['relationships']['images']['data'][0]['links']['self']
-
-    item['summary'] = content_json['attributes']['description']
 
     soup = BeautifulSoup(content_json['attributes']['content'], 'html.parser')
     el = soup.find(id='piano-inline-content-wrapper')
@@ -113,6 +116,20 @@ def get_content(url, args, site_json, save_debug=False):
     soup = BeautifulSoup(content_html, 'html.parser')
     for el in soup.find_all(class_=["ad", "ad-wrapper"]):
         el.decompose()
+
+    for el in soup.find_all('p', class_='drop-cap'):
+        new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', str(el), 1)
+        new_html += '<span style="clear:left;"></span>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.insert_after(new_el)
+        el.decompose()
+
+    for el in soup.find_all('ul', class_='summary-list'):
+        # remove indent
+        el['style'] = 'padding-left:1.2em;'
+        new_el = soup.new_tag('hr')
+        new_el['style'] = 'width:80%; margin:auto;'
+        el.insert_after(new_el)
 
     for el in soup.find_all('figure'):
         if not el.get('class'):

@@ -59,12 +59,19 @@ def get_content(url, args, site_json, save_debug=False):
     content_url = ''
     embed_props = utils.get_url_json('https://www.scribd.com/doc-page/embed-modal-props/{}'.format(doc_id))
     if embed_props:
+        # utils.write_file(embed_props, './debug/scribd.json')
         if not item:
             item['id'] = embed_props['document_id']
             item['url'] = embed_props['embed_path']
             item['title'] = embed_props['title']
             item['author'] = {"name": embed_props['user']['name']}
-        content_url = '{}?start_page=1&view_mode=scroll&access_key={}'.format(embed_props['embed_path'], embed_props['access_key'])
+        if embed_props.get('embed_path'):
+            content_url = embed_props['embed_path']
+        elif embed_props.get('embed_url'):
+            content_url = embed_props['embed_url']
+        else:
+            logger.warning('unknown embed path/url')
+        content_url += '?start_page=1&view_mode=scroll&access_key=' + embed_props['access_key']
 
     if not item.get('_image') and image:
         item['_image'] = image

@@ -259,7 +259,6 @@ def get_content(url, args, site_json, save_debug=False):
         return None
     if save_debug:
         utils.write_file(next_data, './debug/debug.json')
-
     page_json = next_data['pageProps']['page'][next_data['pageProps']['pageKey']]
     metadata = next_data['pageProps']['metadata']
 
@@ -319,6 +318,13 @@ def get_content(url, args, site_json, save_debug=False):
         for it in page_json['topics']:
             if it['title'] not in item['tags']:
                 item['tags'].append(it['title'])
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     item['content_html'] = ''
     if page_json.get('headerContents'):

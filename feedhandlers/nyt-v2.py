@@ -449,46 +449,57 @@ def get_content(url, args, site_json, save_debug=False):
             if it['name'] == 'SIXTEEN_BY_NINE':
                 item['_image'] = utils.closest_dict(it['renditions'], 'width', 1000)['url']
         item['content_html'] = utils.add_video(item['_video'], 'video/mp4', item['_image'])
-        item['content_html'] += '<p>' + article_json['summary'] + '</p>'
+        if 'embed' not in args:
+            item['content_html'] += '<p>' + article_json['summary'] + '</p>'
+        return item
 
-    else:
-        if article_json.get('promotionalMedia'):
-            if article_json['promotionalMedia']['__typename'] == 'Image':
-                crops = article_json['promotionalMedia']['assetCrops']
-            else:
-                crops = article_json['promotionalMedia']['promotionalMedia']['assetCrops']
-            for it in crops:
-                if it['name'] == 'MASTER':
-                    image = utils.closest_dict(it['renditions'], 'width', 1500)
-                    item['_image'] = image['url']
-                    break
+    if article_json.get('promotionalMedia'):
+        if article_json['promotionalMedia']['__typename'] == 'Image':
+            crops = article_json['promotionalMedia']['assetCrops']
+        else:
+            crops = article_json['promotionalMedia']['promotionalMedia']['assetCrops']
+        for it in crops:
+            if it['name'] == 'MASTER':
+                image = utils.closest_dict(it['renditions'], 'width', 1500)
+                item['_image'] = image['url']
+                break
 
-        if article_json.get('groupings'):
-            for group in article_json['groupings']:
-                container = next((it for it in group['containers'] if it['name'] == 'feed lede'), None)
-            if container:
-                for it in container['relations']:
-                    item['content_html'] += render_block(it['asset']['body'], True)
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
-        if article_json.get('highlights'):
-            item['content_html'] += '<h3>Contents:</h3><ul>'
-            for it in article_json['highlights']['edges']:
-                item['content_html'] += '<li>{}</li>'.format(it['node']['headline']['default'])
-            item['content_html'] += '</ul>'
-            for it in article_json['highlights']['edges']:
-                item['content_html'] += '<hr/>'
-                if it['node']['__typename'] == 'Article':
-                    if item['url'] in it['node']['url']:
-                        item['content_html'] += render_block(it['node']['body'], True)
-                    else:
-                        item['content_html'] += render_block(it['node']['body'], True, it['node']['url'])
+    if article_json.get('groupings'):
+        for group in article_json['groupings']:
+            container = next((it for it in group['containers'] if it['name'] == 'feed lede'), None)
+        if container:
+            for it in container['relations']:
+                item['content_html'] += render_block(it['asset']['body'], True)
+
+    if article_json.get('highlights'):
+        item['content_html'] += '<h3>Contents:</h3><ul>'
+        for it in article_json['highlights']['edges']:
+            item['content_html'] += '<li>{}</li>'.format(it['node']['headline']['default'])
+        item['content_html'] += '</ul>'
+        for it in article_json['highlights']['edges']:
+            item['content_html'] += '<hr/>'
+            if it['node']['__typename'] == 'Article':
+                if item['url'] in it['node']['url']:
+                    item['content_html'] += render_block(it['node']['body'], True)
                 else:
-                    logger.warning('skipping highlight type {} in {}'.format(it['node']['__typename'], item['url']))
+                    item['content_html'] += render_block(it['node']['body'], True, it['node']['url'])
+            else:
+                logger.warning('skipping highlight type {} in {}'.format(it['node']['__typename'], item['url']))
 
-        if article_json.get('sprinkledBody'):
-            item['content_html'] += render_block(article_json['sprinkledBody'])
+    if article_json.get('sprinkledBody'):
+        item['content_html'] += render_block(article_json['sprinkledBody'])
 
-    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

@@ -280,6 +280,7 @@ def get_item_info(article_json, save_debug=False):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    url = url.replace('lite.cnn.com', 'www.cnn.com')
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if 'live-news' in paths or 'spanish' in paths:
@@ -579,10 +580,19 @@ def get_content(url, args, site_json, save_debug=False):
             if meta.get('description'):
                 item['summary'] = meta['description']
 
+    # if 'embed' in args:
+    #     if item.get('_image'):
+    #         item['content_html'] = utils.add_image(item['_image'], '<a href="{}">{}</a>'.format(item['url'], item['title']), link=item['url'])
+    #         return item
     if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
-            item['content_html'] = utils.add_image(item['_image'], '<a href="{}">{}</a>'.format(item['url'], item['title']), link=item['url'])
-            return item
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     if 'gallery' in paths:
         item['content_html'] = ''
@@ -905,7 +915,7 @@ def get_content(url, args, site_json, save_debug=False):
                         continue
                     else:
                         new_html = utils.add_blockquote(el.decode_contents())
-            elif 'related-content' in el['class'] or 'related-content_without-image' in el['class']:
+            elif 'related-content' in el['class'] or 'related-content_full-width' in el['class'] or 'related-content_without-image' in el['class']:
                 el.decompose()
                 continue
             if new_html:

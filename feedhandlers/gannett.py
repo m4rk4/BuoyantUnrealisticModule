@@ -204,12 +204,27 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     if not item.get('_image') and article_json.get('thumbnail'):
         item['_image'] = article_json['thumbnail']
 
+    soup = BeautifulSoup(article_html, 'lxml')
+
+    if not item.get('_image'):
+        el = soup.find('meta', attrs={"property": "og:image"})
+        if el:
+            item['_image'] = el['content']
+
     if article_json.get('mp4URL'):
         item['_video'] = article_json['mp4URL']
 
     item['summary'] = article_json['promoBrief']
 
-    soup = BeautifulSoup(article_html, 'html.parser')
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     item['content_html'] = ''
 
@@ -351,8 +366,20 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                 elif el['data-gl-method'] == 'loadHb64' and el.get('data-gl-hb64'):
                     data = base64.b64decode(el['data-gl-hb64']).decode('utf-8')
                     data_soup = BeautifulSoup(data, 'html.parser')
+                    utils.write_file(data, './debug/embed.html')
                     if data_soup.iframe:
                         new_html = utils.add_embed(data_soup.iframe['src'])
+                    elif data_soup.find(class_='oembed-asset-photo'):
+                        captions = []
+                        it = data_soup.find(class_='oembed-asset-photo-title')
+                        if it:
+                            captions.append(it.decode_contents())
+                        it = data_soup.find(class_='oembed-asset-photo-caption')
+                        if it:
+                            captions.append(it.decode_contents())
+                        it = data_soup.find(class_='oembed-asset-photo-image')
+                        if it:
+                            new_html = utils.add_image(it['src'], ' | '.join(captions))
                 elif el['data-gl-method'] == 'loadAnc' or el['data-gl-method'] == 'flp':
                     el.decompose()
                     continue
@@ -386,13 +413,9 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
 
     if not item.get('_image'):
-        el = soup.find('meta', attrs={"property": "og:image"})
+        el = article.find('img')
         if el:
-            item['_image'] = el['content']
-        else:
-            el = article.find('img')
-            if el:
-                item['_image'] = el['src']
+            item['_image'] = el['src']
     return item
 
 

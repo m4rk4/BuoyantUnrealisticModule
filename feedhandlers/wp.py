@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, site_json, save_debug=False, module_format_content=None):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    if paths[-1] == 'embed':
+    if len(paths) > 0 and paths[-1] == 'embed':
         args['embed'] = True
         del paths[-1]
         page_url = '{}://{}/{}'.format(split_url.scheme, split_url.netloc, '/'.join(paths))
@@ -100,6 +100,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     ld_page = it
                 elif not article_json and re.search(r'Article', '|'.join(it['@type'])):
                     article_json = it
+                    ld_article = it
         elif isinstance(ld, list):
             for it in ld:
                 if not it.get('@type'):
@@ -235,7 +236,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         date += '+00:00'
         if date:
             try:
-                dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
+                if date.isnumeric():
+                    dt = datetime.fromtimestamp(int(date)).replace(tzinfo=timezone.utc)
+                else:
+                    dt = datetime.fromisoformat(date).astimezone(timezone.utc)
             except:
                 dt = dateutil.parser.parse(date)
             item['date_published'] = dt.isoformat()
@@ -254,10 +258,15 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 date = meta['article:modified_time'][0]
             else:
                 date = meta['article:modified_time']
+        elif meta and meta.get('og:updated_time'):
+            if isinstance(meta['og:updated_time'], list):
+                date = meta['og:updated_time'][0]
+            else:
+                date = meta['og:updated_time']
         elif article_json and article_json.get('dateModified'):
             date = article_json['dateModified']
         if date:
-            dt = datetime.fromisoformat(date.replace('Z', '+00:00')).astimezone(timezone.utc)
+            dt = datetime.fromisoformat(date).astimezone(timezone.utc)
             item['date_modified'] = dt.isoformat()
 
     if not item.get('author'):
@@ -335,6 +344,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['tags'] = list(map(str.strip, meta['parsely-tags'].split(',')))
         elif meta and meta.get('keywords'):
             item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
+        elif article_json and article_json.get('articleSection') and isinstance(article_json['articleSection'], list):
+            item['tags'] = article_json['articleSection'].copy()
         if not item.get('tags'):
             del item['tags']
         else:
@@ -361,39 +372,37 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         elif oembed_json and oembed_json.get('thumbnail_url'):
             item['_image'] = oembed_json['thumbnail_url']
 
-    if item.get('summary'):
-        if article_json and article_json.get('description'):
-            item['summary'] = article_json['description']
-        elif oembed_json and oembed_json.get('description'):
-            item['summary'] = oembed_json['description']
-        elif meta and meta.get('description'):
-            item['summary'] = meta['description']
-        elif meta and meta.get('og:description'):
-            item['summary'] = meta['og:description']
-        elif meta and meta.get('twitter:description'):
-            item['summary'] = meta['twitter:description']
+    if article_json and article_json.get('description'):
+        item['summary'] = article_json['description']
+    elif oembed_json and oembed_json.get('description'):
+        item['summary'] = oembed_json['description']
+    elif meta and meta.get('description'):
+        item['summary'] = meta['description']
+    elif meta and meta.get('og:description'):
+        item['summary'] = meta['og:description']
+    elif meta and meta.get('twitter:description'):
+        item['summary'] = meta['twitter:description']
 
     if 'embed' in args:
         item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
             item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin-left:8px; margin-right:8px;"><h4><a href="{}">{}</a></h4>'.format(item['url'], item['title'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
         if item.get('summary'):
-            item['content_html'] += '<p><small>{}</small></p>'.format(item['summary'])
-        item['content_html'] += '</div></div>'
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
         return item
 
     gallery = ''
     item['content_html'] = ''
-    if 'add_subtitle' in args:
-        if site_json.get('subtitle'):
-            subtitles = []
-            for el in utils.get_soup_elements(site_json['subtitle'], soup):
-                subtitles.append(el.get_text())
-            if subtitles:
-                item['content_html'] += '<p><em>{}</em></p>'.format('<br/>'.join(subtitles))
-        elif item.get('summary'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+    if site_json.get('subtitle'):
+        subtitles = []
+        for el in utils.get_soup_elements(site_json['subtitle'], soup):
+            subtitles.append(el.get_text())
+        if subtitles:
+            item['content_html'] += '<p><em>{}</em></p>'.format('<br/>'.join(subtitles))
+    elif 'add_subtitle' in args and item.get('summary'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     if 'add_lede_img' in args:
         if 'no_lede_caption' in args:

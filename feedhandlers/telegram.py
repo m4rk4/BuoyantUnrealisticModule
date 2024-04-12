@@ -43,7 +43,10 @@ def get_content(url, args, site_json, save_debug=False):
     if el:
         item['author'] = {}
         item['author']['name'] = el.span.get_text()
-        item['author']['url'] = el['href']
+        if el.get('href'):
+            author_link = '<a href="{}"><b>{}</b></a>'.format(el['href'], item['author']['name'])
+        else:
+            author_link = '<b>{}</b>'.format(item['author']['name'])
         item['title'] = 'A post from {}'.format(item['author']['name'])
 
         verified_icon = ''
@@ -53,7 +56,7 @@ def get_content(url, args, site_json, save_debug=False):
             if it and it.get_text().strip():
                 verified_icon = ' &#9989;'
 
-        item['content_html'] += '<tr><td style="width:48px;"><img src="{}"/></td><td><a href="{}"><b>{}</b></a>{}</td><td style="width:32px;"><a href="{}"><img src="{}/static/telegram.png"/></a></td></tr>'.format(avatar, item['author']['url'], item['author']['name'], verified_icon, item['url'], config.server)
+        item['content_html'] += '<tr><td style="width:48px;"><img src="{}"/></td><td>{}{}</td><td style="width:32px;"><a href="{}"><img src="{}/static/telegram.png"/></a></td></tr>'.format(avatar, author_link, verified_icon, item['url'], config.server)
 
     el = soup.find(class_='tgme_widget_message_reply')
     if el:
@@ -76,6 +79,15 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '<div>{}…</div>'.format(m.group(1))
             #item['content_html'] += '<div>{}</div>'.format(it.decode_contents())
         item['content_html'] += '</td></tr></table></td></tr>'
+
+    el = soup.find('a', class_='tgme_widget_message_document_wrap')
+    if el:
+        it = el.find(class_='tgme_widget_message_document_title')
+        item['content_html'] += '<tr><td colspan="3" style="padding:8px;"><div><div style="display:inline-block; vertical-align:middle; font-size:3em; margin-right:8px;">🗎</div><div style="display:inline-block; vertical-align:middle;"><a href="{}">{}</a>'.format(el['href'], it.get_text().strip())
+        it = el.find(class_='tgme_widget_message_document_extra')
+        if it:
+            item['content_html'] += '<br/><small>{}</small>'.format(it.get_text().strip())
+        item['content_html'] += '</div></div></td></tr>'
 
     has_media = False
     for el in soup.find_all(class_=['tgme_widget_message_photo_wrap', 'tgme_widget_message_video_player']):

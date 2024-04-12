@@ -115,10 +115,13 @@ def get_album_track(track):
 
     item['_image'] = track['attributes']['artwork']['url']
 
-    ms = float(track['attributes']['durationInMillis'])
-    m = math.floor((ms / 1000) / 60)
-    s = math.floor((ms / 1000) % 60)
-    item['_duration'] = '{}:{}'.format(m, s)
+    if track['attributes'].get('durationInMillis'):
+        ms = float(track['attributes']['durationInMillis'])
+        m = math.floor((ms / 1000) / 60)
+        s = math.floor((ms / 1000) % 60)
+        item['_duration'] = '{}:{}'.format(m, s)
+    else:
+        item['_duration'] = 'N/A'
     return item
 
 
@@ -174,14 +177,26 @@ def get_album(url, args, site_json, save_debug=False):
         if album['attributes'].get('description'):
             item['summary'] = album['attributes']['description']['standard']
         elif album['attributes'].get('editorialNotes'):
-            item['summary'] = album['attributes']['editorialNotes']['standard']
+            if album['attributes']['editorialNotes'].get('standard'):
+                item['summary'] = album['attributes']['editorialNotes']['standard']
+            elif album['attributes']['editorialNotes'].get('short'):
+                item['summary'] = album['attributes']['editorialNotes']['short']
 
         poster = album['attributes']['artwork']['url'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')
         desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="{}">{}</a><br/>{} &#8226; {}</small>'.format(item['url'], item['title'], album['attributes']['url'], item['author']['name'], item['tags'][0], item['_year'])
         item['content_html'] = '<div><img style="float:left; margin-right:8px;" src="{}"/><div>{}</div><div style="clear:left;"></div></div>'.format(poster, desc)
 
-        item['content_html'] += '<blockquote style="border-left:3px solid #ccc; margin-top:4px; margin-left:1.5em; padding-left:0.5em;"><h4 style="margin-top:0; margin-bottom:1em;">Tracks:</h4><ol style="margin-top:0;">'
+        item['content_html'] += '<blockquote style="border-left:3px solid #ccc; margin-top:4px; margin-left:1.5em; padding-left:0.5em;"><div style="font-weight:bold;">Tracks:</div>'
+        if album['relationships']['tracks']['data'][0]['attributes']['discNumber'] != album['relationships']['tracks']['data'][-1]['attributes']['discNumber']:
+            d = album['relationships']['tracks']['data'][0]['attributes']['discNumber']
+            item['content_html'] += '<div>Disc {}</div>'.format(d)
+        else:
+            d = 99
+        item['content_html'] += '<ol style="margin-top:0;">'
         for i, track in enumerate(album['relationships']['tracks']['data']):
+            if track['attributes']['discNumber'] > d:
+                d = track['attributes']['discNumber']
+                item['content_html'] += '</ol><div>Disc {}</div><ol style="margin-top:0;">'.format(d)
             track_item = get_album_track(track)
             item['content_html'] += '<li><a href="{}">{}</a>'.format(track_item['url'], track_item['title'])
             if item['author']['name'] != track_item['author']['name']:

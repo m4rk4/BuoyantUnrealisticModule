@@ -236,6 +236,20 @@ def get_item(post_json, args, site_json, save_debug):
                 if it:
                     it['style'] = 'color:white;'
                     new_html += '<div style="text-align:center;"><div style="display:inline-block; padding:1em; background-color:#5928ED; text-align:center;">{}</div></div>'.format(str(it))
+            elif 'kg-file-card' in el['class']:
+                link = el.find('a', class_='kg-file-card-container')
+                if link:
+                    new_html += '<table><tr><td style="font-size:4em;"><a href="{}" style="text-decoration: none;">🗎</a></td><td>'
+                    it = el.find(class_='kg-file-card-title')
+                    if it:
+                        new_html += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link['href'], it.get_text())
+                    it = el.find(class_='kg-file-card-filename')
+                    if it:
+                        new_html += '<div style="font-size:0.8em;"><a href="{}">{}</a></div>'.format(link['href'], it.get_text())
+                    it = el.find(class_='kg-file-card-caption')
+                    if it:
+                        new_html += '<div>{}</div>'.format(it.get_text())
+                    new_html += '</td></tr></table>'
             elif el.find(class_='twitter-tweet'):
                 links = el.find_all('a')
                 new_html = utils.add_embed(links[-1]['href'])
@@ -323,6 +337,9 @@ def get_item(post_json, args, site_json, save_debug):
                 it['style'] = 'font-size:0.9em; font-style:italic;'
                 el.unwrap()
                 continue
+            elif el.find(class_='gh-article-collab'):
+                el.decompose()
+                continue
 
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
@@ -335,8 +352,8 @@ def get_item(post_json, args, site_json, save_debug):
         item['content_html'] += str(soup)
         item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
 
-    if post_json.get('visibility') and post_json['visibility'] == 'paid':
-        item['content_html'] += '<h2 style="text-align:center;"><a href="{}">This post is for paying subscribers only</a></h2>'.format(item['url'])
+    if post_json.get('visibility') and (post_json['visibility'] == 'paid' or post_json['visibility'] == 'members'):
+        item['content_html'] += '<h2 style="text-align:center;"><a href="{}">This post is for subscribers only</a></h2>'.format(item['url'])
     return item
 
 

@@ -1,9 +1,9 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -150,6 +150,16 @@ def get_item(content_json, content_id, args, site_json, save_debug):
         item['content_html'] = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], embed=embed, save_debug=save_debug)
         return item
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
+
     if item_content['abcn:contentType'] == 'imagemaster':
         for i, it in enumerate(content_json['items']):
             image = it['abcn:images'][0]['abcn:image']
@@ -170,8 +180,7 @@ def get_item(content_json, content_id, args, site_json, save_debug):
     lead_video = ''
     if item_content.get('abcn:videos'):
         if item.get('_image'):
-            lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], poster=item['_image'],
-                                   save_debug=save_debug)
+            lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], poster=item['_image'], save_debug=save_debug)
         else:
             lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], save_debug=save_debug)
 
@@ -190,6 +199,7 @@ def get_item(content_json, content_id, args, site_json, save_debug):
 
     if item_content.get('description'):
         content_html = item_content['description'].replace('</div>>', '</div>')
+        content_html = re.sub(r'</p>([A-Z0-9\W\s]+?)<p>', r'</p><h3>\1</h3><p>', content_html)
         content_soup = BeautifulSoup(content_html, 'html.parser')
 
         for el in content_soup.find_all(class_='e_image'):
@@ -237,8 +247,9 @@ def get_content(url, args, site_json, save_debug):
     if '/widgets/' in url:
         return None
 
-    m = re.search(r'id=(\d+)|-(\d+)/image-|-(\d+)$|/embed/(\d+)', url)
+    m = re.search(r'id=(\d+)|-(\d+)/image-|-(\d+)$|/embed/(\d+)|-(\d+)\?|-(\d+)$', url)
     if not m:
+
         logger.warning('unable to parse id from ' + url)
         return None
 

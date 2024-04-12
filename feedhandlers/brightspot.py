@@ -165,7 +165,15 @@ def render_content(content, skip_promos=True):
                 quote += render_content(it, skip_promos)
             # TODO: attribution?
             content_html += utils.add_pullquote(quote, content.get('attribution'))
+        elif '/blockquote/BlockQuote.hbs' in content['_template']:
+            quote = ''
+            for it in content['quote']:
+                quote += render_content(it, skip_promos)
+            content_html += utils.add_blockquote(quote)
         elif '/list/List.hbs' in content['_template']:
+            if content.get('_styledTemplate') and '/list/BigNewsCont.hbs' in content['_styledTemplate']:
+                # Skip
+                return content_html
             if content.get('title'):
                 content_html += '<h4>{}</h4>'.format(content['title'])
             if not skip_promos:
@@ -341,6 +349,8 @@ def render_content(content, skip_promos=True):
             if content.get('oEmbed') and content['oEmbed'].startswith('<blockquote'):
                 m = re.search(r'data-instgrm-permalink="([^"]+)"', content['oEmbed'])
                 content_html += utils.add_embed(m.group(1))
+            elif content.get('postUrl'):
+                content_html += utils.add_embed(content['postUrl'])
             else:
                 logger.warning('unhandled InstagramUrl content')
         elif content['_template'] == '/instagram/InstagramEmbed.hbs':
@@ -356,7 +366,7 @@ def render_content(content, skip_promos=True):
                 src = 'https:' + content['url']
             else:
                 src = content['url']
-            if src.endswith('.pdf'):
+            if src.endswith('.pdf') and 'documentcloud.org' not in src:
                 content_html += utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(src))
             else:
                 content_html += utils.add_embed(src)
@@ -434,8 +444,14 @@ def render_content(content, skip_promos=True):
             if new_html and new_html != '<p></p>':
                 content_html += '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">{}</blockquote>'.format(new_html)
         elif '/htmlmodule/HtmlModuleEnhancement.hbs' in content['_template']:
-            for it in content['htmlModule']:
-                content_html += render_content(it, skip_promos)
+            if content.get('htmlModule'):
+                for it in content['htmlModule']:
+                    content_html += render_content(it, skip_promos)
+            elif content.get('item'):
+                for it in content['item']:
+                    content_html += render_content(it, skip_promos)
+            else:
+                logger.warning('unhandled /htmlmodule/HtmlModuleEnhancement.hbs')
         elif '/listicle/ListicleItem.hbs' in content['_template']:
             content_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
             if content.get('title'):
@@ -484,6 +500,12 @@ def render_content(content, skip_promos=True):
                     m = re.search(r'src="([^"]+)"', content['rawHtml'])
                     if m:
                         content_html += utils.add_embed(m.group(1))
+                    else:
+                        logger.warning('unknown rawHtml content')
+                elif 'infogram-embed' in content['rawHtml']:
+                    m = re.search(r'data-id="([^"]+)"', content['rawHtml'])
+                    if m:
+                        content_html += utils.add_embed('https://infogram.com/' + m.group(1))
                     else:
                         logger.warning('unknown rawHtml content')
                 elif '<script' not in content['rawHtml'] and '<style' not in content['rawHtml']:
@@ -581,8 +603,12 @@ def get_item(article_json, args, site_json, save_debug):
     if authors:
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    if article_json.get('sourceOrganizationName'):
-        item['author']['name'] += ' ({})'.format(article_json['sourceOrganizationName'])
+        if article_json.get('sourceOrganizationName'):
+            item['author']['name'] += ' ({})'.format(article_json['sourceOrganizationName'])
+    elif article_json.get('meta'):
+        meta = next((it for it in article_json['meta'] if it.get('siteName')), None)
+        if meta:
+            item['author'] = {"name": meta['siteName']}
 
     item['tags'] = []
     if meta_json and meta_json.get('type') and meta_json['type'][0].get('tags'):
@@ -656,6 +682,16 @@ def get_item(article_json, args, site_json, save_debug):
                 m = re.search(r'<img .*?src="([^"]+)"', content_html)
                 if m:
                     item['_image'] = m.group(1)
+
+        if 'embed' in args:
+            item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+            if item.get('_image'):
+                item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+            item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+            if item.get('summary'):
+                item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+            item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server,quote_plus(item['url']))
+            return item
 
         if article_json.get('audio'):
             item['attachments'] = []

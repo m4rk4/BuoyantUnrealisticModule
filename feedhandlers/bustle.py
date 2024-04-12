@@ -185,12 +185,24 @@ def render_card(card, list_index=0):
             card_html += render_card(card['item']['card'])
         card_html += render_body(card['fields']['body'], card['bodyZones'])
 
+    elif card['type'] == 'data' and card.get('image'):
+        if card['image'].get('attribution'):
+            if card['image'].get('attributionUrl'):
+                caption = '<a href="{}">{}</a>'.format(card['image']['attributionUrl'], card['image']['attribution'])
+            else:
+                caption = card['image']['attribution']
+        else:
+            caption = ''
+        heading = '<div style="text-align:center;">{}</div>'.format(card['fields']['description'])
+        heading += '<div style="text-align:center; font-size:1.5em; font-weight:bold;">{}</div>'.format(card['fields']['numeral'].upper())
+        card_html += utils.add_image(resize_image(card['image']['url']), caption, heading=heading)
+
     else:
         logger.warning('unhandled card type ' + card['type'])
     return card_html
 
 
-def render_markers(markers, markups):
+def render_markers(markers, markups, atoms):
     render_html = ''
     for marker in markers:
         if marker[0] == 0:
@@ -214,20 +226,25 @@ def render_markers(markers, markups):
 
         elif marker[0] == 1:
             # ATOM_MARKER_TYPE
-            logger.warning('unhandled ATOM_MARKER_TYPE')
+            atom = atoms[marker[3]]
+            if atom[0] == 'soft-return':
+                render_html += '<br/>'
+            else:
+                logger.warning('unhandled ATOM_MARKER_TYPE')
     return render_html
 
 
-def render_markup_section(section, markups):
-    return '<{0}>{1}</{0}>'.format(section[1], render_markers(section[2], markups))
+def render_markup_section(section, markups, atoms):
+    return '<{0}>{1}</{0}>'.format(section[1], render_markers(section[2], markups, atoms))
 
 
 def render_body(body, body_zones=None):
+    # https://github.com/bustle/mobiledoc-text-renderer
     body_html = ''
     for section in body['sections']:
         if section[0] == 1:
             # MARKUP_SECTION_TYPE
-            body_html += render_markup_section(section, body['markups'])
+            body_html += render_markup_section(section, body['markups'], body['atoms'])
 
         elif section[0] == 2:
             # IMAGE_SECTION_TYPE
@@ -237,7 +254,7 @@ def render_body(body, body_zones=None):
             # LIST_SECTION_TYPE
             body_html += '<{}>'.format(section[1])
             for li in section[2]:
-                body_html += '<li>' + render_markers(li, body['markups']) + '</li>'
+                body_html += '<li>' + render_markers(li, body['markups'], body['atoms']) + '</li>'
             body_html += '</{}>'.format(section[1])
 
         elif section[0] == 10:
@@ -251,6 +268,59 @@ def render_body(body, body_zones=None):
             elif card[0] == 'DividerCard':
                 pass
 
+            elif card[0] == 'hr':
+                body_html += '<hr/>'
+
+            elif card[0] == 'tpgH2':
+                body_html += '<h2>' + card[1]['tpgH2']['title'] + '</h2>'
+
+            elif card[0] == 'tpgImage':
+                captions = []
+                if card[1]['tpgImage'].get('caption'):
+                    captions.append(card[1]['tpgImage']['caption'])
+                if card[1]['tpgImage'].get('credit'):
+                    captions.append(card[1]['tpgImage']['credit'])
+                if not captions and card[1]['tpgImage'].get('title') and not re.search(r'\d+-IMG_\d+|screenshot', card[1]['tpgImage']['title'], flags=re.I):
+                    captions.append(card[1]['tpgImage']['title'])
+                body_html += utils.add_image(card[1]['tpgImage']['src'], ' | '.join(captions))
+
+            elif card[0] == 'tpgFigure':
+                captions = []
+                if card[1]['tpgFigure'].get('caption'):
+                    captions.append(card[1]['tpgFigure']['caption'])
+                elif card[1]['tpgFigure']['image'].get('caption'):
+                    captions.append(card[1]['tpgFigure']['image']['caption'])
+                if card[1]['tpgFigure']['image'].get('credit') and card[1]['tpgFigure']['image']['credit'] not in captions:
+                    captions.append(card[1]['tpgFigure']['image']['credit'])
+                body_html += utils.add_image(card[1]['tpgFigure']['image']['src'], ' | '.join(captions))
+
+            elif card[0] == 'tpgGallery':
+                for image in card[1]['tpgGallery']:
+                    captions = []
+                    if image.get('caption'):
+                        captions.append(image['caption'])
+                    if image.get('credit') and image['credit'] not in captions:
+                        captions.append(image['credit'])
+                    if image.get('title') and not re.search(r'\d+-IMG_\d+|screenshot', image['title'], flags=re.I):
+                        captions.append(image['title'])
+                    body_html += utils.add_image(image['src'], ' | '.join(captions))
+
+            elif card[0] == 'tpgYoutube':
+                body_html += utils.add_embed('https://www.youtube.com/watch?v=' + card[1]['tpgYoutube']['id'])
+
+            elif card[0] == 'tpgTable':
+                body_html += '<table style="width:100%; border-collapse:collapse;">'
+                for i, tr in enumerate(card[1]['tpgTable']['rows']):
+                    if i % 2 == 0:
+                        body_html += '<tr style="line-height:2em; background-color:#ccc;">'
+                    else:
+                        body_html += '<tr style="line-height:2em;">'
+                    for td in tr:
+                        body_html += '<td style="border:1px solid black; vertical-align:top;">' + td + '</td>'
+                    body_html += '</tr>'
+                body_html += '</table>'
+
+
             else:
                 logger.warning('unhandled card type ' + card[0])
 
@@ -262,8 +332,15 @@ def render_body(body, body_zones=None):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
+    if split_url.path.startswith('/input/'):
+        site = 'Input'
+        path = split_url.path.replace('/input/', '/')
+    else:
+        site = site_json['site']
+        path = split_url.path
     #graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22mosaicCardFeedLimit%22%3A8%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22a30f582ff45b31cdc13289410e3f43389417573d3911861db93b05aebe2a62f4%22%7D%7D&_client={}&_version=78ec64f'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
-    graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22first%22%3A4%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%225aa93ebf513d6ca4fec12fb19d574f82d9b1ec83a583ff5dea71269624d62a1a%22%7D%7D&_client={}&_version=d49f73a'.format(site_json['site'].upper(), quote_plus(split_url.path), site_json['site'])
+    graph_url = 'https://graph.bustle.com/?variables=%7B%22site%22%3A%22{}%22%2C%22path%22%3A%22{}%22%2C%22includeRelated%22%3Atrue%2C%22first%22%3A4%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22d4346fd59a4a49b0a7eee35f98bce511a9057f0158d3c1ec1176f736240743e6%22%7D%7D&_client={}&_version=a50ab3215'.format(site.upper(), quote_plus(path), site)
+    # print(graph_url)
     graph_json = utils.get_url_json(graph_url)
     if not graph_json:
         logger.debug('graphql unsuccessful, extracting data from ' + url)

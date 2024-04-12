@@ -1,9 +1,10 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
+from urllib.parse import quote_plus, urlsplit
 
+import config, utils
 from feedhandlers import rss
-import utils
 
 import logging
 
@@ -43,6 +44,21 @@ def get_content(url, args, site_json, save_debug=False):
     item['tags'] = page['keywords'].split(',')
 
     item['_image'] = page['thumbnail']
+
+    if page.get('lightboxImages') and page['lightboxImages'].get('standfirst'):
+        if page['lightboxImages']['standfirst'].startswith('<p'):
+            m = re.search(r'^<p[^>]*>(.*?)</p>', page['lightboxImages']['standfirst'])
+            item['summary'] = m.group(1)
+        else:
+            item['summary'] = page['lightboxImages']['standfirst']
+
+    if 'embed' in args:
+        # TODO: check audio/video embeds
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     content_html = ''
     article_body = None
@@ -156,8 +172,10 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         if page.get('lightboxImages'):
             if page['lightboxImages'].get('standfirst'):
-                item['summary'] = page['lightboxImages']['standfirst']
-                content_html += '<p><em>{}</em></p>'.format(page['lightboxImages']['standfirst'])
+                if page['lightboxImages']['standfirst'].startswith('<p'):
+                    content_html += '<div style="font-style:italic;">' + page['lightboxImages']['standfirst'] + '</div>'
+                else:
+                    content_html += '<p><em>{}</em></p>'.format(page['lightboxImages']['standfirst'])
             img_src, caption = get_lightbox_image('')
             if img_src:
                 content_html += utils.add_image(img_src, caption)
