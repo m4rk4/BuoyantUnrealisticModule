@@ -87,7 +87,10 @@ def get_article_content(article_json, args, site_json, save_debug=False):
         del item['tags']
 
     if article_json.get('fn__image'):
-        item['_image'] = article_json['fn__image']['url']
+        if article_json['fn__image']['content_type'] == 'video':
+            item['_image'] = article_json['fn__image']['content']['thumbnail']
+        else:
+            item['_image'] = article_json['fn__image']['url']
 
     item['content_html'] = ''
     if article_json.get('dek'):

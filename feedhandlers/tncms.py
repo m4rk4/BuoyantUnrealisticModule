@@ -308,6 +308,8 @@ def get_content(url, args, site_json, save_debug=False):
             if re.search(r'tncms-inline-relcontent', content):
                 content_html += utils.add_blockquote(re.sub(r'^<aside [^>]+>(.*)</aside>$', r'\1', content))
                 continue
+        elif content.startswith('<p><strong>Related:') or content.startswith('<p><strong>Next, <a href'):
+            continue
         content_html += content
 
     if article_json['type'] == 'collection':

@@ -378,6 +378,13 @@ def get_content(url, args, site_json, save_debug=False):
                 el['href'] = href
 
     for el in caas_body.find_all(class_='caas-readmore'):
+        i = 0
+        sibs = el.find_next_siblings()
+        while sibs[i:] and len(sibs[i:]) >= 3 and sibs[i].name == 'h2' and sibs[i+1].name == 'figure' and sibs[i+2].name == 'p':
+            sibs[i].decompose()
+            sibs[i + 1].decompose()
+            sibs[i + 2].decompose()
+            i += 3
         el.decompose()
 
     for el in caas_body.find_all('p', string=re.compile(r'^Read More:')):

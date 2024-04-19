@@ -1,5 +1,6 @@
 import json, random, re, requests, string
 from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_requests
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlencode, urlsplit
 
@@ -16,7 +17,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
     soup = None
     if not ig_data:
-        post_data, profile_data = get_ig_data(url, False, save_debug)
+        post_data, profile_data = get_ig_post_data(url, False, save_debug)
         if post_data:
             ig_data = post_data['data']['xdt_shortcode_media']
     if not ig_data:
@@ -328,7 +329,7 @@ def get_feed(url, args, site_json, save_debug=False):
     if not site_json['profile'].get(paths[0]):
         logger.warning('unable to get user profile posts without an existing post url')
         return None
-    post_data, profile_data = get_ig_data(site_json['profile'][paths[0]], True, save_debug)
+    post_data, profile_data = get_ig_post_data(site_json['profile'][paths[0]], True, save_debug)
     if not profile_data:
         return None
     # # For tags there is a json feed at https://www.instagram.com/explore/tags/trending/?__a=1 but it seems to be ip restricted
@@ -431,8 +432,8 @@ def get_feed(url, args, site_json, save_debug=False):
     return feed
 
 
-def get_ig_data(url, get_profile_posts=False, save_debug=False):
-    proxies = {"https": "http://127.0.0.1:25345"}
+# https://github.com/Ximaz/instagram-api/blob/0b40c040cf5f1da08071e43b7ff8e753e71a73ea/apigram/natives.py
+def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_file=False):
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "accept-language": "en-US,en;q=0.9",
@@ -455,22 +456,22 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
     }
 
-    if False:
+    s = curl_requests.Session(impersonate='chrome116')
+    r = s.get(utils.clean_url(url), proxies=config.proxies)
+    if r.status_code != 200:
+        return None
+    page_html = r.text
+
+    if load_from_file:
         page_html = utils.read_file('./debug/instagram.html')
-        page_soup = BeautifulSoup(page_html, 'lxml')
-        web_session_id = 'gxquxh:ooli54:fn0ub8'
+        web_session_id = '3hn9qf:77mmtq:efs8ue'
     else:
-        # s = requests.Session()
-        # r = s.get(utils.clean_url(url), headers=headers)
-        # r = requests.get(utils.clean_url(url), impersonate='chrome116', headers=headers, proxies=proxies)
-        r = requests.get(utils.clean_url(url), headers=headers, proxies=proxies)
-        if r.status_code != 200:
-            return None
         if save_debug:
-            utils.write_file(r.text, './debug/instagram.html')
-        page_soup = BeautifulSoup(r.text, 'lxml')
+            utils.write_file(page_html, './debug/instagram.html')
         # web_session_id = rand_str(6) + ':' + rand_str(6) + ':' + rand_str(6)
         web_session_id = ':' + rand_str(6) + ':' + rand_str(6)
+
+    page_soup = BeautifulSoup(page_html, 'lxml')
 
     csr_bm = []
     dyn_bm = []
@@ -480,10 +481,14 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
     config_defaults = None
     eqmc_params = None
     deferred_cookies = None
+    preloaders = None
     csrf_token = ''
     lsd_token = ''
     shortcode = ''
     owner_id = ''
+    versioning_id = ''
+    machine_id = ''
+    device_id = ''
 
     for el in page_soup.find_all('script', attrs={"type": "application/json"}):
         script_json = json.loads(el.string)
@@ -516,11 +521,17 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
                                         csrf_token = d[2]['csrf_token']
                                     elif d[0] == 'LSD' and d[2].get('token'):
                                         lsd_token = d[2]['token']
+                                    elif d[0] == 'WebBloksVersioningID' and d[2].get('versioningID'):
+                                        versioning_id = d[2]['versioningID']
+                                    elif d[0] == 'BarcelonaSharedData' and d[2].get('machine_id'):
+                                        machine_id = d[2]['machine_id']
+                                    elif d[0] == 'AnalyticsCoreData' and d[2].get('device_id'):
+                                        device_id = d[2]['device_id'].split('|')[-1]
                                     if len(d) == 4 and isinstance(d[3], int) and d[3] > 0:
                                         bm_set_value(dyn_bm, d[3])
                             if data['__bbox'].get('require'):
                                 for d in data['__bbox']['require']:
-                                    if d[0] == 'CometPlatformRootClient' and d[1]:
+                                    if d[0].startswith('CometPlatformRootClient') and d[1]:
                                         if d[1] == 'setInitDeferredPayload':
                                             for x in d[3]:
                                                 if isinstance(x, dict) and x.get('deferredCookies'):
@@ -532,10 +543,21 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
                                                         shortcode = x['params']['shortcode']
                                                     if x.get('rootView'):
                                                         owner_id = x['rootView']['props']['page_logging']['params']['owner_id']
+                                        elif d[1] == 'initialize':
+                                            for x in d[3]:
+                                                if isinstance(x, dict):
+                                                    if x.get('expectedPreloaders'):
+                                                        preloaders = x['expectedPreloaders'][0]
+                                                    if x.get('initialRouteInfo') and x['initialRouteInfo'].get('route'):
+                                                        if x['initialRouteInfo']['route'].get('params') and x['initialRouteInfo']['route']['params'].get('shortcode'):
+                                                            shortcode = x['initialRouteInfo']['route']['params']['shortcode']
+                                                        if x['initialRouteInfo']['route'].get('rootView') and x['initialRouteInfo']['route']['rootView'].get('props') and x['initialRouteInfo']['route']['rootView']['props'].get('page_logging') and x['initialRouteInfo']['route']['rootView']['props']['page_logging'].get('params') and x['initialRouteInfo']['route']['rootView']['props']['page_logging']['params'].get('owner_id'):
+                                                            owner_id = x['initialRouteInfo']['route']['rootView']['props']['page_logging']['params']['owner_id']
     for el in page_soup.find_all('link', attrs={"data-bootloader-hash": True, "data-p": True}):
         if el.get('href') and el['href'].startswith('https'):
             for p in el['data-p'].replace(':', '').split(','):
                 bm_set_value(csr_bm, int(p))
+
     for el in page_soup.find_all('script', attrs={"data-bootloader-hash": True, "data-p": True}):
         if el.get('src') and el['src'].startswith('https'):
             for p in el['data-p'].replace(':', '').split(','):
@@ -563,18 +585,19 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
     asbd_id = ''
     for el in page_soup.find_all('link', href=re.compile(r'https://static\.cdninstagram\.com/rsrc\.php/.*\.js')):
         # print(el['href'])
-        # r = requests.get(el['href'], impersonate="chrome116", headers=headers, proxies=proxies)
-        r = requests.get(el['href'], headers=headers, proxies=proxies)
+        r = s.get(el['href'], proxies=config.proxies)
         if r.status_code == 200:
-            # m = re.search(r'\{id:"(\d+)",metadata:\{\},name:"PolarisPostActionLoadPostQueryLegacyQuery",operationKind:"query",text:null\}', r.text)
-            # if m:
-            #     post_doc_id = m.group(1)
-            m = re.search(r'"PolarisPostActionLoadPostQueryQuery_instagramRelayOperation".*?="(\d+)"', r.text)
-            if m:
-                post_doc_id = m.group(1)
-            m = re.search(r'"PolarisProfilePostsActions".*?="(\d+)"', r.text)
-            if m:
-                profile_doc_id = m.group(1)
+            if 'instagram.com' in url:
+                m = re.search(r'"PolarisPostActionLoadPostQueryQuery_instagramRelayOperation".*?="(\d+)"', r.text)
+                if m:
+                    post_doc_id = m.group(1)
+                m = re.search(r'"PolarisProfilePostsActions".*?="(\d+)"', r.text)
+                if m:
+                    profile_doc_id = m.group(1)
+            elif 'threads.net' in url:
+                m = re.search(r'"BarcelonaPostPage__data".*?id:"(\d+)"', r.text)
+                if m:
+                    post_doc_id = m.group(1)
             m = re.search(r'a="(\d+)";f\.ASBD_ID=a', r.text)
             if m:
                 asbd_id = m.group(1)
@@ -588,21 +611,68 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
     post_data = None
     profile_data = None
 
-    gql_cookies = {
-        "csrftoken": csrf_token
-    }
-    if deferred_cookies.get('_js_ig_did'):
-        gql_cookies['ig_did'] = deferred_cookies['_js_ig_did']['value']
-    elif polaris_site_data:
-        gql_cookies['ig_did'] = polaris_site_data['device_id']
-    if deferred_cookies.get('_js_datr'):
-        gql_cookies['datr'] = deferred_cookies['_js_datr']['value']
-    if deferred_cookies.get('mid'):
-        gql_cookies['mid'] = deferred_cookies['mid']['value']
-    elif polaris_site_data:
-        gql_cookies['mid'] = polaris_site_data['machine_id']
-    gql_cookies['ig_nrcb'] = "1"
-    # print(json.dumps(gql_cookies, indent=4))
+    if 'instagram.com' in url:
+        gql_url = 'https://www.instagram.com/graphql/query'
+        req_friendly_name = 'PolarisPostActionLoadPostQueryQuery'
+        variables = {
+            "shortcode": shortcode,
+            "fetch_comment_count": 40,
+            "fetch_related_profile_media_count": 3,
+            "parent_comment_count": 24,
+            "child_comment_count": 3,
+            "fetch_like_count": 10,
+            "fetch_tagged_user_count": None,
+            "fetch_preview_comment_count": 2,
+            "has_threaded_comments": True,
+            "hoisted_comment_id": None,
+            "hoisted_reply_id": None
+        }
+    elif 'threads.net' in url:
+        gql_url = 'https://www.threads.net/api/graphql'
+        req_friendly_name = 'BarcelonaPostPageQuery'
+        if preloaders and preloaders.get('variables'):
+            variables = preloaders['variables']
+        else:
+            variables = {
+                "postID": "3313208983259045191",
+                "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": False,
+                "__relay_internal__pv__BarcelonaIsThreadContextHeaderEnabledrelayprovider": False,
+                "__relay_internal__pv__BarcelonaIsThreadContextHeaderFollowButtonEnabledrelayprovider": False,
+                "__relay_internal__pv__BarcelonaUseCometVideoPlaybackEnginerelayprovider": False,
+                "__relay_internal__pv__BarcelonaOptionalCookiesEnabledrelayprovider": True,
+                "__relay_internal__pv__BarcelonaIsViewCountEnabledrelayprovider": False,
+                "__relay_internal__pv__BarcelonaShouldShowFediverseM075Featuresrelayprovider": False
+            }
+
+    gql_cookies = {}
+    if s.cookies and not load_from_file:
+        for key, val in s.cookies.items():
+            gql_cookies[key] = val
+    if not gql_cookies.get('csrftoken'):
+        gql_cookies['csrftoken'] = csrf_token
+    if not gql_cookies.get('ig_did'):
+        if deferred_cookies and deferred_cookies.get('_js_ig_did'):
+            gql_cookies['ig_did'] = deferred_cookies['_js_ig_did']['value']
+        elif polaris_site_data and polaris_site_data.get('device_id'):
+            gql_cookies['ig_did'] = polaris_site_data['device_id']
+        elif device_id:
+            gql_cookies['ig_did'] = device_id
+    if not gql_cookies.get('datr'):
+        if deferred_cookies and deferred_cookies.get('_js_datr'):
+            gql_cookies['datr'] = deferred_cookies['_js_datr']['value']
+    if not gql_cookies.get('mid'):
+        if deferred_cookies and deferred_cookies.get('mid'):
+            gql_cookies['mid'] = deferred_cookies['mid']['value']
+        elif polaris_site_data and polaris_site_data['machine_id']:
+            gql_cookies['mid'] = polaris_site_data['machine_id']
+        elif machine_id:
+            gql_cookies['mid'] = machine_id
+    if not gql_cookies.get('ps_l'):
+        gql_cookies['ps_l'] = "0"
+    if not gql_cookies.get('ps_n'):
+        gql_cookies['ps_n'] = "0"
+    if not gql_cookies.get('ig_nrcb'):
+        gql_cookies['ig_nrcb'] = "1"
 
     gql_headers = {
         "accept": "*/*",
@@ -623,15 +693,16 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
         "viewport-width": "852",
         "x-asbd-id": asbd_id,
+        "x-bloks-version-id": versioning_id,
         "x-csrftoken": csrf_token,
-        "x-fb-friendly-name": "PolarisPostActionLoadPostQueryLegacyQuery",
+        "x-fb-friendly-name": req_friendly_name,
         "x-fb-lsd": lsd_token,
         "x-ig-app-id": config_defaults['customHeaders']['X-IG-App-ID']
     }
-    # print(json.dumps(gql_headers, indent=4))
+
     gql_data = {
         "av": 0,
-        "__d": config_defaults['customHeaders']['X-IG-D'],
+        "__d": "",
         "__user": eqmc_params['__user'][0],
         "__a": eqmc_params['__a'][0],
         "__req": hex(random.randint(1, 15))[2:],
@@ -650,40 +721,37 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
         "__spin_b": site_data['__spin_b'],
         "__spin_t": site_data['__spin_t'],
         "fb_api_caller_class": "RelayModern",
-        "fb_api_req_friendly_name": "PolarisPostActionLoadPostQueryQuery",
+        "fb_api_req_friendly_name": req_friendly_name,
         "server_timestamps": True,
         "doc_id": post_doc_id
     }
-    # "fb_api_req_friendly_name": "PolarisPostActionLoadPostQueryLegacyQuery",
+    if config_defaults['customHeaders'].get('X-IG-D'):
+        gql_data['__d'] = config_defaults['customHeaders']['X-IG-D']
+    else:
+        del gql_data['__d']
+
+    body = urlencode(gql_data) + '&variables=' + quote_plus(json.dumps(variables, separators=(',', ':')))
+
+    # print(json.dumps(gql_cookies, indent=4))
+    # print(json.dumps(gql_headers, indent=4))
     # print(json.dumps(gql_data, indent=4))
-    body = urlencode(gql_data)
-    variables = {
-        "shortcode": shortcode,
-        "fetch_comment_count": 40,
-        "fetch_related_profile_media_count": 3,
-        "parent_comment_count": 24,
-        "child_comment_count": 3,
-        "fetch_like_count": 10,
-        "fetch_tagged_user_count": None,
-        "fetch_preview_comment_count": 2,
-        "has_threaded_comments": True,
-        "hoisted_comment_id": None,
-        "hoisted_reply_id": None
-    }
-    body += '&variables=' + quote_plus(json.dumps(variables, separators=(',', ':')))
+    # print(json.dumps(variables, indent=4))
     # print(body)
-    gql_url = 'https://www.instagram.com/graphql/query'
-    # r = requests.post(gql_url, data=body, impersonate='chrome116', headers=gql_headers, proxies=proxies)
-    r = requests.post(gql_url, data=body, headers=gql_headers, proxies=proxies)
+
+    # r = requests.post(gql_url, data=body, headers=gql_headers, proxies=config.proxies)
+    # r = curl_requests.post(gql_url, data=body, impersonate='chrome116', headers=gql_headers, proxies=config.proxies)
+    r = s.post(gql_url, data=body, headers=gql_headers, proxies=config.proxies)
     if r.status_code == 200:
         try:
             post_data = r.json()
             if save_debug:
                 utils.write_file(post_data, './debug/instagram.json')
         except:
-            logger.warning('Error: ' + r.text)
+            logger.warning('error converting {} to json: {}'.format(req_friendly_name, r.text))
+    else:
+        logger.warning('status code {} getting {}'.format(req_friendly_name, r.status_code))
 
-    if get_profile_posts:
+    if post_data and get_profile_posts:
         gql_url = 'https://www.instagram.com/graphql/query/?doc_id={}&variables=%7B%22id%22%3A%22{}%22%2C%22first%22%3A12%7D'.format(profile_doc_id, owner_id)
         gql_headers = {
             "accept": "*/*",
@@ -708,14 +776,19 @@ def get_ig_data(url, get_profile_posts=False, save_debug=False):
             "x-ig-www-claim": "0",
             "x-requested-with": "XMLHttpRequest"
         }
-        r = requests.get(gql_url, headers=gql_headers, proxies=proxies)
+        print(gql_url)
+        print(json.dumps(gql_headers, indent=4))
+        # r = requests.get(gql_url, headers=gql_headers, proxies=config.proxies)
+        r = s.get(gql_url, headers=gql_headers, proxies=config.proxies)
         if r.status_code == 200:
             try:
                 profile_data = r.json()
                 if save_debug:
                     utils.write_file(profile_data, './debug/ig_profile.json')
             except:
-                logger.warning('Error: ' + r.text)
+                logger.warning('error converting profile query to json: ' + r.text)
+        else:
+            logger.warning('status code {} getting profile query'.format(r.status_code))
     return post_data, profile_data
 
 

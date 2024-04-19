@@ -390,6 +390,10 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
         if wp_post.get('rj_fields') and wp_post['rj_fields'].get('_rj_field_byline_author') and wp_post['rj_fields']['_rj_field_byline_author'].get('authors'):
             return wp_post['rj_fields']['_rj_field_byline_author']['authors'].copy()
 
+        if wp_post.get('meta') and wp_post['meta'].get('schneps_byline'):
+            authors.append(re.sub(r'^By ', '', wp_post['meta']['schneps_byline'], flags=re.I))
+            return authors
+
         if wp_post.get('authors'):
             for it in wp_post['authors']:
                 if isinstance(it, dict):
@@ -974,40 +978,55 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     if 'skip_lede_img' not in args:
         video_lede = ''
         if post.get('lead_media') and re.search(r'wp:lakana/anvplayer', post['lead_media']['raw']):
-            ld_json = utils.get_ld_json(item['url'])
-            if save_debug:
-                utils.write_file(ld_json, './debug/ld_json.json')
-            if ld_json:
-                if isinstance(ld_json, list):
-                    for it in ld_json:
-                        if it['@type'] == 'NewsArticle':
-                            article_json = it
-                else:
-                    article_json = ld_json
-                for it in article_json['associatedMedia']:
-                    if it['@type'] == 'VideoObject' and it.get('contentUrl'):
-                        video_lede = utils.add_video(it['contentUrl'], 'application/x-mpegURL', it['thumbnailUrl'], it['name'])
-                        break
-            if not video_lede:
-                if not page_soup:
-                    page_html = utils.get_url_html(item['url'])
-                    if page_html:
-                        page_soup = BeautifulSoup(page_html, 'lxml')
-                el = page_soup.find(class_='article-featured-media--lakanaanvplayer')
-                if el:
-                    it = el.find(attrs={"data-video_params": True})
-                    if it:
-                        # https://www.wate.com/news/dr-dre-says-he-had-3-strokes-after-2021-brain-aneurysm/
-                        video_json = json.loads(html.unescape(it['data-video_params']).replace("'/", '"'))
-                        # utils.write_file(video_json, './debug/video.json')
-                        lura_json = {
-                            "anvack": video_json['accessKey'],
-                            "accessKey": video_json['accessKey'],
-                            "token": video_json['token'],
-                            "v": video_json['video']
-                        }
-                        lura_url = 'https://w3.mp.lura.live/player/prod/v3/anvload.html?key=' + quote(base64.b64encode(json.dumps(lura_json).replace(' ', '').encode('utf-8')).decode('utf-8'))
-                        video_lede = utils.add_embed(lura_url)
+            if post['lead_media'].get('feed'):
+                video_feed = utils.get_url_json('https://feed.mp.lura.live/v2/feed/{}?start=0&fmt=json'.format(post['lead_media']['feed']))
+                if video_feed:
+                    params = parse_qs(urlsplit(video_feed['docs'][0]['media_url']).query)
+                    if params.get('anvack'):
+                        video_js = utils.get_url_html('https://tkx.mp.lura.live/rest/v2/mcp/video/{}?anvack={}'.format(video_feed['docs'][0]['obj_id'], params['anvack'][0]))
+                        if video_js:
+                            i = video_js.find('{')
+                            j = video_js.rfind('}') + 1
+                            video_json = json.loads(video_js[i:j])
+                            # utils.write_file(video_json, './debug/video.json')
+                            video_lede = utils.add_video(video_json['published_urls'][0]['embed_url'], 'application/x-mpegURL', video_json['src_image_url'], video_json['def_title'])
+            else:
+                ld_json = utils.get_ld_json(item['url'])
+                if save_debug:
+                    utils.write_file(ld_json, './debug/ld_json.json')
+                if ld_json:
+                    if isinstance(ld_json, list):
+                        for it in ld_json:
+                            if it['@type'] == 'NewsArticle':
+                                article_json = it
+                    else:
+                        article_json = ld_json
+                    if article_json.get('associatedMedia'):
+                        for it in article_json['associatedMedia']:
+                            if it['@type'] == 'VideoObject' and it.get('contentUrl'):
+                                video_lede = utils.add_video(it['contentUrl'], 'application/x-mpegURL', it['thumbnailUrl'], it['name'])
+                                break
+                if not video_lede:
+                    if not page_soup:
+                        page_html = utils.get_url_html(item['url'])
+                        if page_html:
+                            page_soup = BeautifulSoup(page_html, 'lxml')
+                    el = page_soup.find(class_='article-featured-media--lakanaanvplayer')
+                    if el:
+                        print(el)
+                        it = el.find(attrs={"data-video_params": True})
+                        if it:
+                            # https://www.wate.com/news/dr-dre-says-he-had-3-strokes-after-2021-brain-aneurysm/
+                            video_json = json.loads(html.unescape(it['data-video_params']).replace("'/", '"'))
+                            # utils.write_file(video_json, './debug/video.json')
+                            lura_json = {
+                                "anvack": video_json['accessKey'],
+                                "accessKey": video_json['accessKey'],
+                                "token": video_json['token'],
+                                "v": video_json['video']
+                            }
+                            lura_url = 'https://w3.mp.lura.live/player/prod/v3/anvload.html?key=' + quote(base64.b64encode(json.dumps(lura_json).replace(' ', '').encode('utf-8')).decode('utf-8'))
+                            video_lede = utils.add_embed(lura_url)
         elif post.get('rj_fields') and post['rj_fields'].get('rj_field_vdo'):
             for it in post['rj_fields']['rj_field_vdo']:
                 m = re.search(r'id="([^"]+)"', it)
@@ -1324,6 +1343,11 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         for it in site_json['unwrap']:
             for el in utils.get_soup_elements(it, soup):
                 el.unwrap()
+
+    if site_json and site_json.get('rename'):
+        for it in site_json['rename']:
+            for el in utils.get_soup_elements(it, soup):
+                el.name = it['name']
 
     el = soup.find('body')
     if el:
@@ -2407,6 +2431,16 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             new_html = '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, red 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.replace_with(new_el)
+
+    for el in soup.find_all('i', class_='fa-star'):
+        if 'fa-solid' in el['class']:
+            el.string = '★'
+            el.name = 'span'
+        elif 'fa-regular' in el['class'] or 'fa-light' in el['class'] or 'fa-thin' in el['class']:
+            el.string = '☆'
+            el.name = 'span'
+        else:
+            logger.warning('unhandled fa-star icon in ' + item['url'])
 
     for el in soup.find_all(class_='case-documents'):
         # https://www.democracydocket.com/cases/indiana-mail-in-voting-restrictions-challenge/

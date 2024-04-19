@@ -1,9 +1,11 @@
-import basencode, json, math, random, re, requests, string
+import basencode, json, math, re
+from bs4 import BeautifulSoup
+from curl_cffi import requests
 from datetime import datetime
-from urllib.parse import quote_plus, unquote, urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss, twitter_api
+from feedhandlers import rss
 
 import logging
 
@@ -329,20 +331,17 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
     j = tweet_json['display_text_range'][1]
     if j > 0 and i < j and (text_html[i:j][-1] == '…' or (text_html[i:j][-1] == ' ' and text_html[i:j][-2] == '…')):
         logger.warning('truncated text - getting tweet detail from api')
-        tweet_detail = twitter_api.get_tweet_detail(tweet_json['id_str'], None)
+        tweet_detail = get_tweet_result_by_api('https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_json['id_str']))
         if tweet_detail:
             utils.write_file(tweet_detail, './debug/tweet.json')
             try:
-                for instruction in tweet_detail['data']['threaded_conversation_with_injections_v2']['instructions']:
-                    if instruction['type'] == 'TimelineAddEntries':
-                        for entry in instruction['entries']:
-                            if entry['entryId'] == 'tweet-' + tweet_json['id_str']:
-                                text_html = entry['content']['itemContent']['tweet_results']['result']['note_tweet']['note_tweet_results']['result']['text']
-                                entities = entry['content']['itemContent']['tweet_results']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
-                                break
+                text_html = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['text']
+                entities = tweet_detail['data']['tweetResult']['result']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
             except:
                 logger.warning('failed to get full text')
                 pass
+        else:
+            logger.warning('failed to get full text')
 
     def replace_entity(matchobj):
         if matchobj.group(1) == '@':
@@ -564,7 +563,6 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = tweet_json['text']
 
-    has_parent = ''
     tweet_thread = []
     if tweet_json.get('parent'):
         parent = get_tweet_json(tweet_json['parent']['id_str'])
@@ -575,11 +573,29 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 parent = None
         for parent in tweet_thread:
-            content_html += make_tweet(parent, item['url'], is_parent=True, has_parent=has_parent)
-            has_parent = True
-    tweet_thread.append(tweet_json)
+            content_html += make_tweet(parent, item['url'], is_parent=True, has_parent=True)
 
-    content_html += make_tweet(tweet_json, item['url'], has_parent=has_parent)
+    # tweet_thread.append(tweet_json)
+    content_html += make_tweet(tweet_json, item['url'], has_parent=False)
+
+    # Check threadreader to see if there are any "reply" tweets (we should have a all previous "parent" tweets in the thread)
+    if 'threadreader' not in args:
+        tr_json = utils.get_url_json('https://threadreaderapp.com/api/v0/ping/{}.json'.format(tweet_json['id_str']))
+        if tr_json and tr_json['code'] == 200:
+            logger.debug('Getting tweet thread')
+            tr_html = utils.get_url_html('https://threadreaderapp.com/thread/{}.html'.format(tweet_json['id_str']))
+            if tr_html:
+                soup = BeautifulSoup(tr_html, 'lxml')
+                threads = soup.find_all(class_='content-tweet', attrs={"data-tweet": True})
+                if threads:
+                    skip_thread = True
+                    for thread in threads:
+                        if not skip_thread:
+                            thread_json = get_tweet_json(thread['data-tweet'])
+                            content_html += make_tweet(thread_json, item['url'], is_reply=2, has_parent=True)
+                        if thread['data-tweet'] == tweet_id:
+                            skip_thread = False
+
     content_html += '</table><div>&nbsp;</div>'
     item['content_html'] = content_html
     return item
@@ -594,4 +610,54 @@ def get_feed(url, args, site_json, save_debug=False):
         feed_url = 'https://rsshub.app/twitter/user/' + paths[0]
         logger.debug('getting twitter feed from ' + feed_url)
         return rss.get_feed(feed_url, args, site_json, save_debug, get_content)
+    return None
+
+
+def get_tweet_result_by_api(tweet_url):
+    print(tweet_url)
+    auth_token = ''
+    guest_token = ''
+    r = requests.get(tweet_url, impersonate='chrome116')
+    if r and r.status_code == 200:
+        soup = BeautifulSoup(r.text, 'lxml')
+        el = soup.find('script', attrs={"src": re.compile(r'/client-web/main\.')})
+        if el:
+            r = requests.get(el['src'], impersonate='chrome116')
+            if r and r.status_code == 200:
+                m = re.search(r'Bearer [^"]+', r.text)
+                if m:
+                    auth_token = m.group(0)
+        el = soup.find('script', string=re.compile(r'document.cookie'))
+        if el:
+            m = re.search(r'gt=(\d+)', el.string)
+            if m:
+                guest_token = m.group(1)
+    if not (auth_token and guest_token):
+        logger.warning('unable to determine auth and guest tokens for ' + tweet_url)
+        return None
+
+    tweet_id = tweet_url.split('/')[-1]
+    api_url = "https://api.twitter.com/graphql/7xflPyRiUxGVbJd4uWmbfg/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22{}%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Afalse%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_media_interstitial_enabled%22%3Afalse%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Atrue%2C%22withArticlePlainText%22%3Afalse%7D".format(tweet_id)
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "authorization": auth_token,
+        "content-type": "application/json",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "x-guest-token": guest_token,
+        "x-twitter-active-user": "yes",
+        "x-twitter-client-language": "en"
+    }
+    # Doesn't seem necessary
+    # "x-client-transaction-id": "9njOPRLhAiGpjkMdcR7SAp8neLST6j0oBB6BCIc7IvuA9ys193IfDL2zInnPSdegE7xJJvc/D3hHbzc+/8AABEUuMB8B9Q",
+    # print(auth_token, guest_token)
+    # print(api_url)
+    r = requests.get(api_url, headers=headers, impersonate='chrome116')
+    if r and r.status_code == 200:
+        return r.json()
     return None

@@ -362,7 +362,7 @@ def process_content_element(element, url, site_json, save_debug):
             logger.warning('unhandled custom_embed ' + element['subtype'])
 
     elif element['type'] == 'divider':
-        element_html += '<hr />'
+        element_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
 
     elif element['type'] == 'correction':
         element_html += '<blockquote><b>{}</b><br>{}</blockquote>'.format(element['correction_type'].upper(),element['text'])
@@ -536,7 +536,7 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += utils.add_embed(links[-1]['href'])
 
     elif element['type'] == 'reference':
-        print(element)
+        # print(element)
         if element.get('referent') and element['referent'].get('id'):
             if element['referent']['type'] == 'image':
                 captions = []
@@ -545,7 +545,11 @@ def process_content_element(element, url, site_json, save_debug):
                 if element['referent']['referent_properties'].get('vanity_credits') and element['referent']['referent_properties']['vanity_credits'].get('by'):
                     for it in element['referent']['referent_properties']['vanity_credits']['by']:
                         captions.append(it['name'])
-                img_src = '{}{}.jpg'.format(site_json['referent_image_path'], element['referent']['id'])
+                img_src = site_json['referent_image_path'] + element['referent']['id']
+                if utils.url_exists(img_src + '.jpg'):
+                    img_src += '.jpg'
+                else:
+                    img_src += '.png'
                 if element['referent'].get('auth'):
                     img_src += '?auth=' + element['referent']['auth']['1']
                 element_html += utils.add_image(img_src, ' | '.join(captions))
