@@ -50,7 +50,7 @@ def get_next_data(url, site_json):
         else:
             path = split_url.path
     path += '.json'
-    next_url = 'https://assets.onebauer.media/_next/data/{}/{}{}'.format(site_json['buildId'], site_json['site'], path)
+    next_url = 'https://{}/_next/data/{}/en-US/{}{}'.format(split_url.netloc, site_json['buildId'], site_json['site'], path)
     # print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:

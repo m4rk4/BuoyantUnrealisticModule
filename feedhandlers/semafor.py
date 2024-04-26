@@ -140,6 +140,11 @@ def render_block(block):
         if image:
             content_html += add_image(image)
 
+    elif block['_type'] == 'imageContentsBlock':
+        content_html += add_image(block['photo'])
+        for child in block['contents']:
+            content_html += render_block(child)
+
     elif block['_type'] == 'insetImageSlideshow':
         for image in block['slideshowImages']:
             content_html += add_image(image)

@@ -45,6 +45,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['summary'] = article_json['summary']
 
     item['content_html'] = article_json['richText'].replace('{&nbsp;}', '&nbsp;')
+    item['content_html'] = re.sub(r'\{h2\}(MORE|ALSO) \| \{a .*?\{/h2\}', '', item['content_html'])
     item['content_html'] = re.sub(r'{(/?(a|blockquote|em|h\d|li|p|strong|ul))}', r'<\1>', item['content_html'])
     item['content_html'] = item['content_html'].replace('<blockquote>', '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">')
     item['content_html'] = re.sub(r'{(br|hr)}', r'<\1/>', item['content_html'])
@@ -58,6 +59,7 @@ def get_content(url, args, site_json, save_debug=False):
             embed_type = m.group(1)
             if embed_type == 'image':
                 m = re.search(r'data-externalid="([^"]+)"', matchobj.group(0))
+                print(m.group(0))
                 if m:
                     image = next((it for it in article_json['images'] if it.get('externalId') == m.group(1)), None)
                     if image:
@@ -115,7 +117,7 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unhandled sd-embed type ' + embed_type)
         return matchobj.group(0)
 
-    item['content_html'] = re.sub(r'{sd-embed [^}]+}{/sd-embed}', sub_embeds, item['content_html'])
+    item['content_html'] = re.sub(r'{sd-embed [^}]+}(<="" sd-embed="">)?{/sd-embed}', sub_embeds, item['content_html'])
 
     if article_json.get('heroImage'):
         img_src = '{}{}'.format(base_url, article_json['heroImage']['image']['originalUrl'])

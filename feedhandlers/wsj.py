@@ -1,10 +1,10 @@
-import base64, js2py, json, pytz, re
+import base64, certifi, js2py, json, math, pytz, random, re, requests, time
 from bs4 import BeautifulSoup
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from datetime import datetime
 from markdown2 import markdown
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from urllib.parse import parse_qs, quote, quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -422,6 +422,168 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     return decode_b64(b64_content)
 
 
+def get_datadome_cookie():
+    # https://github.com/gravilk/datadome-documented/blob/main/main.py
+    website = 'https://www.barrons.com'
+    datadome_id = 'D428D51E28968797BC27FB9153435D'
+
+    data = {
+        "opts": "ajaxListenerPath",
+        "ttst": random.randint(200, 300) + random.uniform(0, 1),
+        "ifov": False,
+        "tagpu": 12.464481108548958,
+        "glvd": "",
+        "glrd": "",
+        "hc": 12,
+        "br_oh": 1002,
+        "br_ow": 1784,
+        "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+        "wbd": False,
+        "wdif": False,
+        "wdifrm": False,
+        "npmtm": False,
+        "br_h": 811,
+        "br_w": 1706,
+        "nddc": 0,
+        "rs_h": 1440,
+        "rs_w": 2560,
+        "rs_cd": 24,
+        "phe": False,
+        "nm": False,
+        "jsf": False,
+        "lg": "en-US",
+        "pr": 1,
+        "ars_h": 1386,
+        "ars_w": 2560,
+        "tz": -120,
+        "str_ss": True,
+        "str_ls": True,
+        "str_idb": True,
+        "str_odb": True,
+        "plgod": False,
+        "plg": 5,
+        "plgne": True,
+        "plgre": True,
+        "plgof": False,
+        "plggt": False,
+        "pltod": False,
+        "hcovdr": False,
+        "hcovdr2": False,
+        "plovdr": False,
+        "plovdr2": False,
+        "ftsovdr": False,
+        "ftsovdr2": False,
+        "lb": False,
+        "eva": 33,
+        "lo": False,
+        "ts_mtp": 0,
+        "ts_tec": False,
+        "ts_tsa": False,
+        "vnd": "Google Inc.",
+        "bid": "NA",
+        "mmt": "application/pdf,text/pdf",
+        "plu": "PDF Viewer,Chrome PDF Viewer,Chromium PDF Viewer,Microsoft Edge PDF Viewer,WebKit built-in PDF",
+        "hdn": False,
+        "awe": False,
+        "geb": False,
+        "dat": False,
+        "med": "defined",
+        "aco": "probably",
+        "acots": False,
+        "acmp": "probably",
+        "acmpts": True,
+        "acw": "probably",
+        "acwts": False,
+        "acma": "maybe",
+        "acmats": False,
+        "acaa": "probably",
+        "acaats": True,
+        "ac3": "",
+        "ac3ts": False,
+        "acf": "probably",
+        "acfts": False,
+        "acmp4": "maybe",
+        "acmp4ts": False,
+        "acmp3": "probably",
+        "acmp3ts": False,
+        "acwm": "maybe",
+        "acwmts": False,
+        "ocpt": False,
+        "vco": "NA",
+        "vch": "NA",
+        "vcw": "NA",
+        "vc3": "NA",
+        "vcmp": "NA",
+        "vcq": "NA",
+        "vc1": "NA",
+        "vcots": "NA",
+        "vchts": "NA",
+        "vcwts": "NA",
+        "vc3ts": "NA",
+        "vcmpts": "NA",
+        "vcqts": "NA",
+        "vc1ts": "NA",
+        "dvm": 8,
+        "sqt": False,
+        "so": "landscape-primary",
+        "wdw": True,
+        "cokys": "bG9hZFRpbWVzY3NpYXBwL=",
+        "ecpc": False,
+        "lgs": True,
+        "lgsod": False,
+        "psn": True,
+        "edp": True,
+        "addt": True,
+        "wsdc": True,
+        "ccsr": True,
+        "nuad": True,
+        "bcda": False,
+        "idn": True,
+        "capi": False,
+        "svde": False,
+        "vpbq": True,
+        "ucdv": False,
+        "spwn": False,
+        "emt": False,
+        "bfr": False,
+        "dbov": False,
+        "prm": True,
+        "tzp": "US/Eastern",
+        "cvs": True,
+        "usb": "defined",
+        "jset": math.floor(time.time())
+    }
+
+    final_data = {
+        "jsData": json.dumps(data),
+        "eventCounters": [],
+        "cid": "null",
+        "ddk": datadome_id,
+        "Referer": quote(f"{website}/", safe=''),
+        "request": "%2F",
+        "responsePage": "origin",
+        "ddv": "4.10.2"
+    }
+
+    headers = {
+        "origin": website,
+        "referer": f"{website}/",
+        "sec-ch-ua": '"Chromium";v="111", "Not(A:Brand";v="8"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Linux"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+    }
+
+    r = requests.post("https://api-js.datadome.co/js/", data=final_data, headers=headers, verify=certifi.where())
+    if r and r.status_code == 200:
+        dd = r.json()
+        return dd['cookie']
+    return ''
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     path = re.sub(r'\.html', '', split_url.path, flags=re.I)
@@ -595,16 +757,24 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
         return item
 
+    if site_json['datadome'] == '':
+        site_json['datadome'] = get_datadome_cookie()
+        utils.update_sites(url, site_json)
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "accept-language": "en-US,en;q=0.9",
         "cache-control": "no-cache",
-        "cookie": "datadome=" + config.wsj_datadome,
+        "cookie": site_json['datadome'],
         "pragma": "no-cache",
         "upgrade-insecure-requests": "1"
     }
     api_url = site_json['articles_api'] + paths[-1]
     api_json = utils.get_url_json(api_url, headers=headers)
+    if not api_json:
+        site_json['datadome'] = get_datadome_cookie()
+        utils.update_sites(url, site_json)
+        headers['cookie'] = site_json['datadome']
+        api_json = utils.get_url_json(api_url, headers=headers)
     if not api_json:
         page_html = utils.get_url_html(url)
         if not page_html:
@@ -619,6 +789,7 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(api_json, './debug/debug.json')
 
     article_json = api_json['articleData']['attributes']
+    # article_json = api_json['articleData']
 
     item = {}
     # item['id'] = api_json['id']
@@ -628,11 +799,11 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = article_json['source_url']
     item['title'] = article_json['headline']['text']
 
-    dt = datetime.fromisoformat(article_json['published_datetime_utc'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['published_datetime_utc'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['updated_datetime_utc'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['updated_datetime_utc'])
     item['date_published'] = dt.isoformat()
 
     item['author'] = {}
@@ -642,30 +813,39 @@ def get_content(url, args, site_json, save_debug=False):
             authors.append(it['text'])
     elif article_json.get('byline'):
         for it in article_json['byline']:
-            text = re.sub(r'^By\s*', '', it['text'])
-            if text:
-                authors.append(text)
+            if it.get('type'):
+                authors.append(it['text'])
     if authors:
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
     else:
         item['author']['name'] = article_json['publisher']
 
     item['tags'] = []
+    item['tags'].append(article_json['section_name'])
+    item['tags'].append(article_json['section_type'])
     if article_json.get('keywords'):
-        item['tags'] = article_json['keywords'].copy()
-    for it in api_json['articleMeta']['properties']:
-        if it.get('type') and it['type'] == 'code':
-            if it['codeType'] != 'author' and it['codeType'] != 'seo-path':
-                if it.get('properties') and it['properties'].get('name'):
-                    if it['properties']['name'] not in item['tags']:
-                        item['tags'].append(it['properties']['name'])
+        item['tags'] += article_json['keywords'].copy()
+    if api_json.get('articleMeta') and api_json['articleMeta'].get('properties'):
+        for it in api_json['articleMeta']['properties']:
+            if it.get('type') and it['type'] == 'code':
+                if it['codeType'] != 'author' and it['codeType'] != 'seo-path':
+                    if it.get('properties') and it['properties'].get('name'):
+                        if it['properties']['name'] not in item['tags']:
+                            item['tags'].append(it['properties']['name'])
+    if item.get('tags'):
+        # Remove duplicates (case-insensitive)
+        item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
+    else:
+        del item['tags']
 
-    if api_json.get('articleToolsProps') and api_json['articleToolsProps'].get('summary'):
+    if article_json.get('summary') and article_json['summary'].get('content'):
+        item['summary'] = render_contents(article_json['summary']['content'], split_url.netloc)
+    elif article_json.get('standFirst') and article_json['standFirst'].get('content'):
+        item['summary'] = render_contents(article_json['standFirst']['content'], split_url.netloc)
+    elif api_json.get('articleToolsProps') and api_json['articleToolsProps'].get('summary'):
         item['summary'] = api_json['articleToolsProps']['summary']
     elif api_json.get('snippet'):
         item['summary'] = render_contents(api_json['snippet'], split_url.netloc)
-    elif article_json.get('summary') and article_json['summary'].get('content'):
-        item['summary'] = render_contents(article_json['summary']['content'], split_url.netloc)
 
     item['content_html'] = ''
     if article_json.get('standfirst') and article_json['standfirst'].get('content'):

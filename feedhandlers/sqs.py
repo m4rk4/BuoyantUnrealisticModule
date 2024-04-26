@@ -69,15 +69,23 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         soup = BeautifulSoup(post_json['body'], 'html.parser')
 
-    if site_json.get('decompose'):
+    if save_debug:
+        utils.write_file(str(soup), './debug/debug.html')
+
+    if site_json and site_json.get('decompose'):
         for it in site_json['decompose']:
-            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, soup):
                 el.decompose()
 
-    if site_json.get('unwrap'):
+    if site_json and site_json.get('unwrap'):
         for it in site_json['unwrap']:
-            for el in soup.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, soup):
                 el.unwrap()
+
+    if site_json and site_json.get('rename'):
+        for it in site_json['rename']:
+            for el in utils.get_soup_elements(it, soup):
+                el.name = it['name']
 
     for el in soup.find_all(['h2', 'h3', 'h4', 'p', 'ol', 'ul']):
         el.attrs = {}
@@ -219,6 +227,8 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-button' in block['class']:
             el = block.find(class_='sqs-block-button-container')
             if el:
+                if re.search(r'Share on (Facebook|Twitter)', el.get_text(), flags=re.I):
+                    continue
                 style = 'width:80%; margin-right:auto; margin-left:auto; padding:8px; border-style:solid; background-color:grey; font-size:1.2em; weight:bold;'
                 if el['data-alignment'] == 'center':
                     style += ' text-align:center;'

@@ -4,6 +4,7 @@ from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import utils
+from feedhandlers import rss
 
 import logging
 
@@ -22,6 +23,7 @@ def get_content(url, args, site_json, save_debug=False):
     article_json = None
     if re.search(r'\d', post_id):
         api_url = 'https://{}/api/properties/{}/posts?ids={}&limit=1&withBody=true'.format(split_url.netloc, site_json['site_property'], post_id)
+        # print(api_url)
         api_json = utils.get_url_json(api_url)
         if api_json and api_json.get('data') and api_json['data'].get('articles'):
             article_json = api_json['data']['articles'][0]
@@ -52,7 +54,7 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         item['url'] = url
 
-    item['title'] = article_json['title']
+    item['title'] = article_json['title'].encode('iso-8859-1').decode('utf-8')
 
     if article_json.get('createdAtISO'):
         dt = datetime.fromisoformat(article_json['createdAtISO'])
@@ -87,10 +89,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['tags'] = article_json['tags'].copy()
 
-    item['content_html'] = ''
     if article_json.get('seoDescription'):
         item['summary'] = article_json['seoDescription']
-        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+
+    item['content_html'] = ''
+    if article_json.get('intro'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['intro'].encode('iso-8859-1').decode('utf-8'))
 
     if article_json.get('cover')  and article_json['cover'].get('image'):
         if article_json['cover']['image'].get('path'):
@@ -112,9 +116,9 @@ def get_content(url, args, site_json, save_debug=False):
     for content in article_json['body']:
         if content['type'] == 'inline-text':
             if content.get('value'):
-                item['content_html'] += content['value']['html']
+                item['content_html'] += content['value']['html'].encode('iso-8859-1').decode('utf-8')
             elif content.get('html'):
-                item['content_html'] += content['html']
+                item['content_html'] += content['html'].encode('iso-8859-1').decode('utf-8')
         elif content['type'] == 'image':
             captions = []
             if content['image'].get('caption'):
@@ -204,7 +208,20 @@ def get_content(url, args, site_json, save_debug=False):
                     logger.warning('unhandled mm-content-embed data-type {} in {}'.format(embed_soup.blockquote['data-type'], item['url']))
             else:
                 logger.warning('unhandled mm-content-embed in ' + item['url'])
-        elif content['type'] == 'relatedTopics':
+        elif content['type'] == 'table':
+            item['content_html'] += '<table style="width:100%; border-collapse:collapse;">'
+            for i, tr in enumerate(content['data']):
+                if i % 2 == 0:
+                    item['content_html'] += '<tr style="line-height:2em; border-bottom:1pt solid black; background-color:#ccc;">'
+                else:
+                    item['content_html'] += '<tr style="line-height:2em; border-bottom:1pt solid black;">'
+                for td in tr:
+                    item['content_html'] += '<td style="padding:0 8px 0 8px;">' + re.sub(r'^<p>(.*?)</p>$', r'\1', td.strip().encode('iso-8859-1').decode('utf-8')) + '</td>'
+                item['content_html'] += '</tr>'
+            item['content_html'] += '</table>'
+        elif content['type'] == 'divider':
+            item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+        elif content['type'] == 'relatedTopics' or content['type'] == 'table-of-contents':
             continue
         else:
             logger.warning('unhandled body content type {} in {}'.format(content['type'], item['url']))
@@ -213,6 +230,9 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    if url.endswith('.rss'):
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
+
     page_html = utils.get_url_html(url)
     if not page_html:
         return None

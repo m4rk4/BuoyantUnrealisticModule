@@ -331,7 +331,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         item['tags'].append(it.get_text().strip())
         elif article_json and article_json.get('keywords'):
             if isinstance(article_json['keywords'], list):
-                item['tags'] = article_json['keywords'].copy()
+                for it in article_json['keywords']:
+                    if isinstance(it, str):
+                        item['tags'].append(it)
+                    elif isinstance(it, list):
+                        item['tags'] += it.copy()
             elif isinstance(article_json['keywords'], str):
                 # Split & remove whitespace: https://stackoverflow.com/questions/4071396/split-by-comma-and-strip-whitespace-in-python
                 item['tags'] = list(map(str.strip, article_json['keywords'].split(',')))

@@ -704,7 +704,7 @@ def get_content(url, args, site_json, save_debug=False):
                     el.insert(0, BeautifulSoup(source, 'html.parser'))
                     source = ''
                 continue
-            elif 'image' in el['class'] or 'image_inline-small' in el['class']:
+            elif 'image' in el['class'] or 'image_large' in el['class'] or 'image_inline-small' in el['class']:
                 captions = []
                 it = el.find(class_=re.compile(r'^image_.*_credit$'))
                 if it and it.get_text().strip():
@@ -794,6 +794,10 @@ def get_content(url, args, site_json, save_debug=False):
                 if it:
                     new_html = utils.add_embed(it['src'])
                 else:
+                    it = el.find('blockquote', class_='tiktok-embed')
+                    if it:
+                        new_html = utils.add_embed(it['cite'])
+                if not new_html:
                     it = el.find(attrs={"data-type": "dailygraphics"})
                     if it:
                         new_html = utils.add_image('{}/screenshot?url={}&locator=%23root'.format(config.server, quote_plus(it['data-url'])), link=it['data-url'])

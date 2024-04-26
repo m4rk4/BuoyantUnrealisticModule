@@ -1,4 +1,5 @@
-import html
+import html, re
+from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
@@ -57,8 +58,26 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] += '<p>{}</p>'.format(post_json['title'])
 
     if post_json.get('is_self') and post_json.get('selftext_html'):
-        item['content_html'] += html.unescape(post_json['selftext_html'])
-
+        content_html = html.unescape(post_json['selftext_html'])
+        if post_json.get('media_metadata'):
+            soup = BeautifulSoup(content_html, 'html.parser')
+            for media in post_json['media_metadata'].values():
+                if media['e'] == 'Image':
+                    el = soup.find('a', attrs={"href": re.compile(media['id'])})
+                    if el:
+                        img = utils.closest_dict(media['p'], 'x', 640)
+                        img_src = img['u'].replace('&amp;', '&')
+                        new_el = BeautifulSoup(utils.add_image(img_src, width='480px', link=media['s']['u']), 'html.parser')
+                        if el.parent and el.parent.name == 'p':
+                            el.parent.replace_with(new_el)
+                        else:
+                            el.replace_with(new_el)
+                    else:
+                        logger.warning('unable to find link for media id {} in {}'.format(media['id'], url))
+                else:
+                    logger.warning('unhandled media type {} in {}'.format(media['e'], url))
+            content_html = str(soup)
+        item['content_html'] += content_html
     elif post_json.get('is_video'):
         if post_json['domain'] == 'v.redd.it':
             item['_video'] = post_json['url_overridden_by_dest'] + '/DASH_480.mp4'
@@ -82,7 +101,7 @@ def get_content(url, args, site_json, save_debug=False):
         for it in post_json['gallery_data']['items']:
             media = post_json['media_metadata'][it['media_id']]
             if media['e'] == 'Image':
-                img = utils.closest_dict(media['p'], 'x', 480)
+                img = utils.closest_dict(media['p'], 'x', 640)
                 img_src = img['u'].replace('&amp;', '&')
                 item['content_html'] += utils.add_image(img_src, width='480px')
                 if not item.get('_image'):

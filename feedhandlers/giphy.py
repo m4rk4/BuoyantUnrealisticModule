@@ -16,12 +16,16 @@ def get_image(img_src):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    m = re.search(r'^/(embed|gifs|media)/([^/]+)', split_url.path)
-    if not m:
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if not (paths[0] == 'embed' or paths[0] == 'gifs' or paths[0] == 'media'):
         logger.warning('unsupported giphy url ' + url)
         return None
 
-    giphy_html = utils.get_url_html('https://giphy.com/gifs/' + m.group(2))
+    giphy_html = ''
+    for path in paths[1:]:
+        giphy_html = utils.get_url_html('https://giphy.com/gifs/' + path)
+        if giphy_html:
+            break
     if not giphy_html:
         return None
     if save_debug:
@@ -65,6 +69,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['tags'] = giphy_json['tags'].copy()
 
     item['_image'] = get_image(giphy_json['images']['original_still']['url'])
+    item['_gif'] = get_image(giphy_json['images']['original']['url'])
 
     caption = '{} | <a href="{}">Watch on Giphy</a>'.format(giphy_json['title'], giphy_json['url'])
     if args:

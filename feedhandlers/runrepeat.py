@@ -141,7 +141,7 @@ def add_comparison(product_ids, best_text=[]):
         content_html += '<th style="text-align:center; vertical-align:top; padding:8px 8px 0 8px; border:1px solid black;"><img src="{}"/><br/><a href="https://runrepeat.com/{}">{}</a></th>'.format(it['image']['url'].replace('{SIZE}', '250'), it['slug'], it['name'])
     content_html += '</tr>'
     if best_text:
-        content_html += '<tr style="line-height:2em;"><td style="white-space:nowrap; padding:0 8px 0 8px; border:1px solid black;"">Best</td>'
+        content_html += '<tr style="line-height:2em;"><td style="white-space:nowrap; padding:0 8px 0 8px; border:1px solid black;">Best</td>'
         for it in best_text:
             content_html += '<td style="white-space:nowrap; text-align:center; padding:0 8px 0 8px; border:1px solid black;"><b>{}</b></td>'.format(it)
         content_html += '</tr>'
@@ -161,7 +161,7 @@ def add_comparison(product_ids, best_text=[]):
         if row % 2 == 0:
             content_html += '<tr style="line-height:2em; background-color:#ccc;"><td style="white-space:nowrap; padding:0 8px 0 8px; border:1px solid black;">{}</td>'.format(name)
         else:
-            content_html += '<tr style="line-height:2em;"><td style="white-space:nowrap; padding:0 8px 0 8px; border:1px solid black;"">{}</td>'.format(name)
+            content_html += '<tr style="line-height:2em;"><td style="white-space:nowrap; padding:0 8px 0 8px; border:1px solid black;">{}</td>'.format(name)
         row += 1
         for i in range(n):
             if val['slug'] == 'corescore':

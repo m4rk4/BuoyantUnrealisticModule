@@ -1,10 +1,8 @@
-import json, re, requests
+import re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, unquote_plus, urlsplit
+from urllib.parse import urlsplit
 
-import config
-from feedhandlers import rss
 import utils
 
 import logging

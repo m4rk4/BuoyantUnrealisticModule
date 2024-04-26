@@ -1,10 +1,9 @@
-import html, json, pytz, re
-from bs4 import BeautifulSoup
+import re
+from bs4 import BeautifulSoup, Comment
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import config, utils
-from feedhandlers import rss, wp_posts
+import utils
+from feedhandlers import rss
 
 import logging
 
@@ -91,12 +90,12 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     if site_json and site_json.get('decompose'):
         for it in site_json['decompose']:
-            for el in content.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, content):
                 el.decompose()
 
     if site_json and site_json.get('unwrap'):
         for it in site_json['unwrap']:
-            for el in content.find_all(it['tag'], attrs=it['attrs']):
+            for el in utils.get_soup_elements(it, content):
                 el.unwrap()
 
     it = content.find(id=re.compile(r'docs-internal-guid'))
@@ -221,6 +220,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     for el in content.find_all(['script', 'style']):
         el.decompose()
+
+    for el in content.find_all(text=lambda text: isinstance(text, Comment)):
+        el.extract()
 
     item['content_html'] = content.decode_contents()
     return item

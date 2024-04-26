@@ -443,6 +443,10 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
             authors.append(wp_post['meta']['byline'])
             return authors
 
+        if not authors and wp_post.get('meta') and wp_post['meta'].get('extracredits'):
+            authors.append(wp_post['meta']['extracredits'])
+            return authors
+
         if not authors and wp_post.get('metadata') and wp_post['metadata'].get('author'):
             return wp_post['metadata']['author'].copy()
 
@@ -2929,7 +2933,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled infogram-embed in ' + item['url'])
 
-    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'list-gallery', 'm-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout', 'rslides', 'banner-grid-wrapper', 'slider-wrapper']):
+    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'list-gallery', 'carousel-basic', 'm-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout', 'rslides', 'banner-grid-wrapper', 'slider-wrapper']):
         if set(['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery']).intersection(el['class']):
             images = None
             if el.find('ul', class_='gallery-wrap'):
@@ -2962,6 +2966,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         elif 'list-gallery' in el['class']:
             images = el.find_all(class_='ami-gallery-item')
             add_caption = True
+        elif 'carousel-basic' in el['class']:
+            # https://whyy.org/?p=644617
+            images = el.find_all(class_='carousel-cell')
+            add_caption = False
         elif 'm-carousel' in el['class']:
             # https://www.digitaltrends.com/mobile/oneplus-11-review/
             images = el.find_all('figure', class_='m-carousel--content')

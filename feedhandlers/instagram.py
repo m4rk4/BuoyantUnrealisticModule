@@ -598,6 +598,9 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
                 m = re.search(r'"BarcelonaPostPage__data".*?id:"(\d+)"', r.text)
                 if m:
                     post_doc_id = m.group(1)
+                m = re.search(r'id:"(\d+)",metadata:\{\},name:"BarcelonaProfilePageQuery"', r.text)
+                if m:
+                    profile_doc_id = m.group(1)
             m = re.search(r'a="(\d+)";f\.ASBD_ID=a', r.text)
             if m:
                 asbd_id = m.group(1)
@@ -746,49 +749,84 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
             post_data = r.json()
             if save_debug:
                 utils.write_file(post_data, './debug/instagram.json')
+            if post_data.get('errors'):
+                logger.warning('Error: {}. {}'.format(post_data['errors']['message'], post_data['description']['__html']))
+                post_data = None
         except:
             logger.warning('error converting {} to json: {}'.format(req_friendly_name, r.text))
     else:
         logger.warning('status code {} getting {}'.format(req_friendly_name, r.status_code))
 
     if post_data and get_profile_posts:
-        gql_url = 'https://www.instagram.com/graphql/query/?doc_id={}&variables=%7B%22id%22%3A%22{}%22%2C%22first%22%3A12%7D'.format(profile_doc_id, owner_id)
-        gql_headers = {
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "cookie": '; '.join(['{}={}'.format(k, v) for k, v in gql_cookies.items()]),
-            "dpr": "1",
-            "sec-ch-prefers-color-scheme": "light",
-            "sec-ch-ua": "\"Microsoft Edge\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
-            "sec-ch-ua-full-version-list": "\"Microsoft Edge\";v=\"123.0.2420.81\", \"Not:A-Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"123.0.6312.106\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-model": "\"\"",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "sec-ch-ua-platform-version": "\"15.0.0\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "viewport-width": "1113",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
-            "x-asbd-id": asbd_id,
-            "x-csrftoken": csrf_token,
-            "x-ig-app-id": config_defaults['customHeaders']['X-IG-App-ID'],
-            "x-ig-www-claim": "0",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        print(gql_url)
-        print(json.dumps(gql_headers, indent=4))
-        # r = requests.get(gql_url, headers=gql_headers, proxies=config.proxies)
-        r = s.get(gql_url, headers=gql_headers, proxies=config.proxies)
-        if r.status_code == 200:
-            try:
-                profile_data = r.json()
-                if save_debug:
-                    utils.write_file(profile_data, './debug/ig_profile.json')
-            except:
-                logger.warning('error converting profile query to json: ' + r.text)
-        else:
-            logger.warning('status code {} getting profile query'.format(r.status_code))
+        if 'instagram.com' in url:
+            gql_url = 'https://www.instagram.com/graphql/query/?doc_id={}&variables=%7B%22id%22%3A%22{}%22%2C%22first%22%3A12%7D'.format(profile_doc_id, owner_id)
+            gql_headers = {
+                "accept": "*/*",
+                "accept-language": "en-US,en;q=0.9",
+                "cookie": '; '.join(['{}={}'.format(k, v) for k, v in gql_cookies.items()]),
+                "dpr": "1",
+                "sec-ch-prefers-color-scheme": "light",
+                "sec-ch-ua": "\"Microsoft Edge\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
+                "sec-ch-ua-full-version-list": "\"Microsoft Edge\";v=\"123.0.2420.81\", \"Not:A-Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"123.0.6312.106\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-model": "\"\"",
+                "sec-ch-ua-platform": "\"Windows\"",
+                "sec-ch-ua-platform-version": "\"15.0.0\"",
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "viewport-width": "1113",
+                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
+                "x-asbd-id": asbd_id,
+                "x-csrftoken": csrf_token,
+                "x-ig-app-id": config_defaults['customHeaders']['X-IG-App-ID'],
+                "x-ig-www-claim": "0",
+                "x-requested-with": "XMLHttpRequest"
+            }
+            # print(gql_url)
+            # print(json.dumps(gql_headers, indent=4))
+            # r = requests.get(gql_url, headers=gql_headers, proxies=config.proxies)
+            r = s.get(gql_url, headers=gql_headers, proxies=config.proxies)
+            if r.status_code == 200:
+                try:
+                    profile_data = r.json()
+                    if save_debug:
+                        utils.write_file(profile_data, './debug/ig_profile.json')
+                except:
+                    logger.warning('error converting profile query to json: ' + r.text)
+            else:
+                logger.warning('status code {} getting profile query'.format(r.status_code))
+        elif 'threads.net' in url:
+            split_url = urlsplit(url)
+            paths = list(filter(None, split_url.path.split('/')))
+            post_json = None
+            for it in post_data['data']['data']['edges'][0]['node']['thread_items']:
+                if it['post']['code'] == paths[-1]:
+                    post_json = it['post']
+                    break
+            req_friendly_name = 'BarcelonaProfilePageQuery'
+            gql_headers['X-Fb-Friendly-Name'] = req_friendly_name
+            gql_data['fb_api_req_friendly_name'] = req_friendly_name
+            gql_data['doc_id'] = profile_doc_id
+            variables = {
+                "userID": post_json['user']['pk'],
+                "__relay_internal__pv__BarcelonaIsSableEnabledrelayprovider": False,
+                "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": False,
+                "__relay_internal__pv__BarcelonaShouldShowFediverseM075Featuresrelayprovider": False
+            }
+            body = urlencode(gql_data) + '&variables=' + quote_plus(json.dumps(variables, separators=(',', ':')))
+            # print(body)
+            r = s.post(gql_url, data=body, headers=gql_headers, proxies=config.proxies)
+            if r.status_code == 200:
+                try:
+                    profile_data = r.json()
+                    if save_debug:
+                        utils.write_file(profile_data, './debug/profile_data.json')
+                except:
+                    logger.warning('error converting {} to json: {}'.format(req_friendly_name, r.text))
+            else:
+                logger.warning('status code {} getting {}'.format(req_friendly_name, r.status_code))
+
     return post_data, profile_data
 
 
