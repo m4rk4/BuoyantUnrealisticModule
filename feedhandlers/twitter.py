@@ -1,4 +1,4 @@
-import basencode, json, math, re
+import base64, basencode, json, math, random, re
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 from datetime import datetime
@@ -311,7 +311,7 @@ def make_card(card_json, tweet_json):
         img_link = card_link
 
     if card_type == 1:
-        card_html += '<table style="margin:0; padding:0; border:1px solid black; border-radius:10px; border-spacing:0;"><tr>'
+        card_html += '<table style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px; border-spacing:0;"><tr>'
         card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}">{}</a></td>'.format(img_link, img)
         card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(link_text, card_link, title, card_desc)
         card_html += '</tr></table>'
@@ -336,7 +336,7 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
             utils.write_file(tweet_detail, './debug/tweet.json')
             try:
                 text_html = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['text']
-                entities = tweet_detail['data']['tweetResult']['result']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
+                entities = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
             except:
                 logger.warning('failed to get full text')
                 pass
@@ -614,50 +614,85 @@ def get_feed(url, args, site_json, save_debug=False):
 
 
 def get_tweet_result_by_api(tweet_url):
-    print(tweet_url)
-    auth_token = ''
+    logger.debug('get_tweet_result_by_api:' + tweet_url)
+    auth_tokens = None
     guest_token = ''
-    r = requests.get(tweet_url, impersonate='chrome116')
+    r = requests.get(tweet_url, impersonate='chrome116', proxies=config.proxies)
     if r and r.status_code == 200:
         soup = BeautifulSoup(r.text, 'lxml')
         el = soup.find('script', attrs={"src": re.compile(r'/client-web/main\.')})
         if el:
-            r = requests.get(el['src'], impersonate='chrome116')
+            r = requests.get(el['src'], impersonate='chrome116', proxies=config.proxies)
             if r and r.status_code == 200:
-                m = re.search(r'Bearer [^"]+', r.text)
-                if m:
-                    auth_token = m.group(0)
+                auth_tokens = re.findall(r'Bearer [^"]+', r.text)
         el = soup.find('script', string=re.compile(r'document.cookie'))
         if el:
             m = re.search(r'gt=(\d+)', el.string)
             if m:
                 guest_token = m.group(1)
-    if not (auth_token and guest_token):
+    if not (auth_tokens and guest_token):
         logger.warning('unable to determine auth and guest tokens for ' + tweet_url)
         return None
 
+    # x-client-transaction-id doesn't seem necessary
+    # Here's details on reverse engineering: https://antibot.blog/twitter/
+    # https://github.com/obfio/twitter-tid-script-cleaned/blob/main/cleaned.js
+    # https://github.com/laszlovandenhoek/twitter-scraper/blob/7e074a5e409a0501d292404304d0419d5367375f/getbookmarks.py
+    # https://github.com/dimdenGD/OldTwitter/blob/535b762525ceb888003f90aa92dfdcdc10e5a237/scripts/twchallenge.js
+    # random_data = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=70))
+    # transaction_id = base64.urlsafe_b64encode(random_data.encode()).decode().replace('=', '')
+
+    logger.debug('twitter guest token ' + guest_token)
+
     tweet_id = tweet_url.split('/')[-1]
-    api_url = "https://api.twitter.com/graphql/7xflPyRiUxGVbJd4uWmbfg/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22{}%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Afalse%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_media_interstitial_enabled%22%3Afalse%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Atrue%2C%22withArticlePlainText%22%3Afalse%7D".format(tweet_id)
+    api_url = "https://api.twitter.com/graphql/7xflPyRiUxGVbJd4uWmbfg/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22{}%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_media_interstitial_enabled%22%3Atrue%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Atrue%2C%22withArticlePlainText%22%3Afalse%7D".format(tweet_id)
     headers = {
         "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9",
-        "authorization": auth_token,
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "authorization": "",
         "content-type": "application/json",
-        "sec-ch-ua": "\"Microsoft Edge\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
+        "priority": "u=1, i",
+        "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
+        # "x-client-transaction-id": transaction_id,
         "x-guest-token": guest_token,
         "x-twitter-active-user": "yes",
         "x-twitter-client-language": "en"
     }
-    # Doesn't seem necessary
-    # "x-client-transaction-id": "9njOPRLhAiGpjkMdcR7SAp8neLST6j0oBB6BCIc7IvuA9ys193IfDL2zInnPSdegE7xJJvc/D3hHbzc+/8AABEUuMB8B9Q",
-    # print(auth_token, guest_token)
-    # print(api_url)
-    r = requests.get(api_url, headers=headers, impersonate='chrome116')
-    if r and r.status_code == 200:
-        return r.json()
+    for auth_token in reversed(auth_tokens):
+        logger.debug('trying twitter auth_token ' + auth_token)
+        headers['authorization'] = auth_token
+        r = requests.get(api_url, headers=headers, impersonate='chrome116', proxies=config.proxies)
+        if r and r.status_code == 200:
+            return r.json()
+        if r:
+            logger.debug('TweetResultByRestId status code {}'.format(r.status_code))
+        else:
+            logger.debug('TweetResultByRestId failed')
     return None
+
+# https://twitter.com/tracewoodgrains/status/1783701072894193994
+
+# url = "https://api.twitter.com/1.1/onboarding/sso_init.json"
+# headers = {
+#     "accept": "*/*",
+#     "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+#     "authorization": "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
+#     "content-type": "application/json",
+#     "priority": "u=1, i",
+#     "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
+#     "sec-ch-ua-mobile": "?0",
+#     "sec-ch-ua-platform": "\"Windows\"",
+#     "sec-fetch-dest": "empty",
+#     "sec-fetch-mode": "cors",
+#     "sec-fetch-site": "same-site",
+#     "x-client-transaction-id": "ceHMt/cd9On9gzaRO3YfLsH591H/fJ9atbV6hycxmr4XR32l3tnnEbleWT+nR9CavbJyhnBCldKFi1V15EaqeOKnxZJRcg",
+#     "x-guest-token": "1791183215345991843",
+#     "x-twitter-active-user": "yes",
+#     "x-twitter-client-language": "en"
+# }
+# body = {"provider": "apple"}

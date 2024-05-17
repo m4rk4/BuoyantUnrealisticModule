@@ -111,6 +111,9 @@ def get_content(url, args, site_json, save_debug=False):
                     el = soup.find('blockquote', class_='tiktok-embed')
                     if el:
                         return utils.add_embed(el['cite'])
+                    el = soup.find('blockquote', class_='instagram-media')
+                    if el:
+                        return utils.add_embed(el['data-instgrm-permalink'])
                     el = soup.find(class_='tagboard-embed')
                     if el:
                         return utils.add_embed('https://embed.tagboard.com/{}'.format(el['tgb-embed-id']), {"referer": base_url})

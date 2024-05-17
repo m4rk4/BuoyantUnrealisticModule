@@ -54,33 +54,45 @@ def render_content(node, links):
         content_html += '</p>'
 
     elif node['nodeType'] == 'text':
-        if not node.get('marks') and node['value'].startswith('https://'):
-            content_html += utils.add_embed(node['value'])
+        if node['value'].startswith('<iframe'):
+            m = re.search(r'src="([^"]+)"', node['value'])
+            if m:
+                content_html += utils.add_embed(m.group(1))
+            else:
+                logger.warning('unhandled iframe content: ' + node['value'])
         else:
-            start_tags = ''
-            end_tags = ''
-            if node.get('marks'):
-                for mark in node['marks']:
-                    if mark['type'] == 'underline':
-                        start_tags += '<u>'
-                        end_tags = '</u>' + end_tags
-                    elif mark['type'] == 'bold':
-                        start_tags += '<b>'
-                        end_tags = '</b>' + end_tags
-                    elif mark['type'] == 'italic':
-                        start_tags += '<i>'
-                        end_tags = '</i>' + end_tags
-                    else:
-                        logger.warning('unhandle mark type ' + mark['type'])
-            content_html += start_tags + node['value'] + end_tags
+            if not node.get('marks') and node['value'].startswith('https://'):
+                content_html += utils.add_embed(node['value'])
+            else:
+                start_tags = ''
+                end_tags = ''
+                if node.get('marks'):
+                    for mark in node['marks']:
+                        if mark['type'] == 'underline':
+                            start_tags += '<u>'
+                            end_tags = '</u>' + end_tags
+                        elif mark['type'] == 'bold':
+                            start_tags += '<b>'
+                            end_tags = '</b>' + end_tags
+                        elif mark['type'] == 'italic':
+                            start_tags += '<i>'
+                            end_tags = '</i>' + end_tags
+                        else:
+                            logger.warning('unhandle mark type ' + mark['type'])
+                content_html += start_tags + node['value'] + end_tags
 
     elif node['nodeType'].startswith('heading'):
         m = re.search(r'heading-(\d)', node['nodeType'])
-        n = min(3, int(m.group(1)))
-        content_html += '<h{}>'.format(n)
+        n = int(m.group(1))
+        heading = ''
         for content in node['content']:
-            content_html += render_content(content, links)
-        content_html += '</h{}>'.format(n)
+            heading += render_content(content, links)
+        if n == 5 and heading.startswith('“') and heading.endswith('”'):
+            content_html += utils.add_pullquote(heading)
+        elif n == 6 and (heading.startswith('<figure') or heading.startswith('<div')):
+            content_html += heading
+        else:
+            content_html += '<h{0}>{1}</h{0}>'.format(min(3, n), heading)
 
     elif node['nodeType'] == 'hyperlink':
         content_html += '<a href="{}">'.format(node['data']['uri'])
@@ -119,7 +131,7 @@ def render_content(node, links):
         if node['data']['target']['fields'].get('file') and node['data']['target']['fields']['file']['contentType'].startswith('image/'):
             if node['data']['target']['fields'].get('description'):
                 caption = node['data']['target']['fields']['description']
-            elif node['data']['target']['fields'].get('title'):
+            elif node['data']['target']['fields'].get('title') and node['data']['target']['fields']['title'] not in node['data']['target']['fields']['file']['fileName']:
                 caption = node['data']['target']['fields']['title']
             else:
                 caption = ''
@@ -127,8 +139,23 @@ def render_content(node, links):
         else:
             logger.warning('unhandled embedded-asset-block')
 
+    elif node['nodeType'] == 'embedded-entry-inline' and node['data'].get('target'):
+        if node['data']['target']['fields'].get('url'):
+            content_html += '<a href="{}">{}</a>'.format(node['data']['target']['fields']['url'], node['data']['target']['fields']['name'])
+        elif node['data']['target']['fields'].get('shortCode'):
+            content_html += '<a href="https://robinhood.com/us/en/stocks/{}/">{}</a>'.format(node['data']['target']['fields']['shortCode'], node['data']['target']['fields']['name'])
+        else:
+            content_html += node['data']['target']['fields']['name']
+        if node['data']['target']['fields'].get('showLiveData') and node['data']['target']['fields']['showLiveData'] == True and node['data']['target']['fields'].get('shortCode'):
+            data_json = utils.get_url_json('https://sherwood.news/api/public/fetch_instrument/?symbol=' + node['data']['target']['fields']['shortCode'])
+            if data_json:
+                data_json = utils.get_url_json('https://sherwood.news/api/public/fetch_instrument_quote/?instrumentUrl=' + data_json['instrument']['url'])
+                if data_json:
+                    diff = 100 * (float(data_json['quote']['last_trade_price']) - float(data_json['quote']['previous_close'])) / float(data_json['quote']['previous_close'])
+                    content_html += ' <span style="font-size:0.8em; line-height:inherit; padding:3px 5px 1px; border:1px solid rgb(6,187,0); color:green;">{} ${:.2f} ({:.2f}%)</span>'.format(data_json['quote']['symbol'], float(data_json['quote']['last_trade_price']), diff)
+
     elif node['nodeType'] == 'embedded-entry-block':
-        if not re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I):
+        if not (node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I)):
             logger.warning('unhandled embedded-entry-block')
 
     else:

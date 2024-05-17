@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # https://www.mcclatchy.com/our-impact/markets#map
 
 def get_initial_state(url):
-    page_html = utils.get_url_html(url)
+    page_html = utils.get_url_html(url, use_proxy=True, use_curl_cffi=True)
     if not page_html:
         return None
     soup = BeautifulSoup(page_html, 'html.parser')
@@ -59,13 +59,13 @@ def get_content(url, args, site_json, save_debug=False):
         return None
     article_id = m.group(1)
 
-    content_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/content/' + article_id)
+    content_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/content/' + article_id, use_proxy=True, use_curl_cffi=True)
     if not content_json:
         return None
 
     article_json = None
     for section_id in content_json['additional_sections']:
-        section_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/sections/{}/content?limit=75'.format(section_id))
+        section_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/sections/{}/content?limit=75'.format(section_id), use_proxy=True, use_curl_cffi=True)
         if not section_json:
             continue
         article_json = next((it for it in section_json['items'] if it['id'] == article_id), None)
@@ -136,7 +136,7 @@ def get_item(article_json, args, site_json, save_debug):
         elif article_json['lead_media']['asset_type'] == 'videoIngest':
             item['_image'] = article_json['lead_media']['thumbnail']
             if not soup:
-                page_html = utils.get_url_html(item['url'])
+                page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
                 if page_html:
                     soup = BeautifulSoup(page_html, 'html.parser')
             if soup:
@@ -168,7 +168,7 @@ def get_item(article_json, args, site_json, save_debug):
         embeds = None
         asset_html = ''
         asset_url = 'https://publicapi.misitemgr.com/webapi-public/v2/content/{}'.format(asset[1])
-        asset_json = utils.get_url_json(asset_url)
+        asset_json = utils.get_url_json(asset_url, use_proxy=True, use_curl_cffi=True)
         if not asset_json:
             logger.warning('skipping asset {} in {}'.format(asset[1], item['url']))
             continue
@@ -188,7 +188,7 @@ def get_item(article_json, args, site_json, save_debug):
 
         elif asset_json['asset_type'] == 'videoIngest':
             if not soup:
-                page_html = utils.get_url_html(item['url'])
+                page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
                 if page_html:
                     soup = BeautifulSoup(page_html, 'html.parser')
             if soup:
@@ -207,7 +207,7 @@ def get_item(article_json, args, site_json, save_debug):
         elif asset_json['asset_type'] == 'embedInfographic':
             if not embeds:
                 if not soup:
-                    page_html = utils.get_url_html(item['url'])
+                    page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
                     if page_html:
                         soup = BeautifulSoup(page_html, 'html.parser')
                 if soup:
@@ -218,7 +218,7 @@ def get_item(article_json, args, site_json, save_debug):
                 elif embeds[n].blockquote and 'tiktok-embed' in embeds[n].blockquote['class']:
                     asset_html = utils.add_embed(embeds[n].blockquote['cite'])
             n = n + 1
-            if 'NL sign-up' in asset_json['title']:
+            if 'sign-up' in asset_json['title']:
                 continue
 
         elif asset_json['asset_type'] == 'story':
@@ -256,13 +256,13 @@ def get_feed(url, args, site_json, save_debug):
                         if n == int(args['max']):
                             break
     else:
-        page_html = utils.get_url_html(args['url'])
+        page_html = utils.get_url_html(args['url'], use_proxy=True, use_curl_cffi=True)
         if not page_html:
             return None
         m = re.search(r'"sectionId":"(\d+)"', page_html)
         if m:
             split_url = urlsplit(args['url'])
-            section_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/sections/{}/content?limit=20'.format(m.group(1)))
+            section_json = utils.get_url_json('https://publicapi.misitemgr.com/webapi-public/v2/sections/{}/content?limit=20'.format(m.group(1)), use_proxy=True, use_curl_cffi=True)
             if section_json:
                 if save_debug:
                     utils.write_file(section_json, './debug/feed.json')

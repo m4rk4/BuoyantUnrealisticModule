@@ -12,11 +12,7 @@ av = "^12"
 bs4 = "^0"
 feedparser = "^6"
 install-playwright = "^0"
-# https://www.lfd.uci.edu/~gohlke/pythonlibs/#lxml
-lxml = [
-    {path = "lib/lxml-5.1.0-cp311-cp311-win_amd64.whl",  markers = "sys_platform == 'win32'"},
-    {version = "=5.1.0",  markers = "sys_platform != 'win32'"}
-]
+lxml = "^5"
 markdown2 = "^2"
 netifaces = [
     {path = "lib/netifaces-0.11.0-cp38-cp38-win_amd64.whl",  markers = "sys_platform == 'win32'"},
@@ -24,7 +20,7 @@ netifaces = [
 ]
 Pillow = "^9"
 pycryptodome = "^3"
-pytest-playwright = "^0.4"
+pytest-playwright = "^0"
 python-dateutil = "^2"
 pytz = "*"
 requests = {extras = ["socks"], version = "^2"}
@@ -45,6 +41,7 @@ image-utils = "^0"
 js2py = "^0.74"
 curl-cffi = "^0"
 certifi = "^2024.2.2"
+pygal = "^3.0.4"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

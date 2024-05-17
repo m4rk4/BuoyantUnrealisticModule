@@ -22,37 +22,45 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unable to find policyKey in ' + url)
             return None
         pk = m.group(1)
+
+    # print(pk)
     headers = {
-        "accept-language": "en-US,en;q=0.9,de;q=0.8",
-        "sec-ch-ua": "\"Microsoft Edge\";v=\"113\", \"Chromium\";v=\"113\", \"Not-A.Brand\";v=\"24\"",
+        "accept": "application/json;pk=" + pk,
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "priority": "u=1, i",
+        "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "cross-site"
     }
-    headers['accept'] = 'application/json;pk={}'.format(pk)
 
+    video_id = ''
+    playlist_id = ''
     if 'data-account' in args and 'data-video-id' in args:
         account = args['data-account']
         video_id = args['data-video-id']
     else:
         # https://players.brightcove.net/1105443290001/19b4b681-5e7c-4b03-b1ff-050f00d0be3e_default/index.html?videoId=6294188220001
-        m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*videoId=(\d+)', url)
+        m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*(videoId|playlistId)=(\d+)', url, flags=re.I)
         if not m:
             logger.warning('unsupported brightcove url ' + url)
             return None
         account = m.group(1)
-        video_id = m.group(2)
+        if m.group(2).lower() == 'videoid':
+            video_id = m.group(3)
+        else:
+            playlist_id = m.group(3)
 
-    api_url = 'https://edge.api.brightcove.com/playback/v1/accounts/{}/videos/{}'.format(account, video_id)
+    if not video_id and playlist_id:
+        api_url = 'https://edge.api.brightcove.com/playback/v1/accounts/{}/playlists/{}?limit=100'.format(account, playlist_id)
+    else:
+        api_url = 'https://edge.api.brightcove.com/playback/v1/accounts/{}/videos/{}'.format(account, video_id)
+
     r = s.get(api_url, headers=headers)
-
-    item = {}
-    item['id'] = video_id
-    item['url'] = url
-
     if r.status_code == 403:
+        item = {}
         video_json = r.json()
         msg = ''
         if video_json[0].get('error_code'):
@@ -71,12 +79,21 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] = '<blockquote>{}</blockquote>'.format(msg)
         return item
     elif r.status_code != 200:
+        logger.warning('status code {} getting {}'.format(r.status_code, api_url))
         return None
 
-    video_json = r.json()
+    if playlist_id:
+        playlist_json = r.json()
+        video_json = playlist_json['videos'][0]
+    else:
+        video_json = r.json()
     if save_debug:
         utils.write_file(video_json, './debug/video.json')
-    # utils.write_file(video_json, './debug/video.json')
+    utils.write_file(video_json, './debug/video.json')
+
+    item = {}
+    item['id'] = video_json['id']
+    item['url'] = url
 
     item['title'] = video_json['name']
 
@@ -104,19 +121,24 @@ def get_content(url, args, site_json, save_debug=False):
     item['_image'] = video_json['poster']
     item['summary'] = video_json['description']
 
-    sources = []
+    mp4_sources = []
+    m3u8_sources = []
     for source in video_json['sources']:
         if source.get('src') and source.get('container') and source['container'] == 'MP4' and source.get('height'):
             source['type'] = 'video/mp4'
-            sources.append(source)
-    if not sources:
-        for source in video_json['sources']:
-            if source.get('src') and source.get('type') and source['type'] == 'application/x-mpegURL':
-                sources.append(source)
-    if sources:
-        source = utils.closest_dict(sources, 'height', 480)
+            mp4_sources.append(source)
+        elif source.get('src') and source.get('type') and source['type'] == 'application/x-mpegURL':
+            m3u8_sources.append(source)
+
+    source = None
+    if m3u8_sources:
+        source = m3u8_sources[0]
+    elif mp4_sources:
+        source = utils.closest_dict(mp4_sources, 'height', 480)
         if not source:
-            source = sources[0]
+            source = mp4_sources[0]
+
+    if source:
         item['_video'] = source['src']
         item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], item['title'])
     else:

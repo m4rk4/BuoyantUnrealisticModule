@@ -337,6 +337,10 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.pitt.edu/pittwire/
+https://www.historytoday.com/
+https://www.nbc.com
+https://www.straitstimes.com/
 https://labornotes.org/
 https://www.cam.ac.uk/stories/
 https://www.agweb.com/
@@ -534,10 +538,10 @@ Works for axios instead of cloudscraper
 
 buffer = BytesIO()
 c = Curl()
+c.setopt(CurlOpt.WRITEDATA, buffer)
 c.setopt(CurlOpt.CAINFO, 'C:\\Users\\mark.arigo\\AppData\\Roaming\\pip\\mcafee_uce.pem')
 c.setopt(CurlOpt.PROXY, b'http://192.168.1.xxx:8118'
 c.setopt(CurlOpt.URL, b'https://tls.browserleaks.com/json')
-c.setopt(CurlOpt.WRITEDATA, buffer)
 c.impersonate("chrome110")
 c.perform()
 c.close()

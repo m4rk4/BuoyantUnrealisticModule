@@ -41,7 +41,7 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     # page_html = utils.get_url_html(url, user_agent=site_json.get('user_agent'))
-    page_html = utils.get_bing_cache(url)
+    page_html = utils.get_bing_cache(url, None)
     if not page_html:
         return None
     if save_debug:

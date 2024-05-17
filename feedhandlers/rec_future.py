@@ -36,15 +36,15 @@ def get_next_data(url, site_json):
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != site_json['buildId']:
-            logger.debug('updating {} buildId'.format(split_url.netloc))
-            site_json['buildId'] = m.group(1)
-            utils.update_sites(url, site_json)
-            next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
-            next_data = utils.get_url_json(next_url)
-            if not next_data:
-                return None
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if el:
+            next_data = json.loads(el.string)
+            if next_data['buildId'] != site_json['buildId']:
+                logger.debug('updating {} buildId'.format(split_url.netloc))
+                site_json['buildId'] = next_data['buildId']
+                utils.update_sites(url, site_json)
+            return next_data['props']
     return next_data
 
 
@@ -117,10 +117,31 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = '{}{}?w=1080'.format(site_json['image_cms'], image_data['url'])
         item['content_html'] += utils.add_image(item['_image'], lede_image.get('caption'))
 
+    body_html = ''
+    if article_data.get('body') and article_data['body'].startswith('{'):
+        body_json = json.loads(article_data['body'])
+        if save_debug:
+            utils.write_file(body_json, './debug/body.json')
+        if body_json.get('blocks'):
+            for block in body_json['blocks']:
+                if block['type'] == 'paragraph':
+                    item['content_html'] += '<p>' + block['data']['text'] + '</p>'
+                elif block['type'] == 'header':
+                    item['content_html'] += '<h{0}>{1}</h{0}>'.format(block['data']['level'], block['data']['text'])
+                elif block['type'] == 'raw':
+                    raw_soup = BeautifulSoup(block['data']['html'], 'html.parser')
+                    if raw_soup.find('blockquote', class_='twitter-tweet'):
+                        links = raw_soup.find_all('a')
+                        item['content_html'] += utils.add_embed(links[-1]['href'])
+                    else:
+                        logger.warning('unhandled raw block in ' + item['url'])
+                else:
+                    logger.warning('unhandled block type {} in {}'.format(block['type'], item['url']))
+            return item
+
     if article_data.get('body'):
         body_html = markdown(article_data['body'])
     elif article_data.get('blocks'):
-        body_html = ''
         for it in article_data['blocks']:
             if it.get('text'):
                 body_html += markdown(it['text'])

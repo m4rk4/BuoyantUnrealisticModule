@@ -101,7 +101,10 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = '{}/screenshot?url={}&locator=%23g-index-box'.format(config.server, quote_plus(url))
         item['content_html'] = utils.add_image(item['_image'], link=url)
         return item
+
     page_html = utils.get_url_html(url)
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
     soup = BeautifulSoup(page_html, 'html.parser')
     next_data = soup.find('script', id='__NEXT_DATA__')
     if not next_data:
@@ -109,6 +112,19 @@ def get_content(url, args, site_json, save_debug=False):
     next_json = json.loads(next_data.string)
     if save_debug:
         utils.write_file(next_json, './debug/debug.json')
+
+    if next_json['props']['pageProps'].get('walled') and next_json['props']['pageProps']['walled'] == True:
+        logger.debug('article is paywalled, trying to find bing cached version')
+        bing_html = utils.get_bing_cache(url, '', save_debug)
+        if bing_html:
+            if save_debug:
+                utils.write_file(bing_html, './debug/bing.html')
+            soup = BeautifulSoup(bing_html, 'html.parser')
+            next_data = soup.find('script', id='__NEXT_DATA__')
+            if next_data:
+                next_json = json.loads(next_data.string)
+                if save_debug:
+                    utils.write_file(next_json, './debug/debug.json')
 
     item = {}
 
@@ -144,10 +160,11 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(content_json['dateModified'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
+    item['tags'] = []
     item['author'] = {}
     if content_json.get('_metadata'):
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(content_json['_metadata']['author']))
-        item['tags'] = content_json['_metadata']['keywords'].copy()
+        item['tags'] += content_json['_metadata']['keywords'].copy()
         if content_json['_metadata'].get('imageUrl'):
             item['_image'] = content_json['_metadata']['imageUrl']
     elif content_json.get('byline'):
@@ -155,8 +172,23 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         item['author']['name'] = 'The Economist'
 
+    if content_json.get('articleSection') and content_json['articleSection']['__typename'] == 'Taxonomies' and content_json['articleSection'].get('internal'):
+        for it in content_json['articleSection']['internal']:
+            if it['headline'] not in item['tags']:
+                item['tags'].append(it['headline'])
+    if not item.get('tags'):
+        del item['tags']
+
     caption = ''
-    if content_json.get('image'):
+    if content_json.get('leadComponent') and content_json['leadComponent']['type'] == 'IMAGE':
+        item['_image'] = content_json['leadComponent']['url']
+        captions = []
+        if content_json['leadComponent'].get('caption') and content_json['leadComponent']['caption'].get('textHtml'):
+            caption.append(content_json['leadComponent']['caption']['textHtml'])
+        if content_json['leadComponent'].get('credit'):
+            caption.append(content_json['leadComponent']['credit'])
+        caption = ' | '.join(captions)
+    elif content_json.get('image'):
         if content_json['image'].get('main'):
             item['_image'] = content_json['image']['main']['url']['canonical']
             if content_json['image']['main'].get('description'):
@@ -202,18 +234,58 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unhandled content type {} in {}'.format(content_json['type'], item['url']))
     elif content_json.get('text'):
-        item['content_html'] += format_blocks(content_json['text'])
+        if next_json['props']['pageProps'].get('walled') and next_json['props']['pageProps']['walled'] == True and bing_html:
+            item['content_html'] += content_from_html(bing_html)
+        else:
+            item['content_html'] += format_blocks(content_json['text'])
     return item
+
+
+def content_from_html(content_html):
+    soup = BeautifulSoup(content_html, 'lxml')
+    body = soup.find('section', attrs={"data-body-id": True})
+    if not body :
+        return None
+
+    for el in body.find_all('div', class_=re.compile(r'css-'), recursive=False):
+        el.unwrap()
+
+    for el in body.find_all('style'):
+        el.decompose()
+
+    for el in body.find_all(class_=re.compile(r'adComponent')):
+        el.decompose()
+
+    for el in body.find_all('p', attrs={"data-component": "paragraph"}):
+        el.attrs = {}
+
+    for el in body.find_all('figure'):
+        new_html = ''
+        if el.find('audio'):
+            if el.figcaption:
+                caption = el.figcaption.get_text()
+            else:
+                caption = 'Listen to this story.'
+            new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">{2}</a></span></div><div>&nbsp;</div>'.format(el.audio['src'], config.server, caption)
+        elif el.find('img'):
+            if el.img.get('srcset'):
+                img_src = utils.image_from_srcset(el.img['srcset'], 1000)
+            else:
+                img_src = el.img['src']
+            if el.figcaption:
+                caption = el.figcaption.get_text()
+            else:
+                caption = ''
+            new_html = utils.add_image(img_src, caption)
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            if el.parent and el.parent.name == 'div':
+                el.parent.replace_with(new_el)
+            else:
+                el.replace_with(new_el)
+    return body.decode_contents()
 
 
 def get_feed(url, args, site_json, save_debug=False):
     # https://www.economist.com/rss
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://www.economist.com/the-world-this-week/rss.xml',
-             'https://www.economist.com/briefing/rss.xml',
-             'https://www.economist.com/special-report/rss.xml']
-    for url in feeds:
-        get_feed({"url": url}, True)

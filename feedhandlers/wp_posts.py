@@ -22,6 +22,9 @@ def resize_image(img_src, site_json, width=1000, height=800):
     if site_json and site_json.get('img_path'):
         img_src = img_src.replace(img_path, site_json['img_path'])
         img_path = site_json['img_path']
+    if site_json and site_json.get('use_webp'):
+        # https://lazyadmin.nl/home-network/unifi-controller/
+        img_src = re.sub(r'\.(jpe?g|png)(?!\.webp)', r'.\1.webp', img_src)
     if query.get('url'):
         # print(query)
         return img_src
@@ -113,25 +116,38 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
     # print(el_parent['class'])
     # print(el_parent)
 
-    images = []
-    for src in el_parent.find_all('source'):
-        if src.get('srcset') and src.get('media'):
-            if 'min-width' in src['media']:
-                m = re.search(r'(\d+)px', src['media'])
-                if m:
-                    image = {}
-                    # image['src'] = src['srcset']
-                    image['src'] = utils.image_from_srcset(src['srcset'], width)
-                    image['width'] = utils.get_image_width(image['src'], True)
-                    if image['width'] == -1:
-                        # This is not necessarily the real width
-                        image['width'] = int(m.group(1))
-                    images.append(image)
-    if images:
-        # print(images)
-        image = utils.closest_dict(images, 'width', 1000)
-        img_src = image['src']
-    else:
+    img_src = ''
+    if el_parent.find('source'):
+        src = el_parent.find('source', attrs={"type": "image/webp"})
+        if not src:
+            src = el_parent.find('source', attrs={"type": "image/png"})
+            if not src:
+                src = el_parent.find('source', attrs={"type": "image/jpg"})
+        if src:
+            if src.get('data-srcset'):
+                img_src = utils.image_from_srcset(src['data-srcset'], 1000)
+            if src.get('srcset'):
+                img_src = utils.image_from_srcset(src['srcset'], 1000)
+        if not img_src:
+            images = []
+            for src in el_parent.find_all('source'):
+                if src.get('srcset') and src.get('media'):
+                    if 'min-width' in src['media']:
+                        m = re.search(r'(\d+)px', src['media'])
+                        if m:
+                            image = {}
+                            # image['src'] = src['srcset']
+                            image['src'] = utils.image_from_srcset(src['srcset'], width)
+                            image['width'] = utils.get_image_width(image['src'], True)
+                            if image['width'] == -1:
+                                # This is not necessarily the real width
+                                image['width'] = int(m.group(1))
+                            images.append(image)
+            if images:
+                # print(images)
+                image = utils.closest_dict(images, 'width', 1000)
+                img_src = image['src']
+    if not img_src:
         if bg_img:
             m = re.search(r'url\(([^\)]+)\)', img['style'])
             if m:
@@ -222,9 +238,12 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                     if it and it.get_text().strip():
                         captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it.decode_contents().strip()))
                 if not captions:
-                    it = elm.find(class_=re.compile(r'br-image.*-description|caption-text|image-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption'))
+                    it = elm.find(class_=re.compile(r'br-image.*-description|caption-text|image-caption|img-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption'))
                     if it and it.get_text().strip():
-                        captions.append(it.decode_contents().strip())
+                        if it.find('p'):
+                            captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it.decode_contents().strip(), flags=re.S))
+                        else:
+                            captions.append(it.decode_contents().strip())
                 if not captions:
                     it = elm.find(class_=re.compile(r'text'))
                     if it and it.get_text().strip():
@@ -341,13 +360,32 @@ def render_content(content, url):
     return content_html
 
 
+def get_page_soup(url, site_json):
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+    page_soup = BeautifulSoup(page_html, 'lxml')
+    if site_json:
+        if site_json and site_json.get('decompose'):
+            for it in site_json['decompose']:
+                for el in utils.get_soup_elements(it, page_soup):
+                    el.decompose()
+        if site_json and site_json.get('unwrap'):
+            for it in site_json['unwrap']:
+                for el in utils.get_soup_elements(it, page_soup):
+                    el.unwrap()
+        if site_json and site_json.get('rename'):
+            for it in site_json['rename']:
+                for el in utils.get_soup_elements(it, page_soup):
+                    el.name = it['name']
+    return page_soup
+
+
 def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json=None, ld_article=None, ld_people=None, oembed_json=None):
     authors = []
     if site_json.get('author'):
         if not page_soup:
-            page_html = utils.get_url_html(item['url'])
-            if page_html:
-                page_soup = BeautifulSoup(page_html, 'lxml')
+            page_soup = get_page_soup(item['url'], site_json)
         if page_soup:
             for el in utils.get_soup_elements(site_json['author'], page_soup):
                 if el.name == 'meta':
@@ -840,6 +878,8 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 item['_image'] = post['im_images'][0]['url']
 
     if item.get('_image'):
+        if item['_image'].startswith('//'):
+            item['_image'] = 'https:' + item['_image']
         item['_image'] = resize_image(item['_image'], site_json)
 
     if post.get('yoast_head_json') and post['yoast_head_json'].get('og_description'):
@@ -887,7 +927,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             content_html = ''
             for el in utils.get_soup_elements(site_json['content'], content_soup):
                 content_html += el.decode_contents()
-    elif post.get('acf'):
+    elif post.get('acf') and post['acf'].get('article_modules'):
         for module in post['acf']['article_modules']:
             if module['acf_fc_layout'] == 'text_block':
                 content_html += module['copy']
@@ -908,6 +948,52 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 pass
             else:
                 logger.warning('unhandled acf_fc_layout module {} in {}'.format(module['acf_fc_layout'], item['url']))
+    elif post.get('acf') and post['acf'].get('components'):
+        # https://xpn.org/2024/05/08/remembering-steve-albini/
+        if post['acf'].get('header_paragraph'):
+            content_html += '<p><em>' + post['acf']['header_paragraph'] + '</em></p>'
+        if post.get('better_featured_image'):
+            content_html += utils.add_image(post['better_featured_image']['source_url'], post['better_featured_image'].get('caption'))
+        for component in post['acf']['components']:
+            if component['acf_fc_layout'] == 'bodytext':
+                # content_html += component['body']
+                content_html += format_content(component['body'], item, site_json)
+            elif component['acf_fc_layout'] == 'video':
+                if component['videoPlatform'] == 'YouTube':
+                    content_html += utils.add_embed(component['videourl'])
+                else:
+                    logger.warning('unhandled acf video platform {} in {}'.format(component['videoPlatform'], item['url']))
+            elif component['acf_fc_layout'] == 'embedcode':
+                if component['code'].startswith('<iframe'):
+                    m = re.search(r'src="([^"]+)"', component['code'])
+                    content_html += utils.add_embed(m.group(1))
+                elif 'xpn-rss.streamguys' in component['code']:
+                    m = re.search(r'data-guid="([^"]+)"', component['code'])
+                    embed_json = utils.get_url_json('https://utils.xpn.org/xpnRecast/v3/content.php?id=' + m.group(1))
+                    if embed_json:
+                        content_html += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}/videojs?src={1}"><img src="{0}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}/videojs?src={1}">{2} ({3})</a></span></div><div>&nbsp;</div>'.format(config.server, quote_plus(embed_json['url']), embed_json['title'], utils.calc_duration(embed_json['duration']))
+                else:
+                    logger.warning('unhandled acf embedcode in ' + item['url'])
+            elif component['acf_fc_layout'] == 'carousel':
+                for i, image in enumerate(component['images']):
+                    if i > 0:
+                        content_html += '<div>&nbsp;</div>'
+                    content_html += utils.add_image(image['url'], image.get('caption'))
+            elif component['acf_fc_layout'] == 'setlist':
+                content_html += '<h2>Setlist</h2>'
+                content_html += '<div style="font-size:1.2em; font-weight:bold;">' + component['artist_name'] + '</div>'
+                content_html += '<div>' + component['album_name'] + '</div>'
+                content_html += '<div>' + component['date'] + '</div>'
+                content_html += '<ol>'
+                for it in component['song_list']:
+                    content_html += '<li>' + it['song_title'] + '</li>'
+                content_html += '</ol>'
+            elif component['acf_fc_layout'] == '':
+                continue
+            else:
+                logger.warning('unhandled acf component type {} in {}'.format(component['acf_fc_layout'], item['url']))
+        item['content_html'] = content_html
+        return item
     elif post.get('type') and post['type'] == 'video':
         if post.get('excerpt') and post['excerpt'].get('rendered'):
             content_html += post['excerpt']['rendered']
@@ -922,9 +1008,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     subtitle = ''
     if site_json.get('subtitle'):
         if not page_soup:
-            page_html = utils.get_url_html(item['url'])
-            if page_html:
-                page_soup = BeautifulSoup(page_html, 'lxml')
+            page_soup = get_page_soup(item['url'], site_json)
         if page_soup:
             subtitles = []
             for el in utils.get_soup_elements(site_json['subtitle'], page_soup):
@@ -1012,9 +1096,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                                 break
                 if not video_lede:
                     if not page_soup:
-                        page_html = utils.get_url_html(item['url'])
-                        if page_html:
-                            page_soup = BeautifulSoup(page_html, 'lxml')
+                        page_soup = get_page_soup(item['url'], site_json)
                     el = page_soup.find(class_='article-featured-media--lakanaanvplayer')
                     if el:
                         print(el)
@@ -1044,9 +1126,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 if m:
                     media_id = m.group(1)
                     if not page_soup:
-                        page_html = utils.get_url_html(item['url'])
-                        if page_html:
-                            page_soup = BeautifulSoup(page_html, 'lxml')
+                        page_soup = get_page_soup(item['url'], site_json)
                     if page_soup:
                         el = page_soup.find('script', id='connatix_contextual_player_div_{}'.format(media_id))
                         if el:
@@ -1060,9 +1140,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             nbc_json = None
             if post['meta'].get('lede_video_id'):
                 if not page_soup:
-                    page_html = utils.get_url_html(item['url'])
-                    if page_html:
-                        page_soup = BeautifulSoup(page_html, 'lxml')
+                    page_soup = get_page_soup(item['url'], site_json)
                 if page_soup:
                     el = page_soup.find(attrs={"data-react-component": "VideoPlayer"})
                     if el:
@@ -1121,9 +1199,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
         elif post.get('meta') and post['meta'].get('featured_bc_video_id'):
             # https://www.thescottishsun.co.uk/news/11805626/bronson-battersby-died-alone-dead-dad/
             if not page_soup:
-                page_html = utils.get_url_html(item['url'])
-                if page_html:
-                    page_soup = BeautifulSoup(page_html, 'lxml')
+                page_soup = get_page_soup(item['url'], site_json)
             if page_soup:
                 el = page_soup.find('video', attrs={"data-video-id-pending": post['meta']['featured_bc_video_id']['id']})
                 if el:
@@ -1132,15 +1208,17 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             video_lede = utils.add_embed('https://www.youtube.com/watch?v=' + post['you_tube_id'])
         elif site_json.get('lede_video'):
             if not page_soup:
-                page_html = utils.get_url_html(item['url'])
-                if page_html:
-                    page_soup = BeautifulSoup(page_html, 'lxml')
+                page_soup = get_page_soup(item['url'], site_json)
             if page_soup:
-                el = page_soup.find(site_json['lede_video']['tag'], attrs=site_json['lede_video']['attrs'])
+                el = utils.get_soup_elements(site_json['lede_video'], page_soup)
                 if el:
-                    it = el.find(class_='c-videoPlay')
+                    it = el[0].find(class_='c-videoPlay')
                     if it and it.get('data-displayinline'):
                         video_lede = utils.add_embed(it['data-displayinline'])
+                    elif el[0].find(class_='rsm-citynews-video-player'):
+                        it = el[0].find('video-js')
+                        video_url = 'https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(it['data-account'], it['data-player'], it['data-video-id'])
+                        video_lede = utils.add_embed(video_url)
         if video_lede:
             lede += video_lede
         elif re.search(r'^\s*<p><script[^>]+src="https://newsource-embed-prd\.ns\.cnn\.com/videos/embed', post['content']['rendered']):
@@ -1148,9 +1226,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             pass
         elif site_json.get('lede_img'):
             if not page_soup:
-                page_html = utils.get_url_html(item['url'])
-                if page_html:
-                    page_soup = BeautifulSoup(page_html, 'lxml')
+                page_soup = get_page_soup(item['url'], site_json)
             if page_soup:
                 elements = utils.get_soup_elements(site_json['lede_img'], page_soup)
                 if elements:
@@ -1226,9 +1302,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
 
     if re.search('makezine\.com/(projects|products)', item['url']):
         if not page_soup:
-            page_html = utils.get_url_html(item['url'])
-            if page_html:
-                page_soup = BeautifulSoup(page_html, 'lxml')
+            page_soup = get_page_soup(item['url'], site_json)
         if page_soup:
             if '/projects/' in item['url']:
                 lede += '<h2><u>Project Steps</u></h2>'
@@ -1258,9 +1332,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     footer = ''
     if 'add_content' in site_json:
         if not page_soup:
-            page_html = utils.get_url_html(item['url'])
-            if page_html:
-                page_soup = BeautifulSoup(page_html, 'lxml')
+            page_soup = get_page_soup(item['url'], site_json)
         for it in site_json['add_content']:
             sep_lede = False
             sep_foot = False
@@ -1325,7 +1397,7 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
 
 
 def format_content(content_html, item, site_json=None, module_format_content=None):
-    # utils.write_file(content_html, './debug/debug.html')
+    utils.write_file(content_html, './debug/debug.html')
     split_url = urlsplit(item['url'])
     base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
 
@@ -1357,7 +1429,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     if el:
         soup = el
 
-    utils.write_file(str(soup), './debug/debug.html')
+    # utils.write_file(str(soup), './debug/debug.html')
 
     # Format module specific content
     if module_format_content:
@@ -1594,6 +1666,11 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
                 it['style'] = 'line-height:2em;'
         for it in el.find_all(['td', 'th']):
             it['style'] = 'border:1px solid black;'
+        it = el.find_parent('figure')
+        if it:
+            it['style'] = 'margin:0; padding:0;'
+            if it.figcaption:
+                it.figcaption['style'] = 'font-size:0.83em;'
 
     for el in soup.find_all(class_='has-text-align-center'):
         el['style'] = 'text-align:center;'
@@ -1603,37 +1680,6 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         el.decompose()
-
-    for el in soup.find_all(class_='wp-block-group'):
-        if el.find(id='mc_embed_signup'):
-            el.decompose()
-        elif split_url.netloc == 'www.smartprix.com':
-            it = el.find(class_='wp-block-group__inner-container')
-            if it:
-                kbds = it.find_all('kbd')
-                ratings = it.find_all('div', class_='wp-block-jetpack-rating-star')
-                n = len(ratings)
-                new_html = '<table>'
-                for i, kbd in enumerate(kbds):
-                    new_html += '<tr><td>{}</td><td>'.format(str(kbd))
-                    if i < n:
-                        rating = ratings[i].find(attrs={"itemprop": "ratingValue"})
-                        if rating:
-                            val = float(rating['content'])
-                            for j in range(math.floor(val)):
-                                new_html += '&#9733;'
-                            if val % 1:
-                                new_html += '&#x00BD;'
-                    new_html += '</td></tr>'
-                new_html += '</table>'
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
-        elif el.get('style') and 'border' in el['style']:
-            # https://gamesfray.com/apple-effectively-kills-numerous-browser-games-in-the-eu-unprecedented-slap-in-the-face-of-tech-regulation/
-            el.attrs = {}
-            el['style'] = 'border:1px solid black; padding:1em;'
-
 
     for el in soup.find_all(class_='wp-block-buttons'):
         it = el.find(class_='wp-block-button__link')
@@ -1736,7 +1782,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_html = '<hr/><div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
         it = el.find(class_='product-card-image-wrapper')
         if it:
-            new_html += '<div style="flex:1; min-width:256px;">{}</div>'.format(add_image(it, None, base_url, site_json).replace('width:100%;', 'width:auto; max-height:300px;'))
+            new_html += '<div style="flex:1; min-width:256px;">{}</div>'.format(add_image(it, None, base_url, site_json).replace('width:100%;', 'width:100%;').replace('max-height:800px;', 'max-height:300px;'))
         new_html += '<div style="flex:1; min-width:256px;">'
         it = el.find(class_='article-kicker')
         if it:
@@ -2436,6 +2482,81 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.replace_with(new_el)
 
+    for el in soup.find_all('div', class_='review-info-section'):
+        # https://www.expertreviews.co.uk/smartwatches/1418577/huawei-watch-ultimate-review
+        new_html = ''
+        if el.find(class_='score-overall-info'):
+            new_html += '<div style="font-size:1.1em; font-weight:bold;">'
+            it = el.select('div.score-overall-info > div.info-item-label')
+            if it:
+                new_html += it[0].get_text().strip() + '&nbsp;'
+            for it in el.select('div.score-overall-info > div.score-overall > span.score-icon > img'):
+                if 'star-full.svg' in it['src']:
+                    new_html += '★'
+                else:
+                    new_html += '☆'
+            new_html += '</div>'
+        if el.find(class_='price-info'):
+            new_html += '<p>'
+            it = el.select('div.price-info > div.info-item-label')
+            if it:
+                new_html += it[0].decode_contents()
+            it = el.select('div.price-info > span.info')
+            if it:
+                new_html += it[0].decode_contents()
+            new_html += '</p>'
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+
+    for el in soup.find_all('div', class_='review-pros-cons-section'):
+        # https://www.expertreviews.co.uk/smartwatches/1418577/huawei-watch-ultimate-review
+        new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+        it = el.select('div.pros-column > ul')
+        if it:
+            new_html += '<div style="flex:1; min-width:256px;"><div style="font-weight:bold;">Pros</div>' + str(it[0]) + '</div>'
+        it = el.select('div.cons-column > ul')
+        if it:
+            new_html += '<div style="flex:1; min-width:256px;"><div style="font-weight:bold;">Cons</div>' + str(it[0]) + '</div>'
+        new_html += '</div>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all('section', class_='block-two-column-boxes'):
+        # https://www.the-ambient.com/reviews/dyson-gen5detect-cordless-vacuum-review/
+        new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+        for col in el.find_all(class_='col'):
+            new_html += '<div style="flex:1; min-width:256px;">'
+            it = col.find(class_='col-header')
+            if it:
+                # new_html += it.decode_contents()
+                new_html += '<div style="font-weight:bold;">' + it.get_text() + '</div>'
+            it = col.find(class_='col-content')
+            if it:
+                new_html += it.decode_contents()
+            new_html += '</div>'
+        new_html += '</div>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all('section', class_='review-summary'):
+        # https://www.the-ambient.com/reviews/dyson-gen5detect-cordless-vacuum-review/
+        new_html = '<div style="background:#ccc; border-radius:10px; padding:10px;">'
+        if el.find('div', class_='star-rating'):
+            new_html += '<div style="font-size:2em; font-weight:bold;">'
+            for it in el.select('div.star-rating > div.full-stars > i'):
+                if 'fa-star-half' in it['class']:
+                    new_html += '½'
+                    # new_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, red 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
+                elif 'fa-solid' in it['class']:
+                    new_html += '★'
+            new_html += '</div>'
+            el.find('div', class_='star-rating').decompose()
+        new_html += el.decode_contents()
+        new_html += '</div><div>&nbsp;</div>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
     for el in soup.find_all('i', class_='fa-star'):
         if 'fa-solid' in el['class']:
             el.string = '★'
@@ -2489,6 +2610,13 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         el.attrs = {}
         el.name = 'blockquote'
         el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+
+    for el in soup.find_all(class_='snrsInfobox'):
+        el.attrs = {}
+        el.name = 'blockquote'
+        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        for it in el.find_all(class_=['snrsInfoboxContainer', 'snrsInfoboxSubContainer']):
+            it.unwrap()
 
     for el in soup.find_all(class_='su-box'):
         new_html = '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
@@ -2620,6 +2748,56 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled wp-block-embed in ' + item['url'])
             # print(el)
+
+    for el in soup.find_all(class_='wp-block-group'):
+        if el.find(id='mc_embed_signup'):
+            el.decompose()
+        elif split_url.netloc == 'www.smartprix.com':
+            it = el.find(class_='wp-block-group__inner-container')
+            if it:
+                kbds = it.find_all('kbd')
+                ratings = it.find_all('div', class_='wp-block-jetpack-rating-star')
+                n = len(ratings)
+                new_html = '<table>'
+                for i, kbd in enumerate(kbds):
+                    new_html += '<tr><td>{}</td><td>'.format(str(kbd))
+                    if i < n:
+                        rating = ratings[i].find(attrs={"itemprop": "ratingValue"})
+                        if rating:
+                            val = float(rating['content'])
+                            for j in range(math.floor(val)):
+                                new_html += '&#9733;'
+                            if val % 1:
+                                new_html += '&#x00BD;'
+                    new_html += '</td></tr>'
+                new_html += '</table>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+        elif el.get('style') and 'border' in el['style']:
+            # https://gamesfray.com/apple-effectively-kills-numerous-browser-games-in-the-eu-unprecedented-slap-in-the-face-of-tech-regulation/
+            el.attrs = {}
+            el['style'] = 'border:1px solid black; padding:1em;'
+        elif el.find(class_='wp-block-media-text'):
+            # https://signalcleveland.org/cleveland-families-who-lost-loved-ones-to-homicide-reclaim-their-stories/
+            it = el.find(class_='wp-block-group__inner-container')
+            if it:
+                it.unwrap()
+            if 'has-background' in el['class']:
+                el.attrs = {}
+                el['style'] = 'background-color:#ccc; margin:8px; padding:8px;'
+            for elm in el.find_all(class_='wp-block-media-text'):
+                new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                it = elm.find(class_='wp-block-media-text__media')
+                if it and it.img:
+                    new_html += '<div style="flex:1; min-width:256px; margin:auto;"><img src="" style="width:100%;" />' + add_image(it, None, base_url, site_json, decompose=False) + '</div>'
+                it = elm.find(class_='wp-block-media-text__content')
+                if it:
+                    new_html += '<div style="flex:2; min-width:256px; margin:auto;"><img src="" style="width:100%;" />' + it.decode_contents() + '</div>'
+                new_html += '</div>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                elm.replace_with(new_el)
+            print(el)
 
     for el in soup.find_all(class_=re.compile(r'embed-wrap')):
         new_html = ''
@@ -3405,14 +3583,24 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_html = ''
         if el.find(class_='js-video') or 'pmYTPlayerContainer' in el['class']:
             new_html = utils.add_embed('https://cdn.jwplayer.com/previews/{}'.format(el['id']))
+        elif el.find('video-js'):
+            it = el.find('video-js')
+            video_url = 'https://players.brightcove.net/{}/{}_default/index.html'.format(it['data-account'], it['data-player'])
+            if it.get('data-video-id'):
+                video_url += '?videoId=' + it['data-video-id']
+            elif it.get('data-playlist-id'):
+                video_url += '?playlistId=' + it['data-playlist-id']
+            else:
+                video_url = ''
+            if video_url:
+                new_html = utils.add_embed(video_url)
         else:
             it = el.find('iframe')
             if it:
                 new_html = utils.add_embed(it['src'])
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
         else:
             logger.warning('unhandled video-container in ' + item['url'])
 
@@ -3523,13 +3711,22 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             logger.warning('unhandled video-js embed in ' + item['url'])
 
     for el in soup.find_all('video-js'):
-        new_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el['data-account'], el['data-player'], el['data-video-id']))
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el_parent = el
-        while el_parent.parent.parent:
-            el_parent = el_parent.parent
-        el_parent.insert_after(new_el)
-        el_parent.decompose()
+        video_url = 'https://players.brightcove.net/{}/{}_default/index.html?'.format(el['data-account'], el['data-player'])
+        if el.get('data-video-id'):
+            video_url += '?videoId=' + el['data-video-id']
+        elif el.get('data-playlist-id'):
+            video_url += '?playlistId=' + el['data-playlist-id']
+        else:
+            logger.warning('unhandled video-js embed in ' + item['url'])
+            video_url = ''
+        if video_url:
+            new_html = utils.add_embed(video_url)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el_parent = el
+            while el_parent.parent.parent:
+                el_parent = el_parent.parent
+            el_parent.insert_after(new_el)
+            el_parent.decompose()
 
     for el in soup.find_all(class_='blogstyle__iframe'):
         new_html = ''
@@ -3643,6 +3840,26 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             el.insert_after(new_el)
             el.decompose()
 
+    for el in soup.find_all(class_='newsroomBlockQuoteContainer'):
+        quote = ''
+        it = el.find(class_='newsroomBlockQuoteQuoteContainer')
+        if it:
+            for i, p in enumerate(it.find_all('p')):
+                if i > 0:
+                    quote += '<br/><br/>'
+                quote += p.decode_contents()
+        if quote:
+            it = el.find(class_='newsroomBlockQuoteAuthorContainer')
+            if it:
+                author = it.get_text()
+            else:
+                author = ''
+            new_html = utils.add_pullquote(quote, author)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        else:
+            logger.warning('unhandled newsroomBlockQuoteContainer in ' + item['url'])
+
     for el in soup.find_all(id='quote-block'):
         # https://www.mobileworldlive.com/samsung/samsung-unpacks-galaxy-s24-packed-with-google-ai/
         for it in el.find_all('img'):
@@ -3713,6 +3930,8 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         if el.get('class'):
             if 'instagram-media' in el['class']:
                 new_html = utils.add_embed(el['data-instgrm-permalink'])
+            elif 'text-post-media' in el['class']:
+                new_html = utils.add_embed(el['data-text-post-permalink'])
             elif 'reddit-embed-bq' in el['class']:
                 it = el.find('a')
                 if it:
@@ -3989,10 +4208,13 @@ def get_content(url, args, site_json, save_debug=False):
         del paths[-1]
         args['embed'] = True
 
-    page_soup = None
     post = None
     posts_path = ''
     post_url = ''
+    page_soup = None
+    if site_json.get('content') or site_json.get('add_content') or site_json.get('author') or site_json.get('lede_img') or site_json.get('lede_video') or site_json.get('title') or site_json.get('subtitle'):
+        page_soup = get_page_soup(url, site_json)
+
     if site_json.get('posts_path'):
         if isinstance(site_json['posts_path'], str):
             posts_path = site_json['posts_path']
@@ -4014,35 +4236,44 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             wpjson_path = site_json['wpjson_path']
 
-        # Try to determine the post id or slug from the path
-        if len(paths) == 0 and split_url.query:
-            query = parse_qs(split_url.query)
-            if query.get('p'):
-                post_url = '{}{}/{}'.format(wpjson_path, posts_path, query['p'][0])
-                post = utils.get_url_json(post_url)
-        elif 'slug' in site_json:
-            if site_json['slug'] and site_json['slug'].isnumeric():
-                post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, paths[site_json['slug']])
+        if page_soup:
+            # print(wpjson_path)
+            post_url, post_id = find_post_url(page_soup, wpjson_path + posts_path)
+            if post_url:
                 # print(post_url)
                 post = utils.get_url_json(post_url)
-        else:
-            for it in paths:
-                if it.isnumeric() and len(it) > 4:
-                    post_url = '{}{}/{}'.format(wpjson_path, posts_path, it)
-                elif 'no_slug' not in args and '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
-                    slug = it.split('.')[0]
-                    m = re.search(r'-(\d{5,}$)', slug)
-                    if m and 'www.thedailymash.co.uk' in url:
-                        post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1)[8:])
-                    elif m and not (len(m.group(1)) == 8 and m.group(1).startswith('202')):
-                        post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1))
+
+        if not post:
+            # Try to determine the post id or slug from the path
+            if len(paths) == 0 and split_url.query:
+                query = parse_qs(split_url.query)
+                if query.get('p'):
+                    post_url = '{}{}/{}'.format(wpjson_path, posts_path, query['p'][0])
+                    post = utils.get_url_json(post_url)
+            elif 'slug' in site_json:
+                if site_json['slug'] and site_json['slug'].isnumeric():
+                    post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, paths[site_json['slug']])
+                    # print(post_url)
+                    post = utils.get_url_json(post_url)
+            else:
+                for it in paths:
+                    if it.isnumeric() and len(it) > 4:
+                        post_url = '{}{}/{}'.format(wpjson_path, posts_path, it)
+                    elif 'no_slug' not in args and '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
+                        slug = it.split('.')[0]
+                        m = re.search(r'-(\d{5,}$)', slug)
+                        if m and 'www.thedailymash.co.uk' in url:
+                            post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1)[8:])
+                        elif m and not (len(m.group(1)) == 8 and m.group(1).startswith('202')):
+                            post_url = '{}{}/{}'.format(wpjson_path, posts_path, m.group(1))
+                        else:
+                            post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, slug)
                     else:
-                        post_url = '{}{}?slug={}'.format(wpjson_path, posts_path, slug)
-                else:
-                    continue
-                post = utils.get_url_json(post_url)
-                if post:
-                    break
+                        continue
+                    post = utils.get_url_json(post_url)
+                    if post:
+                        break
+
         if post:
             if isinstance(post, list):
                 return get_post_content(post[0], args, site_json, page_soup, save_debug)
@@ -4050,11 +4281,11 @@ def get_content(url, args, site_json, save_debug=False):
                 return get_post_content(post, args, site_json, page_soup, save_debug)
 
     # Look for the post id in the page
-    page_html = utils.get_url_html(url)
-    if page_html:
+    if not page_soup:
+        page_soup = get_page_soup(url, site_json)
+    if page_soup:
         if save_debug:
-            utils.write_file(page_html, './debug/debug.html')
-        page_soup = BeautifulSoup(page_html, 'html.parser')
+            utils.write_file(str(page_soup), './debug/debug.html')
         if 'slug' in site_json:
             if site_json['slug'] and isinstance(site_json['slug'], str) and site_json['slug'] == 'title':
                 el = page_soup.find('meta', attrs={"property": "og:title"})
@@ -4155,12 +4386,8 @@ def get_content_v2(url, args, site_json, save_debug=False):
         args['embed'] = True
 
     page_soup = None
-    if not page_soup and (site_json.get('content') or site_json.get('author') or site_json.get('lede_img') or site_json.get('lede_video') or site_json.get('title')):
-        page_html = utils.get_url_html(url)
-        if page_html:
-            if save_debug:
-                utils.write_file(page_html, './debug/debug.html')
-            page_soup = BeautifulSoup(page_html, 'lxml')
+    if site_json.get('content') or site_json.get('add_content') or site_json.get('author') or site_json.get('lede_img') or site_json.get('lede_video') or site_json.get('title') or site_json.get('subtitle'):
+        page_soup = get_page_soup(url, site_json)
 
     post_id = ''
     wp_post = None
@@ -4182,8 +4409,8 @@ def get_content_v2(url, args, site_json, save_debug=False):
 
         if page_soup:
             post_url, post_id = find_post_url(page_soup, wpjson_path)
-            # print(post_id)
             if post_url:
+                logger.debug('getting wp_post from ' + post_url)
                 wp_post = utils.get_url_json(post_url)
 
         if not wp_post:
@@ -4195,6 +4422,7 @@ def get_content_v2(url, args, site_json, save_debug=False):
                 if it.isnumeric() and len(it) > 4:
                     # Try number as the post id (exclude possible date values: YYYY, MM, DD)
                     post_url = '{}/{}'.format(wpjson_path, it)
+                    logger.debug('getting wp_post from ' + post_url)
                     wp_post = utils.get_url_json(post_url)
                 if 'no_slug' not in args and '-' in it and not (site_json.get('exclude_slugs') and it in site_json['exclude_slugs']):
                     # Try path as slug
@@ -4203,9 +4431,11 @@ def get_content_v2(url, args, site_json, save_debug=False):
                     if m and not (len(m.group(1)) == 8 and m.group(1).startswith('202')):
                         # Check if it contains the post id
                         post_url = '{}/{}'.format(wpjson_path, m.group(1))
+                        logger.debug('getting wp_post from ' + post_url)
                         wp_post = utils.get_url_json(post_url)
                     if not wp_post:
                         post_url = '{}?slug={}'.format(wpjson_path, slug)
+                        logger.debug('getting wp_post from ' + post_url)
                         wp_post = utils.get_url_json(post_url)
                 else:
                     continue
@@ -4216,13 +4446,12 @@ def get_content_v2(url, args, site_json, save_debug=False):
                     break
 
             if not wp_post and not page_soup:
-                page_html = utils.get_url_html(url)
-                if page_html:
-                    if save_debug:
-                        utils.write_file(page_html, './debug/debug.html')
-                    page_soup = BeautifulSoup(page_html, 'html.parser')
+                page_soup = get_page_soup(url, site_json)
+                if page_soup:
+                    # utils.write_file(str(page_soup), './debug/debug.html')
                     post_url, post_id = find_post_url(page_soup, wpjson_path)
                     if post_url:
+                        logger.debug('getting wp_post from ' + post_url)
                         wp_post = utils.get_url_json(post_url)
 
         if not wp_post:

@@ -96,7 +96,7 @@ def render_content(contents):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    api_url = '{}?_data=routes/$topic.$slug'.format(utils.clean_url(url))
+    api_url = '{}?_data=routes%2F%24topic.%24slug._index'.format(utils.clean_url(url))
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None

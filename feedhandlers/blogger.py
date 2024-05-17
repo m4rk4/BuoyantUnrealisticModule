@@ -108,6 +108,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if el.parent and el.parent.name == 'a':
             el_parent = el.parent
             link = el.parent['href']
+            if re.search(r'\.(jpe?g|png|webp)', link):
+                img_src = link
         else:
             link = ''
         caption = ''
@@ -201,7 +203,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 el.insert_after(new_el)
                 el.decompose()
             else:
-                el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+                if not el.find_parent('blockquote'):
+                    el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in content.find_all('pre', class_='microcode'):
         el.attrs = {}

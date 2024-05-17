@@ -402,6 +402,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if site_json.get('subtitle'):
         subtitles = []
         for el in utils.get_soup_elements(site_json['subtitle'], soup):
+            # print(el.get_text())
             subtitles.append(el.get_text())
         if subtitles:
             item['content_html'] += '<p><em>{}</em></p>'.format('<br/>'.join(subtitles))

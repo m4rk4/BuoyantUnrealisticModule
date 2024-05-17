@@ -1,5 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
+from curl_cffi import Curl, CurlOpt
+from io import BytesIO
 from datetime import datetime
 from urllib.parse import urlsplit, quote_plus
 
@@ -10,17 +12,53 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_api_json(url):
+    # Not sure why curl works but requests doesn't
+    headers = [
+        b'accept: */*',
+        b'accept-language: en-US,en;q=0.9,en-GB;q=0.8',
+        b'origin: https://www.semafor.com',
+        b'priority: u=1, i',
+        b'referer: https://www.semafor.com/',
+        b'sec-ch-ua: "Chromium";v="124", "Microsoft Edge";v="124", "Not-A.Brand";v="99"',
+        b'sec-ch-ua-mobile: ?0',
+        b'sec-ch-ua-platform: "Windows"',
+        b'sec-fetch-dest: empty',
+        b'sec-fetch-mode: cors',
+        b'sec-fetch-site: same-site',
+        b'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0'
+    ]
+    buffer = BytesIO()
+    c = Curl()
+    c.setopt(CurlOpt.WRITEDATA, buffer)
+    c.setopt(CurlOpt.PROXY, b'http://127.0.0.1:25345')
+    c.setopt(CurlOpt.URL, url.encode())
+    c.setopt(CurlOpt.HTTPHEADER, headers)
+    try:
+        c.perform()
+        c.close()
+        body = buffer.getvalue()
+        if body:
+            body_json = json.loads(body)
+            return body_json
+        else:
+            logger.warning('no value returned from ' + url)
+    except Exception as e:
+        logger.debug('exception {} getting {}'.format(e.__class__.__name__, url))
+    return None
+
+
 def get_article_by_slug(slug):
     api_url = 'https://api.semafor.com/content?query=*%5B%0A%20%20slug.current%20%3D%3D%20%22{}%22%0A%5D%20%7C%20order(updatedTimestamp%20desc)%7B%0A%20%20%22headline%22%3A%20headline.headline%2C%0A%20%20%22slug%22%3A%20slug.current%2C%0A%20%20description%2C%0A%20%20%22tragedy%22%3A%20(%22internal%3Atragedy%22%20in%20taglist.tags%5B%5D.value)%2C%0A%20%20%22seoDescription%22%3A%20seo.seoDescription%2C%0A%20%20%22intro%22%3A%20intro%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20body%5B%5D%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%0A%20%20_type%20%3D%3D%20%22imageEmbed%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%0A%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20semaforms%5B%5D%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20_type%20%3D%3D%20%22scoop%22%20%3D%3E%20%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20scoop%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%20%20%0A%20%20_type%20%3D%3D%20%22imageEmbed%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%0A%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%2C%0A%20%20%7D%2C%0A%20%20%22location%22%3A%20geo.location%2C%0A%20%20%22ledePhoto%22%3A%20%7B%0A%20%20%20%20...ledePhoto.ledephoto.imageEmbed%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20ledePhoto.ledephoto.imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20ledePhoto.ledephoto.imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%2C%0A%20%20ledeVideo%2C%0A%20%20%22vertical%22%3A%20vertical.vertical%2C%0A%20%20%22verticalDisplay%22%3A%20verticalDisplay.verticalDisplay%2C%0A%20%20publishedTimestamp%2C%0A%20%20updatedTimestamp%2C%0A%20%20%22signal%22%3A%20signal%5B%5D%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20body%5B%5D%20%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20children%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20content%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%2C%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20_id%2C%0A%20%20%22authors%22%3A%20author%5B%5D-%3E%20%7B%0A%20%20%22headshot%22%3A%20headshot.asset-%3Eurl%2C%0A%20%20name%2C%0A%20%20authorSlug%2C%0A%20%20_id%2C%0A%7D%2C%0A%20%20_createdAt%2C%0A%7D'.format(quote_plus(slug))
-    api_json = utils.get_url_json(api_url)
-    if api_json and api_json.get('result') and len(api_json['result']) > 0:
+    api_json = get_api_json(api_url)
+    if api_json:
         return api_json['result'][0]
     return None
 
 
 def get_article_by_id(id):
     api_url = 'https://api.semafor.com/content?query=*%5B%0A%20%20_id%20%3D%3D%20%22{}%22%0A%5D%20%7C%20order(updatedTimestamp%20desc)%7B%0A%20%20%22headline%22%3A%20headline.headline%2C%0A%20%20%22slug%22%3A%20slug.current%2C%0A%20%20description%2C%0A%20%20%22tragedy%22%3A%20(%22internal%3Atragedy%22%20in%20taglist.tags%5B%5D.value)%2C%0A%20%20%22seoDescription%22%3A%20seo.seoDescription%2C%0A%20%20%22intro%22%3A%20intro%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20body%5B%5D%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%0A%20%20_type%20%3D%3D%20%22imageEmbed%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%0A%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20semaforms%5B%5D%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20_type%20%3D%3D%20%22scoop%22%20%3D%3E%20%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20scoop%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%20%20%0A%20%20_type%20%3D%3D%20%22imageEmbed%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%0A%0A%20%20%20%20%20%20%7D%0A%20%20%20%20%7D%2C%0A%20%20%7D%2C%0A%20%20%22location%22%3A%20geo.location%2C%0A%20%20%22ledePhoto%22%3A%20%7B%0A%20%20%20%20...ledePhoto.ledephoto.imageEmbed%2C%0A%20%20%20%20%22imageEmbedExternalLink%22%3A%20ledePhoto.ledephoto.imageEmbed.link.externalLink%2C%0A%20%20%20%20%22imageEmbedInternalLink%22%3A%20ledePhoto.ledephoto.imageEmbed.link.internalLink-%3Eslug.current%2C%0A%20%20%7D%2C%0A%20%20ledeVideo%2C%0A%20%20%22vertical%22%3A%20vertical.vertical%2C%0A%20%20%22verticalDisplay%22%3A%20verticalDisplay.verticalDisplay%2C%0A%20%20publishedTimestamp%2C%0A%20%20updatedTimestamp%2C%0A%20%20%22signal%22%3A%20signal%5B%5D%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20body%5B%5D%20%7B%0A%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20children%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20content%5B%5D%20%7B%0A%20%20%20%20%20%20%20%20%20%20...%2C%0A%20%20%20%20%20%20%20%20%20%20%0A%20%20markDefs%5B%5D%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%0A%20%20_type%20%3D%3D%20%22internalLink%22%20%3D%3E%20%7B%0A%20%20%20%20...%2C%0A%20%20%20%20%22slug%22%3A%20%40.internalLink-%3Eslug.current%0A%20%20%7D%0A%0A%20%20%7D%0A%2C%0A%20%20%20%20%20%20%20%20%7D%0A%20%20%20%20%20%20%7D%2C%0A%20%20%20%20%7D%0A%20%20%7D%2C%0A%20%20_id%2C%0A%20%20%22authors%22%3A%20author%5B%5D-%3E%20%7B%0A%20%20%22headshot%22%3A%20headshot.asset-%3Eurl%2C%0A%20%20name%2C%0A%20%20authorSlug%2C%0A%20%20_id%2C%0A%7D%2C%0A%20%20_createdAt%2C%0A%7D'.format(id)
-    api_json = utils.get_url_json(api_url)
+    api_json = get_api_json(api_url)
     if api_json and api_json.get('result') and len(api_json['result']) > 0:
         return api_json['result'][0]
     return None
@@ -39,8 +77,8 @@ def resize_image(image, width=1200):
     return img_src + '?w={}&q=75&auto=format'.format(width)
 
 
-def add_image(image):
-    img_src = resize_image(image)
+def add_image(image, sub_resize_image):
+    img_src = sub_resize_image(image)
     captions = []
     if image.get('caption'):
         captions.append(image['caption'])
@@ -51,12 +89,12 @@ def add_image(image):
     elif image.get('rteCredit'):
         credit = ''
         for blk in image['rteCredit']:
-            credit += render_block(blk)
+            credit += render_block(blk, sub_resize_image)
         captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', credit, flags=re.S))
     return utils.add_image(img_src, ' | '.join(captions))
 
 
-def render_block(block):
+def render_block(block, sub_resize_image):
     content_html = ''
     footnotes = []
     if block['_type'] == 'block':
@@ -94,7 +132,7 @@ def render_block(block):
                 start_tag = '<hr style="width:80%; margin:auto; border-top:1px dashed #ccc;"/>'
                 text = ''
                 for blk in child['content']:
-                    text += render_block(blk)
+                    text += render_block(blk, sub_resize_image)
                 text = re.sub(r'</p>$', '&nbsp;&#10230;</p>', text)
             elif child['_type'] == 'oneClickSubscribe':
                 text = '<a href="https://www.semafor.com/newsletters#{}">Sign up here</a>.'.format(child['audience'].lower())
@@ -138,16 +176,16 @@ def render_block(block):
             image = None
             logger.warning('unhandled ' + block['_type'])
         if image:
-            content_html += add_image(image)
+            content_html += add_image(image, sub_resize_image)
 
     elif block['_type'] == 'imageContentsBlock':
-        content_html += add_image(block['photo'])
+        content_html += add_image(block['photo'], sub_resize_image)
         for child in block['contents']:
-            content_html += render_block(child)
+            content_html += render_block(child, sub_resize_image)
 
     elif block['_type'] == 'insetImageSlideshow':
         for image in block['slideshowImages']:
-            content_html += add_image(image)
+            content_html += add_image(image, sub_resize_image)
 
     elif block['_type'] == 'pullQuote':
         content_html += utils.add_pullquote(block['text'])
@@ -179,7 +217,7 @@ def render_block(block):
         for footnote in footnotes:
             footnote_html = ''
             for blk in footnote['content']:
-                footnote_html += render_block(blk)
+                footnote_html += render_block(blk, sub_resize_image)
             content_html += '<tr><td style="vertical-align:top;">{}</td><td style="vertical-align:top;">{}</td></tr>'.format(footnote['number'], re.sub(r'^<p>(.*)</p>$', r'\1', footnote_html, flags=re.S))
         content_html += '</table><div>&nbsp;</div>'
     return content_html
@@ -231,14 +269,14 @@ def get_article(article_json, args, site_json, save_debug):
     item['content_html'] = ''
     if article_json.get('ledePhoto') and article_json['ledePhoto'].get('asset'):
         item['_image'] = resize_image(article_json['ledePhoto'])
-        item['content_html'] += add_image(article_json['ledePhoto'])
+        item['content_html'] += add_image(article_json['ledePhoto'], resize_image)
 
     if article_json.get('seoDescription'):
         item['summary'] = article_json['seoDescription']
 
     if article_json.get('intro') and article_json['intro'].get('body'):
         for block in article_json['intro']['body']:
-            item['content_html'] += render_block(block)
+            item['content_html'] += render_block(block, resize_image)
 
     if article_json.get('semaforms'):
         for i, semaform in enumerate(article_json['semaforms']):
@@ -248,10 +286,10 @@ def get_article(article_json, args, site_json, save_debug):
                 item['content_html'] += '<h2>{}</h2>'.format(semaform['title'])
             if semaform['_type'] == 'scoop':
                 for block in semaform['scoop']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'generaform':
                 for block in semaform['body']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'reportersTake':
                 if semaform['author'].get('shortName'):
                     item['content_html'] += '<h2>{}\'s View</h2>'.format(semaform['author']['shortName'])
@@ -263,35 +301,35 @@ def get_article(article_json, args, site_json, save_debug):
                     else:
                         item['content_html'] += '<h2>The Author\'s View</h2>'
                 for block in semaform['thescoop']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'knowMore':
                 item['content_html'] += '<h2>Know More</h2>'
                 for block in semaform['knowMore']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'theViewFrom':
                 item['content_html'] += '<h2>The View from {}</h2>'.format(semaform['where'])
                 for block in semaform['theViewFrom']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'roomForDisagreement':
                 item['content_html'] += '<h2>Room For Disagreement</h2>'
                 for block in semaform['roomForDisagreement']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'furtherReading':
                 item['content_html'] += '<h2>Notable</h2>'
                 for block in semaform['furtherReading']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'worldToday':
                 item['content_html'] += '<h2>The World Today</h2>'
                 for block in semaform['worldToday']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'numbered':
                 item['content_html'] += '<div style="font-size:1.5em; font-weight:bold">{}</div><h2>{}</h2>'.format(semaform['number'], semaform['headline'])
                 for block in semaform['numbered']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'topical':
                 item['content_html'] += '<div style="font-size:1.5em; font-weight:bold">{}</div><h2>{}</h2>'.format(semaform['lable'], semaform['headline'])
                 for block in semaform['topical']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             elif semaform['_type'] == 'story':
                 story_json = get_article_by_id(semaform['internalShareUrl']['_ref'])
                 if story_json:
@@ -305,7 +343,7 @@ def get_article(article_json, args, site_json, save_debug):
                 else:
                     item['content_html'] += '<h2>{}</h2>'.format(semaform['headline'])
                 for block in semaform['body']:
-                    item['content_html'] += render_block(block)
+                    item['content_html'] += render_block(block, resize_image)
             else:
                 logger.warning('unhandled semaform type {} in {}'.format(semaform['_type'], item['url']))
 
@@ -313,15 +351,17 @@ def get_article(article_json, args, site_json, save_debug):
         item['content_html'] += '<hr/><h2>Signals</h2>'
         for signal in article_json['signal']:
             if signal.get('insightTitle'):
-                item['content_html'] += '<div style="font-size:1.2em; font-weight:bold">{}</div>'.format(signal['insightTitle'])
+                item['content_html'] += '<div style="font-size:1.2em; font-weight:bold">&bull;&nbsp;{}</div>'.format(signal['insightTitle'])
+            item['content_html'] += '<div style="margin-left:0.4em; padding-left:8px; border-left:2px solid rgb(196, 207, 214);">'
             if signal.get('source'):
                 if len(signal['source']) == 1:
-                    item['content_html'] += '<div><small>Source: '
+                    item['content_html'] += '<div><small>&rdsh; Source: '
                 else:
-                    item['content_html'] += '<div><small>Sources: '
+                    item['content_html'] += '<div><small>&rdsh; Sources: '
                 item['content_html'] += ', '.join(signal['source']) + '</small></div>'
             for block in signal['body']:
-                item['content_html'] += render_block(block)
+                item['content_html'] += render_block(block, resize_image)
+            item['content_html'] += '</div>'
 
     # Fix lists
     item['content_html'] = re.sub(r'</(ol|ul)><(ol|ul)>', '', item['content_html'])

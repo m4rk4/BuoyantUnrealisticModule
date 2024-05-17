@@ -90,6 +90,8 @@ def get_content(url, args, site_json, save_debug):
     for block in post_json['body']:
         if block['type'] == 'paragraph' or block['type'] == 'heading' :
             if block['format'] == 'html':
+                if block['content'].startswith('<p><strong>Read More'):
+                    continue
                 if re.search('dropcap', block['content']):
                     soup = BeautifulSoup(block['content'], 'html.parser')
                     el = soup.find(class_='dropcap')

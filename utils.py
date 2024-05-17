@@ -1,5 +1,6 @@
-import basencode, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, string, tldextract
+import basencode, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
 from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -160,7 +161,7 @@ def requests_retry_session(retries=4):
   session.mount('https://', adapter)
   return session
 
-def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
+def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False):
   # https://www.whatismybrowser.com/guides/the-latest-user-agent/
   if user_agent == 'desktop':
     ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
@@ -189,9 +190,17 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
     headers = {}
     headers['user-agent'] = ua
 
+  if use_proxy:
+    proxies = config.proxies
+  else:
+    proxies = {}
+
   r = None
   try:
-    r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects)
+    if use_curl_cffi:
+      r = curl_cffi_requests.get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+    else:
+      r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     r.raise_for_status()
   except Exception as e:
     if r != None:
@@ -201,7 +210,10 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True):
         status_code = ' status code {}'.format(r.status_code)
     else:
       status_code = ''
-    logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+    if use_curl_cffi:
+      logger.warning('curl_cffi request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+    else:
+      logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying cloudscraper')
       scraper = cloudscraper.create_scraper()
@@ -243,11 +255,11 @@ def get_browser_request(url, get_json=False, save_screenshot=False):
     browser.close()
     return content
 
-def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
+def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url, get_json=True)
 
-  r = get_request(url, user_agent, headers, retries, allow_redirects)
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404 or r.status_code == 500):
     try:
       return r.json()
@@ -256,23 +268,23 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
       write_file(r.text, './debug/json.txt')
   return None
 
-def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
   if site_json and site_json.get('user_agent'):
     ua = site_json['user_agent']
   else:
     ua = user_agent
-  r = get_request(url, ua, headers, retries, allow_redirects)
+  r = get_request(url, ua, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
 
-def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_browser=False, site_json=None):
+def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
 
-  r = get_request(url, user_agent, headers, retries, allow_redirects)
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.content
   return None
@@ -586,10 +598,13 @@ def init_jsonfeed(args):
 
 def format_display_date(dt_utc, include_time=True):
   dt_loc = dt_utc.astimezone(pytz.timezone(config.local_tz))
+  month = dt_loc.strftime('%b')
+  if month != 'May':
+    month += '.'
   if include_time:
-    return '{}. {}, {}, {}:{} {} EST'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower())
+    return '{} {}, {}, {}:{} {} {}'.format(month, dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
   else:
-    return '{}. {}, {}'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year)
+    return '{} {}, {}'.format(month, dt_loc.day, dt_loc.year)
 
 def random_alphanumeric_string(str_len=8):
   letters_digits = string.ascii_letters + string.digits
@@ -695,16 +710,18 @@ def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
   return '<blockquote style="border-left:3px solid {}; margin:1.5em 10px; padding:0.5em 10px;">{}</blockquote>'.format(border_color, quote)
 
 def open_pullquote():
-  #return '<table style="margin-left:10px; margin-right:10px;"><tr><td style="font-size:3em; vertical-align:top;">&#8220;</td><td style="vertical-align:top; padding-top:1em;"><em>'
-  return '<div style="margin-left:10px;"><div style="float:left; font-size:3em;">“</div><div style="overflow:hidden; padding-top:1em; padding-left:8px;"><em>'
+  # return '<div style="margin-left:10px;"><div style="float:left; font-size:3em;">“</div><div style="overflow:hidden; padding-top:1em; padding-left:8px;"><em>'
+  return '<div style="display:grid; grid-template-columns:1fr;"><div style="grid-row-start:1; grid-column-start:1; font-family:Serif; font-size:5em; color:#ccc;">“</div><div style="grid-row-start:1; grid-column-start:1; padding:2em; 1.5em 0 0;"><div style="font-size:1.2em; font-weight:bold; font-style:italic;">'
 
 def close_pullquote(author=''):
-  end_html = '</em>'
+  # end_html = '</em>'
+  end_html = '</div>'
   if author:
-    author = re.sub(r'^(–\s*|&#8211;\s*)', '', author)
-    end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
-  #end_html += '</td></tr></table>'
-  end_html += '</div><div style="clear:left"></div></div>'
+    author = re.sub(r'^\s*(–|&#8211;)\s*', '', author)
+    # end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
+    end_html += '<div style="font-size:0.8em; padding-top:1em;">&mdash;&nbsp;{}</div>'.format(author)
+  # end_html += '</div><div style="clear:left"></div></div>'
+  end_html += '</div></div>'
   return end_html
 
 def add_pullquote(quote, author=''):
@@ -810,7 +827,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     else:
       video_src = video_url
 
-  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'audio/mp4':
+  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
@@ -986,7 +1003,7 @@ def add_button(link, text, button_color='gray', text_color='white', center=True,
   button = '<div style="margin:0.5em;'
   if center:
     button += ' text-align:center;'
-  button += '"><a href="{} style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
+  button += '"><a href="{}" style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
   return button
 
 def add_audio_track(track_info):
@@ -1150,44 +1167,58 @@ def calc_duration(s):
   return ', '.join(duration)
 
 
-def get_bing_cache(url, slug=-1):
+def get_bing_cache(url, slug=-1, save_debug=False):
   split_url = urlsplit(url)
   paths = list(filter(None, split_url.path[1:].split('/')))
-  bing_url = 'https://www.bing.com/search?q={}+site%3A{}'.format(paths[slug], split_url.netloc.replace('www.', ''))
-  # print(bing_url)
-  bing_html = get_url_html(bing_url)
-  # write_file(bing_html, './debug/bing.html')
+  if isinstance(slug, int):
+    query = '{}+site%3A{}'.format(paths[slug], split_url.netloc.replace('www.', ''))
+  else:
+    query = '{}'.format(quote_plus(url))
+  bing_url = 'https://www.bing.com/search?q=' + query
+  bing_url += '&brdr=1'
+  if save_debug:
+    logger.warning('bing search url: '+ bing_url)
+  headers = {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "en-US,en;q=0.9",
+    "preferanonymous": "1",
+    "priority": "u=0, i",
+    "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-ch-ua-platform-version": "\"15.0.0\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "none",
+    "sec-fetch-user": "?1",
+    "sec-ms-gec": secrets.token_hex(64).upper(),
+    "sec-ms-gec-version": "1-124.0.2478.67",
+    "sec-ms-inbox-fonts": "Roboto",
+    "upgrade-insecure-requests": "1",
+    "x-edge-shopping-flag": "0",
+    "x-search-safesearch": "Moderate"
+  }
+  bing_html = get_url_html(bing_url, headers=headers)
   if not bing_html:
     return ''
+  if save_debug:
+    write_file(bing_html, './debug/bing.html')
   soup = BeautifulSoup(bing_html, 'lxml')
   for el in soup.select('ol#b_results > li.b_algo'):
-    link = el.find(class_='tilk')
-    if link:
-      if url in link['href'] or link['href'] in url:
-        attrib = link.find(class_='b_attribution', attrs={"u": True})
+    tilk = el.find(class_='tilk')
+    if tilk:
+      link = get_redirect_url(tilk['href'].replace('&amp;', '&'))
+      if url in link or link in url:
+        attrib = tilk.find(class_='b_attribution', attrs={"u": True})
         if attrib:
           u = attrib['u'].split('|')
-          cache_url = 'https://cc.bingj.com/cache.aspx?q={}+site%3A{}&d={}&mkt=en-US&setlang=en-US&w={}'.format(paths[slug], split_url.netloc, u[2], u[3])
+          cache_url = 'https://cc.bingj.com/cache.aspx?q={}&d={}&mkt=en-US&setlang=en-US&w={}'.format(query, u[2], u[3])
+          if save_debug:
+            logger.warning('found bing cache at ' + cache_url)
           cache_html = get_url_html(cache_url)
           return cache_html
         else:
-          logger.warning('no Bing cache found for ' + url)
+          logger.warning('no bing cache found for ' + url)
           return ''
   logger.warning('no bing search result found for ' + url)
   return ''
-  # cite = None
-  # for el in soup.find_all('cite'):
-  #   if url in el.string:
-  #     cite = el
-  #     break
-  # if not cite:
-  #   logger.warning('url not found')
-  #   return ''
-  # el = cite.find_parent(class_='b_attribution', attrs={"u": True})
-  # if not el:
-  #   logger.warning('no Bing cache found')
-  #   return ''
-  # u = el['u'].split('|')
-  # cache_url = 'https://cc.bingj.com/cache.aspx?q={}+site%3A{}&d={}&mkt=en-US&setlang=en-US&w={}'.format(paths[slug], split_url.netloc, u[2], u[3])
-  # cache_html = get_url_html(cache_url)
-  # return cache_html

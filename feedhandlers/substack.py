@@ -110,7 +110,7 @@ def get_post(post_json, args, site_json, save_debug):
         # utils.write_file(post_json['body_html'], './debug/debug.html')
         soup = BeautifulSoup(post_json['body_html'], 'html.parser')
 
-        for el in soup.find_all(class_='subscription-widget-wrap'):
+        for el in soup.find_all(class_=['subscription-widget-wrap', 'subscription-widget-wrap-editor']):
             el.decompose()
 
         for el in soup.find_all(class_=re.compile('button-wrap')):

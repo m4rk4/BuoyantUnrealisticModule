@@ -17,7 +17,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     video_json = utils.get_url_json('https://cdn.jwplayer.com/v2/media/' + m.group(2))
     if not video_json:
-        return None
+        video_json = utils.get_url_json('https://cdn.jwplayer.com/v2/playlists/' + m.group(2))
+        if not video_json:
+            return None
     if save_debug:
         utils.write_file(video_json, './debug/video.json')
 
@@ -34,14 +36,17 @@ def get_content(url, args, site_json, save_debug=False):
     image = utils.closest_dict(video_json['playlist'][0]['images'], 'width', 1080)
     item['_image'] = image['src']
 
-    videos = []
-    for video in video_json['playlist'][0]['sources']:
-        if video.get('type') == 'video/mp4':
-            videos.append(video)
-    if videos:
-        video = utils.closest_dict(videos, 'height', 480)
-    else:
-        video = video_json['playlist'][0]['sources'][0]
+    video = next((it for it in video_json['playlist'][0]['sources'] if it['type'] == 'application/vnd.apple.mpegurl'), None)
+    if not video:
+        videos = []
+        for video in video_json['playlist'][0]['sources']:
+            if video.get('type') == 'video/mp4':
+                videos.append(video)
+        if videos:
+            video = utils.closest_dict(videos, 'height', 480)
+        else:
+            video = video_json['playlist'][0]['sources'][0]
+
     item['_video'] = video['file']
 
     if video_json['playlist'][0].get('description'):

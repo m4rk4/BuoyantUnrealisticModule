@@ -1,4 +1,5 @@
-import html, math, re
+import html, json, math, re
+from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
 
@@ -132,12 +133,25 @@ def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     api_url = 'https://{}/rest/carbon/filter/main{}'.format(split_url.netloc, split_url.path)
     api_json = utils.get_url_json(api_url)
+    if not api_json or (api_json['options']['method'] == 'get_404'):
+        page_html = utils.get_url_html(url)
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('script', string=re.compile(r'window\.__INITIAL_STATE__'))
+            if el:
+                i = el.string.find('{')
+                j = el.string.rfind('}') + 1
+                init_state = json.loads(el.string[i:j])
+                api_json = init_state['json']['response']
+    if not api_json or (api_json['options']['method'] == 'get_404'):
+        logger.warning('unable to get article data for ' + url)
+        return None
+    if save_debug:
+        utils.write_file(api_json, './debug/debug.json')
 
     item = {}
     item['id'] = api_json['options']['postId']
     article_json = api_json['widgets']['carbonwidget/single-1']['dataDetails'][str(item['id'])]
-    if save_debug:
-        utils.write_file(article_json, './debug/debug.json')
 
     item['url'] = article_json['url']
     item['title'] = html.unescape(article_json['title'])

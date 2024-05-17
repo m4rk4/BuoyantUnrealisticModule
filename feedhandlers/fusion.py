@@ -225,18 +225,18 @@ def process_content_element(element, url, site_json, save_debug):
                         elif re.search(r'\.m3u8', stream['url']):
                             streams_ts.append(stream)
                 stream = None
-                if streams_mp4:
-                    if streams_mp4[0].get('height'):
-                        stream = utils.closest_dict(streams_mp4, 'height', 720)
-                    else:
-                        stream = streams_mp4[0]
-                    stream_type = 'video/mp4'
-                elif streams_ts:
+                if streams_ts:
                     if streams_ts[0].get('height'):
                         stream = utils.closest_dict(streams_ts, 'height', 720)
                     else:
                         stream = streams_ts[0]
                     stream_type = 'application/x-mpegURL'
+                elif streams_mp4:
+                    if streams_mp4[0].get('height'):
+                        stream = utils.closest_dict(streams_mp4, 'height', 720)
+                    else:
+                        stream = streams_mp4[0]
+                    stream_type = 'video/mp4'
                 if stream:
                     poster = video['promo_image']['url']
                     element_html += utils.add_video(stream['url'], stream_type, poster, video['headlines']['basic'])
@@ -508,18 +508,18 @@ def process_content_element(element, url, site_json, save_debug):
                 elif re.search(r'\.m3u8', stream['url']):
                     streams_ts.append(stream)
         stream = None
-        if streams_mp4:
-            if streams_mp4[0].get('height'):
-                stream = utils.closest_dict(streams_mp4, 'height', 720)
-            else:
-                stream = streams_mp4[0]
-            stream_type = 'video/mp4'
-        elif streams_ts:
+        if streams_ts:
             if streams_ts[0].get('height'):
                 stream = utils.closest_dict(streams_ts, 'height', 720)
             else:
                 stream = streams_ts[0]
             stream_type = 'application/x-mpegURL'
+        elif streams_mp4:
+            if streams_mp4[0].get('height'):
+                stream = utils.closest_dict(streams_mp4, 'height', 720)
+            else:
+                stream = streams_mp4[0]
+            stream_type = 'video/mp4'
         if stream:
             if element.get('imageResizerUrls'):
                 poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
@@ -623,12 +623,12 @@ def get_content_html(content, url, site_json, save_debug):
             elif stream['stream_type'] == 'ts':
                 streams_ts.append(stream)
         stream = None
-        if streams_mp4:
-            stream = utils.closest_dict(streams_mp4, 'height', 720)
-            stream_type = 'video/mp4'
-        elif streams_ts:
+        if streams_ts:
             stream = utils.closest_dict(streams_ts, 'height', 720)
             stream_type = 'application/x-mpegURL'
+        elif streams_mp4:
+            stream = utils.closest_dict(streams_mp4, 'height', 720)
+            stream_type = 'video/mp4'
         if stream:
             if content.get('imageResizerUrls'):
                 poster = utils.closest_dict(content['imageResizerUrls'], 'width', 1000)
@@ -813,10 +813,12 @@ def get_item(content, url, args, site_json, save_debug):
         if content.get('authors'):
             for author in content['authors']:
                 authors.append(author['name'])
-        elif content.get('source'):
+        elif content.get('source') and content['source'].get('name'):
             authors.append(content['source']['name'])
-        elif content.get('distributor'):
+        elif content.get('distributor') and content['distributor'].get('name'):
             authors.append(content['distributor']['name'])
+        elif content.get('canonical_website'):
+            authors.append(content['canonical_website'])
     if authors:
         item['author'] = {}
         if len(authors) == 1:
@@ -827,14 +829,22 @@ def get_item(content, url, args, site_json, save_debug):
     tags = []
     if content.get('taxonomy'):
         for key, val in content['taxonomy'].items():
-            if isinstance(val, dict) and val.get('name'):
-                if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', val['name']):
-                    tags.append(val['name'])
+            if isinstance(val, dict):
+                if val.get('name'):
+                    if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', val['name']):
+                        tags.append(val['name'])
+                elif val.get('text'):
+                    if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', val['text']):
+                        tags.append(val['text'])
             elif isinstance(val, list):
                 for it in val:
-                    if isinstance(it, dict) and it.get('name'):
-                        if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', it['name']):
-                            tags.append(it['name'])
+                    if isinstance(it, dict):
+                        if it.get('name'):
+                            if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', it['name']):
+                                tags.append(it['name'])
+                        elif it.get('text'):
+                            if not re.search('advertising|blocklists|EXCLUDE|INCLUDE|iptc-media|Safe from|TRBC', it['text']):
+                                tags.append(it['text'])
     if content.get('websites'):
         for key, val in content['websites'].items():
             if val.get('website_section') and val['website_section'].get('name'):

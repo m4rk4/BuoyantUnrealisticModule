@@ -151,6 +151,24 @@ def format_body(body_json):
                     return ''
             if video_src:
                 return utils.add_video(video_src, video_type, video_json['video']['poster_frame'], video_json['video']['title'])
+        elif body_json[1]['type'] == 'firework':
+            firework_api = 'https://fireworkapi1.com/embed/v2/playlists/{}/feeds?page_size=10'.format(body_json[1]['ref'])
+            firework_json = utils.post_url(firework_api)
+            if firework_json:
+                # utils.write_file(firework_json, './debug/firework.json')
+                content_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                for i in range(3):
+                    video_json = firework_json['feed_items'][i]['video']
+                    poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(video_json['thumbnail_url']))
+                    caption = '<a href="{}">{}</a>'.format(video_json['web_share_url'], video_json['caption'])
+                    content_html += '<div style="flex:1; min-width:240px;">'
+                    content_html += utils.add_video(video_json['video_sources'][0]['src'], video_json['video_sources'][0]['type'], poster, caption)
+                    content_html += '</div>'
+                content_html += '</div>'
+                return content_html
+            else:
+                logger.warning('failed to get firwork api ' + firework_api)
+                return ''
         elif body_json[1]['type'] == 'iframe' or body_json[1]['type'] == 'twitter':
             return utils.add_embed(body_json[1]['props']['url'])
         elif body_json[1]['type'] == 'product':

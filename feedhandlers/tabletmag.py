@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(image, width=1200):
-    return utils.clean_url(image['src']) + 'w={}&q=70&auto=format&dpr=1'.format(width)
+    # return utils.clean_url(image['src']) + '?w={}&q=70&auto=format&dpr=1'.format(width)
+    img_src = re.sub('^image-', r'https://tablet-mag-images.b-cdn.net/production/', image['id'])
+    img_src = re.sub('-(\w+)$', r'.\1', img_src)
+    return img_src + '?w={}&q=70&auto=format&dpr=1'.format(width)
 
 
 def get_next_data(url, site_json):
@@ -88,8 +91,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += semafor.add_image(article_json['hero']['heroImage'], resize_image)
 
     for block in article_json['content']['body']:
-        item['content_html'] += semafor.render_block(block)
+        item['content_html'] += semafor.render_block(block, resize_image)
 
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

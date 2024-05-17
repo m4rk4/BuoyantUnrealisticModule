@@ -24,6 +24,7 @@ def resize_image(img_src, width=1000):
             return src + quote_plus(query['url'][0])
     return img_src
 
+
 def get_content(url, args, site_json, save_debug=False):
     # https://www.politico.com/spring/cms-api/v1/live-updates/congress/2023_10_20
     split_url = urlsplit(url)

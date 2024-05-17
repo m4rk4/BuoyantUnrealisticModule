@@ -1,4 +1,4 @@
-import feedparser, json, re
+import base64, feedparser, json, re
 from bs4 import BeautifulSoup
 from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
@@ -15,14 +15,25 @@ def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if split_url.netloc == 'news.google.com':
-        page_html = utils.get_url_html(url)
-        soup = BeautifulSoup(page_html, 'lxml')
-        el = soup.find(attrs={"data-n-au": True})
-        if el:
-            logger.debug('getting content for ' + el['data-n-au'])
-            item = utils.get_content(el['data-n-au'], args, save_debug)
+        # https://stackoverflow.com/questions/51131834/decoding-encoded-google-news-urls
+        primary_url = ''
+        _ENCODED_URL_PREFIX = "https://news.google.com/rss/articles/"
+        _ENCODED_URL_RE = re.compile(fr"^{re.escape(_ENCODED_URL_PREFIX)}(?P<encoded_url>[^?]+)")
+        _DECODED_URL_RE = re.compile(rb'^\x08\x13".+?(?P<primary_url>http[^\xd2]+)\xd2\x01')
+        match = _ENCODED_URL_RE.match(url)
+        if match:
+            encoded_text = match.groupdict()["encoded_url"]
+            encoded_text += "==="
+            decoded_text = base64.urlsafe_b64decode(encoded_text)
+            match = _DECODED_URL_RE.match(decoded_text)
+            if match:
+                primary_url = match.groupdict()["primary_url"]
+                primary_url = primary_url.decode()
+        if primary_url:
+            logger.debug('getting content for ' + primary_url)
+            item = utils.get_content(primary_url, args, save_debug)
         else:
-            logger.warning('unknown target url for ' + url)
+            logger.warning('unhandled url ' + url)
     elif split_url.netloc == 'docs.google.com' and 'gview' in paths:
         # https://docs.google.com/gview?url=https://static.fox5atlanta.com/www.fox5atlanta.com/content/uploads/2023/09/23.09.07_DOJ-Letter-re-Clayton-County-Jail.pdf
         query = parse_qs(split_url.query)
