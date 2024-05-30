@@ -284,7 +284,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         if author not in authors:
                             authors.append(author)
                 if not authors and el.get_text().strip():
-                    author = re.sub(r'^By:?\s*', '', el.get_text().strip(), flags=re.I)
+                    author = re.sub(r'^By:?\s*(.*?)[\s\W]*$', r'\1', el.get_text().strip(), flags=re.I)
                 if author:
                     author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
                     if author not in authors:

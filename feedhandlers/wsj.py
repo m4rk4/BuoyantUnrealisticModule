@@ -18,32 +18,32 @@ logger = logging.getLogger(__name__)
 # Fix - 2 leads: https://www.wsj.com/tech/personal-tech/chatgpt-can-now-chat-aloud-with-you-and-yes-it-sounds-pretty-much-human-3be39840
 
 
-def render_contents(contents, netloc, image_link=None):
+def render_contents(contents, netloc, article_links, image_link=None):
     content_html = ''
     for content in contents:
         if not content.get('type'):
             content_html += content['text']
         elif content['type'] == 'paragraph':
             if content.get('content'):
-                content_html += '<p>' + render_contents(content['content'], netloc) + '</p>'
+                content_html += '<p>' + render_contents(content['content'], netloc, article_links) + '</p>'
         elif content['type'] == 'headline':
             if content.get('content'):
-                content_html += '<h2>' + render_contents(content['content'], netloc) + '</h2>'
+                content_html += '<h2>' + render_contents(content['content'], netloc, article_links) + '</h2>'
         elif content['type'] == 'hed':
             if content.get('content'):
                 if content['hed_type'] == 'subhed':
-                    content_html += '<h2>' + render_contents(content['content'], netloc) + '</h2>'
+                    content_html += '<h2>' + render_contents(content['content'], netloc, article_links) + '</h2>'
                 elif content['hed_type'] == 'small-hed':
-                    content_html += '<h3>' + render_contents(content['content'], netloc) + '</h3>'
+                    content_html += '<h3>' + render_contents(content['content'], netloc, article_links) + '</h3>'
         elif content['type'] == 'list':
             if content.get('content'):
                 if content.get('ordered'):
-                    content_html += '<ol>' + render_contents(content['content'], netloc) + '</ol>'
+                    content_html += '<ol>' + render_contents(content['content'], netloc, article_links) + '</ol>'
                 else:
-                    content_html += '<ul>' + render_contents(content['content'], netloc) + '</ul>'
+                    content_html += '<ul>' + render_contents(content['content'], netloc, article_links) + '</ul>'
         elif content['type'] == 'listitem':
             if content.get('content'):
-                content_html += '<li>' + render_contents(content['content'], netloc) + '</li>'
+                content_html += '<li>' + render_contents(content['content'], netloc, article_links) + '</li>'
         elif content['type'] == 'phrase':
             if content.get('href'):
                 content_html += '<a href="https://{}{}">{}</a>'.format(netloc, content['href'], content['text'])
@@ -51,9 +51,24 @@ def render_contents(contents, netloc, image_link=None):
                 content_html += content['text']
         elif content['type'] == 'link':
             if content.get('content'):
-                content_html += '<a href="{}">{}</a>'.format(content['uri'], render_contents(content['content'], netloc))
+                link_content = render_contents(content['content'], netloc, article_links)
             elif content.get('text'):
-                content_html += '<a href="{}">{}</a>'.format(content['uri'], content['text'])
+                link_content = content['text']
+            else:
+                link_content = ''
+                logger.warning('unknown link content')
+            link_uri = ''
+            if not content.get('uri') and content.get('ref'):
+                link = next((it for it in article_links['related'] if (it['type'] == 'link' and it['id'] == content['ref'])), None)
+                if link:
+                    link_uri = link['uri']
+            else:
+                link_uri = content['uri']
+            if link_uri:
+                content_html += '<a href="{}">{}</a>'.format(link_uri, link_content)
+            else:
+                logger.warning('unknown link uri')
+                content_html += link_content
         elif content['type'] == 'emphasis':
             if content['emphasis'] == 'BOLD':
                 tag = 'b'
@@ -62,22 +77,22 @@ def render_contents(contents, netloc, image_link=None):
             else:
                 tag = 'em'
             if content.get('content'):
-                content_html += '<{0}>{1}</{0}>'.format(tag, render_contents(content['content'], netloc))
+                content_html += '<{0}>{1}</{0}>'.format(tag, render_contents(content['content'], netloc, article_links))
             elif content.get('text'):
                 content_html += '<{0}>{1}</{0}>'.format(tag, content['text'])
         elif content['type'] == 'sub':
             if content.get('content'):
-                content_html += '<sub>' + render_contents(content['content'], netloc) + '</sub>'
+                content_html += '<sub>' + render_contents(content['content'], netloc, article_links) + '</sub>'
             elif content.get('text'):
                 content_html += '<sub>{}</sub>'.format(content['text'])
         elif content['type'] == 'sup':
             if content.get('content'):
-                content_html += '<sup>' + render_contents(content['content'], netloc) + '</sup>'
+                content_html += '<sup>' + render_contents(content['content'], netloc, article_links) + '</sup>'
             elif content.get('text'):
                 content_html += '<sup>{}</sup>'.format(content['text'])
         elif content['type'] == 'tagline':
             if content.get('content'):
-                content_html +=  '<h5>' + render_contents(content['content'], netloc) + '</h5>'
+                content_html +=  '<h5>' + render_contents(content['content'], netloc, article_links) + '</h5>'
         elif content['type'] == 'image':
             if content.get('src'):
                 img_src = content['src']['params']['href']
@@ -134,9 +149,9 @@ def render_contents(contents, netloc, image_link=None):
             else:
                 logger.warning('unhandled audio content')
         elif content['type'] == 'table':
-            content_html += '<table>' + render_contents(content['content'], netloc) + '</table>'
+            content_html += '<table>' + render_contents(content['content'], netloc, article_links) + '</table>'
         elif content['type'] == 'tr' or content['type'] == 'td':
-            content_html += '<{0}>{1}</{0}>'.format(content['type'], render_contents(content['content'], netloc))
+            content_html += '<{0}>{1}</{0}>'.format(content['type'], render_contents(content['content'], netloc, article_links))
         elif content['type'] == 'Break':
             content_html += '<br/>'
         elif content['type'] == 'inset':
@@ -148,7 +163,7 @@ def render_contents(contents, netloc, image_link=None):
                     captions.append(content['properties']['imagecredit'])
                 content_html += utils.add_image(content['properties']['urllarge'], ' | '.join(captions))
             elif content['inset_type'] == 'slideshow':
-                content_html += render_contents(content['content'], netloc)
+                content_html += render_contents(content['content'], netloc, article_links)
             elif content['inset_type'] == 'videobyguid':
                 video_item = get_content('https://www.wsj.com/video/' + content['properties']['videoguid'], {"embed": True}, {}, False)
                 if video_item:
@@ -166,13 +181,13 @@ def render_contents(contents, netloc, image_link=None):
                 for i, it in enumerate(content['content']):
                     if it['type'] == 'tagline':
                         if it.get('content'):
-                            author = render_contents(it['content'], netloc)
+                            author = render_contents(it['content'], netloc, article_links)
                         del content['content'][i]
-                text = render_contents(content['content'], netloc)
+                text = render_contents(content['content'], netloc, article_links)
                 content_html += utils.add_pullquote(text, author)
             elif content['inset_type'] == 'advisortake':
                 if content.get('content'):
-                    content_html +=  render_contents(content['content'], netloc)
+                    content_html +=  render_contents(content['content'], netloc, article_links)
             elif content['inset_type'] == 'dynamic':
                 inset_html = ''
                 link = 'https://pub-prod-djcs-dynamicinset-renderer.ohi.onservo.com/?url=' + content['properties']['url']
@@ -201,7 +216,7 @@ def render_contents(contents, netloc, image_link=None):
                             inset_json = utils.get_url_json(content['properties']['url'])
                             if inset_json:
                                 if inset_json.get('alt') and inset_json['alt'].get('capi') and inset_json['alt']['capi'].get('links') and inset_json['alt']['capi']['links'].get('related'):
-                                    inset_html += render_contents(inset_json['alt']['capi']['links']['related'], netloc)
+                                    inset_html += render_contents(inset_json['alt']['capi']['links']['related'], netloc, article_links)
                         elif content['dynamic_inset_properties']['resolvedInset']['subType'] == 'parallax-gallery':
                             inset_json = utils.get_url_json(content['properties']['url'])
                             if inset_json:
@@ -253,14 +268,14 @@ def render_contents(contents, netloc, image_link=None):
                         if inset_json.get('alt') and inset_json['alt'].get('picture') and inset_json['alt']['picture'].get('img'):
                             inset_html += utils.add_image(inset_json['alt']['picture']['img']['src'], link=link)
                         if inset_json.get('alt') and inset_json['alt'].get('capi') and inset_json['alt']['capi'].get('links') and inset_json['alt']['capi']['links'].get('related'):
-                            inset_html += render_contents(inset_json['alt']['capi']['links']['related'], netloc, image_link=link)
+                            inset_html += render_contents(inset_json['alt']['capi']['links']['related'], netloc, article_links, image_link=link)
                 if inset_html:
                     content_html += inset_html
                 else:
                     logger.warning('unhandled dynamic inset')
                     content_html += '<blockquote><b><a href="{}">View dynamic inset content</a></b></blockquote>'.format(link)
             elif content['inset_type'] == 'richtext':
-                text = render_contents(content['content'], netloc)
+                text = render_contents(content['content'], netloc, article_links)
                 if not re.search(r'>read more|>SHARE YOUR THOUGHTS|>Explore Buy Side|>new from', text, flags=re.I):
                     content_html += '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">' + text + '</blockquote>'
             elif content['inset_type'] == 'newsletterinset' or content['inset_type'] == 'relatedbyarticletype':
@@ -624,7 +639,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if it['type'] == 'text':
                     item['content_html'] += markdown(it['text'])
                 elif it['type'] == 'image' or it['type'] == 'video':
-                    item['content_html'] += render_contents([it], split_url.netloc)
+                    item['content_html'] += render_contents([it], split_url.netloc, None)
                 # if it['type'] == 'iframe':
                 #     if 'dynamic-inset-iframer' in it['url']:
                 else:
@@ -677,7 +692,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         if page_props.get('featuredMedia') and page_props['featuredMedia'].get('data'):
             for it in page_props['featuredMedia']['data'].values():
-                item['content_html'] += render_contents([it], split_url.netloc)
+                item['content_html'] += render_contents([it], split_url.netloc, None)
 
         if page_props.get('featuredContent') and page_props['featuredContent'].get('data'):
             for it in page_props['featuredContent']['data'].values():
@@ -838,26 +853,28 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         del item['tags']
 
+    article_links = api_json.get('articleLinks')
+
     if article_json.get('summary') and article_json['summary'].get('content'):
-        item['summary'] = render_contents(article_json['summary']['content'], split_url.netloc)
+        item['summary'] = render_contents(article_json['summary']['content'], split_url.netloc, article_links)
     elif article_json.get('standFirst') and article_json['standFirst'].get('content'):
-        item['summary'] = render_contents(article_json['standFirst']['content'], split_url.netloc)
+        item['summary'] = render_contents(article_json['standFirst']['content'], split_url.netloc, article_links)
     elif api_json.get('articleToolsProps') and api_json['articleToolsProps'].get('summary'):
         item['summary'] = api_json['articleToolsProps']['summary']
     elif api_json.get('snippet'):
-        item['summary'] = render_contents(api_json['snippet'], split_url.netloc)
+        item['summary'] = render_contents(api_json['snippet'], split_url.netloc, article_links)
     if item.get('summary'):
         # Remove title
         item['summary'] = re.sub(r'<h2>{}</h2>'.format(item['title']), '', item['summary'], flags=re.I)
 
     item['content_html'] = ''
     if article_json.get('standfirst') and article_json['standfirst'].get('content'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(render_contents(article_json['standfirst']['content'], split_url.netloc))
+        item['content_html'] += '<p><em>{}</em></p>'.format(render_contents(article_json['standfirst']['content'], split_url.netloc, article_links))
     elif api_json.get('dek'):
         item['content_html'] += '<p><em>{}</em></p>'.format(api_json['dek'])
 
     if article_json.get('leadInset'):
-        item['content_html'] += render_contents([article_json['leadInset']], split_url.netloc)
+        item['content_html'] += render_contents([article_json['leadInset']], split_url.netloc, article_links)
         if article_json['leadInset']['type'] == 'image':
             if article_json['leadInset'].get('src'):
                 item['_image'] = article_json['leadInset']['src']['params']['href']
@@ -890,7 +907,7 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if api_json.get('body'):
-        item['content_html'] += render_contents(api_json['body'], split_url.netloc)
+        item['content_html'] += render_contents(api_json['body'], split_url.netloc, article_links)
 
     if api_json.get('encryptedDocumentKey'):
         content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
@@ -898,7 +915,7 @@ def get_content(url, args, site_json, save_debug=False):
             content_json = json.loads(content)
             if save_debug:
                 utils.write_file(content_json, './debug/content.json')
-            item['content_html'] += render_contents(content_json, split_url.netloc)
+            item['content_html'] += render_contents(content_json, split_url.netloc, article_links)
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item

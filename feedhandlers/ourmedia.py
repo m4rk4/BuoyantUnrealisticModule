@@ -1,7 +1,7 @@
 import json, math, re, uuid
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlencode, urlsplit
 
 import config, utils
 
@@ -46,7 +46,7 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(gql_json, './debug/debug.json')
 
     content_id = ''
-    for it in gql_json['data']['catalog']['lookupPathSegments']:
+    for it in reversed(gql_json['data']['catalog']['lookupPathSegments']):
         for m in it['matches']:
             if m['__typename'] == 'ContentMatch':
                 content_id = m['id']
@@ -158,113 +158,195 @@ def get_item(content_json, url, args, site_json, save_debug):
         item['content_html'] += utils.add_image(item['_image'], caption)
 
     for block in content_json['content']:
-        if block.get('parentId'):
-            # skip blocks with a parent - process them within the parent
-            parent = next((it for it in content_json['content'] if it['id'] == block['parentId']), None)
-            print('{} parent: {}'.format(block['type'], parent['type']))
-            continue
-        if block['type'] == 'core/paragraph' or block['type'] == 'core/list':
-            item['content_html'] += block['html']
-        elif block['type'] == 'core/heading':
-            level = next((it for it in block['properties'] if it['key'] == 'level'), None)
-            prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
-            if level and prop:
-                item['content_html'] += '<h{0}>{1}</h{0}>'.format(level['value'], prop['value'])
-            else:
-                item['content_html'] += block['html']
-        elif block['type'] == 'core/image':
-            img_src = ''
-            caption = ''
-            link = ''
-            for prop in block['properties']:
-                if prop['key'] == 'url':
-                    img_src = prop['value']
-                elif prop['key'] == 'content' and prop['value'] != "none":
-                    caption = prop['value']
-                elif prop['key'] == 'linkDestination' and prop['value'] != "none":
-                    link = prop['value']
-            item['content_html'] += utils.add_image(img_src, caption, link=link)
-        elif block['type'] == 'core/video':
-            m = re.search(r'<video[^>]+src="([^"]+)"', block['html'])
-            if m:
-                prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
-                if prop and prop['value'] != 'none':
-                    caption = prop['value']
-                else:
-                    caption = ''
-                item['content_html'] += utils.add_video(m.group(1), 'video/mp4', None, caption)
-            else:
-                logger.warning('unhandled core/video content in ' + item['url'])
-        elif block['type'] == 'core/audio':
-            m = re.search(r'<audio[^>]+src="([^"]+)"', block['html'])
-            if m:
-                prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
-                if prop and prop['value'] != 'none':
-                    caption = prop['value']
-                else:
-                    caption = 'Listen'
-                item['content_html'] += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">{2}</a></span></div><div>&nbsp;</div>'.format(m.group(1), config.server, caption)
-            else:
-                logger.warning('unhandled core/audio content in ' + item['url'])
-        elif block['type'] == 'core/embed':
-            prop = next((it for it in block['properties'] if it['key'] == 'url'), None)
-            if prop:
-                item['content_html'] += utils.add_embed(prop['value'])
-            else:
-                logger.warning('unhandled core/embed content in ' + item['url'])
-        elif block['type'] == 'core/quote':
-            prop = next((it for it in block['properties'] if it['key'] == 'quote'), None)
-            if prop:
-                quote = prop['value']
-                prop = next((it for it in block['properties'] if it['key'] == 'author'), None)
-                if prop and prop['value'] != 'none':
-                    caption = prop['value']
-                else:
-                    caption = ''
-                item['content_html'] += utils.add_pullquote(quote, caption)
-            else:
-                logger.warning('unhandled core/quote content in ' + item['url'])
-        elif block['type'] == 'core/separator':
-            item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
-        elif block['type'] == 'core/button':
-            m = re.search(r'<a[^>]+href="([^"]+)"', block['html'])
-            if m:
-                prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
-                item['content_html'] += utils.add_button(m.group(1), prop['value'])
-            else:
-                logger.warning('unhandled core/button content in ' + item['url'])
-        elif block['type'] == 'acf/button':
-            prop = next((it for it in block['properties'] if it['key'] == 'data'), None)
-            if prop:
-                data = json.loads(prop['value'])
-                item['content_html'] += utils.add_button(data['buttonPath'], data['buttonText'])
-            else:
-                logger.warning('unhandled acf/button content in ' + item['url'])
-        elif block['type'] == 'core/html':
-            m = re.search(r'src="(https://cdn\.jwplayer\.com/players/[^\.]+\.js)"', block['html'])
-            if m:
-                item['content_html'] += utils.add_embed(m.group(1))
-            else:
-                logger.warning('unhandled core/html content in ' + item['url'])
-        elif block['type'] == 'ub/star-rating-block':
-            prop = next((it for it in block['properties'] if it['key'] == 'selectedStars'), None)
-            if prop:
-                n = float(prop['value'])
-                item['content_html'] += '<div style="font-size:2em; font-weight:bold; color:rgb(255,165,0); margin-bottom:12px;">'
-                for i in range(math.floor(n)):
-                    item['content_html'] += '★'
-                if n % 1 > 0.0:
-                    item['content_html'] += '½'
-                item['content_html'] += '</div>'
-        elif block['type'] == 'core/buttons' or block['type'] == 'purple/m101-price-comparsion':
-            prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
-            if not prop or prop['value'] != '':
-                logger.warning('unhandled {} content in {}'.format(block['type'], item['url']))
-        else:
-            logger.warning('unhandled content block type {} in {}'.format(block['type'], item['url']))
+        item['content_html'] += render_content_block(block, content_json['content'])
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
+
+
+def render_content_block(block, content, is_child=False):
+    block_html = ''
+
+    if is_child == False and block.get('parentId'):
+        # skip blocks with a parent - process them within the parent
+        return block_html
+        # parent = next((it for it in content if it['id'] == block['parentId']), None)
+        # if parent:
+        #     block_html += render_content_block(parent, content)
+        #     return block_html
+        # else:
+        #     logger('unable to find parent block {}'.format(block['parentId']))
+
+    if block['type'] == 'core/paragraph' or block['type'] == 'core/list':
+        block_html += block['html']
+    elif block['type'] == 'core/heading':
+        level = next((it for it in block['properties'] if it['key'] == 'level'), None)
+        prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
+        if level and prop:
+            block_html += '<h{0}>{1}</h{0}>'.format(level['value'], prop['value'])
+        else:
+            block_html += block['html']
+    elif block['type'] == 'core/image':
+        img_src = ''
+        caption = ''
+        link = ''
+        for prop in block['properties']:
+            if prop['key'] == 'url':
+                img_src = prop['value']
+            elif prop['key'] == 'content' and prop['value'] != "none":
+                caption = prop['value']
+            elif prop['key'] == 'linkDestination' and prop['value'] != "none":
+                link = prop['value']
+        block_html += utils.add_image(img_src, caption, link=link)
+    elif block['type'] == 'coblocks/gallery-carousel':
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child:
+                block_html += render_content_block(child, content, True)
+    elif block['type'] == 'core/video':
+        m = re.search(r'<video[^>]+src="([^"]+)"', block['html'])
+        if m:
+            prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
+            if prop and prop['value'] != 'none':
+                caption = prop['value']
+            else:
+                caption = ''
+            block_html += utils.add_video(m.group(1), 'video/mp4', None, caption)
+        else:
+            logger.warning('unhandled core/video content')
+    elif block['type'] == 'core/audio':
+        m = re.search(r'<audio[^>]+src="([^"]+)"', block['html'])
+        if m:
+            prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
+            if prop and prop['value'] != 'none':
+                caption = prop['value']
+            else:
+                caption = 'Listen'
+            block_html += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">{2}</a></span></div><div>&nbsp;</div>'.format(m.group(1), config.server, caption)
+        else:
+            logger.warning('unhandled core/audio content')
+    elif block['type'] == 'core/embed':
+        prop = next((it for it in block['properties'] if it['key'] == 'url'), None)
+        if prop:
+            block_html += utils.add_embed(prop['value'])
+        else:
+            logger.warning('unhandled core/embed content')
+    elif block['type'] == 'core/group':
+        block_html += '<div'
+        prop = next((it for it in block['properties'] if it['key'] == 'className'), None)
+        if prop and prop['value'] != 'none':
+            if 'highlight-box' in prop['value']:
+                block_html += ' style="background-color:#ccc; padding:12px; border-radius:10px;"'
+        block_html += '>'
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child:
+                block_html += render_content_block(child, content, True)
+        block_html += '</div>'
+    elif block['type'] == 'core/columns':
+        block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;'
+        prop = next((it for it in block['properties'] if it['key'] == 'className'), None)
+        if prop and prop['value'] != 'none':
+            if 'highlight-box' in prop['value']:
+                block_html += ' background-color:#ccc; padding:12px; border-radius:10px;'
+        block_html += '">'
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child and child['type'] == 'core/column':
+                block_html += render_content_block(child, content, True)
+        block_html += '</div>'
+    elif block['type'] == 'core/column':
+        block_html += '<div style="flex:1; min-width:256px; margin:auto;">'
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child:
+                block_html += render_content_block(child, content, True)
+        block_html += '</div>'
+    elif block['type'] == 'core/media-text':
+        block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; background-color:#ccc; padding:12px; border-radius:10px;">'
+        block_soup = BeautifulSoup(block['html'], 'html.parser')
+        el = block_soup.find(class_='wp-block-media-text__media')
+        if el:
+            block_html += '<div style="flex:1; min-width:256px; margin:auto;"><img src="{}" style="width:100%" /></div>'.format(el.img['src'])
+        block_html += '<div style="flex:2; min-width:256px; margin:auto;">'
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child:
+                block_html += render_content_block(child, content, True)
+        block_html += '</div></div>'
+    elif block['type'] == 'core/quote':
+        prop = next((it for it in block['properties'] if it['key'] == 'quote'), None)
+        if prop:
+            quote = prop['value']
+            prop = next((it for it in block['properties'] if it['key'] == 'author'), None)
+            if prop and prop['value'] != 'none':
+                caption = prop['value']
+            else:
+                caption = ''
+            block_html += utils.add_pullquote(quote, caption)
+        else:
+            logger.warning('unhandled core/quote content')
+    elif block['type'] == 'core/separator':
+        block_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+    elif block['type'] == 'core/buttons':
+        for id in block['children']:
+            child = next((it for it in content if it['id'] == id), None)
+            if child:
+                block_html += render_content_block(child, content, True)
+    elif block['type'] == 'core/button':
+        m = re.search(r'<a[^>]+href="([^"]+)"', block['html'])
+        if m:
+            prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
+            block_html += utils.add_button(m.group(1), prop['value'])
+        else:
+            logger.warning('unhandled core/button content')
+    elif block['type'] == 'acf/button':
+        prop = next((it for it in block['properties'] if it['key'] == 'data'), None)
+        if prop:
+            data = json.loads(prop['value'])
+            block_html += utils.add_button(data['buttonPath'], data['buttonText'])
+        else:
+            logger.warning('unhandled acf/button content')
+    elif block['type'] == 'core/html':
+        block_soup = BeautifulSoup(block['html'], 'html.parser')
+        if block_soup.blockquote and block_soup.blockquote.get('class'):
+            if 'instagram-media' in block_soup.blockquote['class']:
+                block_html += utils.add_embed(block_soup.blockquote['data-instgrm-permalink'])
+        elif block_soup.script and block_soup.script.get('src') and 'jwplayer' in block_soup.script['src']:
+            block_html += utils.add_embed(block_soup.script['src'])
+        elif block_soup.find(class_='riddle2-wrapper'):
+            pass
+        else:
+            logger.warning('unhandled core/html content')
+    elif block['type'] == 'ub/star-rating-block':
+        prop = next((it for it in block['properties'] if it['key'] == 'selectedStars'), None)
+        if prop:
+            n = float(prop['value'])
+            block_html += '<div style="font-size:2em; font-weight:bold; color:rgb(255,165,0); margin-bottom:12px;">'
+            for i in range(math.floor(n)):
+                block_html += '★'
+            if n % 1 > 0.0:
+                block_html += '½'
+            block_html += '</div>'
+    elif block['type'] == 'purple/m101-in-text' or block['type'] == 'purple/m101-price-comparsion':
+        block_soup = BeautifulSoup(block['html'], 'html.parser')
+        el = block_soup.find(class_='m101')
+        if el and el.get('data-config'):
+            data = json.loads(el['data-config'])
+            monetizer_url = 'https://link.monetizer101.com/shop-rest/api/int/shop/918/compare/prices/geolocated/by/accuracy?' + urlencode(data) + '&filter-merchant=&xp=1&&url=' + quote_plus(el['data-url'])
+            if not data.get('limit'):
+                monetizer_url += '&limit=3'
+            monetizer_json = utils.get_url_json(monetizer_url)
+            if monetizer_json:
+                caption = 'Buy at {} ({}{:.2f})'.format(monetizer_json[0]['merchant']['name'], '$' if monetizer_json[0]['currency'] == 'USD' else '€', float(monetizer_json[0]['salePrice']))
+                block_html += utils.add_button(utils.get_redirect_url(monetizer_json[0]['deepLink']), caption)
+    # elif block['type'] == 'core/buttons' or block['type'] == 'purple/m101-price-comparsion':
+    #     prop = next((it for it in block['properties'] if it['key'] == 'content'), None)
+    #     if not prop or prop['value'] != '':
+    #         logger.warning('unhandled content block type ' + block['type'])
+    else:
+        logger.warning('unhandled content block type ' + block['type'])
+    return block_html
 
 
 def get_feed(url, args, site_json, save_debug=False):

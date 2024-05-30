@@ -281,6 +281,7 @@ __all__ = [
     'tmo_widen',
     'tmz',
     'tnm',
+    'tnn',
     'tnr',
     'tncms',
     'toi',

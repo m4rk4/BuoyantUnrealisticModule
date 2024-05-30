@@ -337,6 +337,8 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.torquenews.com/
+https://www.cam.ac.uk/research/news
 https://www.pitt.edu/pittwire/
 https://www.historytoday.com/
 https://www.nbc.com
@@ -412,6 +414,7 @@ https://www.hydrogeninsight.com/policy/a-campaign-built-on-dishonesty-hydrogen-h
 https://www.rechargenews.com/wind/avangrid-doubles-down-on-power-deal-pull-out-as-economic-gales-hit-us-offshore-wind/2-1-1392327
 
 Hugo-based blogs (https://github.com/gohugoio/hugo)
+https://longform.asmartbear.com/
 https://badgerbadgerbadgerbadger.dev/
 https://brainbaking.com/
 https://jimmyislive.dev/

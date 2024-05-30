@@ -198,7 +198,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
   r = None
   try:
     if use_curl_cffi:
-      r = curl_cffi_requests.get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+      r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     else:
       r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     r.raise_for_status()
@@ -214,6 +214,20 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
       logger.warning('curl_cffi request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     else:
       logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+    if r != None and (r.status_code == 401 or r.status_code == 403):
+      logger.debug('trying curl_cffi')
+      try:
+        r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
+        r.raise_for_status()
+      except Exception as e:
+        if r != None:
+          if r.status_code == 402 or r.status_code == 500:
+            return r
+          else:
+            status_code = ' status code {}'.format(r.status_code)
+        else:
+          status_code = ''
+        logger.warning('curl_cffi error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying cloudscraper')
       scraper = cloudscraper.create_scraper()

@@ -1,11 +1,11 @@
 import json, math, pygal, pytz, re
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup
 from datetime import datetime
 from pygal.style import Style
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
 import config, utils
-from feedhandlers import dirt, rss
+from feedhandlers import dirt
 
 import logging
 logger = logging.getLogger(__name__)

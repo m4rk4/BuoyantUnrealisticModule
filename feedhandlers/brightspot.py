@@ -171,7 +171,7 @@ def render_content(content, skip_promos=True):
                 quote += render_content(it, skip_promos)
             content_html += utils.add_blockquote(quote)
         elif '/list/List.hbs' in content['_template']:
-            if content.get('_styledTemplate') and '/list/BigNewsCont.hbs' in content['_styledTemplate']:
+            if (content.get('_styledTemplate') and '/list/BigNewsCont.hbs' in content['_styledTemplate']) or (content.get('title') and content['title'].lower() == 'more to read'):
                 # Skip
                 return content_html
             if content.get('title'):

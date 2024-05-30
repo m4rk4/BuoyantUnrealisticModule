@@ -228,11 +228,13 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                         if it and it.get_text().strip():
                             credit = it.get_text().strip()
                 if it:
+                    if it.get('class') and 'author-name' in it['class'] and it.find_parent(class_='author'):
+                        it = it.find_parent(class_='author')
                     it.decompose()
 
                 it = elm.find(class_='caption')
                 if it and it.get_text().strip():
-                    captions.insert(0, it.decode_contents().strip())
+                    captions.insert(0, re.sub(r'^<p>(.*)</p>$', r'\1', it.decode_contents().strip(), flags=re.S))
                 if not captions:
                     it = elm.find(class_=re.compile(r'wp-block-media-text__content'))
                     if it and it.get_text().strip():
@@ -3313,10 +3315,22 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         else:
             logger.warning('unhandled wp-block-uagb-section in ' + item['url'])
 
+    for el in soup.find_all(class_='dc-image-container'):
+        if el.parent and el.parent.name == 'p':
+            it = el.parent.find_next_sibling('p')
+            if it and it.find(class_='wp-caption'):
+                caption = it.find(class_='wp-caption').decode_contents()
+                it.decompose()
+            else:
+                caption = ''
+            add_image(el, el.parent, base_url, site_json, caption=caption)
+        else:
+            logger.warning('unhandled dc-image-container in ' + item['url'])
+
     for el in soup.find_all(['figure', 'div'], id=re.compile(r'media-\d+|attachment_\d+')):
         add_image(el, None, base_url, site_json)
 
-    for el in soup.find_all(class_=re.compile(r'article-image|bp-embedded-image|br-image|c-figure|c-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-ups-image|wp-caption|wp-image-\d+|wp-block-media|img-container')):
+    for el in soup.find_all(class_=re.compile(r'article-image|bp-embedded-image|br-image|c-figure|c-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|module__featured-image|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-ups-image|wp-caption|wp-image-\d+|wp-block-media|img-container')):
         if el.name != None:
             add_image(el, None, base_url, site_json)
 

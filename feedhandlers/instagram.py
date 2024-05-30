@@ -164,7 +164,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             try:
                 post_caption = ig_data['edge_media_to_caption']['edges'][0]['node']['text']
             except:
-                post_caption = None
+                post_caption = ''
         if post_caption:
             post_caption = post_caption.replace('\n', '<br/>')
             def format_caption_links(matchobj):
@@ -828,7 +828,6 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
                 logger.warning('status code {} getting {}'.format(req_friendly_name, r.status_code))
 
     return post_data, profile_data
-
 
 
 def bm_set_value(b_map, i):
