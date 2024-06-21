@@ -150,11 +150,21 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-video' in block['class']:
             if block.get('data-block-json'):
                 data_json = json.loads(block['data-block-json'])
-                #utils.write_file(data_json, './debug/video.json')
-                if data_json['providerName'] == 'YouTube' or data_json['providerName'] == 'Vimeo':
-                    item['content_html'] += utils.add_embed(data_json['url'])
+                # utils.write_file(data_json, './debug/video.json')
+                if data_json.get('providerName'):
+                    if data_json['providerName'] == 'YouTube' or data_json['providerName'] == 'Vimeo':
+                        item['content_html'] += utils.add_embed(data_json['url'])
+                    else:
+                        logger.warning('unhandled video provider {} in {}'.format(data_json['providerName'], item['url']))
                 else:
-                    logger.warning('unhandled video provider {} in {}'.format(data_json['providerName'], item['url']))
+                    el = block.find(class_='sqs-native-video', attrs={"data-config-video": True})
+                    if el:
+                        data_json = json.loads(el['data-config-video'])
+                        utils.write_file(data_json, './debug/video.json')
+                        if data_json.get('alexandriaUrl'):
+                            item['content_html'] += utils.add_video(data_json['alexandriaUrl'].replace('{variant}', 'playlist.m3u8'), 'application/x-mpegURL', data_json['alexandriaUrl'].replace('{variant}', 'thumbnail'))
+                    else:
+                        logger.warning('unhandled sqs-native-video ' + item['url'])
             else:
                 logger.warning('unhandled sqs-block-video in ' + item['url'])
 

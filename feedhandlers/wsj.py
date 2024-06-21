@@ -1,5 +1,5 @@
 import base64, certifi, js2py, json, math, pytz, random, re, requests, time
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from datetime import datetime
@@ -333,10 +333,23 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     # or look here: https://www.reddit.com/domain/wsj.com/.json
     # https://www.wsj.com/lifestyle/dog-owners-death-lessons-love-grief-53c77511?st=ycgues92xaxtr83
     # original_url = '/world/middle-east/israel-hamas-engage-in-some-of-fiercest-fighting-of-war-30edb859?st=mb6j2s8lus85b04'
-    original_url = 'https://www.wsj.com/world/europe/ukraine-withdraws-from-besieged-city-as-russia-advances-554644c0?st=g2h1gd2v9orwuhm'
+    # original_url = 'https://www.wsj.com/world/europe/ukraine-withdraws-from-besieged-city-as-russia-advances-554644c0?st=g2h1gd2v9orwuhm'
     # original_url = '/world/middle-east/hamas-militants-had-detailed-maps-of-israeli-towns-military-bases-and-infiltration-routes-7fa62b05?st=i9kvxxh54grfkvu'
     # Adding mod=djemalertNEWS seems to bypass the need for a token
     # original_url = urlsplit(url).path + "?mod=djemalertNEWS"
+    original_url = ''
+    reddit_json = utils.get_url_json('https://www.reddit.com/user/wsj/comments.json?sort=new')
+    if reddit_json:
+        for comment in reddit_json['data']['children']:
+            if comment['data'].get('body'):
+                m = re.search(r'\((https://www.wsj.com/[^\)]+)\)', comment['data']['body'])
+                if m:
+                    print(m.group(1))
+                    params = parse_qs(urlsplit(m.group(1)).query)
+                    if params.get('st'):
+                        original_url = m.group(1)
+                        break
+
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
@@ -906,16 +919,127 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
         return item
 
-    if api_json.get('body'):
-        item['content_html'] += render_contents(api_json['body'], split_url.netloc, article_links)
+    body_json = utils.get_url_json('https://www.mansionglobal.com/articles/{}?jsondata=y&noredirect=true&count=1'.format(item['id']), headers=headers)
+    if body_json:
+        body_soup = BeautifulSoup(body_json['body'], 'html.parser')
+        if save_debug:
+            utils.write_file(str(body_soup), './debug/body.html')
+        el = body_soup.find('div', class_='paywall')
+        if el:
+            el.unwrap()
 
-    if api_json.get('encryptedDocumentKey'):
-        content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
-        if content:
-            content_json = json.loads(content)
-            if save_debug:
-                utils.write_file(content_json, './debug/content.json')
-            item['content_html'] += render_contents(content_json, split_url.netloc, article_links)
+        # Remove comment sections
+        for el in body_soup.find_all(text=lambda text: isinstance(text, Comment)):
+            el.extract()
+
+        for el in body_soup.find_all('a', href=re.compile(r'https://www\.mansionglobal\.com/quote/')):
+            m = re.search(r'/quote/([^/]+)', el['href'])
+            if m:
+                if 'wsj' in split_url.netloc:
+                    # https://www.wsj.com/market-data/quotes/AAPL
+                    el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.wsj.com/market-data/quotes/')
+                elif 'barrons' in split_url.netloc:
+                    # https://www.wsj.com/market-data/quotes/AAPL
+                    el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.barrons.com/market-data/stocks/')
+                else:
+                    logger.warning('unhandled stock quote link {} in {}'.format(el['href'], item['url']))
+                if el.get('class') and 'chiclet-wrapper' in el['class']:
+                    stock_json = utils.get_url_json('https://api.foxbusiness.com/factset/stock-search?stockType=quoteInfo&identifiers=US:{}&isIndex=true'.format(m.group(1)))
+                    if stock_json:
+                        new_html = ' ({} ${:,.2f}'.format(stock_json['data'][0]['symbol'], stock_json['data'][0]['last'])
+                        if stock_json['data'][0]['changePercent'] < 0:
+                            el['style'] = 'color:red; text-decoration:none;'
+                            new_html += ' ▼ '
+                        else:
+                            el['style'] = 'color:green; text-decoration:none;'
+                            new_html += ' ▲ '
+                        new_html += '{:,.2f}%)'.format(stock_json['data'][0]['changePercent'])
+                        el.string = new_html
+                        # new_el = BeautifulSoup(new_html, 'html.parser')
+                        # el.insert(0, new_el)
+
+        for el in body_soup.find_all(class_='media-object'):
+            new_html = ''
+            if 'type-InsetMediaIllustration' in el['class']:
+                it = el.find('img')
+                if it:
+                    if it.get('srcset'):
+                        img_src = utils.image_from_srcset(it['srcset'], 1200)
+                    else:
+                        img_src = it['src']
+                    captions = []
+                    it = el.find(class_='wsj-article-caption-content')
+                    if it:
+                        captions.append(it.decode_contents())
+                    it = el.find(class_='wsj-article-credit')
+                    if it:
+                        captions.append(it.decode_contents())
+                    new_html = utils.add_image(img_src, ' | '.join(captions))
+            elif 'type-InsetMediaVideo' in el['class']:
+                it = el.find(class_='video-container')
+                if it:
+                    video_item = get_content('https://www.wsj.com/video/' + it['data-src'], {"embed": True}, {}, False)
+                    if video_item:
+                        new_html = video_item['content_html']
+            elif 'type-InsetDynamic' in el['class']:
+                group_captions = []
+                it = el.find(class_='origami-grouped-caption')
+                if it:
+                    group_captions.append(it.decode_contents())
+                it = el.find(class_='origami-grouped-credit')
+                if it:
+                    group_captions.append(it.decode_contents())
+                new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                for it in el.find_all(class_='origami-item'):
+                    if it.figure and it.figure.img:
+                        captions = []
+                        if not group_captions:
+                            cap = it.find(class_='origami-caption')
+                            if cap:
+                                captions.append(cap.decode_contents())
+                            cap = it.find(class_='origami-credit')
+                            if cap:
+                                captions.append(cap.decode_contents())
+                        new_html += '<div style="flex:1; min-width:256px; margin:auto;">' + utils.add_image(it.figure.img['src'], ' | '.join(captions), link=it.figure.img['src']) + '</div>'
+                new_html += '</div>'
+                if group_captions:
+                    new_html += '<div><small>' + ' | '.join(group_captions) + '</div>'
+            elif 'type-InsetArticleReader' in el['class']:
+                it = el.find(class_='audioplayer')
+                if it:
+                    video_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=read-to-me&query={}&fields=adZone,audioURL,audioURLPanoply,author,body,column,description,doctypeID,duration,episodeNumber,formattedCreationDate,guid,keywords,linkURL,name,omniPublishDate,omniVideoFormat,playbackSite,podcastName,podcastSubscribeLinks,podcastUrl,rootId,thumbnailImageManager,thumbnailList,titletag,type,wsj-section,wsj-subsection'.format(it['data-sbid'])
+                    video_json = utils.get_url_json(video_url)
+                    if video_json:
+                        duration = utils.calc_duration(int(video_json['items'][0]['duration']))
+                        new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a> ({2})</span></div><div>&nbsp;</div>'.format(video_json['items'][0]['audioURL'], config.server, duration)
+            elif 'type-InsetPageRule' in el['class']:
+                new_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+            elif 'type-InsetRichText' in el['class']:
+                it = el.find('h4')
+                if it and re.search(r'MORE IN|SHARE YOUR THOUGHTS', it.get_text().strip()):
+                    el.decompose()
+                    continue
+            elif 'type-InsetBigTopHero' in el['class'] or 'type-InsetNewsletterSignup' in el['class']:
+                # Skip
+                el.decompose()
+                continue
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled media-object class {} in {}'.format(el['class'], item['url']))
+
+        item['content_html'] += body_soup.find(class_='article-wrap').decode_contents()
+    else:
+        if api_json.get('body'):
+            item['content_html'] += render_contents(api_json['body'], split_url.netloc, article_links)
+        if api_json.get('encryptedDocumentKey'):
+            content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
+            if content:
+                content_json = json.loads(content)
+                if save_debug:
+                    utils.write_file(content_json, './debug/content.json')
+                item['content_html'] += render_contents(content_json, split_url.netloc, article_links)
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item

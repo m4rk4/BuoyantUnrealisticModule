@@ -146,6 +146,9 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '<li>Genre: ' + re.sub(r'(\w),(\w)', r'\1, \2', content_json['metainfo']['MovieGenere']['value']) + '</li>'
             item['content_html'] += '</ul>'
 
+        if content_json.get('summary'):
+            item['content_html'] += '<div>&nbsp;</div><div style="font-size:1.1em; font-weight:bold;">Key Highlights</div>' + content_json['summary']
+
         if content_json.get('embedData'):
             for block in content_json['embedData']:
                 if block.get('photoType'):

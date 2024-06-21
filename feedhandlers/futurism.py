@@ -1,8 +1,8 @@
-import re
-from bs4 import BeautifulSoup
+import pytz, re
 from datetime import datetime
 from urllib.parse import urlsplit
 
+import config
 import utils
 from feedhandlers import wp_posts
 
@@ -71,12 +71,17 @@ def get_item(post_json, apollo_state, url, args, site_json, save_debug=False):
     elif post_json.get('seo'):
         item['title'] = post_json['seo']['title']
 
-    dt = datetime.fromisoformat(post_json['date'] + '+00:00')
+    # Local tz or always US/Eastern?
+    tz_loc = pytz.timezone(config.local_tz)
+    dt_loc = datetime.fromisoformat(post_json['date'])
+    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(post_json['modifiedGmt'] + '+00:00')
-    item['date_modified'] = dt.isoformat()
+    if post_json.get('modified'):
+        dt_loc = datetime.fromisoformat(post_json['modified'])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_modified'] = dt.isoformat()
 
     item['author'] = {"name": post_json['author']['node']['name']}
 

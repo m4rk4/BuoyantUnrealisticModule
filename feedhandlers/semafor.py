@@ -150,6 +150,8 @@ def render_block(block, sub_resize_image):
                                 start_tag += '<a href="mailto:{}">'.format(text)
                             else:
                                 logger.warning('unhandled mark link')
+                                # Link to self
+                                start_tag += '<a href="">'
                             end_tag = '</a>' + end_tag
                         elif mark['_type'] == 'internalLink':
                             article_json = get_article_by_id(mark['internalLink']['_ref'])
@@ -199,6 +201,80 @@ def render_block(block, sub_resize_image):
             content_html += utils.add_embed(soup.iframe['src'])
         else:
             logger.warning('unhandled embedBlock content')
+
+    elif block['_type'] == 'media':
+        for media in block['mediaType']:
+            if media['_type'] == 'kaltura':
+                # https://health.clevelandclinic.org/slow-running
+                # TODO: widgetId/providerId are for clevelandclinic.com. Not sure if they will work for others.
+                data_json = {
+                    "1": {
+                        "service": "session",
+                        "action": "startWidgetSession",
+                        "widgetId": "_2207941"
+                    },
+                    "2": {
+                        "service": "baseEntry",
+                        "action": "list",
+                        "ks": "{1:result:ks}",
+                        "filter": {
+                            "redirectFromEntryId": media['kalturaId']
+                        },
+                        "responseProfile": {
+                            "type": 1,
+                            "fields": "id,referenceId,name,description,thumbnailUrl,dataUrl,duration,msDuration,flavorParamsIds,mediaType,type,tags,dvrStatus,externalSourceType,status,createdAt,updatedAt,endDate,plays,views,downloadUrl,creatorId"
+                        }
+                    },
+                    "3": {
+                        "service": "baseEntry",
+                        "action": "getPlaybackContext",
+                        "entryId": "{2:result:objects:0:id}",
+                        "ks": "{1:result:ks}",
+                        "contextDataParams": {
+                            "objectType": "KalturaContextDataParams",
+                            "flavorTags": "all"
+                        }
+                    },
+                    "4": {
+                        "service": "metadata_metadata",
+                        "action": "list",
+                        "filter": {
+                            "objectType": "KalturaMetadataFilter",
+                            "objectIdEqual": "{2:result:objects:0:id}",
+                            "metadataObjectTypeEqual": "1"
+                        },
+                        "ks": "{1:result:ks}"
+                    },
+                    "apiVersion": "3.3.0",
+                    "format": 1,
+                    "ks": "",
+                    "clientTag": "html5:v3.17.17",
+                    "partnerId": 2207941
+                }
+                media_json = utils.post_url("https://cdnapisec.kaltura.com/api_v3/service/multirequest", json_data=data_json)
+                if media_json:
+                    media_obj = media_json[1]['objects'][0]
+                    source = next((it for it in media_json[2]['sources'] if it['format'] == 'applehttp'), None)
+                    if source:
+                        poster = media_obj['thumbnailUrl'] + '/height/720/width/1200'
+                        content_html += utils.add_video(source['url'], 'application/x-mpegURL', poster, media_obj['name'])
+            else:
+                logger.warning('unhandled media type ' + media['_type'])
+
+    elif block['_type'] == 'table':
+        content_html += '<table style="width:100%; border-collapse:collapse;">'
+        for i, row in enumerate(block['rows']):
+            if i == 0:
+                content_html += '<tr style="line-height:1.8em; border-bottom:1px solid #555; background-color:#ccc;">'
+                for it in row['cells']:
+                    content_html += '<th style="text-align:left;">' + it + '</th>'
+                content_html += '</tr>'
+            else:
+                content_html += '<tr style="line-height:1.8em; border-bottom:1px solid #555;">'
+                for it in row['cells']:
+                    content_html += '<td>' + it + '</td>'
+                content_html += '</tr>'
+        content_html += '</table>'
 
     elif block['_type'] == 'divider':
         if block.get('variant') and block['variant'] == 'dotted-rule':

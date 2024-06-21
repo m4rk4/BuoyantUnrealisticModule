@@ -42,15 +42,17 @@ def get_next_data(url, site_json):
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != site_json['buildId']:
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            logger.warning('unable to find __NEXT_DATA__ in ' + url)
+            return None
+        next_data = json.loads(el.string)
+        if next_data['buildId'] != site_json['buildId']:
             logger.debug('updating {} buildId'.format(split_url.netloc))
-            site_json['buildId'] = m.group(1)
+            site_json['buildId'] = next_data['buildId']
             utils.update_sites(url, site_json)
-            next_url = '{}://{}/_next/data/{}/{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
-            next_data = utils.get_url_json(next_url)
-            if not next_data:
-                return None
+        return next_data['props']
     return next_data
 
 

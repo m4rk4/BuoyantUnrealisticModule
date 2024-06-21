@@ -28,7 +28,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         return None
     soup = BeautifulSoup(page_html, 'html.parser')
     if save_debug:
-        utils.write_file(soup.prettify(), './debug/debug.html')
+        utils.write_file(soup.prettify(), './debug/page.html')
 
     meta = {}
     for el in soup.find_all('meta'):
@@ -127,7 +127,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     elif ld_page:
         article_json = ld_page
 
-    el = soup.find('link', attrs={"rel": "alternative", "type": "application/json+oembed"})
+    el = soup.find('link', attrs={"type": "application/json+oembed"})
     if el:
         oembed_json = utils.get_url_json(el['href'])
     else:
@@ -143,7 +143,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if not item.get('id'):
         el = soup.find('link', attrs={"rel": "shortlink"})
         if el:
-            item['url'] = el['href']
+            # item['url'] = el['href']
             m = re.search(r'p=(\d+)', urlsplit(el['href']).query)
             if m:
                 item['id'] = m.group(1)
@@ -163,7 +163,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if not item.get('id') and article_json and article_json.get('@id'):
             item['id'] = article_json['@id']
 
-    if not item.get('url'):
+    el = soup.find('link', attrs={"rel": "canonical"})
+    if el:
+        item['url'] = el['href']
+    else:
         if meta and meta.get('og:url'):
             item['url'] = meta['og:url']
         elif article_json and article_json.get('url'):
@@ -211,7 +214,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
             item['title'] = html.unescape(item['title'])
         if site_json.get('site_title') and site_json['site_title'] in item['title']:
-            item['title'] = re.sub(r'(.*)\s+[–-]\s+{}'.format(site_json['site_title']), r'\1', item['title'])
+            item['title'] = re.sub(r'(.*?)\s+[–-]\s+{}'.format(site_json['site_title']), r'\1', item['title'], flags=re.I)
 
     if not item.get('date_published'):
         date = ''
@@ -246,10 +249,31 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
         elif site_json.get('date'):
-            # This is for displaying content, the real date to be substituted from the rss feed
             for el in utils.get_soup_elements(site_json['date'], soup):
-                item['_display_date'] = el.get_text()
+                try:
+                    if el.name == 'meta':
+                        date = el['content']
+                    else:
+                        date = el.get_text().strip()
+                    if site_json['date'].get('strptime'):
+                        dt = datetime.strptime(date, site_json['date']['strptime'])
+                    else:
+                        dt = dateutil.parser.parse(date)
+                    item['date_published'] = dt.isoformat()
+                    item['_timestamp'] = dt.timestamp()
+                    item['_display_date'] = utils.format_display_date(dt)
+                except:
+                    # This is for displaying content, the real date to be substituted from the rss feed
+                    item['_display_date'] = date
                 break
+        else:
+            print(item['url'])
+            m = re.search(r'/(2[01][123]\d)/([01]\d)/([0123]\d)/', item['url'])
+            if m:
+                dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                item['date_published'] = dt.isoformat()
+                item['_timestamp'] = dt.timestamp()
+                item['_display_date'] = utils.format_display_date(dt)
 
     if not item.get('date_modified'):
         date = ''
@@ -319,6 +343,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
         elif site_json.get('authors'):
             item['author'] = {"name": site_json['authors']['default']}
+        else:
+            item['author'] = {"name": split_url.netloc}
 
     if not item.get('tags'):
         item['tags'] = []
@@ -409,66 +435,71 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     elif 'add_subtitle' in args and item.get('summary'):
         item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
-    if 'add_lede_img' in args:
-        if 'no_lede_caption' in args:
-            add_caption = False
-        else:
-            add_caption = True
-        lede = False
-        if site_json.get('lede_video'):
-            elements = utils.get_soup_elements(site_json['lede_video'], soup)
+    if 'no_lede_caption' in args:
+        add_caption = False
+        caption = ''
+    else:
+        add_caption = True
+        caption = ''
+        if site_json.get('lede_caption'):
+            elements = utils.get_soup_elements(site_json['lede_caption'], soup)
             if elements:
-                el = elements[0]
-                if el:
-                    it = el.find(class_='jw-video-box')
+                caption = elements[0].decode_contents()
+    lede = False
+    if site_json.get('lede_video'):
+        elements = utils.get_soup_elements(site_json['lede_video'], soup)
+        if elements:
+            el = elements[0]
+            if el:
+                it = el.find(class_='jw-video-box')
+                if it:
+                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
+                    lede = True
+                else:
+                    it = el.find(id=re.compile(r'jw-player-'))
                     if it:
-                        item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
-                        lede = True
-                    else:
-                        it = el.find(id=re.compile(r'jw-player-'))
-                        if it:
-                            if article_json.get('video'):
-                                item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
-                                lede = True
-                            else:
-                                it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
-                                if it:
-                                    m = re.search(r'"mediaid":"([^"]+)"', it.string)
-                                    if m:
-                                        item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
-                                        lede = True
-                        else:
-                            it = el.find(class_='video-wrapper')
-                            if it and it.get('data-type') and it['data-type'] == 'youtube':
-                                item['content_html'] += utils.add_embed(it['data-src'])
-                                lede = True
-                            else:
-                                it = el.find('iframe')
-                                if it:
-                                    item['content_html'] += utils.add_embed(it['src'])
-                                    lede = True
-                                else:
-                                    logger.warning('unhandled lede video wrapper in ' + item['url'])
-        if not lede and site_json.get('lede_img'):
-            elements = utils.get_soup_elements(site_json['lede_img'], soup)
-            if elements:
-                el = elements[0]
-                if el:
-                    if el.find(class_='rslides'):
-                        it = el.find('li')
-                        item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, add_caption=add_caption)
-                        lede = True
-                        gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
-                    elif el.find('img'):
-                        item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, add_caption=add_caption)
-                        lede = True
-                    else:
-                        it = el.find('iframe')
-                        if it:
-                            item['content_html'] += utils.add_embed(it['src'])
+                        if article_json.get('video'):
+                            item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
                             lede = True
-        if not lede and item.get('_image'):
-            item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
+                        else:
+                            it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
+                            if it:
+                                m = re.search(r'"mediaid":"([^"]+)"', it.string)
+                                if m:
+                                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
+                                    lede = True
+                    else:
+                        it = el.find(class_='video-wrapper')
+                        if it and it.get('data-type') and it['data-type'] == 'youtube':
+                            item['content_html'] += utils.add_embed(it['data-src'])
+                            lede = True
+                        else:
+                            it = el.find('iframe')
+                            if it:
+                                item['content_html'] += utils.add_embed(it['src'])
+                                lede = True
+                            else:
+                                logger.warning('unhandled lede video wrapper in ' + item['url'])
+    if not lede and site_json.get('lede_img'):
+        elements = utils.get_soup_elements(site_json['lede_img'], soup)
+        if elements:
+            el = elements[0]
+            if el:
+                if el.find(class_='rslides'):
+                    it = el.find('li')
+                    item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, caption, add_caption)
+                    lede = True
+                    gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
+                elif el.find('img'):
+                    item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, caption, add_caption)
+                    lede = True
+                else:
+                    it = el.find('iframe')
+                    if it:
+                        item['content_html'] += utils.add_embed(it['src'])
+                        lede = True
+    if 'add_lede_img' in args and not lede and item.get('_image'):
+        item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
     if site_json.get('add_content'):
         for it in site_json['add_content']:
@@ -495,6 +526,20 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     if gallery:
         item['content_html'] += '<h3>Gallery</h3>' + gallery
+
+    if site_json.get('text_encode'):
+        def encode_item(item, enc):
+            if isinstance(item, str):
+                # print(item)
+                item = item.encode(enc, 'replace').decode('utf-8', 'replace')
+            elif isinstance(item, list):
+                for i, it in enumerate(item):
+                    item[i] = encode_item(it, enc)
+            elif isinstance(item, dict):
+                for key, val in item.items():
+                    item[key] = encode_item(val, enc)
+            return item
+        encode_item(item, site_json['text_encode'])
 
     return item
 

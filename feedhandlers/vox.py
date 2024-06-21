@@ -41,15 +41,18 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+
     soup = BeautifulSoup(page_html, 'lxml')
     el = soup.find('script', attrs={"type": "application/ld+json"})
     if not el:
         logger.warning('unable to find ld+json in ' + url)
         return None
-
     ld_json = json.loads(el.string)
     if save_debug:
         utils.write_file(ld_json, './debug/debug.json')
+
     article_json = None
     if isinstance(ld_json, dict):
         article_json = ld_json
@@ -137,6 +140,17 @@ def get_content(url, args, site_json, save_debug=False):
             elif el.find(class_='c-image-grid'):
                 for it in el.find_all('figure', class_='e-image'):
                     new_html += add_image(it)
+            elif el.find(class_='c-image-gallery'):
+                for li in el.find_all('li'):
+                    img_src = li.a['href']
+                    captions = []
+                    it = li.find(class_='c-image-gallery__thumb-title')
+                    if it:
+                        captions.append(it.get_text().strip())
+                    it = li.find(class_='c-image-gallery__thumb-desc')
+                    if it:
+                        captions.append(it.get_text().strip())
+                    new_html += utils.add_image(img_src, ' | '.join(captions))
             elif el.find(class_='c-imageslider'):
                 it = el.find(class_='c-imageslider')
                 data_json = json.loads(it['data-cdata'])

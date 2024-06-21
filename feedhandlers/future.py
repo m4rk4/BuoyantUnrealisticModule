@@ -294,7 +294,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     body = soup.find(id='article-body')
     if body:
-        for el in body.find_all(class_=['ad-unit', 'newsletter-signup', 'remixd-audioplayer__container', 'table__instruction', 'van_vid_carousel']):
+        for el in body.find_all(class_=['ad-unit', 'newsletter-signup', 'remixd-audioplayer__container', 'slice-container-newsletterForm', 'table__instruction', 'van_vid_carousel']):
             el.decompose()
 
         for el in body.find_all(id='blueconic-article-kiplinger'):
@@ -309,15 +309,50 @@ def get_content(url, args, site_json, save_debug=False):
         for el in body.find_all('script', id=re.compile('vanilla-slice-person-\d+-hydrate')):
             el.decompose()
 
+        for el in body.find_all('script', attrs={"data-id": re.compile('vanilla-slice-newsletter')}):
+            el.decompose()
+
         for el in body.find_all(id=re.compile(r'slice-container-person-\d+')):
             el.decompose()
 
-        for el in body.find_all(class_='table-wrapper'):
+        for el in body.find_all('div', class_='table__container'):
+            for it in el.find_all('span', class_='sr-only'):
+                it.decompose()
+            for it in el.find_all('th', class_='table__head__heading'):
+                if 'table__head__heading--left' in it['class']:
+                    it.attrs = {}
+                    it['style'] = 'text-align:left;'
+                else:
+                    it.attrs = {}
+            it = el.find('caption')
+            if it:
+                new_html = '<div style="font-size:1.2em; font-weight:bold;">' + it.decode_contents() + '</div>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_before(new_el)
+                it.decompose()
+            el.table.attrs = {}
+            el.table['style'] = 'border-collapse:collapse;'
+            for i, it in enumerate(el.table.find_all('tr')):
+                if 'table__head__row' in it['class']:
+                    it.attrs = {}
+                    it['style'] = 'line-height:1.8em; border-bottom:2px solid black; background-color:#555; color:white;'
+                else:
+                    it.attrs = {}
+                    it['style'] = 'line-height:1.8em; border-bottom:1px solid black;'
+                    if i % 2 == 0:
+                        it['style'] += ' background-color:#ccc;'
+                    if it.td and it.td.get('style'):
+                        it.td['style'] = 'padding-right:1em; ' + it.td['style']
+                    else:
+                        it.td['style'] = 'padding-right:1em;'
             el.unwrap()
-        for el in body.find_all(class_='table__container'):
-            el.unwrap()
-        for el in body.find_all('table'):
-            el.attrs = {}
+
+        # for el in body.find_all(class_='table-wrapper'):
+        #     el.unwrap()
+        # for el in body.find_all(class_='table__container'):
+        #     el.unwrap()
+        # for el in body.find_all('table'):
+        #     el.attrs = {}
 
         for el in body.find_all(re.compile(r'^h\d')):
             el.attrs = {}

@@ -36,6 +36,10 @@ def add_image(image):
         img_src = image['variantUrl']
     elif image.get('main'):
         img_src = image['main']
+    elif image.get('thumbnail'):
+        img_src = image['thumbnail']['url']
+    elif image.get('image') and image['image'].get('thumbnails'):
+        img_src = image['image']['thumbnails']['horizontal']['url']
     else:
         logger.warning('unknown image src')
         img_src = ''
@@ -74,7 +78,7 @@ def get_next_data(url):
 
 def render_body_component(component):
     content_html = ''
-    if component['__typename'] == 'EntryBodyParagraph':
+    if component['__typename'] == 'EntryBodyParagraph' or component['__typename'] == 'CoreParagraphBlockType':
         if component.get('dropcap') == True:
             if component['contents']['html'][0] == '<':
                 content_html += re.sub(r'^(<[^>]+>)(\w)(.*)', r'<p>\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>\3</p><span style="clear:left;"></span>', component['contents']['html'])
@@ -83,12 +87,15 @@ def render_body_component(component):
         else:
             content_html += '<p>{}</p>'.format(component['contents']['html'])
 
-    elif component['__typename'] == 'EntryBodyHeading':
+    elif component['__typename'] == 'EntryBodyHeading' or component['__typename'] == 'CoreHeadingBlockType':
         content_html += '<h{0}>{1}</h{0}>'.format(component['level'], component['contents']['html'])
 
-    elif component['__typename'] == 'EntryBodyList':
+    elif component['__typename'] == 'EntryBodyList' or component['__typename'] == 'CoreListBlockType':
         for it in component['items']:
-            content_html += '<li>{}</li>'.format(it['line']['html'])
+            if it.get('line'):
+                content_html += '<li>{}</li>'.format(it['line']['html'])
+            elif it.get('contents'):
+                content_html += '<li>{}</li>'.format(it['contents']['html'])
         if component.get('ordered'):
             content_html = '<ol>' + content_html + '</ol>'
         else:
@@ -97,7 +104,7 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyImage':
         content_html += add_image(component['image'])
 
-    elif component['__typename'] == 'EntryImage':
+    elif component['__typename'] == 'EntryImage' or component['__typename'] == 'CoreImageBlockType' or component['__typename'] == 'LedeMediaImageType':
         content_html += add_image(component)
 
     elif component['__typename'] == 'EntryBodyImageGroup':
@@ -121,32 +128,54 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyVideo' or component['__typename'] == 'EntryLeadVideo':
         content_html += add_video_embed(component['video']['uuid'])
 
-    elif component['__typename'] == 'EntryEmbed' or component['__typename'] == 'EntryBodyEmbed' or component['__typename'] == 'EntryLeadEmbed':
-        if component['__typename'] == 'EntryEmbed':
+    elif component['__typename'] == 'EntryEmbed' or component['__typename'] == 'EntryBodyEmbed' or component['__typename'] == 'EntryLeadEmbed' or component['__typename'] == 'CoreEmbedBlockType':
+        if component['__typename'] == 'EntryEmbed' or component['__typename'] == 'CoreEmbedBlockType':
             embed = component
         else:
             embed = component['embed']
         soup = BeautifulSoup(embed['embedHtml'], 'html.parser')
-        if embed.get('provider') and embed['provider']['name'] == 'Twitter':
-            links = soup.find_all('a')
-            content_html += utils.add_embed(links[-1]['href'])
-        elif embed.get('provider') and embed['provider']['name'] == 'TikTok':
-            content_html += utils.add_embed(soup.blockquote['cite'])
+        provider = ''
+        if embed.get('provider'):
+            if isinstance(embed['provider'], str):
+                provider = embed['provider'].lower()
+            elif isinstance(embed['provider'], dict):
+                provider = embed['provider']['name'].lower()
+            if provider == 'twitter':
+                links = soup.find_all('a')
+                content_html += utils.add_embed(links[-1]['href'])
+            elif provider == 'instagram':
+                content_html += utils.add_embed(soup.blockquote['data-instgrm-permalink'])
+            elif provider == 'tiktok':
+                content_html += utils.add_embed(soup.blockquote['cite'])
+            elif provider == 'spotify':
+                content_html += utils.add_embed(soup.iframe['src'])
+            else:
+                logger.warning('unhandled {} provider {}'.format(component['__typename'], provider))
         elif soup.iframe:
             content_html += utils.add_embed(soup.iframe['src'])
         else:
             logger.warning('unhandled ' + component['__typename'])
 
-    elif component['__typename'] == 'EntryBodyHTML':
-        soup = BeautifulSoup(component['rawHtml'], 'html.parser')
-        if soup.iframe and soup.iframe['src'] == 'https://www.platformer.news/embed':
-            pass
-        elif soup.find(id='toc-main'):
-            pass
-        elif soup.iframe:
-            content_html += utils.add_embed(soup.iframe['src'])
+    elif component['__typename'] == 'EntryBodyHTML' or component['__typename'] == 'CoreHTMLBlockType':
+        if component.get('rawHtml'):
+            soup = BeautifulSoup(component['rawHtml'], 'html.parser')
+        elif component.get('markup'):
+            soup = BeautifulSoup(component['markup'], 'html.parser')
         else:
-            logger.warning('unhandled EntryBodyHTML')
+            soup = None
+        if soup:
+            if soup.iframe and soup.iframe['src'] == 'https://www.platformer.news/embed':
+                pass
+            elif soup.find(id='toc-main'):
+                pass
+            elif soup.iframe:
+                content_html += utils.add_embed(soup.iframe['src'])
+            elif soup.p:
+                content_html += str(soup)
+            else:
+                logger.warning('unhandled ' + component['__typename'])
+        else:
+            logger.warning('unhandled ' + component['__typename'])
 
     elif component['__typename'] == 'EntryBodyBlockquote':
         quote = ''
@@ -157,8 +186,11 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyPullquote':
         content_html += utils.add_pullquote(component['quote']['html'])
 
-    elif component['__typename'] == 'EntryBodyHorizontalRule':
-        content_html += '<hr/>'
+    elif component['__typename'] == 'CorePullquoteBlockType':
+        content_html += utils.add_pullquote(component['contents']['html'])
+
+    elif component['__typename'] == 'EntryBodyHorizontalRule' or component['__typename'] == 'CoreSeparatorBlockType':
+        content_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
 
     elif component['__typename'] == 'EntryExternalLink':
         content_html += '<p><a href="{}">{}</a> [{}]</p>'.format(component['url'], component['title'], component['source'])
@@ -262,7 +294,7 @@ def render_body_component(component):
         else:
             logger.warning('unhandled EntryBodyActionbox')
 
-    elif component['__typename'] == 'EntryBodyRelatedList' or component['__typename'] == 'EntryBodyNewsletter':
+    elif component['__typename'] == 'EntryBodyRelatedList' or component['__typename'] == 'RelatedPostsBlockType' or component['__typename'] == 'EntryBodyNewsletter' or component['__typename'] == 'NewsletterBlockType':
         pass
 
     else:
@@ -279,32 +311,70 @@ def get_item(entry_json, args, site_json, save_debug):
 
     if entry_json.get('_id'):
         item['id'] = entry_json['_id']
-    else:
-        split_url = urlsplit(entry_json['shortLink'])
+    elif entry_json.get('id'):
+        item['id'] = entry_json['id']
+    elif entry_json.get('wpId'):
+        item['id'] = entry_json['wpId']
+
+    if entry_json.get('permalink'):
+        item['url'] = entry_json['permalink']
+    elif entry_json.get('url'):
+        item['url'] = entry_json['url']
+    elif entry_json.get('shortLink'):
+        item['url'] = entry_json['shortLink']
+
+    if item.get('url') and not item.get('id'):
+        split_url = urlsplit(item['url'])
         paths = list(filter(None, split_url.path.split('/')))
-        item['id'] = paths[-1]
+        if paths[1].isnumeric():
+            item['id'] = paths[1]
+        else:
+            item['id'] = paths[-1]
 
-    item['url'] = entry_json['url']
-
-    if entry_json['type'] == 'QUICK_POST':
+    if entry_json.get('type') and entry_json['type'] == 'QUICK_POST':
         item['title'] = 'Quick Post: ' + entry_json['title']
     else:
         item['title'] = entry_json['title']
 
-    dt = datetime.fromisoformat(entry_json['originalPublishDate'].replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(entry_json['publishDate'].replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
+    if entry_json.get('originalPublishDate'):
+        dt = datetime.fromisoformat(entry_json['originalPublishDate'])
+    elif entry_json.get('originalPublishedAt'):
+        dt = datetime.fromisoformat(entry_json['originalPublishedAt'])
+    elif entry_json.get('createdAt'):
+        dt = datetime.fromisoformat(entry_json['createdAt'])
+    else:
+        dt = None
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": entry_json['author']['fullName']}
+    if entry_json.get('updatedAt'):
+        dt = datetime.fromisoformat(entry_json['updatedAt'])
+    elif entry_json.get('publishDate'):
+        dt = datetime.fromisoformat(entry_json['publishDate'])
+    else:
+        dt = None
+    if dt:
+        item['date_modified'] = dt.isoformat()
+
+    if entry_json.get('author'):
+        item['author'] = {"name": entry_json['author']['fullName']}
+    elif entry_json.get('authors'):
+        authors = []
+        for it in entry_json['authors']:
+            authors.append(it['name'])
+        item['author'] = {}
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     item['tags'] = []
     if entry_json.get('communityGroups'):
         for it in entry_json['communityGroups']:
             if it['name'] != 'Front Page':
                 item['tags'].append(it['name'])
+    if entry_json.get('categories'):
+        for it in entry_json['categories']:
+            item['tags'].append(it['title'])
     if not item.get('tags'):
         del item['tags']
 
@@ -312,6 +382,8 @@ def get_item(entry_json, args, site_json, save_debug):
         item['_image'] = entry_json['leadImage']['variantUrl']
     elif entry_json.get('leadImage') and entry_json['leadImage'].get('defaultImageUrl'):
         item['_image'] = entry_json['leadImage']['defaultImageUrl']
+    elif entry_json.get('leadMedia') and entry_json['leadMedia'].get('image'):
+        item['_image'] = entry_json['leadMedia']['image']['thumbnails']['horizontal']['url']
     elif entry_json.get('promoImage'):
         item['_image'] = entry_json['promoImage']['variantUrl']
     elif entry_json.get('socialImage'):
@@ -333,14 +405,19 @@ def get_item(entry_json, args, site_json, save_debug):
 
     if entry_json.get('leadComponent'):
         item['content_html'] += render_body_component(entry_json['leadComponent'])
+    if entry_json.get('ledeMediaData'):
+        item['content_html'] += render_body_component(entry_json['ledeMediaData'])
 
-    if entry_json['type'] == 'QUICK_POST':
+    if entry_json.get('type') and entry_json['type'] == 'QUICK_POST':
         for component in entry_json['body']['quickPostComponents']:
             item['content_html'] += render_body_component(component)
         if entry_json.get('quickAttachment'):
             item['content_html'] += render_body_component(entry_json['quickAttachment'])
-    else:
+    elif entry_json.get('body'):
         for component in entry_json['body']['components']:
+            item['content_html'] += render_body_component(component)
+    elif entry_json.get('blocks'):
+        for component in entry_json['blocks']:
             item['content_html'] += render_body_component(component)
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
@@ -357,12 +434,14 @@ def get_content(url, args, site_json, save_debug):
     if next_data['props']['pageProps'].get('entityProps'):
         entry_json = next_data['props']['pageProps']['entityProps']['hydration']['responses'][0]['data']['entryRevision']
     elif next_data['props']['pageProps'].get('hydration'):
-        response = next((it for it in next_data['props']['pageProps']['hydration']['responses'] if ('ArticleLayoutQuery' in it['operationName'] or 'EntityLayoutQuery' in it['operationName'])), None)
+        response = next((it for it in next_data['props']['pageProps']['hydration']['responses'] if ('ArticleLayoutQuery' in it['operationName'] or 'EntityLayoutQuery' in it['operationName'] or 'PostLayoutQuery' in it['operationName'])), None)
         if response and response.get('data'):
             if response['data'].get('entryRevision'):
                 entry_json = response['data']['entryRevision']
             elif response['data'].get('entity'):
                 entry_json = response['data']['entity']
+            elif response['data'].get('node'):
+                entry_json = response['data']['node']
     if not entry_json:
         logger.warning('unable to determine entry data in ' + url)
         return None

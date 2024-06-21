@@ -19,8 +19,9 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled acast url ' + url)
                 return None
 
-    audio_json = utils.get_url_json(
-        'https://feeder.acast.com/api/v1/shows/{}/episodes/{}?showInfo=true'.format(m.group(1), m.group(2)))
+    audio_json = utils.get_url_json('https://feeder.acast.com/api/v1/shows/{}/episodes/{}?showInfo=true'.format(m.group(1), m.group(2)))
+    if not audio_json:
+        return None
     if save_debug:
         utils.write_file(audio_json, './debug/audio.json')
 

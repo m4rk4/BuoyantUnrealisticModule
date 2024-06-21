@@ -131,6 +131,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         return usatoday_sportswire.get_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
+    if not article_html:
+        return None
     if save_debug:
         utils.write_file(article_html, './debug/debug.html')
 
@@ -205,6 +207,19 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         item['_image'] = article_json['thumbnail']
 
     soup = BeautifulSoup(article_html, 'lxml')
+    if site_json:
+        if site_json and site_json.get('decompose'):
+            for it in site_json['decompose']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.decompose()
+        if site_json and site_json.get('unwrap'):
+            for it in site_json['unwrap']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.unwrap()
+        if site_json and site_json.get('rename'):
+            for it in site_json['rename']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.name = it['name']
 
     if not item.get('_image'):
         el = soup.find('meta', attrs={"property": "og:image"})
@@ -319,7 +334,11 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all('aside'):
             new_html = ''
             if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
-                print('skipping aside ' + str(el['class']))
+                logger.debug('skipping aside ' + str(el['class']))
+                el.decompose()
+                continue
+            elif 'gnt_em_cp' in el['class'] and el['data-c-cta'] == 'DIG DEEPER':
+                # Content package - a list of related links
                 el.decompose()
                 continue
             elif 'gnt_em_vp__tp' in el['class']:

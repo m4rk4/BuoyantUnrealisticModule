@@ -206,6 +206,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] += str(soup)
     return item
 
+
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
 

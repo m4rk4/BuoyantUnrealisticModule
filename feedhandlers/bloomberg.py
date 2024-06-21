@@ -12,12 +12,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 def resize_image(img_src):
-    return re.sub(r'[\d-]+x[\d-]+.(jpg|png)', '1024x-1.\\1', img_src)
+    return re.sub(r'[\d-]+x[\d-]+.(jpg|png)', '1200x-1.\\1', img_src)
 
 
 def get_bb_url(url, get_json=False):
     # print(url)
-    r = requests.get(url, impersonate="chrome110")
+    r = requests.get(url, impersonate="chrome116")
     if r.status_code != 200:
         return None
     if get_json:

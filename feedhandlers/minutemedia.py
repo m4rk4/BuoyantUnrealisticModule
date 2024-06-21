@@ -54,7 +54,10 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         item['url'] = url
 
-    item['title'] = article_json['title'].encode('iso-8859-1').decode('utf-8')
+    try:
+        item['title'] = article_json['title'].encode('iso-8859-1').decode('utf-8')
+    except:
+        item['title'] = article_json['title']
 
     if article_json.get('createdAtISO'):
         dt = datetime.fromisoformat(article_json['createdAtISO'])

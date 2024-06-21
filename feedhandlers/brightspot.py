@@ -78,18 +78,18 @@ def add_image(image):
     captions = []
     if image.get('caption'):
         if isinstance(image['caption'], str):
-            captions.append(image['caption'])
+            captions.append(re.sub(r'</?p>|<br>', '', image['caption']))
         elif isinstance(image['caption'], list):
             for caption in image['caption']:
                 for it in caption['items']:
-                    captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it))
+                    captions.append(re.sub(r'</?p>|<br>', '', it))
     if image.get('credit'):
         if isinstance(image['credit'], str):
-            captions.append(image['credit'])
+            captions.append(re.sub(r'</?p>|<br>', '', image['credit']))
         elif isinstance(image['credit'], list):
             for caption in image['credit']:
                 for it in caption['items']:
-                    captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', it))
+                    captions.append(re.sub(r'</?p>|<br>', '', it))
     if image.get('url'):
         link = image['url'][0]['href']
     else:
@@ -107,7 +107,7 @@ def render_content(content, skip_promos=True):
         if '/article/RichTextArticleBody.hbs' in content['_template']:
             for it in content['body']:
                 content_html += render_content(it, skip_promos)
-        elif '/text/RichTextHeading.hbs' in content['_template']:
+        elif '/text/RichTextHeading.hbs' in content['_template'] or '/rte/HeadingHTag.hbs' in content['_template']:
             content_html += '<{}>'.format(content['tag'])
             if content.get('text'):
                 if isinstance(content['text'], str):
@@ -501,13 +501,19 @@ def render_content(content, skip_promos=True):
                     if m:
                         content_html += utils.add_embed(m.group(1))
                     else:
-                        logger.warning('unknown rawHtml content')
+                        logger.warning('unknown iframe rawHtml content')
                 elif 'infogram-embed' in content['rawHtml']:
                     m = re.search(r'data-id="([^"]+)"', content['rawHtml'])
                     if m:
                         content_html += utils.add_embed('https://infogram.com/' + m.group(1))
                     else:
-                        logger.warning('unknown rawHtml content')
+                        logger.warning('unknown infogram-embed rawHtml content')
+                elif 'flourish-embed' in content['rawHtml']:
+                    m = re.search(r'data-src="([^"]+)"', content['rawHtml'])
+                    if m:
+                        content_html += utils.add_embed('https://flo.uri.sh/' + m.group(1) + '/embed?auto=1')
+                    else:
+                        logger.warning('unhandled flourish-embed rawHtml content')
                 elif '<script' not in content['rawHtml'] and '<style' not in content['rawHtml']:
                     content_html += content['rawHtml']
                 else:
@@ -584,6 +590,9 @@ def get_item(article_json, args, site_json, save_debug):
                     authors.append(it['name'])
                 elif isinstance(it['name'], list):
                     authors.append(it['name'][0]['items'][0])
+            elif it.get('authorName'):
+                for x in it['authorName']:
+                    authors += x['items'].copy()
             elif it.get('body'):
                 authors.append(it['body'])
     elif article_json.get('authorsInfo'):

@@ -241,7 +241,7 @@ def make_card(card_json, tweet_json):
         card_link = get_expanded_url(tweet_json, card_json['url'])
         title = binding_values['event_title']['string_value']
         card_desc = binding_values['event_subtitle']['string_value']
-        img = binding_values['event_thumbnail']['image_value']['url']
+        img_src = binding_values['event_thumbnail']['image_value']['url']
 
     elif re.search('poll\dchoice_text_only', card_json['name']):
         # https://twitter.com/elonmusk/status/1604617643973124097
@@ -287,14 +287,14 @@ def make_card(card_json, tweet_json):
         card_type = 2
         card_link = binding_values['website_dest_url']['string_value']
         title = binding_values['title']['string_value']
-        img = binding_values['promo_image']['image_value']['url']
+        img_src = binding_values['promo_image']['image_value']['url']
 
     elif 'promo_video_website' in card_json['name']:
         # Only shows the image not the promo video
         card_type = 2
         card_link = binding_values['website_dest_url']['string_value']
         title = binding_values['title']['string_value']
-        img = binding_values['player_image']['image_value']['url']
+        img_src = binding_values['player_image']['image_value']['url']
 
     else:
         logger.warning('unknown twitter card name ' + card_json['name'])
@@ -617,8 +617,25 @@ def get_tweet_result_by_api(tweet_url):
     logger.debug('get_tweet_result_by_api:' + tweet_url)
     auth_tokens = None
     guest_token = ''
-    r = requests.get(tweet_url, impersonate='chrome116', proxies=config.proxies)
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "priority": "u=0, i",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"116\", \"Chromium\";v=\"116\", \"Not.A/Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.0.0"
+    }
+    r = requests.get(tweet_url + '?mx=2', impersonate='chrome116', headers=headers, proxies=config.proxies)
     if r and r.status_code == 200:
+        utils.write_file(r.text, './debug/twitter.html')
         soup = BeautifulSoup(r.text, 'lxml')
         el = soup.find('script', attrs={"src": re.compile(r'/client-web/main\.')})
         if el:
@@ -632,6 +649,8 @@ def get_tweet_result_by_api(tweet_url):
                 guest_token = m.group(1)
     if not (auth_tokens and guest_token):
         logger.warning('unable to determine auth and guest tokens for ' + tweet_url)
+        # print(str(auth_tokens))
+        # print(str(guest_token))
         return None
 
     # x-client-transaction-id doesn't seem necessary

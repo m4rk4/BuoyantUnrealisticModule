@@ -1,4 +1,4 @@
-import basencode, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
+import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime
@@ -200,7 +200,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if use_curl_cffi:
       r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     else:
-      r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+      r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=certifi.where())
     r.raise_for_status()
   except Exception as e:
     if r != None:
@@ -278,8 +278,11 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
     try:
       return r.json()
     except:
-      logger.warning('error converting response to json from request {}'.format(url))
-      write_file(r.text, './debug/json.txt')
+      try:
+        return json.loads(r.text.encode().decode('utf-8-sig'))
+      except:
+        logger.warning('error converting response to json from request {}'.format(url))
+        write_file(r.text, './debug/json.txt')
   return None
 
 def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
@@ -1039,17 +1042,21 @@ def add_embed(url, args={}, save_debug=False):
   if url.startswith('//'):
     embed_url = 'https:' + url
 
-  if 'twitter.com' in embed_url:
-    embed_url = clean_url(embed_url)
-  elif '/t.co/' in embed_url:
+  if 'go.redirectingat.com' in embed_url:
     embed_url = get_redirect_url(embed_url)
-  elif 'youtube.com/embed' in embed_url:
-    if 'list=' not in embed_url:
-      embed_url = clean_url(embed_url)
+
+  if '/t.co/' in embed_url:
+    embed_url = get_redirect_url(embed_url)
   elif 'cloudfront.net' in embed_url:
     embed_url = get_redirect_url(embed_url)
   elif 'dts.podtrac.com/redirect' in embed_url:
     embed_url = get_redirect_url(embed_url)
+
+  if 'twitter.com' in embed_url or '/x.com' in embed_url:
+    embed_url = clean_url(embed_url)
+  elif 'youtube.com/embed' in embed_url:
+    if 'list=' not in embed_url:
+      embed_url = clean_url(embed_url)
   elif 'embedly.com' in embed_url:
     split_url = urlsplit(embed_url)
     params = parse_qs(split_url.query)

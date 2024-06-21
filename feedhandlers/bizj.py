@@ -1,5 +1,6 @@
-import html, json, pytz, re
+import json, pytz, re
 from bs4 import BeautifulSoup
+from curl_cffi import requests
 from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright
 from urllib.parse import urlsplit
@@ -74,7 +75,8 @@ def get_html_content(page_soup, url, args, site_json, save_debug):
     params = json.loads(meta['gpt:params'])
 
     item = {}
-    item['id'] = params['pageid']
+    # item['id'] = params['pageid']
+    item['id'] = meta['cxenseparse:articleid']
     item['url'] = meta['og:url']
     if meta.get('sailthru.title'):
         item['title'] = meta['sailthru.title']
@@ -212,7 +214,7 @@ def get_page_soup(url, site_json):
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "accept-language": "en-US,en;q=0.9",
         "cache-control": "no-cache",
-        "cookie": site_json['cookie'],
+        # "cookie": site_json['cookie'],
         "pragma": "no-cache",
         "sec-ch-ua": "\"Microsoft Edge\";v=\"117\", \"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"117\"",
         "sec-ch-ua-mobile": "?0",
@@ -223,12 +225,16 @@ def get_page_soup(url, site_json):
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.60"
     }
-    page_html = utils.get_url_html(url, headers)
-    utils.write_file(page_html, './debug/debug.html')
-    page_soup = BeautifulSoup(page_html, 'lxml')
-    # if page_soup.find('script', src=re.compile(r'_Incapsula_Resource')):
-    if page_soup.find('script', id='__NUXT_DATA__') or page_soup.find(class_=['article-content-items', 'article__content']):
-        return page_soup
+    # page_html = utils.get_url_html(url, headers)
+    # page_html = utils.get_url_html(url, headers=headers, use_proxy=True, use_curl_cffi=True)
+    r = requests.get(url, impersonate="chrome116", proxies=config.proxies)
+    if r.status_code == 200:
+        page_html = r.text
+        utils.write_file(page_html, './debug/debug.html')
+        page_soup = BeautifulSoup(page_html, 'lxml')
+        # if page_soup.find('script', src=re.compile(r'_Incapsula_Resource')):
+        if page_soup.find('script', id='__NUXT_DATA__') or page_soup.find(class_=['article-content-items', 'article__content']):
+            return page_soup
 
     logger.warning('unable to load page. trying to update incap cookie...')
     with sync_playwright() as playwright:
@@ -269,8 +275,8 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(str(page_soup), './debug/debug.html')
 
-    if '/inno/' in url or '/bizwomen/' in url or '/profiles-strategies/' in url:
-        return get_html_content(page_soup, url, args, site_json, save_debug)
+    # if '/inno/' in url or '/bizwomen/' in url or '/profiles-strategies/' in url:
+    #     return get_html_content(page_soup, url, args, site_json, save_debug)
 
     el = page_soup.find('script', id='__NUXT_DATA__')
     if el:
@@ -278,50 +284,14 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         logger.warning('unable to find __NUXT_DATA__ in ' + url)
         return None
-
-    #     logger.debug('updating cookies...')
-    #     #el = page_soup.find('script', src=re.compile(r'_Incapsula_Resource'))
-    #     with sync_playwright() as playwright:
-    #         engine = playwright.chromium
-    #         browser = engine.launch()
-    #         context = browser.new_context()
-    #         page = context.new_page()
-    #         page.goto('https://www.bizjournals.com')
-    #         cookies = context.cookies()
-    #         browser.close()
-    #     cookie = ''
-    #     for it in cookies:
-    #         if it['name'].startswith('visid_incap') or it['name'].startswith('incap_ses'):
-    #             cookie += '{}={}; '.format(it['name'], it['value'])
-    #     if not cookie:
-    #         logger.warning('unable to get new incap cookies for ' + url)
-    #         return None
-    #     site_json['cookie'] = cookie.strip()
-    #     logger.debug('updating bizjournals.com cookies')
-    #     utils.update_sites(url, site_json)
-    #     page_html = get_page_html(url, site_json)
-    #     if not page_html:
-    #         return None
-    #     if save_debug:
-    #         utils.write_file(page_html, './debug/debug.html')
-    #     page_soup = BeautifulSoup(page_html, 'lxml')
-    #     el = page_soup.find('script', id='__NUXT_DATA__')
-    #     if el:
-    #         nuxt_data = json.loads(el.string)
-    #     else:
-    #         logger.warning('unable to find __NUXT_DATA__ in ' + url)
-    #         nuxt_data = None
-    #
-    # if not nuxt_data:
-    #     return None
-
     if save_debug:
         utils.write_file(nuxt_data, './debug/debug.json')
 
     article = None
     for data in nuxt_data:
-        if isinstance(data, dict) and data.get('article'):
-            article = nuxt_data[data['article']]
+        if isinstance(data, dict) and data.get('canonicalUrl'):
+            # article = nuxt_data[data['article']]
+            article = data
             break
 
     if not article:

@@ -14,10 +14,14 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, site_json, save_debug=False, ig_data=None):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
+    # ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
+    ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[0], paths[1])
     soup = None
     if not ig_data:
-        post_data, profile_data = get_ig_post_data(url, False, save_debug)
+        if 'embed' in paths:
+            post_data, profile_data = get_ig_post_data(ig_url, False, save_debug)
+        else:
+            post_data, profile_data = get_ig_post_data(url, False, save_debug)
         if post_data:
             ig_data = post_data['data']['xdt_shortcode_media']
     if not ig_data:

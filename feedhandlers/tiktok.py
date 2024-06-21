@@ -362,9 +362,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     #item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
     #item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td style="width:48px;"><img src="{}"/></td><td style="text-align:left; vertical-align:middle;">{}<br/><small>{}</small></td></tr><tr><td colspan="2">'.format(avatar, author_info, dt.strftime('%Y-%m-%d'))
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border-collapse:collapse; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td colspan="2" style="margin:0; padding:0 0 8px 0;">'
+    item['content_html'] = '<table style="min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border-collapse:collapse; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td colspan="2" style="margin:0; padding:0 0 8px 0;">'
 
-    item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='width:100%;')
+    # item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='width:100%;')
+    poster = '{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] += '<a href="{}"><img src="{}" style="width:100%;"</a>'.format(item['_video'], poster)
 
     avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(author_info['coversMedium'][0]))
     item['content_html'] += '</td></tr><tr><td style="width:48px; padding:0 8px 0 8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.tiktok.com/@{1}"><b>{1}</b></a>'.format(avatar, author_info['uniqueId'])
@@ -393,7 +395,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] += '</td></tr><tr><td colspan="2" style="padding:8px;">'
 
     if item.get('summary'):
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
+        item['content_html'] += '<p style="max-width:540px; word-wrap:break-word;">{}</p>'.format(item['summary'])
 
     if music_info:
         item['_audio'] = music_info['playUrl'][0]
