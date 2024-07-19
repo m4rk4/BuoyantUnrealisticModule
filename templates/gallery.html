@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css"/>
+        <style>
+            body {
+                font-size: 18px;
+                font-family: Verdana, Geneva, sans-serif;
+                background-color: color-mix(in srgb, Canvas, CanvasText 2.5%);
+                color: color-mix(in srgb, CanvasText, Canvas 15%);
+                color-scheme: light dark;
+            }
+        </style>
+		<title>{{ title }}</title>
+    </head>
+    <body>
+        {% if title %}
+            {% if link %}
+                <h2><a href="{{ link }}">{{ title }}</a></h2>
+            {% else %}
+                <h2>{{ title }}</h2>
+            {% endif %}
+        {% endif %}
+        <div style="display:flex; flex-wrap:wrap; gap:16px 8px;">
+            {% for image in images %}
+                <div style="flex:1; min-width:360px;">
+                    <figure style="margin:0; padding:0;">
+                        <a data-fancybox="gallery" data-src="{{ image.src }}" data-caption="{{ image.caption }}">
+                            <img src="{{ image.thumb }}" style="display:block; margin-left:auto; margin-right:auto; width:auto; max-width:100%; max-height:800px;"/>
+                        </a>
+                        <figcaption>
+                            {% if image.caption.startswith("<p") or image.caption.startswith("<div") %}
+                                {{ image.caption | safe }}
+                            {% else %}
+                                <small>{{ image.caption | safe }}</small>
+                            {% endif %}
+                        </figcaption>
+                    </figure>
+                </div>
+            {% endfor %}
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+        <script>
+            Fancybox.bind('[data-fancybox="gallery"]', {
+                Toolbar: {
+                    display: {
+                        left: ["infobar"],
+                        middle: [
+                            "zoomIn",
+                            "zoomOut",
+                            "toggle1to1",
+                            "rotateCCW",
+                            "rotateCW",
+                            "flipX",
+                            "flipY",
+                        ],
+                        right: ["slideshow", "thumbs", "close"],
+                    },
+                },
+                Thumbs: {
+                    type: "modern"
+                }
+            });
+            // Start Fancybox on page load
+            Fancybox.fromSelector('[data-fancybox="gallery"]');
+        </script>
+    </body>
+</html>

@@ -80,35 +80,49 @@ def get_gallery_content_old(gallery_soup):
     gallery_html = ''
     for slide in gallery_soup.find_all('slide'):
         img_src = resize_image(slide['original'])
-        caption = []
+        captions = []
         if slide.get('caption'):
-            cap = slide['caption'].replace('&nbsp;', ' ').strip()
-            if cap.endswith('<br />'):
-                cap = cap[:-6].strip()
-            caption.append(cap)
+            capption = slide['caption'].replace('&nbsp;', ' ').strip()
+            if caption.endswith('<br />'):
+                caption = caption[:-6].strip()
+            captions.append(caption)
         if slide.get('author'):
-            caption.append(slide['author'])
-        gallery_html += utils.add_image(img_src, ' | '.join(caption)) + '<br/>'
+            captions.append(slide['author'])
+        gallery_html += utils.add_image(img_src, ' | '.join(captions)) + '<div>&nbsp;</div>'
     return gallery_html
 
 
-def get_gallery_content(gallery_id, site_code):
+def get_gallery_content(gallery_id, site_code, embed=False):
     api_url = 'https://api.gannett-cdn.com/thorium/gallery/?apiKey=TGgXAxAcR3ktiGl6cRsHSGsLS6ySi6yz&site-code={}&id={}'.format(site_code, gallery_id)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return ''
+    # utils.write_file(api_json, './debug/gallery.json')
     images = api_json['data']['asset']['links']['assets']
-    gallery_html = '<h3>{} ({} images)</h3>'.format(api_json['data']['asset']['headline'], len(images))
+    gallery_images = []
+    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+    title = api_json['data']['asset']['headline'] + ' ({} images)'.format(len(images))
     for image in images:
         img = next((it for it in image['asset']['crops'] if it['name'] == 'bestCrop'), None)
-        img_src = resize_image(img['path'], 1000, img['width'], img['height'])
+        thumb = resize_image(img['path'], 600, img['width'], img['height'])
         captions = []
         if image['asset'].get('caption'):
             captions.append(image['asset']['caption'])
         if image['asset'].get('byline'):
             captions.append(image['asset']['byline'])
-        gallery_html += utils.add_image(img_src, ' | '.join(captions))
-    return re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', gallery_html)
+        caption = ' | '.join(captions)
+        gallery_images.append({"src": img['path'], "caption": caption, "thumb": thumb})
+        gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img['path']) + '</div>'
+    gallery_html += '</div>'
+    # gallery_html = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', gallery_html)
+    gallery_url = '{}/gallery?images={}&title={}&link={}'.format(config.server, quote_plus(json.dumps(gallery_images)), quote_plus(title), quote_plus(api_json['data']['asset']['pageURL']['long']))
+    if not embed:
+        content_html = '<h2><a href="{}">View Photo Gallery</a> ({} images)</h2>'.format(gallery_url, len(images))
+        content_html += gallery_html
+    else:
+        caption = '<a href="{}">View Photo Gallery</a> ({} images): {}'.format(gallery_url, len(images), api_json['data']['asset']['headline'])
+        content_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_url)
+    return content_html
 
 
 def get_content(url, args, site_json, save_debug=False, article_json=None):
@@ -192,8 +206,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             item['author']['name'] = ld_article_json['author']['name']
         elif isinstance(ld_article_json['author'], str):
             item['author']['name'] = ld_article_json['author']
-    else:
+    elif article_json.get('publication'):
         item['author']['name'] = article_json['publication']
+    elif article_json.get('source'):
+        item['author']['name'] = article_json['source']
 
     item['tags'] = []
     for it in article_json['tags']:

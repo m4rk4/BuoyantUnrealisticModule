@@ -1,6 +1,6 @@
-import math, pytz, re
+import pytz, re
 from datetime import datetime, timezone
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 
@@ -25,42 +25,38 @@ def get_episode(episode, show):
     item['author']['name'] = show['title']
 
     item['_image'] = episode['imageUrl']
-    item['_audio'] = utils.get_redirect_url(episode['mediaUrl'])
+    item['_audio'] = utils.find_redirect_url(episode['mediaUrl'])
     item['summary'] = episode['description']
-
-    duration = []
-    t = math.floor(float(episode['duration']) / 3600)
-    if t >= 1:
-        duration.append('{} hr'.format(t))
-    t = math.ceil((float(episode['duration']) - 3600 * t) / 60)
-    if t > 0:
-        duration.append('{} min.'.format(t))
-    item['_duration'] = ', '.join(duration)
+    item['_duration'] = utils.calc_duration(float(episode['duration']))
     return item
 
 
 def get_content(url, args, site_json, save_debug=False):
-    clean_url = utils.clean_url(url)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
     show = None
-    m = re.search(r'/podcast/[^/]+-(\d+)', clean_url)
-    if m:
-        show = utils.get_url_json('https://us.api.iheart.com/api/v3/podcast/podcasts/' + m.group(1))
-        if save_debug:
-            utils.write_file(show, './debug/podcast.json')
+    if 'podcast' in paths:
+        m = re.search(r'\d+$', paths[paths.index('podcast') + 1])
+        if m:
+            show = utils.get_url_json('https://us.api.iheart.com/api/v3/podcast/podcasts/' + m.group(0))
+            if save_debug:
+                utils.write_file(show, './debug/podcast.json')
 
     episode = None
-    m = re.search(r'/episode/[^/]+-(\d+)', clean_url)
-    if m:
-        episode = utils.get_url_json('https://us.api.iheart.com/api/v3/podcast/episodes/' + m.group(1))
-        if save_debug:
-            utils.write_file(show, './debug/iheart.json')
+    if 'episode' in paths:
+        m = re.search(r'\d+$', paths[paths.index('episode') + 1])
+        if m:
+            episode = utils.get_url_json('https://us.api.iheart.com/api/v3/podcast/episodes/' + m.group(0))
+            if save_debug:
+                utils.write_file(show, './debug/episode.json')
 
     if episode and show:
         item = get_episode(episode['episode'], show)
         show_url = 'https://www.iheart.com/podcast/{}-{}/'.format(show['slug'], show['id'])
-        poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="https://www.iheart.com{}">{}</a><br/>{} &#8226; {}</small>'.format(item['url'], item['title'], show_url, item['author']['name'], item['_display_date'], item['_duration'])
-        item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(item['_audio'], poster, desc)
+        # poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
+        # desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="https://www.iheart.com{}">{}</a><br/>{} &#8226; {}</small>'.format(item['url'], item['title'], show_url, item['author']['name'], item['_display_date'], item['_duration'])
+        # item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(item['_audio'], poster, desc)
+        item['content_html'] = utils.add_audio(item['_audio'], item.get('_image'), item['title'], item['url'], item['author']['name'], show_url, item['_display_date'], item['_duration'])
         if not 'embed' in args:
             item['content_html'] += '<blockquote style="border-left:3px solid #ccc; margin-top:4px; margin-left:1.5em; padding-left:0.5em;"><small>{}</small></blockquote>'.format(item['summary'])
 

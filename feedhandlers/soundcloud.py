@@ -109,8 +109,7 @@ def get_playlist_content(playlist_id, client_id, secret_token, save_debug):
         return None
 
     if save_debug:
-        with open('./debug/debug.json', 'w') as file:
-            json.dump(playlist_json, file, indent=4)
+        utils.write_file(playlist_json, './debug/playlist.json')
 
     item = get_item_info(playlist_json)
     if not item:
@@ -286,6 +285,9 @@ def get_content(url, args, site_json, save_debug=False):
     if api_json.get('artwork_url'):
         item['_image'] = api_json['artwork_url'].replace('large', 't500x500')
         poster = '{}/image?url={}&height=128'.format(config.server, item['_image'])
+    elif api_json['user'].get('avatar_url'):
+        item['_image'] = api_json['user']['avatar_url'].replace('large', 't500x500')
+        poster = '{}/image?url={}&height=128'.format(config.server, item['_image'])
     else:
         #item['_image'] = '{}/image?height=500&width=500'.format(config.server)
         #poster = '{}/image?height=128&width=128'.format(config.server)
@@ -308,24 +310,8 @@ def get_content(url, args, site_json, save_debug=False):
             if audio_json:
                 item['_audio'] = audio_json['url']
 
-        if item.get('_audio'):
-            poster = '<a href="{}/openplayer?url={}&content_type=audio&poster={}"><img src="{}&overlay=audio"/></a>'.format(config.server, quote_plus(api_json['uri']), quote_plus(item['_image']), poster)
-        else:
-            poster = '<img src="{}"/>'.format(poster)
+        item['content_html'] = utils.add_audio(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(api_json['duration']) / 1000)
 
-        item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;"><tr><td style="width:128px;">{}</td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/>by <a href="{}">{}</a><br/><small>released {}'.format(poster, item['url'], item['title'], item['author']['url'], item['author']['name'], item['_display_date'])
-
-        if api_json.get('duration'):
-            duration = []
-            t = math.floor(float(api_json['duration']) / 3600000)
-            if t >= 1:
-                duration.append('{} hr'.format(t))
-            t = math.ceil((float(api_json['duration']) - 3600000 * t) / 60000)
-            if t > 0:
-                duration.append('{} min.'.format(t))
-            item['content_html'] += '<br/>{}'.format(', '.join(duration))
-
-        item['content_html'] += '</small></td></tr></table>'
         if 'embed' not in args and api_json.get('description'):
             item['content_html'] += '<p>{}</p>'.format(api_json['description'])
 

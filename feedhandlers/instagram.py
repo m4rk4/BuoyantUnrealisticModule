@@ -1,7 +1,8 @@
-import json, random, re, requests, string
+import json, random, re, string
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 from datetime import datetime, timezone
+from duckduckgo_search import DDGS
 from urllib.parse import parse_qs, quote_plus, urlencode, urlsplit
 
 import config, utils
@@ -22,7 +23,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             post_data, profile_data = get_ig_post_data(ig_url, False, save_debug)
         else:
             post_data, profile_data = get_ig_post_data(url, False, save_debug)
-        if post_data:
+        if post_data and post_data.get('data'):
             ig_data = post_data['data']['xdt_shortcode_media']
     if not ig_data:
         logger.debug('using embed data')
@@ -42,10 +43,11 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             "upgrade-insecure-requests": "1",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
         }
-        embed_url = ig_url + 'embed/captioned/?cr=1'
-        ig_embed = utils.get_url_html(embed_url, headers=headers)
+        embed_url = ig_url + 'embed/captioned/?cr=1&v=14&wp=540'
+        ig_embed = utils.get_url_html(embed_url, headers=headers, allow_redirects=False)
         if not ig_embed:
-            return ''
+            logger.warning('unable to get get instagram embed page ' + embed_url)
+            return None
         if save_debug:
             utils.write_file(ig_embed, './debug/instagram.html')
 
@@ -101,7 +103,11 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             if ig_data['owner'].get('full_name'):
                 names.append('<br/>' + ig_data['owner']['full_name'])
             else:
-                names.append('')
+                name = search_for_fullname('https://www.instagram.com/{}/'.format(ig_data['owner']['username']))
+                if name:
+                    names.append('<br/>' + name)
+                else:
+                    names.append('')
             if ig_data['owner'].get('is_verified'):
                 verified.append(' &#9989;')
             else:
@@ -117,9 +123,18 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         if el:
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
             avatars.append(avatar)
-            users.append(soup.find(class_='UsernameText').get_text())
-            names.append('')
-            verified.append('')
+            el = soup.select('div.HeaderText > a.Username')
+            users.append(el[0].find(class_='UsernameText').get_text())
+            name = search_for_fullname(utils.clean_url(el[0]['href']))
+            if name:
+                names.append('<br/>' + name)
+            else:
+                names.append('')
+            it = el[0].find('i', class_='VerifiedSprite')
+            if it and 'Verified' in it.get_text():
+                verified.append(' &#9989;')
+            else:
+                verified.append('')
         else:
             for el in soup.find_all(class_='CollabAvatar'):
                 avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
@@ -140,6 +155,12 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         item['title'] = title[:50] + '...'
     else:
         item['title'] = title
+
+    item['author'] = {}
+    item['author']['name'] = username
+
+    tags = []
+    post_caption = ''
     if ig_data:
         if ig_data.get('taken_at_timestamp'):
             # Assuming it's UTC
@@ -152,16 +173,10 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
-    item['author'] = {}
-    item['author']['name'] = username
 
-    if ig_data.get('display_url'):
-        item['_image'] = ig_data['display_url']
+        if ig_data.get('display_url'):
+            item['_image'] = ig_data['display_url']
 
-    tags = []
-
-    post_caption = ''
-    if ig_data:
         if ig_data.get('caption'):
             post_caption = ig_data['caption']['text']
         else:
@@ -307,7 +322,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-collapse:collapse;">'
     for i in range(len(users)):
         if i == 0:
-            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td><td style="width:48px; text-align:center; verticla-align:middle;"><a href="{4}"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td><td style="width:48px; text-align:right; vertical-align:middle;"><a href="{4}"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
         else:
             item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatars[i], users[i], verified[i], names[i])
 
@@ -463,7 +478,7 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     s = curl_requests.Session(impersonate='chrome116')
     r = s.get(utils.clean_url(url), proxies=config.proxies)
     if r.status_code != 200:
-        return None
+        return None, None
     page_html = r.text
 
     if load_from_file:
@@ -582,11 +597,14 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     if not dyn_bm:
         logger.warning('unable to get ServerJS BitMap data in ' + url)
     if not (site_data or user_data or config_defaults or csrf_token or eqmc_params or csr_bm or dyn_bm):
-        return None
+        return None, None
 
+    # https://github.com/riad-azz/instagram-video-downloader
+    # asbd_id = '129477'
+    # post_doc_id = '10015901848480474'
+    asbd_id = ''
     post_doc_id = ''
     profile_doc_id = ''
-    asbd_id = ''
     for el in page_soup.find_all('link', href=re.compile(r'https://static\.cdninstagram\.com/rsrc\.php/.*\.js')):
         # print(el['href'])
         r = s.get(el['href'], proxies=config.proxies)
@@ -613,13 +631,14 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     if not asbd_id:
         logger.warning('unable to determine asbd_id in ' + url)
     if not post_doc_id or not asbd_id:
-        return None
+        return None, None
 
     post_data = None
     profile_data = None
 
     if 'instagram.com' in url:
-        gql_url = 'https://www.instagram.com/graphql/query'
+        # gql_url = 'https://www.instagram.com/graphql/query'
+        gql_url = 'https://www.instagram.com/api/graphql'
         req_friendly_name = 'PolarisPostActionLoadPostQueryQuery'
         variables = {
             "shortcode": shortcode,
@@ -750,7 +769,8 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     r = s.post(gql_url, data=body, headers=gql_headers, proxies=config.proxies)
     if r.status_code == 200:
         try:
-            post_data = r.json()
+            # post_data = r.json()
+            post_data = json.loads(r.text)
             if save_debug:
                 utils.write_file(post_data, './debug/instagram.json')
             if post_data.get('errors'):
@@ -880,3 +900,13 @@ def encode_base64(binary_str):
 
 def rand_str(n):
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=n))
+
+
+def search_for_fullname(url):
+    results = DDGS().text(url, max_results=5)
+    if results:
+        for result in results:
+            if result['href'] == url:
+                m = re.search(r'^(.*?)\s\(@', result['title'])
+                return m.group(1)
+    return ''

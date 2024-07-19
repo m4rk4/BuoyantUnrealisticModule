@@ -42,17 +42,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = audio_json['_item']['item_body']
 
-    duration = []
-    t = math.floor(float(audio_json['_item']['_primary_content']['duration']) / 3600)
-    if t >= 1:
-        duration.append('{} hr'.format(t))
-    t = math.ceil((float(audio_json['_item']['_primary_content']['duration']) - 3600 * t) / 60)
-    if t > 0:
-        duration.append('{} min.'.format(t))
-
+    duration = utils.calc_duration(float(audio_json['_item']['_primary_content']['duration']))
+    videojs_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(item['_image']))
     poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-    desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>{}<br/>{}&nbsp;&bull;&nbsp;{}</small>'.format(item['url'], item['title'], item['author']['name'], item['_display_date'], ', '.join(duration))
-    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr>'.format(item['_audio'], poster, desc)
+    desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>{}<br/>{}&nbsp;&bull;&nbsp;{}</small>'.format(item['url'], item['title'], item['author']['name'], item['_display_date'], duration)
+
+    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr>'.format(videojs_src, poster, desc)
     if not 'embed' in args:
         item['content_html'] += '<tr><td colspan="2">{}</td></tr>'.format(item['summary'])
     item['content_html'] += '</table>'

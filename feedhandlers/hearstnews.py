@@ -1,9 +1,9 @@
-import json, re, pytz, tldextract
+import base64, json, re, pytz, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss, wp_posts
 
 import logging
@@ -11,14 +11,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def add_image(image, width=1000):
-    img_src = image['sizes']['original']['url'].replace('rawImage', '{}x0'.format(width))
+def add_image(image, width=1200):
+    orig_src = image['sizes']['original']['url']
+    img_src = orig_src.replace('rawImage', '{}x0'.format(width))
     captions = []
     if image.get('caption'):
         captions.append(image['caption']['plain'])
     if image.get('byline'):
         captions.append(image['byline'])
-    return utils.add_image(img_src, ' | '.join(captions))
+    return utils.add_image(img_src, ' | '.join(captions), link=orig_src)
 
 
 def add_hst_exco_video(player_id):
@@ -35,19 +36,28 @@ def add_hst_exco_video(player_id):
     return utils.add_video(stream_config['contents'][0]['video']['mp4']['src'], 'video/mp4', stream_config['contents'][0]['poster'], stream_config['contents'][0]['title'])
 
 
-def render_content(content):
+def render_content(content, img_width=1200):
     content_html = ''
     if content['type'] == 'text':
-        if not re.search(r'<strong>RELATED</strong>', content['params']['html1'], flags=re.I):
+        # if not re.search(r'<strong>RELATED</strong>', content['params']['html1'], flags=re.I):
+        #     content_html += content['params']['html1']
+        if 'MM_onlineOnly' not in content['params']['html1']:
             content_html += content['params']['html1']
 
     elif content['type'] == 'image':
-        content_html += add_image(content['params'])
+        content_html += add_image(content['params'], img_width)
 
     elif content['type'] == 'gallery':
-        content_html += '<h3>Gallery</h3>'
+        content_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for slide in content['params']['slides']:
-            content_html += render_content(slide)
+            content_html += '<div style="flex:1; min-width:360px;">' + render_content(slide, 640) + '</div>'
+        content_html += '</div>'
+        gallery_soup = BeautifulSoup(content_html, 'html.parser')
+        gallery_images = []
+        for el in gallery_soup.find_all('figure'):
+            gallery_images.append({"src": el.a['href'], "caption": el.figcaption.small.decode_contents(), "thumb": el.img['src']})
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        content_html = '<h3><a href="{}">View photo gallery</a></h3>'.format(gallery_url) + content_html
 
     elif content['type'] == 'video' and content['params']['originalSource'] == 'jwplayer':
         content_html += utils.add_embed(content['params']['playerUrl'])
@@ -126,7 +136,29 @@ def get_content(url, args, site_json, save_debug=False):
         api_url += 'article/'
     api_url += '?id={}&content=full&imageSizes=original'.format(content_id)
     #print(api_url)
-    api_json = utils.get_url_json(api_url)
+    headers = {
+        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "cache-control": "no-cache",
+        "pragma": "no-cache",
+        "priority": "u=0, i",
+        "sec-ch-ua": "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Microsoft Edge\";v=\"126\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-user": "?1",
+        "upgrade-insecure-requests": "1"
+    }
+    hnpde = {
+        "timestamp": int(round(datetime.now().timestamp()*1000, 0)),
+        "f_kb": 0,
+        "ipc_id": [],
+        "cgp": 1
+    }
+    headers['cookie'] = 'hnpde=' + base64.b64encode(json.dumps(hnpde, separators=(',', ':')).encode()).decode()
+    api_json = utils.get_url_json(api_url, headers=headers)
     if not api_json:
         return None
     if save_debug:

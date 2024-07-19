@@ -19,7 +19,11 @@ def resize_image(img_src, width=980):
 def render_content(content, netloc, inc_gallery=False):
     content_html = ''
     if content['type'] == 'singlePostText':
-        content_html += content['data']['text']
+        if content['data'].get('podInfo') and content['data']['podInfo'].get('name'):
+            if content['data']['podInfo']['name'] == 'blockquote':
+                content_html += utils.add_blockquote(content['data']['podInfo']['attribs']['dangerouslySetInnerHTML']['__html'])
+        if not content_html:
+            content_html += content['data']['text']
 
     elif content['type'] == 'singlePostImage' or content['type'] == 'articleThumbnail':
         if content['data'].get('url'):

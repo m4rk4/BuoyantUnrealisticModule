@@ -2,9 +2,9 @@ import pytz, re
 import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import urlsplit
 
-import config
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -69,7 +69,11 @@ def get_content(url, args, site_json, save_debug=False):
             dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
             item['date_modified'] = dt.isoformat()
 
-        item['author'] = {"name": article['data-author']}
+        # item['author'] = {"name": article['data-author']}
+        authors = [it.strip() for it in article['data-author'].split(',')]
+        item['author'] = {}
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+
         item['tags'] = article['data-keywords'].split(',')
         item['tags'] += article['data-watson-keywords'].split(',')
 
@@ -113,6 +117,12 @@ def get_content(url, args, site_json, save_debug=False):
 
         article_body = article.find(class_='article__body')
         if article_body:
+            for el in article_body.find_all('a'):
+                if el['href'].startswith('//'):
+                    el['href'] = 'https:' + el['href']
+                elif el['href'].startswith('/'):
+                    el['href'] = 'https://' + urlsplit(item['url']).netloc + el['href']
+
             for el in article_body.children:
                 if el.name == 'div':
                     if not el.get('class'):

@@ -9,6 +9,7 @@ from urllib3.util import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
+import utils
 from feedhandlers import instagram, twitter, vimeo, youtube
 
 import logging
@@ -213,7 +214,19 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if use_curl_cffi:
       logger.warning('curl_cffi request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     else:
-      logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+      if not use_curl_cffi and e.__class__.__name__ == 'SSLError':
+        try:
+          r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=config.verify_path)
+          r.raise_for_status()
+        except Exception as e:
+          if r != None:
+            if r.status_code == 402 or r.status_code == 500:
+              return r
+            else:
+              status_code = ' status code {}'.format(r.status_code)
+          else:
+            status_code = ''
+          logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying curl_cffi')
       try:
@@ -317,6 +330,9 @@ def find_redirect_url(url):
       return m.group(1)
   elif 'play.podtrac.com' in split_url.netloc:
     return 'https://' + '/'.join(paths[1:])
+  elif 'injector.simplecastaudio.com' in split_url.path:
+    m = re.search(r'injector\.simplecastaudio\.com/.*', split_url.path)
+    return 'https://' + m.group(0)
   elif split_url.netloc == 'www.hp.com' or split_url.netloc == 'www.amazon.com' or split_url.netloc == 'www.newegg.com' or 'www.t-mobile.com' in split_url.netloc:
     return clean_url(url)
   if split_url.query:
@@ -485,7 +501,16 @@ def url_exists(url):
       r = requests.head(r.headers['location'], headers=config.default_headers)
     return r.status_code == requests.codes.ok
   except Exception as e:
-    logger.warning('exception error {} getting {}'.format(e.__class__.__name__, url))
+    if e.__class__.__name__ == 'SSLError':
+      try:
+        r = curl_cffi_requests.get(url, impersonate="chrome116", proxies=config.proxies)
+        if r.status_code == 301 and r.headers.get('location'):
+          r = requests.head(r.headers['location'], proxies=config.proxies)
+        return r.status_code == requests.codes.ok
+      except Exception as e:
+        logger.warning('curl_cffi_requests exception error {} getting {}'.format(e.__class__.__name__, url))
+        return None
+    logger.warning('requests exception error {} getting {}'.format(e.__class__.__name__, url))
     return None
 
 def write_file(data, filename):
@@ -734,7 +759,7 @@ def close_pullquote(author=''):
   # end_html = '</em>'
   end_html = '</div>'
   if author:
-    author = re.sub(r'^\s*(–|&#8211;)\s*', '', author)
+    author = re.sub(r'^\s*(-|–|&#8211;)\s*', '', author)
     # end_html += '<br/><small>&mdash;&nbsp;{}</small>'.format(author)
     end_html += '<div style="font-size:0.8em; padding-top:1em;">&mdash;&nbsp;{}</div>'.format(author)
   # end_html += '</div><div style="clear:left"></div></div>'
@@ -750,7 +775,7 @@ def add_pullquote(quote, author=''):
   quote = quote.strip()
   while re.search(r'<br/?>$', quote):
     quote = re.sub(r'<br/?>$', '', quote)
-  m = re.search(r'^("|“|‘)(.*)("|”|’)$', quote)
+  m = re.search(r'^("|“|‘|&#34;)(.*)("|”|’|&#34;)$', quote)
   if m:
     quote = m.group(2)
   pullquote = open_pullquote() + quote + close_pullquote(author)
@@ -796,7 +821,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     #fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
 
   if link:
-    fig_html += '<a href="{}">'.format(link)
+    fig_html += '<a href="{}" target="_blank">'.format(link)
 
   fig_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
   if width:
@@ -829,11 +854,71 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   fig_html += '</figure>'
   return fig_html
 
-def add_audio(audio_src, title='', poster='', desc='', link=''):
-  if not poster:
-    if not title:
-      title = 'Play'
-    audio_html = '<blockquote><h4><a style="text-decoration:none;" href="{0}">&#9654;</a>&nbsp;<a href="{0}">{1}</a></h4>{2}</blockquote>'.format(audio_src, title, desc)
+def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg'):
+  audio_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+
+  if poster:
+    audio_html += '<div style="flex:1; min-width:128px; max-width:160px;">'
+  else:
+    audio_html += '<div style="flex:1; min-width:48px; max-width:64px;">'
+
+  if audio_src:
+    audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
+
+  if poster:
+    if audio_src:
+      audio_html += '<img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/></a>'.format(config.server, quote_plus(poster))
+    else:
+      audio_html += '<img src="{}/image?url={}&width=160" style="width:100%;"/></a>'.format(config.server, quote_plus(poster))
+  else:
+    # audio_html += '<img src="{}/image?width=160&height=160{}" style="width:100%;"/>'.format(config.server, overlay)
+    audio_html += '<img src="{}/static/play_button-64x64.png" style="width:100%;"/>'.format(config.server)
+
+  if audio_src:
+    audio_html += '</a>'
+
+  audio_html += '</div><div style="flex:2; min-width:256px;">'
+
+  if title:
+    audio_html += '<div style="font-size:1.1em; font-weight:bold;">'
+    if title_url:
+      audio_html += '<a href="{}">{}</a>'.format(title_url, title)
+    else:
+      audio_html += title
+    audio_html += '</div>'
+
+  if author:
+    audio_html += '<div>by '
+    if author_url:
+      audio_html += '<a href="{}">{}</a>'.format(author_url, author)
+    else:
+      audio_html += author
+    audio_html += '</div>'
+
+  if (isinstance(duration, int) or isinstance(duration, float)):
+    if duration > 0:
+      has_duration = True
+    else:
+      has_duration = False
+  elif isinstance(duration, str) and len(duration) > 0:
+      has_duration = True
+  else:
+    has_duration = False
+
+  if date or has_duration:
+    audio_html += '<div style="font-size:0.9em;">'
+    if date:
+      audio_html += date
+    if date and has_duration:
+      audio_html += '&nbsp;&bull;&nbsp;'
+    if has_duration:
+      if isinstance(duration, str):
+        audio_html += duration
+      else:
+        audio_html += utils.calc_duration(duration)
+    audio_html += '</div>'
+
+  audio_html += '</div></div>'
   return audio_html
 
 def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False):
@@ -957,13 +1042,7 @@ def add_twitter(tweet_url, tweet_id=''):
     return ''
   return tweet['content_html']
 
-def add_instagram(igstr):
-  ig = instagram.get_content(igstr, {}, {}, False)
-  if not ig:
-    return ''
-  return ig['content_html']
-
-def add_bar(label, value, max_value, show_percent=True):
+def add_bar(label, value, max_value, show_percent=True, bar_color='#4169E1'):
   if max_value == 0:
     pct = 0
   else:
@@ -974,8 +1053,8 @@ def add_bar(label, value, max_value, show_percent=True):
     val = value
   pct = int(pct)
   if pct >= 50:
-    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, lightblue {}%, white {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(pct, 100 - pct, label, val)
-  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {}%, lightblue {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(100 - pct, pct, label, val)
+    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {}%, transparent {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(bar_color, pct, 100 - pct, label, val)
+  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, transparent {}%, {} {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(100 - pct, bar_color, pct, label, val)
 
 def add_barchart(labels, values, title='', caption='', max_value=0, percent=True, border=True, width="75%"):
   color = 'rgb(196, 207, 214)'
@@ -1023,19 +1102,23 @@ def add_button(link, text, button_color='gray', text_color='white', center=True,
   button += '"><a href="{}" style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
   return button
 
-def add_audio_track(track_info):
-  desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4>'.format(track_info['url'], track_info['title'])
-  if track_info.get('artist'):
-    desc += '<small>by {}<br/>'.format(track_info['artist'])
-  if track_info.get('album'):
-    if track_info.get('artist'):
-      desc += '<br/>'
+def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label=''):
+  # num_stars is a float
+  star_html = '<div style="text-align:center; color:{}; font-size:{};">'.format(star_color, star_size)
+  if label:
+    star_html += label
+  for i in range(1, max_stars + 1):
+    if i <= num_stars:
+      star_html += '★'
+    elif i == math.ceil(num_stars):
+      x = 100 - int(100 * (i - num_stars))
+      # star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, {} {}%, transparent {}%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, 100 - x, x)
+      star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(90deg, {0} 0%, {0} {1}%, transparent {1}%, transparent 100%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, x)
     else:
-      desc += '<small>'
-    desc += 'from '.format(track_info['album'])
-  if track_info.get('artist') or track_info.get('album'):
-    desc += '</small>'
-  return '<center><table style="width:360px; border:1px solid black; border-radius:10px; border-spacing:0;"><tr><td style="width:1%; padding:0; margin:0;"><a href="{}"><img style="display:block; border-top-left-radius:10px; border-bottom-left-radius:10px;" src="{}" /></a></td><td style="padding-left:0.5em; vertical-align:top;">{}</td></tr></table></center>'.format(track_info['audio_src'], track_info['image'], desc)
+      star_html += '☆'
+  star_html += '</div>'
+  return star_html
+
 
 def add_embed(url, args={}, save_debug=False):
   embed_url = url

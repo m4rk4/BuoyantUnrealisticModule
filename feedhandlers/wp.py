@@ -188,9 +188,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     if not item.get('title'):
         if site_json.get('title'):
-            el = soup.find(site_json['title']['tag'], attrs=site_json['title']['attrs'])
+            el = utils.get_soup_elements(site_json['title'], soup)
             if el:
-                item['title'] = el.get_text().strip()
+                item['title'] = el[0].get_text().strip()
         if not item.get('title'):
             if article_json and article_json.get('headline'):
                 item['title'] = article_json['headline']
@@ -259,6 +259,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         dt = datetime.strptime(date, site_json['date']['strptime'])
                     else:
                         dt = dateutil.parser.parse(date)
+                    if not dt.tzname():
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    else:
+                        dt = dt.astimezone(timezone.utc)
                     item['date_published'] = dt.isoformat()
                     item['_timestamp'] = dt.timestamp()
                     item['_display_date'] = utils.format_display_date(dt)
@@ -267,7 +271,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     item['_display_date'] = date
                 break
         else:
-            print(item['url'])
+            # print(item['url'])
             m = re.search(r'/(2[01][123]\d)/([01]\d)/([0123]\d)/', item['url'])
             if m:
                 dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -311,6 +315,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     author = re.sub(r'^By:?\s*(.*?)[\s\W]*$', r'\1', el.get_text().strip(), flags=re.I)
                 if author:
                     author = re.sub(r'(.*?),\s?Associated Press$', r'\1 (Associated Press)', author)
+                    author = author.replace(',', '&#44;')
                     if author not in authors:
                         authors.append(author)
                 if authors and not site_json['author'].get('multi'):
@@ -474,7 +479,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                             item['content_html'] += utils.add_embed(it['data-src'])
                             lede = True
                         else:
-                            it = el.find('iframe')
+                            if el.name == 'iframe':
+                                it = el
+                            else:
+                                it = el.find('iframe')
                             if it:
                                 item['content_html'] += utils.add_embed(it['src'])
                                 lede = True
@@ -490,8 +498,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, caption, add_caption)
                     lede = True
                     gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
-                elif el.find('img'):
-                    item['content_html'] += wp_posts.add_image(el, None, base_url, site_json, caption, add_caption)
+                elif el.find('img') or (el.get('style') and 'background-image' in el['style']):
+                    item['content_html'] += wp_posts.add_image(el, el, base_url, site_json, caption, add_caption)
                     lede = True
                 else:
                     it = el.find('iframe')
@@ -506,7 +514,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             if it['position'] == 'top':
                 contents = utils.get_soup_elements(it, soup)
                 for el in contents:
-                    item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+                    if 'unwrap' in it and it['unwrap'] == False:
+                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content)
+                    else:
+                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
                 if it.get('separator'):
                     item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
 
@@ -522,7 +533,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 if contents and it.get('separator'):
                     item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
                 for el in contents:
-                    item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+                    if 'unwrap' in it and it['unwrap'] == False:
+                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content)
+                    else:
+                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
 
     if gallery:
         item['content_html'] += '<h3>Gallery</h3>' + gallery

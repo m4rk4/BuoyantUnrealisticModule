@@ -1,4 +1,4 @@
-import glob, importlib, io, os, requests, sys
+import glob, importlib, io, json, os, requests, sys
 import logging, logging.handlers
 from flask import Flask, jsonify, render_template, redirect, request, send_file
 from flask_cors import CORS
@@ -321,6 +321,26 @@ def image():
     return mimetype
 
 
+@app.route('/gallery')
+def gallery():
+    args = request.args
+    if args.get('title'):
+        title = args['title']
+    else:
+        title = ''
+    if args.get('link'):
+        link = args['link']
+    else:
+        link = ''
+    if args.get('images'):
+        images = json.loads(args['images'])
+    else:
+        images = []
+    for image in images:
+        print(image['caption'])
+    return render_template('gallery.html', title=title, link=link, images=images)
+
+
 @app.route('/map')
 def map():
     args = request.args
@@ -393,6 +413,8 @@ def screenshot():
             page.goto(args['url'])
         if args.get('waitfor'):
             page.wait_for_selector(args['waitfor'])
+        if args.get('waitfortime'):
+            page.wait_for_timeout(int(args['waitfortime']))
         if args.get('locator'):
             ss = page.locator(args['locator']).screenshot()
         else:

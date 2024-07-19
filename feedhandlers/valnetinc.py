@@ -13,26 +13,37 @@ logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
     split_url = urlsplit(img_src)
-    if split_url.query:
-        query = re.sub(r'w=\d+', 'w={}'.format(width), split_url.query)
-        query = re.sub(r'(\?|&)h=\d+', '', query)
+    if width > 0:
+        if split_url.query:
+            query = '?' + split_url.query
+            query = re.sub(r'([\?&]w=)\d+', r'\1{}'.format(width), query)
+            query = re.sub(r'[\?&]h=\d+', '', query)
+        else:
+            query = '?w={}'.format(width)
     else:
-        query = 'w={}'.format(width)
-    return '{}://{}{}?{}'.format(split_url.scheme, split_url.netloc, split_url.path, query)
+        if split_url.query:
+            query = re.sub(r'[\?&][hw]=\d+', '', split_url.query)
+        else:
+            query = ''
+    return '{}://{}{}{}'.format(split_url.scheme, split_url.netloc, split_url.path, query)
 
 
-def add_image(el, gallery=False, width=1000):
+def get_image(el, gallery=False):
+    img_src = ''
+    img = None
     if gallery:
         img = el.find(class_='img-gallery-thumbnail-img')
-    else:
+    if not img:
         img = el.find(attrs={"data-img-url": True})
-    img_src = ''
     if img and img.get('data-img-url'):
         img_src = img['data-img-url']
     else:
         src = el.find('source')
         if src:
-            img_src = src['srcset']
+            if src.get('data-srcset'):
+                img_src = src['data-srcset']
+            elif src.get('srcset'):
+                img_src = src['srcset']
     if not img_src:
         logger.warning('image with unknown src')
         return ''
@@ -42,37 +53,53 @@ def add_image(el, gallery=False, width=1000):
             caption = ''
     else:
         caption = ''
-    image_html = utils.add_image(resize_image(img_src, width), caption)
+    return img_src, caption
+
+
+def add_image(el, gallery=False, width=1000):
+    img_src, caption = get_image(el)
+    image_html = utils.add_image(resize_image(img_src, width), caption, link=utils.clean_url(img_src))
     if el.find_parent('li'):
         image_html = '<div>&nbsp;</div>' + image_html + '<div>&nbsp;</div>'
     return image_html
 
 
 def add_play_store_app(el):
-    new_html = '<table><tr>'
+    new_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center;">'
+
+    new_html += '<div style="flex:0;">'
     it = el.find('img')
     if it:
-        new_html += '<td style="vertical-align:top;"><img src="{}/image?url={}&width=128" style="width:128px;"/></td>'.format(config.server, quote_plus(it['src']))
-    new_html += '<td style="vertical-align:top;">'
+        new_html += '<img src="{}/image?url={}&width=128" style="width:128px;"/>'.format(config.server, quote_plus(it['src']))
+    else:
+        new_html += '<img src="{}/image?width=128&height=128" style="width:128px;"/>'.format(config.server, quote_plus(it['src']))
+
+    new_html += '</div><div style="flex:1; min-width:256px;"><div style="padding-left:1em;">'
+
     it = el.find(class_='app-widget-name')
     if it:
-        new_html += '<span style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></span>'.format(it['href'], it.get_text().strip())
+        new_html += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
+
     it = el.find(class_='app-developer-name')
     if it:
         if it.a:
-            new_html += '<br/><a href="{}">{}</a>'.format(it.a['href'], it.get_text().strip())
+            new_html += '<div><a href="{}">{}</a></div>'.format(it.a['href'], it.get_text().strip())
         else:
-            new_html += '<br/>{}'.format(it.get_text().strip())
+            new_html += '<div>{}</div>'.format(it.get_text().strip())
+
     it = el.find(class_='app-widget-price')
     if it:
-        new_html += '<br/><small>{}</small>'.format(it.get_text().strip())
+        new_html += '<div><small>{}</small></div>'.format(it.get_text().strip())
+
     it = el.find(class_=re.compile(r'app-widget-rating'))
     if it:
-        new_html += '<br/><small>Rating: {}</small>'.format(it.get_text().strip())
+        new_html += '<div><small>Rating: {}</small></div>'.format(it.get_text().strip())
+
     it = el.find(class_='app-widget-download')
     if it:
-        new_html += '<br/><a href="{}">{}</a>'.format(it['href'], it.get_text().strip())
-    new_html += '</td></tr></table>'
+        new_html += '<div><a href="{}">{}</a></div>'.format(it['href'], it.get_text().strip())
+
+    new_html += '</div></div></div>'
     return new_html
 
 
@@ -101,7 +128,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
 
-        el = soup.find('a', class_='author')
+        el = soup.find('a', class_=['author', 'article-author'])
         if el:
             item['author'] = {"name": el.get_text().strip()}
         else:
@@ -319,6 +346,10 @@ def get_content(url, args, site_json, save_debug=False):
             if el.find(class_='adsninja-video-player'):
                 el.decompose()
                 continue
+            it = el.find(class_='article-card-label')
+            if it and it.get_text().strip().lower() == 'related':
+                el.decompose()
+                continue
             it = el.find(class_='w-display-card-info')
             if it and it.get_text().strip():
                 new_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
@@ -331,6 +362,18 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='display-card-rating')
                 if it:
                     new_html += '<div style="text-align:center;"><span style="font-size:1.5em; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
+                it = el.find(class_='w-rating-star')
+                if it:
+                    new_html += '<div style="color:#DBA432; font-size:2em; font-weight:bold;">'
+                    for it in el.select('div.w-rating-star div.full'):
+                        m = re.search(r'width:\s?(\d+)%', it['style'])
+                        if m.group(1) == '100':
+                            new_html += '★'
+                        elif m.group(1) == '50':
+                            new_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, #DBA432 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
+                        elif m.group(1) == '0':
+                            new_html += '☆'
+                    new_html += '</div>'
                 for it in body.find_all(class_='article__gallery'):
                     img = it.find(attrs={"data-img-url": re.compile(r'reco-badge', flags=re.I)})
                     if img:
@@ -345,7 +388,16 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<p>{}</p>'.format(it.decode_contents())
                 it = el.find(class_=re.compile(r'display-card-info'))
                 if it:
-                    new_html += '<div>{}</div>'.format(it.decode_contents())
+                    if it.dl:
+                        new_html += '<table style="width:100%; border-collapse:collapse;">'
+                        for row in it.dl.find_all('div', recursive=False):
+                            new_html += '<tr style="line-height:1.5em; border-bottom:1px solid black;">'
+                            for col in row.find_all(['dt', 'dd']):
+                                new_html += '<td>' + col.decode_contents() + '</td>'
+                            new_html += '</tr>'
+                        new_html += '</table>'
+                    else:
+                        new_html += '<div>{}</div>'.format(it.decode_contents())
                 it = el.find(class_=re.compile(r'display-card-pros-cons'))
                 if it:
                     new_html += str(it)
@@ -358,10 +410,10 @@ def get_content(url, args, site_json, save_debug=False):
                     #new_html += '</ul></div>'
                 new_html += '</div>'
             else:
-                new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
+                new_html = '<div style="display:flex; flex-wrap:wrap; gap:8px; width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
                 it = el.find(class_='display-card-badge')
                 if it:
-                    new_html += '<div style="flex:0 0 100%;"><span style="color:#e01a4f; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
+                    new_html += '<div style="flex:0 0 100%;"><div style="text-align:center; color:#e01a4f; font-size:1.2em; font-weight:bold;">{}</div></div>'.format(it.get_text().strip())
                 img_src = ''
                 it = el.find('img')
                 if it:
@@ -378,15 +430,30 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(class_='display-card-title')
                 if it:
                     if it.a:
-                        new_html += '<div><a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a></div>'.format(it.a['href'], it.get_text().strip())
+                        new_html += '<div style="text-align:center;"><a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a></div>'.format(it.a['href'], it.get_text().strip())
                     else:
-                        new_html += '<div><span style="font-size:1.1em; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
+                        new_html += '<div style="text-align:center;"><span style="font-size:1.1em; font-weight:bold;">{}</span></div>'.format(it.get_text().strip())
                 it = el.find(class_='display-card-subtitle')
                 if it:
                     new_html += '<div><i>{}</i></div>'.format(it.get_text().strip())
                 it = el.find(class_='display-card-rating')
                 if it:
-                    new_html += '<div>Rating: {}</div>'.format(it.get_text().strip())
+                    new_html += '<div style="text-align:center;">Rating: {}</div>'.format(it.get_text().strip())
+                it = el.find(class_='w-rating-star')
+                if it:
+                    new_html += '<div style="text-align:center; color:#DBA432; font-size:2em;">'
+                    for it in el.select('div.w-rating-star div.full'):
+                        m = re.search(r'width:\s?(\d+)%', it['style'])
+                        if m.group(1) == '100':
+                            new_html += '★'
+                        elif m.group(1) == '50':
+                            new_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, #DBA432 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
+                        elif m.group(1) == '0':
+                            new_html += '☆'
+                    new_html += '</div>'
+                it = el.find('img', attrs={"data-field": "badge-image"})
+                if it:
+                    new_html += '<div style="text-align:center;"><img src="{}" style="width:96px; height:96px;"/></div>'.format(it['src'])
                 it = el.find(class_=re.compile(r'display-card-description'))
                 if it:
                     new_html += '<p>{}<p>'.format(it.get_text().strip())
@@ -397,11 +464,11 @@ def get_content(url, args, site_json, save_debug=False):
                 if it:
                     for link in it.find_all('a'):
                         # print(link['href'])
-                        new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                        # new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
+                        new_html += utils.add_button(utils.get_redirect_url(link['href']), link.get_text().strip(), '#e01a4f', 'white')
                 new_html += '</div></div><div>&nbsp;</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
 
         for el in body.find_all(class_='w-review-item'):
             new_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid black; border-radius:10px;">'
@@ -427,8 +494,14 @@ def get_content(url, args, site_json, save_debug=False):
 
         for el in body.find_all(class_='article__gallery'):
             new_html = ''
-            for it in el.find_all(class_='gallery__images__item'):
-                new_html += add_image(it, True)
+            gallery_images = []
+            gallery = el.find(class_='splide-gallery')
+            if not gallery:
+                gallery = el
+            for it in gallery.find_all(class_=['gallery__images__item', 'gallery-main-img']):
+                new_html += '<div style="flex:1; min-width:256px;">' + add_image(it, True) + '</div>'
+                img_src, caption = get_image(it, True)
+                gallery_images.append({"src": resize_image(img_src, 0), "caption": caption, "thumb": resize_image(img_src, 400)})
             if not new_html:
                 it = soup.find('script', string=re.compile(r'window\.arrayOfGalleries\["{}"\]'.format(el['id'])))
                 if it:
@@ -442,12 +515,19 @@ def get_content(url, args, site_json, save_debug=False):
                             img_src = utils.clean_url(slide.source['srcset'])
                             if not img_src in slides:
                                 slides.append(img_src)
-                                new_html += add_image(slide)
-                    it.decompose()
+                                new_html += '<div style="flex:1; min-width:256px;">' + add_image(slide) + '</div>'
+                                img_src, caption = get_image(it, True)
+                                gallery_images.append({"src": resize_image(img_src, 0), "caption": caption, "thumb": resize_image(img_src, 400)})
+                        it.decompose()
             if new_html:
+                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                new_html = '<h2><a href="' + gallery_url + '">View Photo Gallery</a></h2><div style="display:flex; flex-wrap:wrap; gap:8px;">' + new_html + '</div>'
                 new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
+                it = el.find_parent(class_='valnet-gallery')
+                if it:
+                    it.replace_with(new_el)
+                else:
+                    el.replace_with(new_el)
             else:
                 logger.warning('unhandled article__gallery in ' + item['url'])
 

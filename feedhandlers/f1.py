@@ -91,7 +91,17 @@ def get_content(url, args, site_json, save_debug=False):
                 if next_json.get(key) and 'ArticleBodyWrapper' in next_json[key]:
                     body_wrapper = data[3]
 
+    brightcove_url = ''
     next_config = next((it for it in next_json.values() if (isinstance(it, dict) and it.get('PUBLIC_GLOBAL_BRIGHTCOVE_ACCOUNTID'))), None)
+    if next_config:
+        brightcove_url = 'https://players.brightcove.net/' + next_config['PUBLIC_GLOBAL_BRIGHTCOVE_ACCOUNTID'] + '/'
+        if next_config.get('PUBLIC_GLOBAL_BRIGHTCOVE_PLAYERID'):
+            brightcove_url += next_config['PUBLIC_GLOBAL_BRIGHTCOVE_PLAYERID']
+        elif next_config.get('PUBLIC_GLOBAL_BRIGHTCOVE_ATOMPLAYERID'):
+            brightcove_url += next_config['PUBLIC_GLOBAL_BRIGHTCOVE_ATOMPLAYERID']
+        elif next_config.get('PUBLIC_GLOBAL_BRIGHTCOVE_HUBPLAYERID'):
+            brightcove_url += next_config['PUBLIC_GLOBAL_BRIGHTCOVE_HUBPLAYERID']
+        brightcove_url += '_default/index.html'
 
     if not ld_json:
         logger.warning('unable to find ld+json data in ' + url)
@@ -192,8 +202,9 @@ def get_content(url, args, site_json, save_debug=False):
                                     fields = next_json[key]['fields']
                         else:
                             fields = children[3]['content']['fields']
-                        if content_type == 'Brightcove':
-                            start_tag += utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(next_config['PUBLIC_GLOBAL_BRIGHTCOVE_ACCOUNTID'], next_config['PUBLIC_GLOBAL_BRIGHTCOVE_PLAYERID'], fields['videoId']))
+                        if content_type == 'Brightcove' and brightcove_url:
+                            # start_tag += utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(next_config['PUBLIC_GLOBAL_BRIGHTCOVE_ACCOUNTID'], next_config['PUBLIC_GLOBAL_BRIGHTCOVE_PLAYERID'], fields['videoId']))
+                            start_tag += utils.add_embed(brightcove_url + '?videoId=' + fields['videoId'])
                         elif content_type == 'AudioBoom':
                             dt = datetime.fromisoformat(fields['audioPodcast']['updatedAt'])
                             poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(fields['audioPodcast']['postImage']))

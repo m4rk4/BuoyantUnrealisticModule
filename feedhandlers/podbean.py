@@ -64,20 +64,14 @@ def get_content(url, args, site_json, save_debug=False):
         }
         if ep_json.get('largeLogo'):
             item['_image'] = ep_json['largeLogo']
-            poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        else:
-            item['_image'] = '{}/image?height=128&width=128'.format(config.server)
-            poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
-        item['_audio'] = ep_json['downloadLink']
+        item['_audio'] = utils.find_redirect_url(ep_json['downloadLink'])
         attachment = {
             "url": item['_audio'],
             "mime_type": "audio/mpeg"
         }
         item['attachments'] = []
         item['attachments'].append(attachment)
-        item['_duration'] = ep_json['duration']
-        video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(item['_image']))
-        item['content_html'] = '<table style="width:480px;"><tr><td><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><strong><a href="{}">{}</a></strong><br/><small>by <a href="{}">{}</a><br/>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(video_src, poster, item['url'], item['title'], api_json['setting']['podcastLink'], api_json['setting']['podcastTitle'], item['_display_date'], item['_duration'])
+        item['content_html'] = utils.add_audio(item['_audio'], item.get('_image'), item['title'], item['url'], api_json['setting']['podcastTitle'], api_json['setting']['podcastLink'], item['_display_date'], ep_json['duration'])
         return item
 
     page_html = utils.get_url_html(ep_url)
@@ -99,29 +93,20 @@ def get_content(url, args, site_json, save_debug=False):
     item['id'] = api_json['episodes'][0]['id']
     item['url'] = ld_json['url']
     item['title'] = ld_json['name']
-
     tz_loc = pytz.timezone(config.local_tz)
     dt_loc = datetime.fromisoformat(ld_json['datePublished'])
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt, False)
-
     item['author'] = {}
     item['author']['name'] = ld_json['partOfSeries']['name']
     item['author']['url'] = ld_json['partOfSeries']['url']
-
     el = soup.find('meta', attrs={"name": "og:image"})
     if el:
         item['_image'] = el['content']
     elif api_json:
         item['_image'] = api_json['episodes'][0]['logo']
-    if item.get('_image'):
-        poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-    else:
-        item['_image'] = '{}/image?height=128&width=128'.format(config.server)
-        poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
-
     item['_audio'] = ld_json['associatedMedia']['contentUrl']
     attachment = {
         "url": item['_audio'],
@@ -129,14 +114,8 @@ def get_content(url, args, site_json, save_debug=False):
     }
     item['attachments'] = []
     item['attachments'].append(attachment)
-
-    item['_duration'] = api_json['episodes'][0]['duration']
-
     item['summary'] = ld_json['description']
-
-    video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(item['_image']))
-
-    item['content_html'] = '<table style="width:480px;"><tr><td><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><strong><a href="{}">{}</a></strong><br/><small>by <a href="{}">{}</a><br/>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(video_src, poster, item['url'], item['title'], api_json['setting']['podcastLink'], api_json['setting']['podcastTitle'], item['_display_date'], item['_duration'])
+    item['content_html'] = utils.add_audio(item['_audio'], item.get('_image'), item['title'], item['url'], api_json['setting']['podcastTitle'], api_json['setting']['podcastLink'], item['_display_date'], api_json['episodes'][0]['duration'])
 
     if 'embed' not in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])

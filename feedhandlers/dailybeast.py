@@ -256,6 +256,8 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = ''
     if article_json.get('dek'):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
+    elif article_json.get('rubric'):
+        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['rubric'])
     if hero:
         item['content_html'] += hero
 

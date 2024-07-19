@@ -1,7 +1,7 @@
-import json, math, re
+import base64, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -30,6 +30,8 @@ def get_content(url, args, site_json, save_debug=False):
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
     page_soup = BeautifulSoup(page_html, 'html.parser')
     el = page_soup.find('script', attrs={"type": "application/ld+json"})
     if not el:
@@ -190,7 +192,7 @@ def get_content(url, args, site_json, save_debug=False):
                             new_html = utils.add_embed(it['cite'])
                         elif 'instagram-media' in it['class']:
                             new_html = utils.add_embed(it['data-instgrm-permalink'])
-                if not new_html:
+                if not new_html and not el.find(id='responsive-embed-headlines'):
                     logger.warning('unhandled bucketwrap statichtml in ' + item['url'])
             elif 'internallink' in el['class'] and 'insettwocolumn' in el['class'] or 'twitter' in el['class'] or 'youtube-video' in el['class']:
                 pass
@@ -216,33 +218,31 @@ def get_content(url, args, site_json, save_debug=False):
     el = page_soup.find(class_='audio-module-controls-wrap')
     if el:
         if el.get('data-audio'):
+            new_html = ''
             audio_data = json.loads(el['data-audio'])
-            attachment = {}
-            attachment['url'] = audio_data['audioUrl']
-            attachment['mime_type'] = 'audio/mpeg'
-            item['attachments'] = []
-            item['attachments'].append(attachment)
-            item['_audio'] = audio_data['audioUrl']
-
-            program_poster, program_link = get_program_details(audio_data['program'])
-            if program_poster:
-                poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(program_poster))
+            if audio_data['audioUrl'].startswith('http'):
+                item['_audio'] = audio_data['audioUrl']
             else:
-                poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
-
-            duration = []
-            t = math.floor(float(audio_data['duration']) / 3600)
-            if t >= 1:
-                duration.append('{} hr'.format(t))
-            t = math.ceil((float(audio_data['duration']) - 3600 * t) / 60)
-            if t > 0:
-                duration.append('{} min.'.format(t))
-
-            new_html = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/><a href="{}"><small>{}</small></a><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(audio_data['audioUrl'], poster, audio_data['storyUrl'], audio_data['title'], program_link, audio_data['program'], item['_display_date'], ', '.join(duration))
-
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            it = paragraphs.find('p')
-            it.insert_before(new_el)
+                try:
+                    item['_audio'] = base64.b64decode(audio_data['audioUrl'] + '=').decode()
+                except:
+                    logger.warning('unknown audioUrl {} in {}'.format(audio_data['audioUrl'], item['url']))
+            if item['_audio']:
+                attachment = {}
+                attachment['url'] = item['_audio']
+                attachment['mime_type'] = 'audio/mpeg'
+                item['attachments'] = []
+                item['attachments'].append(attachment)
+                if audio_data.get('program'):
+                    program_poster, program_link = get_program_details(audio_data['program'])
+                else:
+                    program_poster = ''
+                    program_link = ''
+                new_html = utils.add_audio(item['_audio'], program_poster, audio_data['title'], audio_data['storyUrl'], audio_data['program'], program_link, utils.format_display_date(datetime.fromisoformat(item['date_published']), False), audio_data['duration'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                it = paragraphs.find('p')
+                it.insert_before(new_el)
         else:
             it = el.find(class_='audio-availability-message')
             if it:

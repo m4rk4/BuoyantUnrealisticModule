@@ -1,7 +1,7 @@
 import copy, html, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import datawrapper, rss
@@ -243,11 +243,11 @@ def get_item_info(article_json, save_debug=False):
     item['url'] = article_json['canonicalUrl']
     item['title'] = article_json['title']
 
-    dt = datetime.fromisoformat(article_json['firstPublishDate'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['firstPublishDate'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['lastPublishDate'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['lastPublishDate'])
     item['date_modified'] = dt.isoformat()
 
     author = ''
@@ -288,7 +288,7 @@ def get_content(url, args, site_json, save_debug=False):
     if split_url.netloc == 'ix.cnn.io' and 'dailygraphics' not in paths:
         return datawrapper.get_content(url, args, site_json, True)
 
-    article_html = utils.get_url_html(url)
+    article_html = utils.get_url_html(url, use_curl_cffi=True, use_proxy=True)
     if not article_html:
         return None
     if save_debug:
@@ -323,55 +323,80 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(ld_json, './debug/debug.json')
 
     if 'podcasts' in paths:
-        audio_player = soup.find('audio-player-wc')
+        audio_player = soup.find('audio-player-wc', class_='episode')
         if audio_player:
             item = {}
-            item['id'] = url
-            item['url'] = url
-            el = audio_player.find(id='title')
+            item['id'] = paths[-1]
+            el = soup.find('meta', attrs={"property": "og:url"})
             if el:
-                item['title'] = el.string.encode('iso-8859-1').decode('utf-8')
-            el = audio_player.find(id='date')
+                item['url'] = el['content']
+            else:
+                item['url'] = url
+            el = audio_player.find(attrs={"slot": "title"})
             if el:
-                # Oct 14, 2022
-                dt = datetime.strptime(el.string.strip(), '%b %d, %Y')
+                item['title'] = el.decode_contents()
+            params = parse_qs(urlsplit(audio_player['src']).query)
+            if 'updated' in params:
+                dt = datetime.fromtimestamp(int(params['updated'][0]))
                 item['date_published'] = dt.isoformat()
                 item['_timestamp'] = dt.timestamp()
                 item['_display_date'] = utils.format_display_date(dt, False)
-            el = audio_player.find(id='author')
+            else:
+                el = audio_player.find(attrs={"slot": "date"})
+                if el:
+                    # Oct 14, 2022
+                    dt = datetime.strptime(el.string.strip(), '%b %d, %Y')
+                    item['date_published'] = dt.isoformat()
+                    item['_timestamp'] = dt.timestamp()
+                    item['_display_date'] = utils.format_display_date(dt, False)
+            el = audio_player.find(attrs={"slot": "author"})
             if el:
                 item['author'] = {}
-                item['author']['name'] = el.string
-                item['author']['url'] = 'https://www.cnn.com' + el['href']
+                item['author']['name'] = el.get_text().strip()
+                if el.name == 'a':
+                    author_url = 'https://www.cnn.com' + el['href']
+                else:
+                    author_url = ''
             el = audio_player.find('picture')
             if el:
-                it = el.find('source')
-                if it:
-                    item['_image'] = 'https://www.cnn.com' + it['srcset']
-            el = audio_player.find(id='description')
+                item['_image'] = el.source['srcset']
+            else:
+                el = soup.select('div.top-wrapper img.coverart')
+                if el:
+                    item['_image'] = el[0]['src']
+                else:
+                    el = soup.find('meta', attrs={"property": "og:image"})
+                    if el:
+                        item['_image'] = el['content']
+            if item['_image'].startswith('/'):
+                item['_image'] = 'https://www.cnn.com' + item['_image']
+            el = audio_player.find(attrs={"slot": "description"})
             if el:
-                item['summary'] = el.string.encode('iso-8859-1').decode('utf-8')
+                item['summary'] = el.decode_contents()
+            else:
+                el = soup.find('meta', attrs={"name": "description"})
+                if el:
+                    item['summary'] = '<p>' + el['content'] + '</p>'
+                else:
+                    el = soup.find('meta', attrs={"property": "og:description"})
+                    if el:
+                        item['summary'] = '<p>' + el['content'] + '</p>'
             item['_audio'] = utils.get_redirect_url(audio_player['src'])
             attachment = {}
             attachment['url'] = item['_audio']
             attachment['mime_type'] = 'audio/mpeg'
             item['attachments'] = []
             item['attachments'].append(attachment)
-            poster = '{}/image?url={}&width=160&overlay=audio'.format(config.server, quote_plus(item['_image']))
-            item['content_html'] = '<div style="display:flex; flex-wrap:wrap;">'
-            item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><a href="{}"><img style="width:128px;" src="{}"/></a></div>'.format(item['_audio'], poster)
-            item['content_html'] += '<div style="flex:2; min-width:256px; margin:auto;">'
-            item['content_html'] += '<div style="font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-            item['content_html'] += '<div><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
-            item['content_html'] += '<div style="font-size:0.8em;">{}&nbsp;&bull;&nbsp;'.format(item['_display_date'])
-            el = audio_player.find(id='duration')
+            el = audio_player.find(attrs={"slot": "eplength"})
             if el:
-                item['content_html'] += el.get_text().strip()
-            item['content_html'] += '</div></div></div>'
+                duration = el.get_text().strip()
+            else:
+                duration = ''
+            item['content_html'] = utils.add_audio(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], author_url, item['_display_date'], duration)
             if 'embed' not in args:
-                item['content_html'] += '<p>{}</p>'.format(item['summary'])
+                item['content_html'] += item['summary']
             return item
-    elif 'videos' in paths:
+    elif 'videos' in paths or 'video' in paths:
         article_json = next((it for it in ld_json if it['@type'] == 'VideoObject'), None)
     else:
         article_json = next((it for it in ld_json if it['@type'] == 'NewsArticle'), None)
@@ -556,12 +581,23 @@ def get_content(url, args, site_json, save_debug=False):
             item['url'] = meta['og:url']
             item['title'] = meta['og:title']
 
-            dt = datetime.fromisoformat(meta['pubdate'].replace('Z', '+00:00'))
-            item['date_published'] = dt.isoformat()
-            item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt)
-            if meta.get('lastmod'):
-                dt = datetime.fromisoformat(meta['lastmod'].replace('Z', '+00:00'))
+            if meta.get('article:published_time'):
+                dt = datetime.fromisoformat(meta['article:published_time'])
+            elif meta.get('pubdate'):
+                dt = datetime.fromisoformat(meta['pubdate'])
+            else:
+                dt = None
+            if dt:
+                item['date_published'] = dt.isoformat()
+                item['_timestamp'] = dt.timestamp()
+                item['_display_date'] = utils.format_display_date(dt)
+            if meta.get('article:modified_time'):
+                dt = datetime.fromisoformat(meta['article:modified_time'])
+            elif meta.get('lastmod'):
+                dt = datetime.fromisoformat(meta['lastmod'])
+            else:
+                dt = None
+            if dt:
                 item['date_modified'] = dt.isoformat()
 
             item['author'] = {}
@@ -640,10 +676,10 @@ def get_content(url, args, site_json, save_debug=False):
                 if article_json.get('video'):
                     video = None
                     for it in article_json['video']:
-                        if it.get('url') and re.search(div['data-video-id'], it['url']):
+                        if it.get('url') and (div['data-video-id'].lower() in it['url'].lower()):
                             video = it
                             break
-                        elif it.get('embedUrl') and re.search(div['data-video-id'], it['embedUrl']):
+                        elif it.get('embedUrl') and (div['data-video-id'].lower() in it['embedUrl']):
                             video = it
                             break
                     #video = next((it for it in article_json['video'] if re.search(div['data-video-id'], it['url'])), None)
@@ -653,8 +689,7 @@ def get_content(url, args, site_json, save_debug=False):
                         if div.get('data-headline'):
                             captions.append(html.unescape(div['data-headline']))
                         if div.get('data-source-html'):
-                            source = BeautifulSoup(html.unescape(div['data-source-html']),
-                                                   'html.parser').get_text().strip()
+                            source = BeautifulSoup(html.unescape(div['data-source-html']), 'html.parser').get_text().strip()
                             captions.append(re.sub(r'^-\s*', '', source))
                         lede += utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
             if not lede:
@@ -696,6 +731,8 @@ def get_content(url, args, site_json, save_debug=False):
                     lede += utils.add_image(div['data-url'], ' | '.join(captions))
         item['content_html'] = lede
         source = ''
+        for el in content.find_all(class_=['product-offer-card-container_listing', 'product-offer-card-container_listing__container', 'product-offer-card-container_listing__container-items']):
+            el.unwrap()
         for el in content.find_all(recursive=False):
             new_html = ''
             if 'paragraph' in el['class'] or 'subheader' in el['class']:
@@ -731,23 +768,30 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<figcaption><small>{}</small></figcaption>'.format(' | '.join(captions))
                 new_html += '</figure>'
             elif 'gallery-inline' in el['class']:
-                gallery = copy.copy(el)
-                div = el.find(class_='image_gallery-image')
-                if div:
-                    captions = []
-                    it = div.find(class_='image_gallery-image__credit')
-                    if it and it.get_text().strip():
-                        captions.append(it.get_text().strip())
-                        it.decompose()
-                    it = div.find(class_='image_gallery-image__caption')
-                    if it and it.get_text().strip():
-                        captions.insert(0, it.get_text().strip())
-                    if el.get('data-headline'):
-                        caption = '<b>{}</b> (gallery below)<br/>'.format(el['data-headline'])
+                gallery_images = []
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                for image in el.select('div.gallery-inline__slides > div.image'):
+                    img_src = image['data-url']
+                    if 'media.cnn.com/api' in img_src:
+                        img_src = utils.clean_url(img_src) + '?c=original'
+                        thumb = img_src + '&q=h_640,c_fill/f_webp'
                     else:
-                        caption = '<b>Photo gallery</b> (below)<br/>'
-                    caption += ' | '.join(captions)
-                    new_html = utils.add_image(div['data-url'], caption)
+                        thumb = img_src
+                    captions = []
+                    it = image.find(attrs={"data-editable": "metaCaption"})
+                    if it and it.get_text().strip():
+                        captions.append(it.decode_contents().strip())
+                    it = image.find(class_='image__credit')
+                    if it and it.get_text().strip():
+                        captions.append(it.decode_contents().strip())
+                    new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, ' | '.join(captions), link=img_src) + '</div>'
+                    gallery_images.append({"src": img_src, "caption": ' | '.join(captions), "thumb": thumb})
+                new_html += '</div>'
+                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                if el.get('data-headline'):
+                    new_html = '<h3><a href="{}">{}</a></h3>'.format(gallery_url, el['data-headline']) + new_html
+                else:
+                    new_html = '<h3><a href="{}">View photo gallery</a></h3>'.format(gallery_url) + new_html
             elif 'interactive-video' in el['class']:
                 video = el.find('video')
                 if video:
@@ -755,13 +799,12 @@ def get_content(url, args, site_json, save_debug=False):
             elif 'video-resource' in el['class']:
                 video = None
                 for it in article_json['video']:
-                    if it.get('url') and re.search(el['data-video-id'], it['url']):
+                    if it.get('url') and (el['data-video-id'].lower() in it['url'].lower()):
                         video = it
                         break
-                    elif it.get('embedUrl') and re.search(el['data-video-id'], it['embedUrl']):
+                    elif it.get('embedUrl') and (el['data-video-id'].lower() in it['embedUrl'].lower()):
                         video = it
                         break
-                #video = next((it for it in article_json['video'] if re.search(el['data-video-id'], it['url'])), None)
                 if video:
                     image = json.loads(html.unescape(el['data-fave-thumbnails']))
                     captions = []
@@ -772,6 +815,12 @@ def get_content(url, args, site_json, save_debug=False):
                         captions.append(re.sub(r'^-\s*', '', source))
                         source = ''
                     new_html = utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
+                elif el.get('data-parent-uri'):
+                    # CONTENT_HUB_UNIQUE_DEPLOYMENT_KEY = rn0624cy
+                    video = utils.get_url_json('https://fave.api.cnn.io/v1/video?stellarUri={}&stellarUdk=rn0624cy&edition=domestic&customer=cnn&env=prod'.format(el['data-parent-uri']))
+                    image = utils.closest_dict(video['images'], 'imageWidth', 1200)
+                    if video:
+                        new_html = utils.add_video(video['files'][0]['fileUri'], 'video/mp4', image['uri'], 'Watch: ' + video['headline'])
             elif 'youtube' in el['class']:
                 it = el.find(class_='youtube__content')
                 if it:
@@ -914,11 +963,53 @@ def get_content(url, args, site_json, save_debug=False):
             elif 'factbox_inline-small' in el['class']:
                 it = el.find(attrs={"data-editable": "title"})
                 if it:
-                    if re.search(r'^Latest|^More on|newsletter', it.get_text().strip(), flags=re.I):
+                    if re.search(r'^Latest|^More on|newsletter|sign up', it.get_text().strip(), flags=re.I):
                         el.decompose()
                         continue
+                it = el.find('a', string=re.compile(r'^Sign up', flags=re.I))
+                if it:
+                    el.decompose()
+                    continue
+                new_html = utils.add_blockquote(el.decode_contents())
+            elif 'product-offer-card' in el['class'] or 'product-offer-card_listing-item' in el['class']:
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px; margin:8px; padding:8px; border:1px solid #ccc; border-radius:10px;">'
+                it = el.find('a', class_='offer-link')
+                if it.get('data-zjs-product_url'):
+                    link = utils.get_redirect_url(it['data-zjs-product_url'])
+                else:
+                    link = utils.get_redirect_url(it['href'])
+                it = el.find(class_=['product-offer-card__image', 'product-offer-card_listing-item__image'])
+                if it:
+                    image = it.find(class_='image')
+                    if image:
+                        img_src = image['data-url']
+                        if 'media.cnn.com/api' in img_src:
+                            img_src = utils.clean_url(img_src) + '?c=original'
+                            thumb = img_src + '&q=h_640,c_fill/f_webp'
+                        else:
+                            thumb = img_src
+                        captions = []
+                        it = image.find(attrs={"data-editable": "metaCaption"})
+                        if it and it.get_text().strip():
+                            captions.append(it.decode_contents().strip())
+                        it = image.find(class_='image__credit')
+                        if it and it.get_text().strip():
+                            captions.append(it.decode_contents().strip())
+                        new_html += '<div style="flex:1; min-width:256px;">' + utils.add_image(thumb, ' | '.join(captions), link=link) + '</div>'
+                new_html += '<div style="flex:2; min-width:256px;">'
+                it = el.find(class_=['product-offer-card__title', 'product-offer-card_listing-item__title'])
+                if it:
+                    new_html += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link, it.get_text().strip())
+                it = el.find(class_=['product-offer-card__description', 'product-offer-card_listing-item__description'])
+                if it:
+                    new_html += it.decode_contents()
+                for it in el.find_all('a', class_=['product-offer-card__button-link', 'product-offer-card_listing-item__button-link']):
+                    if it.get('data-zjs-product_url'):
+                        link = utils.get_redirect_url(it['data-zjs-product_url'])
                     else:
-                        new_html = utils.add_blockquote(el.decode_contents())
+                        link = utils.get_redirect_url(it['href'])
+                    new_html += utils.add_button(link, it.find(class_=['product-offer-card__price', 'product-offer-card_listing-item__price']).decode_contents())
+                new_html += '</div></div>'
             elif 'related-content' in el['class'] or 'related-content_full-width' in el['class'] or 'related-content_without-image' in el['class']:
                 el.decompose()
                 continue

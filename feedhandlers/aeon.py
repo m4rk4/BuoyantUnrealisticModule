@@ -65,7 +65,7 @@ def get_content(url, args, site_json, save_debug=False):
     authors = []
     if article_json.get('authors'):
         for it in article_json['authors']:
-            authors.append(it['displayName'])
+            authors.append(it['name'])
     elif article_json.get('credits'):
         authors.append(BeautifulSoup(article_json['credits'].replace('\n', ', '), 'html.parser').get_text().strip())
     if authors:
@@ -73,7 +73,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     if article_json.get('editor'):
-        item['author']['name'] += ' (edited by {})'.format(article_json['editor']['displayName'])
+        item['author']['name'] += ' (edited by {})'.format(article_json['editor']['name'])
 
     item['tags'] = []
     if article_json.get('tags'):
@@ -84,7 +84,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append(it['title'])
     if article_json.get('topic') and article_json['topic'] not in item['tags']:
         item['tags'].append(article_json['topic'])
-    if item.get('tags'):
+    if len(item['tags']) == 0:
         del item['tags']
 
     if article_json.get('description'):
@@ -112,9 +112,14 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if article_json.get('standfirstLong'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirstLong'].encode('iso-8859-1').decode('utf-8'))
+        try:
+            item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirstLong'].encode('iso-8859-1').decode('utf-8'))
+        except:
+            item['content_html'] += '<p><em>{}</em></p>'.format(article_json['standfirstLong'])
 
-    if article_json.get('thumbnail'):
+    if article_json.get('image'):
+        image = article_json['image']
+    elif article_json.get('thumbnail'):
         image = article_json['thumbnail']
     elif article_json.get('imageSquare'):
         image = article_json['imageSquare']
@@ -165,6 +170,24 @@ def get_content(url, args, site_json, save_debug=False):
             el.decompose()
         else:
             logger.warning('unhandled figure in ' + item['url'])
+
+    el = soup.find('p')
+    if not el.find('span', class_='ld-dropcap'):
+        new_html = re.sub(r'^(<[^>]+>)(<[^>]+>)?(\W*\w)', r'\1\2<span style="float:left; font-size:4em; line-height:0.8em;">\3</span>', str(el), 1)
+        new_html += '<span style="clear:left;"></span>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all('span', class_='ld-dropcap'):
+        el['style'] = 'float:left; font-size:4em; line-height:0.8em;'
+        new_el = soup.new_tag('span')
+        new_el['style'] = 'clear:left;'
+        el.find_parent('p').insert_after(new_el)
+
+    for el in soup.find_all('p', class_='pullquote'):
+        new_html = utils.add_pullquote(el.decode_contents())
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
 
     for el in soup.find_all('blockquote', class_=False):
         el['style'] = 'border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;'

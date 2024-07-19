@@ -3,9 +3,19 @@
 	<head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                max-width: 800px;
+                font-size: 18px;
+                font-family: Verdana, Geneva, sans-serif;
+                background-color: color-mix(in srgb, Canvas, CanvasText 2.5%);
+                color: color-mix(in srgb, CanvasText, Canvas 15%);
+                color-scheme: light dark;
+            }
+        </style>
 		<title>{{ content.title }}</title>
 	</head>
-	<body style="max-width:800px; font-size:18px; font-family:Verdana, Geneva, sans-serif;">
+	<body>
     <h2><a href="{{ content.url }}">{{ content.title }}</a></h2>
     <p>
       {% if content.author %}

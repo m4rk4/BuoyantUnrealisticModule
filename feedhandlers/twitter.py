@@ -204,10 +204,18 @@ def make_card(card_json, tweet_json):
                         images.append(media['media_url_https'])
                     elif media['type'] == 'video':
                         poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, media['media_url_https'])
-                        for video in media['video_info']['variants']:
-                            if 'mp4' in video['content_type']:
+                        video = next((it for it in media['video_info']['variants'] if it['content_type'] == 'application/x-mpegurl'), None)
+                        if video:
+                            videos.append({
+                                "src": "{}/videojs?src={}&type={}&poster={}".format(config.server, quote_plus(video['url']), quote_plus(video['content_type']), quote_plus(poster)),
+                                "poster": poster
+                            })
+                        else:
+                            video = utils.closest_dict([it for it in media['video_info']['variants'] if it['content_type'] == 'video/mp4'], 'bitrate', 1000000)
+                            if video:
                                 videos.append({"src": video['url'], "poster": poster})
-                                break
+                            else:
+                                logger.warning('unhandled unified video card')
                     else:
                         logger.warning('unhandled unified card media type ' + media['type'])
                 elif object['type'] == 'details':
@@ -387,10 +395,27 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
 
     if tweet_json.get('video'):
         if tweet_json['video'].get('variants'):
-            for video in tweet_json['video']['variants']:
-                if 'mp4' in video['type']:
-                    media_html += utils.add_video(video['src'], 'video/mp4', tweet_json['video']['poster'], img_style='border-radius:10px;')
-                    break
+            video = next((it for it in tweet_json['video']['variants'] if it['type'].lower() == 'application/x-mpegurl'), None)
+            if not video:
+                videos = []
+                for it in tweet_json['video']['variants']:
+                    if it['type'] == 'video/mp4':
+                        m = re.search(r'/(\d+)x(\d+)/', it['src'])
+                        if m:
+                            videos.append({
+                                "src": it['src'],
+                                "type": it['type'],
+                                "width": m.group(1),
+                                "height": m.group(2),
+                            })
+                if videos:
+                    video = utils.closest_dict(videos, 'width', 640)
+                else:
+                    video = [it for it in tweet_json['video']['variants'] if it['type'] == 'video/mp4'][-1]
+            if video:
+                media_html += utils.add_video(video['src'], video['type'], tweet_json['video']['poster'], img_style='border-radius:10px;')
+            else:
+                logger.warning('unhandled video variants')
         else:
             video_url = entities['media'][0]['expanded_url']
             poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, tweet_json['video']['poster'])

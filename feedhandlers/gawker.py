@@ -31,6 +31,8 @@ def add_image(image):
     if image.get('caption'):
         content = ''
         for it in image['caption']:
+            if it['type'] == 'LineBreak':
+                continue
             content += render_content(it)
         if content:
             captions.append(content)

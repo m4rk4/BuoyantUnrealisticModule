@@ -109,10 +109,16 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-image' in block['class']:
             if block.find(class_='sqs-empty'):
                 continue
-            caption = ''
             el = block.find(class_='image-caption')
             if el:
                 caption = el.get_text().strip()
+            else:
+                caption = ''
+            el = block.find('a', class_='sqs-block-image-link')
+            if el:
+                link = el['href']
+            else:
+                link = ''
             img_src = ''
             el = block.find('img', attrs={"data-src": True})
             if el:
@@ -122,7 +128,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if el:
                     img_src = el['src']
             if img_src:
-                item['content_html'] += utils.add_image(el['data-src'], caption)
+                item['content_html'] += utils.add_image(el['data-src'], caption, link=link)
                 el = block.find(class_='image-card')
                 if el:
                     card_html = ''

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -125,16 +125,7 @@ def get_content(url, args, site_json, save_debug=False):
         if content_json['cmstype'] == 'MOVIEREVIEW':
             item['content_html'] += '<p style="text-align:center; font-size:1.5em; font-weight:bold;">' + content_json['metainfo']['MovieName']['value'] + '</p>'
             if content_json['metainfo'].get('CriticRating'):
-                item['content_html'] += '<div style="text-align:center; color:red; font-size:3em; font-weight:bold;">'
-                n = float(content_json['metainfo']['CriticRating']['value'])
-                for i in range(1, 6):
-                    if i <= n:
-                        item['content_html'] += '★'
-                    elif i == math.ceil(n):
-                        item['content_html'] += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, red 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
-                    else:
-                        item['content_html'] += '☆'
-                item['content_html'] += '</div>'
+                item['content_html'] += utils.add_stars(float(content_json['metainfo']['CriticRating']['value']), star_color='red')
             item['content_html'] += '<ul>'
             if content_json['metainfo'].get('MovieReleaseDate'):
                 item['content_html'] += '<li>Release Date: ' + utils.format_display_date(datetime.fromtimestamp(int(content_json['metainfo']['MovieReleaseDate']['value']) / 1000), False) + '</li>'
@@ -202,7 +193,9 @@ def get_content(url, args, site_json, save_debug=False):
         if content_json.get('synopsis'):
             item['summary'] = content_json['synopsis']
             item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
-        for slide in content_json['slides']:
+        item['content_html'] += '<h3><a href="GALLERY_URL">View photo gallery</a></h3>'
+        gallery_images = []
+        for i, slide in enumerate(content_json['slides']):
             if slide['widgetType'] == 'PHOTO_SLIDE':
                 img_src = site_json['image_path'] + '/photo/msid-{0}/{0}.jpg'.format(slide['msid'])
                 if not item.get('_image'):
@@ -211,15 +204,30 @@ def get_content(url, args, site_json, save_debug=False):
                     caption = slide['agency']['name']
                 else:
                     caption = ''
-                item['content_html'] += utils.add_image(img_src, caption)
+                if i == 0:
+                    item['content_html'] += utils.add_image(img_src + '?quality=60', caption, link=img_src)
+                else:
+                    item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(img_src + '?quality=60', caption, link=img_src)
+                desc = ''
                 if slide.get('title'):
-                    item['content_html'] += '<p style="font-size:1.1em; font-weight:bold;">' + slide['title'] + '</p>'
+                    desc += '<p style="font-size:1.1em; font-weight:bold;">' + slide['title'] + '</p>'
                 if slide.get('synopsis'):
-                    item['content_html'] += slide['synopsis']
+                    desc += slide['synopsis']
+                item['content_html'] += desc
+                if caption:
+                    desc += '<div><small>Credit: ' + caption + '</small></div>'
+                gallery_images.append({"src": img_src, "caption": desc, "thumb": img_src + '?quality=60'})
+                if i == 0:
+                    item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                else:
+                    item['content_html'] += '</div>'
             elif slide['widgetType'] == 'ad':
                 pass
             else:
                 logger.warning('unhandled slide widgetType {} in {}'.format(slide['widgetType'], item['url']))
+        item['content_html'] += '</div>'
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        item['content_html'] = item['content_html'].replace('GALLERY_URL', gallery_url)
     elif content_json['cmstype'] == 'LIVEBLOG':
         if content_json['metainfo'].get('Prefix') and content_json['metainfo']['Prefix'].get('value'):
             item['content_html'] += '<p><em>' + content_json['metainfo']['Prefix']['value'] + '</em></p>'

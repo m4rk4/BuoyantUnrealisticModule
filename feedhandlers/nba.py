@@ -29,7 +29,7 @@ def get_next_data(url, site_json):
             path = split_url.path
     path += '.json'
     next_url = '{}://{}{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, prefix, build_id, path)
-    print(next_url)
+    # print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
@@ -115,6 +115,11 @@ def get_content(url, args, site_json, save_debug=False):
                 if isinstance(v, str) and v not in item['tags']:
                     item['tags'].append(v)
 
+    if article_json.get('excerpt'):
+        item['summary'] = article_json['excerpt']
+    elif article_json.get('description'):
+        item['summary'] = article_json['description']
+
     lede_html = ''
     if article_json.get('featuredImage'):
         if isinstance(article_json['featuredImage'], dict):
@@ -124,19 +129,14 @@ def get_content(url, args, site_json, save_debug=False):
                 captions.append(article_json['featuredImage']['attributes']['caption'])
             if article_json['featuredImage']['attributes'].get('credit'):
                 captions.append(article_json['featuredImage']['attributes']['credit'])
-            lede_html = utils.add_image(item['_image'], ' | '.join(captions))
+            lede_html += utils.add_image(item['_image'], ' | '.join(captions))
         else:
             item['_image'] = article_json['featuredImage']
     elif article_json.get('image'):
         item['_image'] = article_json['image']
 
     if article_json['type'] == 'gallery' and article_json.get('galleryDefaults'):
-        lede_html = '<p><em>{} | Credit: {}</em></p>'.format(article_json['galleryDefaults']['caption'], article_json['galleryDefaults']['credit'])
-
-    if article_json.get('excerpt'):
-        item['summary'] = article_json['excerpt']
-    elif article_json.get('description'):
-        item['summary'] = article_json['description']
+        lede_html += '<p><em>{} | Credit: {}</em></p>'.format(article_json['galleryDefaults']['caption'], article_json['galleryDefaults']['credit'])
 
     if article_json['type'] == 'video':
         if article_json.get('videoAssets'):
@@ -178,10 +178,11 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unable to get access token from https://watch.nba.com/secure/accesstoken?format=json')
     elif article_json.get('contentStructured'):
+        item['content_html'] = ''
+        if article_json.get('excerpt'):
+            item['content_html'] += '<p><em>' + article_json['excerpt'] + '</em></p>'
         if lede_html:
-            item['content_html'] = lede_html
-        else:
-            item['content_html'] = ''
+            item['content_html'] += lede_html
         for content in article_json['contentStructured']:
             if content['type'] == 'paragraph':
                 item['content_html'] += content['html']
@@ -199,7 +200,10 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unhandled content type {} in {}'.format(content['type'], item['url']))
     elif article_json.get('contentFiltered'):
-        item['content_html'] = wp_posts.format_content(article_json['contentFiltered'], item)
+        item['content_html'] = ''
+        if article_json.get('excerpt'):
+            item['content_html'] += '<p><em>' + article_json['excerpt'] + '</em></p>'
+        item['content_html'] += wp_posts.format_content(article_json['contentFiltered'], item, site_json)
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item

@@ -1,5 +1,4 @@
 import copy, html, json, math, pygal, re
-import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
@@ -154,14 +153,7 @@ def get_content(url, args, site_json, save_debug=False):
             if el:
                 it = el.find('meta', attrs={"itemprop": "ratingValue"})
                 if it:
-                    item['content_html'] += '<div style="font-size:2em; text-align:center;">'
-                    for i in range(math.floor(float(it['content']))):
-                        item['content_html'] += '★'
-                    if it['content'].endswith('.5'):
-                        item['content_html'] += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, red 50%, white 50%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'
-                    for i in range(5 - math.ceil(float(it['content']))):
-                        item['content_html'] += '☆'
-                    item['content_html'] += '</div>'
+                    item['content_html'] += utils.add_stars(float(it['content']))
 
     for el in page_soup.find_all(class_='live-post'):
         body.append(copy.copy(el))

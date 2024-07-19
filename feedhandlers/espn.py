@@ -26,8 +26,10 @@ def get_image(image):
 
 
 def get_video(video):
-    vid_src = video['links']['mobile']['source']['href']
-    vid_type = 'video/mp4'
+    # vid_src = video['links']['mobile']['source']['href']
+    # vid_type = 'video/mp4'
+    vid_src = video['links']['source']['HLS']['href']
+    vid_type = 'application/x-mpegURL'
     poster = resize_image(video['thumbnail'])
     # poster = video['posterImages']['full']['href']
     caption = ''

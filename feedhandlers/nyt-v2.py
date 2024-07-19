@@ -267,6 +267,9 @@ def render_block(block, full_header=False, headline_url=''):
                 block_html += '<hr/>'
             else:
                 logger.warning('unhandled card in Pilot EmbeddedInteractive')
+        elif block['appName'] == 'Runway':
+            embed_url = 'data:text/html;base64,' + base64.b64encode(block['html'].encode()).decode()
+            block_html += utils.add_image('{}/screenshot?url={}&browser=chrome&waitfortime=5000&locator=div.birdkit-body'.format(config.server, quote_plus(embed_url)), link=embed_url)
         elif soup.find('blockquote', class_='tiktok-embed'):
             block_html += utils.add_embed(soup.blockquote['cite'])
         elif block.get('slug') and 'burst-video' in block['slug']:

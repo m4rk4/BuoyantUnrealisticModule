@@ -19,6 +19,7 @@ def get_content(url, args, site_json, save_debug=False):
         logger.warning('unhandled url ' + url)
         return None
     api_url = 'https://api.newsoveraudio.com/v1/player/article?code={}&offPlatform=true'.format(quote_plus(query['id'][0]))
+    # print(api_url)
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
@@ -65,20 +66,5 @@ def get_content(url, args, site_json, save_debug=False):
     item['attachments'] = []
     item['attachments'].append(attachment)
 
-    duration = []
-    s = article_json['audioLength']
-    if s > 3600:
-        h = s / 3600
-        duration.append('{} hr'.format(math.floor(h)))
-        m = (s % 3600) / 60
-        duration.append('{} min'.format(math.ceil(m)))
-    else:
-        m = s / 60
-        duration.append('{} min'.format(math.ceil(m)))
-
-    item['content_html'] = '<div style="margin-top:1em;"><a href="{}"><img src="{}/image?url={}&width=128&overlay=audio" style="float:left; margin-right:8px; width:128px;"/></a><div style="overflow:hidden;">'.format(item['_audio'], config.server, quote_plus(item['_image']))
-    item['content_html'] += '<a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a>'.format(item['url'], item['title'])
-    item['content_html'] += '<br/>{}'.format(item['author']['name'])
-    item['content_html'] += '<br/><small>{}&nbsp;&bull;&nbsp;{}</small>'.format(item['_display_date'], ', '.join(duration))
-    item['content_html'] += '</div><div style="clear:left;">&nbsp;</div></div>'
+    item['content_html'] = utils.add_audio(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], '', item['_display_date'], article_json['audioLength'])
     return item

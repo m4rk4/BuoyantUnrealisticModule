@@ -156,7 +156,8 @@ def format_block(block, content, netloc):
                 logger.warning('unhandled image mediaid {}'.format(block['attribs']['mediaid']))
 
         elif block['name'] == 'gallery':
-            # https://css-tricks.com/snippets/css/a-guide-to-flexbox/
+            if block['response'].get('galleryTitle') and 'deals' in block['response']['galleryTitle']:
+                return ''
             block_html += '<div style="display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center;">'
             #block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
             for slide in block['response']['parsedSlides']:

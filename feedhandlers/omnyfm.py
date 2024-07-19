@@ -142,11 +142,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['attachments'].append(attachment)
         item['summary'] = clip_json['Description']
 
-        duration = calc_duration(clip_json['DurationSeconds'])
-
-        poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-
-        item['content_html'] = '<table style="width:100%;"><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a><br/>by <a href="{}">{}</a><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['url'], item['author']['name'], item['_display_date'], duration)
+        item['content_html'] = utils.add_audio(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(clip_json['DurationSeconds']))
 
         if 'embed' not in args:
             item['content_html'] += clip_json['DescriptionHtml']

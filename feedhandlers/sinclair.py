@@ -1,9 +1,9 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import unquote_plus, urlsplit
+from urllib.parse import quote_plus, unquote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -45,7 +45,9 @@ def get_content(url, args, site_json, save_debug=False):
     item['summary'] = article_json['summary']
 
     item['content_html'] = article_json['richText'].replace('{&nbsp;}', '&nbsp;')
-    item['content_html'] = re.sub(r'\{h2\}(MORE|ALSO) \| \{a .*?\{/h2\}', '', item['content_html'])
+    item['content_html'] = re.sub(r'\{h2\}(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/h2\}', '', item['content_html'])
+    item['content_html'] = re.sub(r'\{p\}\{strong\}.*?(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/a\}\{/strong\}\{/p\}', '', item['content_html'])
+    item['content_html'] = re.sub(r'\{ul\}\{li\}\{em\}\{strong\}.*?(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/li\}\{/ul\}', '', item['content_html'])
     item['content_html'] = re.sub(r'{(/?(a|blockquote|em|h\d|li|p|strong|ul))}', r'<\1>', item['content_html'])
     item['content_html'] = item['content_html'].replace('<blockquote>', '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">')
     item['content_html'] = re.sub(r'{(br|hr)}', r'<\1/>', item['content_html'])
@@ -59,11 +61,16 @@ def get_content(url, args, site_json, save_debug=False):
             embed_type = m.group(1)
             if embed_type == 'image':
                 m = re.search(r'data-externalid="([^"]+)"', matchobj.group(0))
-                print(m.group(0))
+                # print(m.group(0))
                 if m:
                     image = next((it for it in article_json['images'] if it.get('externalId') == m.group(1)), None)
                     if image:
-                        return utils.add_image(base_url + image['originalUrl'], image.get('caption'))
+                        img_src = base_url + image['originalUrl']
+                        if image.get('caption'):
+                            caption = re.sub(r'\{/?(p|&nbsp;)\}', '', image['caption'])
+                        else:
+                            caption = ''
+                        return utils.add_image(img_src, caption)
             elif embed_type == 'video':
                 m = re.search(r'data-externalid="([^"]+)"', matchobj.group(0))
                 if m:
@@ -123,8 +130,12 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = re.sub(r'{sd-embed [^}]+}(<="" sd-embed="">)?{/sd-embed}', sub_embeds, item['content_html'])
 
     if article_json.get('heroImage'):
-        img_src = '{}{}'.format(base_url, article_json['heroImage']['image']['originalUrl'])
-        item['content_html'] = utils.add_image(img_src, article_json['heroImage']['image']['caption']) + item['content_html']
+        img_src = base_url + article_json['heroImage']['image']['originalUrl']
+        if article_json['heroImage']['image'].get('caption'):
+            caption = re.sub(r'\{/?(p|&nbsp;)\}', '', article_json['heroImage']['image']['caption'])
+        else:
+            caption = ''
+        item['content_html'] = utils.add_image(img_src, caption) + item['content_html']
 
     gallery_html = ''
     for video in article_json['videos']:
@@ -138,14 +149,21 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<h2>Videos</h2>' + gallery_html
 
     gallery_html = ''
-    for image in article_json['images']:
-        img_src = '{}{}'.format(base_url, image['originalUrl'])
-        paths = list(filter(None, urlsplit(img_src).path[1:].split('/')))
-        filename = paths[-1].replace(image['externalId'], '')[1:]
-        if not (image['externalId'] in item['content_html'] or filename in item['content_html']):
-            gallery_html += utils.add_image(img_src, image['caption']) + '<div>&nbsp</div>'
-    if gallery_html:
-        item['content_html'] += '<h2>Photos</h2>' + gallery_html
+    gallery_images = []
+    if len(article_json['images']) > 1:
+        gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        for image in article_json['images']:
+            img_src = base_url + image['originalUrl']
+            thumb = img_src.replace('/resources/media/', '/resources/media2/original/full/640/center/80/')
+            if image.get('caption'):
+                caption = re.sub(r'\{/?(p|&nbsp;)\}', '', image['caption'])
+            else:
+                caption = ''
+            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+            gallery_html += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
+        gallery_html += '</div>'
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        item['content_html'] += '<h2><a href="{}" target="_blank">View photo gallery</a></h2>'.format(gallery_url) + gallery_html
     return item
 
 

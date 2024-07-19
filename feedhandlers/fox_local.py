@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -57,16 +57,24 @@ def get_article_content(article_json, args, site_json, save_debug=False):
             dt = datetime.fromisoformat(article_json['last_modified_date']).astimezone(timezone.utc)
         item['date_modified'] = dt.isoformat()
 
+    authors = []
     item['author'] = {}
     if article_json.get('fn__additional_authors'):
+        authors = article_json['fn__additional_authors']
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(article_json['fn__additional_authors']))
     elif article_json.get('fn__persons'):
-        authors = []
-        for it in article_json['fn__persons']:
-            authors.append(it['full_name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        authors = [it['full_name'] for it in article_json['fn__persons']]
+    elif article_json.get('fn__contributors'):
+        authors = [it['full_name'] for it in article_json['fn__contributors']]
+    elif article_json.get('meta') and article_json['meta'].get('chartbeat') and article_json['meta']['chartbeat'].get('authors'):
+        authors = article_json['meta']['chartbeat']['authors']
     elif article_json.get('source'):
-        item['author']['name'] = article_json['source']['label']
+        authors.append(article_json['source']['label'])
+    if authors:
+        item['author'] = {}
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    else:
+        item['author']['name'] = urlsplit(item['url']).netloc
 
     item['tags'] = []
     if article_json.get('category'):
@@ -92,6 +100,16 @@ def get_article_content(article_json, args, site_json, save_debug=False):
         else:
             item['_image'] = article_json['fn__image']['url']
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
+
     item['content_html'] = ''
     if article_json.get('dek'):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['dek'])
@@ -114,10 +132,11 @@ def render_components(components):
     for i, component in enumerate(components):
         if component['content_type'] == 'text':
             # Skip related/suggested content
-            if component['content']['text'].startswith('<p><strong>RELATED:</strong>'):
+            if '<strong>RELATED:' in component['content']['text']:
                 continue
-            elif component['content']['text'].startswith('<p><strong>SUGGESTED:</strong>') and i+1 < n and components[i+1]['content_type'] == 'list':
-                skip_list = True
+            elif '<strong>SUGGESTED:' in component['content']['text']:
+                if i + 1 < n and components[i+1]['content_type'] == 'list':
+                    skip_list = True
                 continue
             component_html += component['content']['text']
         elif component['content_type'] == 'heading':
@@ -152,6 +171,12 @@ def render_components(components):
             component_html += utils.add_embed(component['content']['url'])
         elif component['content_type'] == 'pdf':
             component_html += utils.add_embed('https://docs.google.com/gview?url=' + quote_plus(component['content']['url']))
+        elif component['content_type'] == 'freeform' and '<iframe' in component['content']['text']:
+            m = re.search(r'src="([^"]+)"', component['content']['text'])
+            if 'media.foxtv.com' in m.group(1) and 'wx' in m.group(1):
+                component_html += utils.add_image('{}/screenshot?url={}&browser=chrome&locator=div.wx-map-container-defaults'.format(config.server, quote_plus(m.group(1))), link=m.group(1))
+            else:
+                component_html += utils.add_embed(m.group(1))
         elif component['content_type'] == 'pull_quote':
             component_html += utils.add_pullquote(component['content']['text'], component['content'].get('credit'))
         elif component['content_type'] == 'list':

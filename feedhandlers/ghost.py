@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
+    if len(paths) == 0:
+        logger.warning('unsupported url ' + url)
+        return None
     slug = paths[-1].split('.')[0]
     ghost_url = '{}posts/slug/{}/?key={}&slug={}&include=authors%2Ctags'.format(site_json['data-api'], slug, site_json['data-key'], slug)
     ghost_json = utils.get_url_json(ghost_url)
@@ -69,8 +72,14 @@ def get_item(post_json, args, site_json, save_debug):
 
     if post_json.get('feature_image'):
         item['_image'] = post_json['feature_image']
-        if not soup or soup.find().name != 'figure':
+        if not soup:
             item['content_html'] += utils.add_image(item['_image'], post_json.get('feature_image_caption'))
+        else:
+            el = soup.find()
+            if el.name == 'figure' or (el.name == 'div' and el.find('iframe')):
+                pass
+            else:
+                item['content_html'] += utils.add_image(item['_image'], post_json.get('feature_image_caption'))
 
     if soup:
         for el in soup.find_all('blockquote'):
@@ -158,12 +167,15 @@ def get_item(post_json, args, site_json, save_debug):
                     attachment['mime_type'] = 'audio/mpeg'
                     item['attachments'] = []
                     item['attachments'].append(attachment)
+                    new_html += '<table><tr>'
                     it = el.find('img', class_='kg-audio-thumbnail')
-                    if it:
+                    if it and it.get('src'):
                         poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(it['src']))
+                        new_html += '<td style="width:128px;"><a href="{}"><img src="{}"/></a></td>'.format(item['_audio'], poster)
                     else:
                         poster = '{}/static/play_button-48x48.png'.format(config.server)
-                    new_html += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td><div style="font-size:1.1em; font-weight:bold;">'.format(item['_audio'], poster)
+                        new_html += '<td style="width:48px;"><a href="{}"><img src="{}"/></a></td>'.format(item['_audio'], poster)
+                    new_html += '<td><div style="font-size:1.1em; font-weight:bold;">'
                     it = el.find(class_='kg-audio-title')
                     if it:
                         new_html += it.decode_contents()
@@ -234,8 +246,11 @@ def get_item(post_json, args, site_json, save_debug):
             elif 'kg-button-card' in el['class']:
                 it = el.find(class_='kg-btn')
                 if it:
-                    it['style'] = 'color:white;'
-                    new_html += '<div style="text-align:center;"><div style="display:inline-block; padding:1em; background-color:#5928ED; text-align:center;">{}</div></div>'.format(str(it))
+                    if it.name == 'a':
+                        new_html += utils.add_button(it['href'], it.decode_contents(), '#5928ED', 'white')
+                    else:
+                        it['style'] = 'color:white;'
+                        new_html += '<div style="text-align:center;"><div style="display:inline-block; padding:1em; background-color:#5928ED; text-align:center;">{}</div></div>'.format(str(it))
             elif 'kg-file-card' in el['class']:
                 link = el.find('a', class_='kg-file-card-container')
                 if link:
@@ -315,6 +330,19 @@ def get_item(post_json, args, site_json, save_debug):
             elif el.find('a', attrs={"href": re.compile(r'api\.addthis\.com')}):
                 el.decompose()
                 continue
+            elif el.find(class_='gh-ingredient-card'):
+                new_html += '<div style="width:90%; margin:auto; padding:10px; border:1px solid black; border-radius:10px;"><table style="width:100%; border-collapse:collapse">'
+                it = el.find(class_='gh-ingredient-card-heading')
+                if it:
+                    new_html += '<tr style="border-bottom:3px solid black;"><td colspan="2" style="padding:8px 0 8px 0;"><div style="font-size:1.2em; font-weight:bold;">' + it.get_text() + '</td></tr>'
+                for i, it in enumerate(el.find_all(class_='gh-ingredient-card-category')):
+                    if i == 0:
+                        new_html += '<tr>'
+                    else:
+                        new_html += '<tr style="border-top:1px solid black;">'
+                    new_html += '<td style="vertical-align:top; padding:8px 1em 8px 0;">' + it.find(class_='gh-ingredient-card-category-name').get_text() + '</td>'
+                    new_html += '<td style="vertical-align:top; padding:8px 0 8px 0;">' + it.find(class_='gh-ingredient-card-category-body').get_text() + '</td></tr>'
+                new_html += '</table></div>'
             elif el.find(class_='gh-group-with-header'):
                 it = el.find('header')
                 it.name = 'div'

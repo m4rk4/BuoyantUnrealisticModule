@@ -100,34 +100,49 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['intro'].encode('iso-8859-1').decode('utf-8'))
 
     if article_json.get('cover')  and article_json['cover'].get('image'):
+        captions = []
         if article_json['cover']['image'].get('path'):
             item['_image'] = resize_image(article_json['cover']['image']['path'])
-            captions = []
             if article_json['cover']['image'].get('caption'):
                 captions.append(article_json['cover']['image']['caption'])
             if article_json['cover']['image'].get('credit'):
                 captions.append(article_json['cover']['image']['credit'])
         elif article_json['cover']['image'].get('value'):
             item['_image'] = resize_image(article_json['cover']['image']['value']['path'])
-            captions = []
             if article_json['cover']['image']['value'].get('caption'):
                 captions.append(article_json['cover']['image']['value']['caption'])
             if article_json['cover']['image']['value'].get('credit'):
                 captions.append(article_json['cover']['image']['value']['credit'])
+        for i, it in enumerate(captions):
+            try:
+                captions[i] = it.encode('iso-8859-1').decode('utf-8')
+            except:
+                pass
         item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
 
     for content in article_json['body']:
         if content['type'] == 'inline-text':
             if content.get('value'):
-                item['content_html'] += content['value']['html'].encode('iso-8859-1').decode('utf-8')
+                try:
+                    item['content_html'] += content['value']['html'].encode('iso-8859-1').decode('utf-8')
+                except:
+                    item['content_html'] += content['value']['html']
             elif content.get('html'):
-                item['content_html'] += content['html'].encode('iso-8859-1').decode('utf-8')
+                try:
+                    item['content_html'] += content['html'].encode('iso-8859-1').decode('utf-8')
+                except:
+                    item['content_html'] += content['html']
         elif content['type'] == 'image':
             captions = []
             if content['image'].get('caption'):
                 captions.append(content['image']['caption'])
             if content['image'].get('credit'):
                 captions.append(content['image']['credit'])
+            for i, it in enumerate(captions):
+                try:
+                    captions[i] = it.encode('iso-8859-1').decode('utf-8')
+                except:
+                    pass
             item['content_html'] += utils.add_image(resize_image(content['image']['path']), ' | '.join(captions))
         elif content['type'] == 'twitter':
             if content.get('value'):
@@ -247,12 +262,19 @@ def get_feed(url, args, site_json, save_debug=False):
     i = el.string.find('{')
     j = el.string.rfind('}') + 1
     preloaded_state = json.loads(el.string[i:j])
-    # utils.write_file(preloaded_state, './debug/feed.json')
-    api_url = 'https:' + preloaded_state['template']['expandableSection']['showMorePaginationURL']
-    split_url = urlsplit(api_url)
-    params = parse_qs(split_url.query)
-    api_url = '{}://{}{}?limit=10&topic={}'.format(split_url.scheme, split_url.netloc, split_url.path, params['topic'][0])
-    api_json = utils.get_url_json(api_url)
+    if save_debug:
+        utils.write_file(preloaded_state, './debug/feed.json')
+
+    api_json = None
+    for key, val in preloaded_state['template'].items():
+        if isinstance(val, dict) and val.get('showMorePaginationURL'):
+            api_url = 'https:' + val['showMorePaginationURL']
+            split_url = urlsplit(api_url)
+            params = parse_qs(split_url.query)
+            api_url = '{}://{}{}?limit=10&topic={}'.format(split_url.scheme, split_url.netloc, split_url.path, params['topic'][0])
+            api_json = utils.get_url_json(api_url)
+            if api_json:
+                break
     if not api_json:
         return None
     if save_debug:
