@@ -115,7 +115,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         caption = ''
         it = el.find_parent(class_='tr-caption-container')
         if it:
-            if it.parent and it.parent.name == 'div':
+            if it.name != 'table' and it.parent and it.parent.name == 'div':
                 el_parent = it.parent
             else:
                 el_parent = it

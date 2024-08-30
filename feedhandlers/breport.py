@@ -294,7 +294,7 @@ def get_feed(url, args, site_json, save_debug=False):
         if save_debug:
             logger.debug('getting content for ' + track['content']['metadata']['share_url'])
         if track['content_type'] == 'gamecast':
-            game_json = utils.get_url_json('https://layserbeam-cached.bleacherreport.com' + re.sub('^\/game\/', '/gamecast/', track['permalink']))
+            game_json = utils.get_url_json('https://layserbeam-cached.bleacherreport.com' + re.sub(r'^/game/', r'/gamecast/', track['permalink']))
             if game_json:
                 for game_track in game_json['social']['tracks']:
                     item = get_track_content(game_track, args, site_json, save_debug)

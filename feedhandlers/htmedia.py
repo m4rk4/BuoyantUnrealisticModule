@@ -98,7 +98,9 @@ def get_content(url, args, site_json, save_debug=False):
     slide_no = 0
     for element in api_json['listElement']:
         if element['type'] == 'paragraph':
-            body = re.sub(r'<h2>also read.+?</h2>', '', element['paragraph']['body'], flags=re.I)
+            body = element['paragraph']['body']
+            body = re.sub(r'<h2>also read.+?</h2>', '', body, flags=re.I)
+            body = re.sub(r'<p><a [^>]+>also read.+?</a></p>', '', body, flags=re.I)
             #body = re.sub(r'<strong>also read.+?</h2>', '', element['paragraph']['body'], flags=re.I)
             item['content_html'] += body
         elif element['type'] == 'image':

@@ -6,7 +6,7 @@ authors = ["m4rk4 <<>>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-Flask = "^2"
+Flask = "*"
 flask-cors = "^4"
 av = "^12"
 bs4 = "^0"
@@ -18,7 +18,7 @@ netifaces = [
     {path = "lib/netifaces-0.11.0-cp38-cp38-win_amd64.whl",  markers = "sys_platform == 'win32'"},
     {version = "=0.11.0",  markers = "sys_platform != 'win32'"}
 ]
-Pillow = "^9"
+Pillow = "*"
 pycryptodome = "^3"
 pytest-playwright = "^0"
 python-dateutil = "^2"
@@ -28,21 +28,23 @@ tldextract = "^5"
 # https://github.com/psf/requests/issues/6443
 # urllib3 = "^1.26"
 urllib3 = "^2"
-cloudscraper = "^1"
+cloudscraper = "*"
 staticmap = "^0.5"
-pytube = "^15"
+pytube = "*"
 basencode = "^2"
 requests-oauthlib = "^2"
-cryptography = "^42"
+cryptography = "*"
 utils = "^1.0.1"
 config = "^0.5.1"
 playwright = "^1"
 image-utils = "^0"
-js2py = "^0.74"
+js2py = "*"
 curl-cffi = "^0"
-certifi = "^2024.2.2"
-pygal = "^3.0.4"
-duckduckgo-search = "^6.2.1"
+certifi = "*"
+pygal = "*"
+duckduckgo-search = "*"
+yt-dlp = "*"
+httpx = "^0.27.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

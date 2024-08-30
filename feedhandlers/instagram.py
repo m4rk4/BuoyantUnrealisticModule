@@ -18,15 +18,16 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     # ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
     ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[0], paths[1])
     soup = None
+    # TODO: Fix
+    # if not ig_data:
+    #     if 'embed' in paths:
+    #         post_data, profile_data = get_ig_post_data(ig_url, False, save_debug)
+    #     else:
+    #         post_data, profile_data = get_ig_post_data(url, False, save_debug)
+    #     if post_data and post_data.get('data'):
+    #         ig_data = post_data['data']['xdt_shortcode_media']
     if not ig_data:
-        if 'embed' in paths:
-            post_data, profile_data = get_ig_post_data(ig_url, False, save_debug)
-        else:
-            post_data, profile_data = get_ig_post_data(url, False, save_debug)
-        if post_data and post_data.get('data'):
-            ig_data = post_data['data']['xdt_shortcode_media']
-    if not ig_data:
-        logger.debug('using embed data')
+        # logger.debug('using embed data')
         headers = {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
             "accept-language": "en-US,en;q=0.9",
@@ -43,6 +44,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             "upgrade-insecure-requests": "1",
             "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
         }
+        # ?cr=1&v=14&wp=583&rd=https%3A%2F%2Fpeople.com&rp=%2Fembed%3Furl%3Dhttps%253A%252F%252Fwww.instagram.com%252Fp%252FC64j5ILPzRH%26id%3Dmntl-sc-block_15-0-iframe%26options%3De30%253D%26docId%3D8681133
         embed_url = ig_url + 'embed/captioned/?cr=1&v=14&wp=540'
         ig_embed = utils.get_url_html(embed_url, headers=headers, allow_redirects=False)
         if not ig_embed:
@@ -71,7 +73,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 ig_data = None
 
         if not ig_data:
-            soup = BeautifulSoup(ig_embed, 'html.parser')
+            soup = BeautifulSoup(ig_embed, 'lxml')
             el = soup.find('script', string=re.compile(r'gql_data'))
             if el:
                 m = re.search(r'handle\((.*?)\);requireLazy', el.string)
@@ -80,7 +82,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                         script_data = json.loads(m.group(1))
                         #utils.write_file(script_data, './debug/instagram.json')
                         for data in script_data['require']:
-                            if data[0] == 'PolarisEmbedSimple':
+                            if data[0].startswith('PolarisEmbedSimple'):
                                 context_json = json.loads(data[3][0]['contextJSON'])
                                 ig_data = context_json['gql_data']
                                 break
@@ -101,11 +103,11 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['owner']['profile_pic_url']))
             users.append(ig_data['owner']['username'])
             if ig_data['owner'].get('full_name'):
-                names.append('<br/>' + ig_data['owner']['full_name'])
+                names.append('<br/><small>' + ig_data['owner']['full_name'] + '</small>')
             else:
                 name = search_for_fullname('https://www.instagram.com/{}/'.format(ig_data['owner']['username']))
                 if name:
-                    names.append('<br/>' + name)
+                    names.append('<br/><small>' + name + '</small>')
                 else:
                     names.append('')
             if ig_data['owner'].get('is_verified'):
@@ -127,7 +129,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             users.append(el[0].find(class_='UsernameText').get_text())
             name = search_for_fullname(utils.clean_url(el[0]['href']))
             if name:
-                names.append('<br/>' + name)
+                names.append('<br/><small>' + name + '</small>')
             else:
                 names.append('')
             it = el[0].find('i', class_='VerifiedSprite')
@@ -142,7 +144,11 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 m = re.search(r'^/([^/]+)/', urlsplit(el['href']).path)
                 if m:
                     users.append(m.group(1))
-                    names.append('')
+                    name = search_for_fullname(utils.clean_url(el['href']))
+                    if name:
+                        names.append('<br/><small>' + name + '</small>')
+                    else:
+                        names.append('')
                     verified.append('')
 
     username = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(users))
@@ -266,65 +272,82 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 video_src = ig_data['video_versions'][0]['url']
             else:
                 video_src = ig_data['video_url']
+            item['_video'] = video_src
+            item['_video_type'] = 'video/mp4'
             if ig_data.get('display_resources'):
                 img = utils.closest_dict(ig_data['display_resources'], 'config_width', 640)
-                img_src = img['src']
+                item['_image'] = 'https://wsrv.nl/?url=' + quote_plus(img['src'])
             elif ig_data.get('image_versions2'):
                 img = utils.closest_dict(ig_data['image_versions2']['candidates'], 'width', 640)
-                img_src = img['url']
+                item['_image'] = 'https://wsrv.nl/?url=' + quote_plus(img['url'])
             else:
-                img_src = ig_data['display_url']
-            #post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), height='0', link=video_src, img_style='border-radius:10px;')
-            post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(video_src, config.server, quote_plus(img_src))
+                item['_image'] = 'https://wsrv.nl/?url=' + quote_plus(ig_data['display_url'])
+            # video_src = '{}/videojs?src={}&type=video%2Fmp4&poster={}'.format(config.server, quote_plus(item['_video']), quote_plus(item['_image']))
+            video_src = config.server + '/video?url=' + quote_plus(ig_url)
+            poster = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(item['_image']))
+            post_media += '<div><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(video_src, poster)
         else:
             el = soup.find('img', class_='EmbeddedMediaImage')
             if el:
-                img_src = el['src']
-                poster = '{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src))
+                item['_image'] = el['src']
+                poster = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(item['_image']))
                 caption = '<div style="padding:0 8px 0 8px;"><small><a href="{}">Watch on Instagram</a></small></div>'.format(ig_url)
-                #post_media += utils.add_image(poster, caption, height='0', link=ig_url, img_style='border-radius:10px;')
-                post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(ig_url, config.server, quote_plus(img_src), caption)
+                post_media += '<div><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(ig_url, config.server, poster, caption)
 
     elif media_type == 'GraphSidecar' or media_type == 'XDTGraphSidecar':
         if ig_data:
+            item['_gallery'] = []
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
             for edge in ig_data['edge_sidecar_to_children']['edges']:
                 if edge['node']['__typename'] == 'GraphImage' or edge['node']['__typename'] == 'XDTGraphImage':
                     if edge['node'].get('display_resources'):
-                        img_src = edge['node']['display_resources'][0]['src']
-                    else:
-                        img_src = edge['node']['display_url']
-                    #post_media += utils.add_image('{}/image?url={}&width=540'.format(config.server, quote_plus(img_src)), height='0', link=img_src, img_style='border-radius:10px;')
-                    post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540" style="display:block; width:100%;" /></a></div><div>&nbsp;</div>'.format(img_src, config.server, quote_plus(img_src))
-
-                elif edge['node']['__typename'] == 'GraphVideo' or edge['node']['__typename'] == 'XDTGraphVideo':
-                    if edge['node'].get('video_url'):
-                        video_src = edge['node']['video_url']
-                        caption = ''
-                    else:
-                        video_src = ''
-                        #caption = '<a href="{}"><small>Watch on Instagram</small></a>'.format(ig_url)
-                        caption = '<div style="padding:0 8px 0 8px;"><small><a href="">{}>Watch on Instagram</a></small></div>'.format(ig_url)
-                    if edge['node'].get('display_resources'):
-                        img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 640)
+                        img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 1080)
                         img_src = img['src']
                     else:
                         img_src = edge['node']['display_url']
-                    #post_media += utils.add_image('{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(img_src)), caption, height='0', link=video_src, img_style='border-radius:10px;')
-                    post_media += '<div><a href="{}"><img src="{}/image?url={}&width=540&overlay=video" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(video_src, config.server, quote_plus(img_src), caption)
-                #post_media += '<div>&nbsp;</div>'
-            #post_media = post_media[:-10]
+                    img_src = 'https://wsrv.nl/?url=' + quote_plus(img_src)
+                    thumb = img_src + '&w=640'
+                    gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a></div>'.format(img_src, thumb)
+                    item['_gallery'].append({"src": img_src, "caption": "", "thumb": thumb})
+                elif edge['node']['__typename'] == 'GraphVideo' or edge['node']['__typename'] == 'XDTGraphVideo':
+                    if edge['node'].get('display_resources'):
+                        img = utils.closest_dict(edge['node']['display_resources'], 'config_width', 1080)
+                        img_src = img['src']
+                    else:
+                        img_src = edge['node']['display_url']
+                    thumb = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(img_src))
+                    img_src = 'https://wsrv.nl/?url=' + quote_plus(img_src)
+                    if edge['node'].get('video_url'):
+                        video_src = edge['node']['video_url']
+                        if edge['node'].get('shortcode'):
+                            video_link = '{}/video?url=https%3A%2F%2Fwww.instagram.com%2Freel%2F{}%2F'.format(config.server, edge['node']['shortcode'])
+                        else:
+                            video_link = '{}/videojs?src={}&type=video%2Fmp4&poster={}'.format(config.server, quote_plus(video_src), quote_plus(img_src))
+                        caption = ''
+                    else:
+                        video_src = ig_url
+                        video_link = ig_url
+                        caption = '<div style="padding:0 8px 0 8px;"><small><a href="">{}>Watch on Instagram</a></small></div>'.format(ig_url)
+                    gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a>{}</div>'.format(video_link, thumb, caption)
+                    item['_gallery'].append({"src": video_src, "caption": caption, "thumb": thumb})
+
+            gallery_html += '</div>'
+            # gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(item['_gallery'])))
+            gallery_url = '{}/gallery?url={}'.format(config.server, quote_plus(ig_url))
+            post_media += gallery_html
+            post_media += '<div style="padding:8px; font-size:0.9em;"><a href="{}" target="_blank">View photo gallery</a></div>'.format(gallery_url)
         else:
             logger.warning('Instagram GraphSidecar media without ig_data in ' + ig_url)
     post_media = re.sub('<div>&nbsp;</div>$', '', post_media)
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
     #item['content_html'] = '<table style="table-layout:fixed; width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-collapse:collapse;">'
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px black;">'
     for i in range(len(users)):
         if i == 0:
-            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td><td style="width:48px; text-align:right; vertical-align:middle;"><a href="{4}"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{4}" target="_blank"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
         else:
-            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatars[i], users[i], verified[i], names[i])
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatars[i], users[i], verified[i], names[i])
 
     item['content_html'] += '<tr><td colspan="3" style="padding:0;">'
     if post_media:
@@ -337,7 +360,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     if item.get('_display_date'):
         item['content_html'] += '<a href="{}"><small>{}</small></a>'.format(item['url'], item['_display_date'])
     else:
-        item['content_html'] += '<a href="{}"><small>Open in Instagram</small></a>'.format(item['url'])
+        item['content_html'] += '<a href="{}" target="_blank"><small>Open in Instagram</small></a>'.format(item['url'])
     item['content_html'] += '</td></tr></table>'
     return item
 
@@ -475,7 +498,7 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
     }
 
-    s = curl_requests.Session(impersonate='chrome116')
+    s = curl_requests.Session(impersonate=config.impersonate)
     r = s.get(utils.clean_url(url), proxies=config.proxies)
     if r.status_code != 200:
         return None, None
@@ -606,7 +629,7 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     post_doc_id = ''
     profile_doc_id = ''
     for el in page_soup.find_all('link', href=re.compile(r'https://static\.cdninstagram\.com/rsrc\.php/.*\.js')):
-        # print(el['href'])
+        print(el['href'])
         r = s.get(el['href'], proxies=config.proxies)
         if r.status_code == 200:
             if 'instagram.com' in url:
@@ -620,7 +643,10 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
                 m = re.search(r'"BarcelonaPostPage__data".*?id:"(\d+)"', r.text)
                 if m:
                     post_doc_id = m.group(1)
-                m = re.search(r'id:"(\d+)",metadata:\{\},name:"BarcelonaProfilePageQuery"', r.text)
+                # m = re.search(r'id:"(\d+)",metadata:\{\},name:"BarcelonaProfilePageQuery"', r.text)
+                # if m:
+                #     profile_doc_id = m.group(1)
+                m = re.search(r'id:"(\d+)",metadata:\{\},name:"BarcelonaUsernameHoverCardImplQuery"', r.text)
                 if m:
                     profile_doc_id = m.group(1)
             m = re.search(r'a="(\d+)";f\.ASBD_ID=a', r.text)
@@ -702,10 +728,11 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
 
     gql_headers = {
         "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
         "content-type": "application/x-www-form-urlencoded",
         "cookie": '; '.join(['{}={}'.format(k, v) for k, v in gql_cookies.items()]),
         "dpr": "1",
+        "priority": "u=1, i",
         "sec-ch-prefers-color-scheme": "light",
         "sec-ch-ua": "\"Microsoft Edge\";v=\"123\", \"Not:A-Brand\";v=\"8\", \"Chromium\";v=\"123\"",
         "sec-ch-ua-full-version-list": "\"Microsoft Edge\";v=\"123.0.2420.65\", \"Not:A-Brand\";v=\"8.0.0.0\", \"Chromium\";v=\"123.0.6312.87\"",
@@ -828,16 +855,22 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
                 if it['post']['code'] == paths[-1]:
                     post_json = it['post']
                     break
-            req_friendly_name = 'BarcelonaProfilePageQuery'
+            # req_friendly_name = 'BarcelonaProfilePageQuery'
+            # variables = {
+            #     "userID": post_json['user']['pk'],
+            #     "__relay_internal__pv__BarcelonaIsSableEnabledrelayprovider": False,
+            #     "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": False,
+            #     "__relay_internal__pv__BarcelonaIsLinkVerificationEnabledrelayprovider": True,
+            #     "__relay_internal__pv__BarcelonaShouldShowFediverseM075Featuresrelayprovider": False
+            # }
+            req_friendly_name = 'BarcelonaUsernameHoverCardImplQuery'
+            variables = {
+                "username": paths[0][1:],
+                "__relay_internal__pv__BarcelonaShouldShowFediverseM075Featuresrelayprovider": False
+            }
             gql_headers['X-Fb-Friendly-Name'] = req_friendly_name
             gql_data['fb_api_req_friendly_name'] = req_friendly_name
             gql_data['doc_id'] = profile_doc_id
-            variables = {
-                "userID": post_json['user']['pk'],
-                "__relay_internal__pv__BarcelonaIsSableEnabledrelayprovider": False,
-                "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": False,
-                "__relay_internal__pv__BarcelonaShouldShowFediverseM075Featuresrelayprovider": False
-            }
             body = urlencode(gql_data) + '&variables=' + quote_plus(json.dumps(variables, separators=(',', ':')))
             # print(body)
             r = s.post(gql_url, data=body, headers=gql_headers, proxies=config.proxies)
@@ -846,6 +879,10 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
                     profile_data = r.json()
                     if save_debug:
                         utils.write_file(profile_data, './debug/profile_data.json')
+                    if 'errors' in profile_data:
+                        for error in profile_data['errors']:
+                            logger.warning('error getting BarcelonaProfilePageQuery: ' + error['message'])
+                        profile_data = None
                 except:
                     logger.warning('error converting {} to json: {}'.format(req_friendly_name, r.text))
             else:
@@ -903,10 +940,16 @@ def rand_str(n):
 
 
 def search_for_fullname(url):
+    # print(url)
     results = DDGS().text(url, max_results=5)
+    if url.endswith('/'):
+        ig_url = url[:-1].lower()
+    else:
+        ig_url = url.lower()
     if results:
         for result in results:
-            if result['href'] == url:
+            if ig_url in result['href'].lower():
+                # print(result)
                 m = re.search(r'^(.*?)\s\(@', result['title'])
                 return m.group(1)
     return ''

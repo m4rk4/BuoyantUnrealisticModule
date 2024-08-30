@@ -135,9 +135,10 @@ def get_content(url, args, site_json, save_debug):
     next_data = get_next_data(url)
     if not next_data:
         return None
-    #utils.write_file(next_data, './debug/debug.json')
+    if save_debug:
+        utils.write_file(next_data, './debug/debug.json')
 
-    if next_data['props']['pageProps'].get('productName') and next_data['props']['pageProps']['productName'] == 'radio':
+    if next_data['props']['pageProps'].get('productName') and (next_data['props']['pageProps']['productName'] == 'radio' or next_data['props']['pageProps']['productName'] == 'listen'):
         article_json = next_data['props']['pageProps']['data']['documentProps']
     elif next_data['props']['pageProps']['document']['docType'] == 'Video':
         article_json = next_data['props']['pageProps']['document']['loaders']['media']
@@ -156,7 +157,10 @@ def get_content(url, args, site_json, save_debug):
             dt = datetime.fromisoformat(article_json['datelinePrepared']['publishedDate']).astimezone(timezone.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt)
+            if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
+                item['_display_date'] = utils.format_display_date(dt, False)
+            else:
+                item['_display_date'] = utils.format_display_date(dt)
         if article_json['datelinePrepared'].get('updatedDate'):
             dt = datetime.fromisoformat(article_json['datelinePrepared']['updatedDate']).astimezone(timezone.utc)
             item['date_modified'] = dt.isoformat()
@@ -170,26 +174,35 @@ def get_content(url, args, site_json, save_debug):
             dt = datetime.fromisoformat(article_json['headlinePrepared']['lastUpdated']).astimezone(timezone.utc)
             item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    authors = []
-    if article_json['docType'] == 'audio':
-        item['author']['name'] = article_json['analytics']['document']['program']['name']
+    item['authors'] = []
+    if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
+        item['author'] = {
+            "name": article_json['analytics']['document']['program']['name']
+        }
+        if article_json.get('attributionLinkWithThumbnailPrepared'):
+            item['author']['url'] = 'https://' + urlsplit(item['url']).netloc + article_json['attributionLinkWithThumbnailPrepared']['url']
+        elif article_json.get('attributionLinksPrepared') and article_json['attributionLinksPrepared'].get('links'):
+            item['author']['url'] = 'https://' + urlsplit(item['url']).netloc + article_json['attributionLinksPrepared']['links'][0]['url']
+        item['authors'].append(item['author'])
     elif article_json.get('headlinePrepared'):
         if article_json['headlinePrepared'].get('newsBylinePrepared'):
             if article_json['headlinePrepared']['newsBylinePrepared'].get('byline'):
                 byline = format_block(article_json['headlinePrepared']['newsBylinePrepared']['byline']['descriptor'])
                 if byline:
-                    authors.append(BeautifulSoup(byline, 'html.parser').get_text())
+                    item['authors'].append({"name": BeautifulSoup(byline, 'html.parser').get_text()})
             if article_json['headlinePrepared']['newsBylinePrepared'].get('authors'):
                 for it in article_json['headlinePrepared']['newsBylinePrepared']['authors']:
-                    if it['name'] not in authors:
-                        authors.append(it['name'])
+                    if not any(x['name'] == it['name'] for x in item['authors']):
+                        item['authors'].append({"name": it['name']})
         elif article_json['headlinePrepared'].get('byline'):
             logger.warning('unhandled headlinePrepared byline')
-    if authors:
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    else:
-        item['author']['name'] = 'ABC News'
+        if len(item['authors']):
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+        else:
+            item['author'] = {"name": "ABC News"}
+            item['authors'].append(item['author'])
 
     if article_json['headTagsPagePrepared'].get('keywords'):
         item['tags'] = article_json['headTagsPagePrepared']['keywords'].copy()
@@ -198,59 +211,69 @@ def get_content(url, args, site_json, save_debug):
         item['summary'] = article_json['synopsis']
 
     if article_json.get('headTagsArticlePrepared') and article_json['headTagsArticlePrepared'].get('schema') and article_json['headTagsArticlePrepared']['schema'].get('image'):
-        item['_image'] = resize_image(article_json['headTagsArticlePrepared']['schema']['image']['url'])
+        item['image'] = resize_image(article_json['headTagsArticlePrepared']['schema']['image']['url'])
 
     item['content_html'] = ''
     if article_json['docType'] == 'video':
         video = utils.closest_dict(article_json['headlinePrepared']['media']['renditions'], 'height', 480)
         if article_json['headlinePrepared']['media'].get('thumbnailLink'):
             poster = resize_image(article_json['headlinePrepared']['media']['thumbnailLink']['cropInfo'][0]['value'][0]['url'])
-            item['_image'] = poster
+            item['image'] = poster
         else:
             poster = ''
         caption = 'Video: <a href="{}">{}</a>'.format(item['url'], item['title'])
         if article_json['headlinePrepared']['media'].get('caption'):
             caption += ' | ' + article_json['headlinePrepared']['media']['caption']['plain']
         item['content_html'] += utils.add_video(video['url'], video['contentType'], poster, caption)
-    if article_json['docType'] == 'audio':
-        captions = []
+    if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
+        item['_audio'] = article_json['renditions'][0]['url']
+        attachment = {
+            "url": article_json['renditions'][0]['url']
+            "mime_type": article_json['renditions'][0]['MIMEType']
+        }
+        item['attachments'] = []
+        item['attachments'].append(attachment)
         if article_json.get('thumbnailLink') and article_json['thumbnailLink'].get('picture'):
-            item['_image'] = resize_image(article_json['thumbnailLink']['picture']['cropInfo'][0]['value'][0]['url'])
-            if article_json['thumbnailLink'].get('caption'):
-                captions.append(article_json['thumbnailLink']['caption']['plain'])
-            if article_json['thumbnailLink'].get('byline'):
-                captions.append(article_json['thumbnailLink']['byline']['plain'])
-        elif article_json.get('embedded') and article_json['embedded'].get('mediaThumbnail'):
-            item['_image'] = resize_image(article_json['embedded']['mediaThumbnail']['cropInfo'][0]['value'][0]['url'])
-            if article_json['embedded']['mediaThumbnail'].get('caption'):
-                captions.append(article_json['embedded']['mediaThumbnail']['caption']['plain'])
-            if article_json['embedded']['mediaThumbnail'].get('byline'):
-                captions.append(article_json['embedded']['mediaThumbnail']['byline']['plain'])
-        duration = []
-        s = article_json['duration']
-        if s > 3600:
-            h = s / 3600
-            duration.append('{} hr'.format(math.floor(h)))
-            m = (s % 3600) / 60
-            duration.append('{} min'.format(math.ceil(m)))
+            picture = article_json['thumbnailLink']['picture']
+        elif article_json.get('embedded') and article_json['embedded'].get('mediaThumbnail') and article_json['embedded']['mediaThumbnail'].get('picture'):
+            picture = article_json['embedded']['mediaThumbnail']['picture']
         else:
-            m = s / 60
-            duration.append('{} min'.format(math.ceil(m)))
-        captions.insert(0, '<a href="{}">Listen ({})</a>'.format(item['url'], ', '.join(duration)))
-        poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        item['content_html'] += utils.add_image(poster, ' | '.join(captions), link=article_json['renditions'][0]['url'])
+            logger.warning('unknown audio thumbnail in ' + item['url'])
+            picture = None
+        if picture:
+            crop = next((it for it in picture['cropInfo'] if it['key'] == 'thumbnail'), None)
+            if not crop:
+                crop = article_json['thumbnailLink']['picture']['cropInfo'][0]
+            image = next((it for it in crop['value'] if it['ratio'] == '1x1'), None)
+            if not image:
+                image = crop['value'][0]
+            item['image'] = image['url']
+        elif article_json.get('embedded') and article_json['embedded'].get('mediaThumbnail'):
+            item['image'] = resize_image(article_json['embedded']['mediaThumbnail']['cropInfo'][0]['value'][0]['url'])
+        item['content_html'] += utils.add_audio(article_json['renditions'][0]['url'], item.get('image'), item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], article_json['duration'], article_json['renditions'][0]['MIMEType'])
     elif article_json.get('featureMediaPrepared') and article_json['featureMediaPrepared'].get('heroContent'):
         if article_json['featureMediaPrepared']['heroContent']['descriptor']['key'] == 'Video':
             item['content_html'] += add_video(article_json['featureMediaPrepared']['heroContent']['descriptor']['props'])
-            # TODO: item['_image']
+            # TODO: item['image']
         else:
-            item['_image'] = article_json['featureMediaPrepared']['heroContent']['descriptor']['props']['imgSrc']
+            item['image'] = article_json['featureMediaPrepared']['heroContent']['descriptor']['props']['imgSrc']
             item['content_html'] += add_image(article_json['featureMediaPrepared']['heroContent']['descriptor']['props'])
 
-    if article_json.get('text') and 'embed' not in args:
+    if 'embed' in args:
+        if article_json['docType'] != 'video' and article_json['docType'] != 'audio' and article_json['docType'] != 'audioepisode':
+            item['content_html'] = utils.format_embed_preview(item)
+        return item
+
+    if article_json.get('summary'):
+        item['content_html'] += '<div>&nbsp;</div><div style="background-color:#ecf2fb; border-radius:10px; padding:1px 1em 8px 1em;">'
+        for block in article_json['summary']['descriptor']['children']:
+            item['content_html'] += format_block(block)
+        item['content_html'] += '</div>'
+
+    if article_json.get('text'):
         for block in article_json['text']['descriptor']['children']:
             item['content_html'] += format_block(block)
-    elif article_json.get('richTextCaption') and 'embed' not in args:
+    elif article_json.get('richTextCaption'):
         for block in article_json['richTextCaption']['descriptor']['children']:
             item['content_html'] += format_block(block)
 

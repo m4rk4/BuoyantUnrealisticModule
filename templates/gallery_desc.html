@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+	<head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.css"/>
+        <style>
+            body {
+                font-size: 18px;
+                font-family: Verdana, Geneva, sans-serif;
+                background-color: color-mix(in srgb, Canvas, CanvasText 2.5%);
+                color: color-mix(in srgb, CanvasText, Canvas 15%);
+                color-scheme: light dark;
+            }
+            .fancybox__container {
+                --fancybox-bg: #27272a;
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) clamp(300px, 30vw, 600px) 46px;
+                grid-template-rows: minmax(0, 1fr);
+            }
+
+            .fancybox__container.is-opening {
+                --f-transition-duration: 0.25s;
+                --f-transition-easing: ease-out;
+                --f-transition-delay: 0.1s;
+            }
+
+            .fancybox__container.is-closing {
+                --f-transition-duration: 0.1s;
+            }
+
+            .fancybox__toolbar {
+                --f-button-color: #fff;
+                --f-button-hover-color: #fff;
+                --f-button-bg: #000;
+                --f-button-hover-bg: #333;
+                --f-button-active-bg: #444;
+                grid-column: 3 / 3;
+                grid-row: 1 / 3;
+                background: #000;
+            }
+
+            .fancybox__caption {
+                grid-column: 2 / 3;
+                grid-row: 1 / 3;
+                height: 100%;
+                overflow: auto;
+                padding: 1rem 1.5rem;
+                background: #18181b;
+            }
+        </style>
+		<title>{{ title }}</title>
+    </head>
+    <body>
+        {% if title %}
+            {% if link %}
+                <h2><a href="{{ link }}">{{ title }}</a></h2>
+            {% else %}
+                <h2>{{ title }}</h2>
+            {% endif %}
+        {% endif %}
+        <div style="display:flex; flex-wrap:wrap; gap:16px 8px;">
+            {% for image in images %}
+                <div style="flex:1; min-width:360px;">
+                    <figure style="margin:0; padding:0;">
+                        {% if image.caption %}
+                            {% set caption = image.desc + "<small>" + image.caption + "</small>" %}
+                        {% else %}
+                            {% set caption = image.desc %}
+                        {% endif %}
+                        <a data-fancybox="gallery" data-src="{{ image.src }}" data-caption="{{ caption }}">
+                            <img src="{{ image.thumb }}" style="display:block; margin-left:auto; margin-right:auto; width:auto; max-width:100%; max-height:800px;"/>
+                        </a>
+                        {% if image.caption %}
+                            <figcaption>
+                                <small>{{ image.caption | safe }}</small>
+                            </figcaption>
+                        {% endif %}
+                        {{ image.desc | safe }}
+                    </figure>
+                </div>
+            {% endfor %}
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0/dist/fancybox/fancybox.umd.js"></script>
+        <script>
+Fancybox.bind('[data-fancybox]', {
+    compact: false,
+    idle: false,
+    dragToClose: false,
+    commonCaption: true,
+
+    Images: {
+        zoom: false,
+    },
+    showClass: 'f-fadeIn',
+
+    Toolbar: {
+        absolute: false,
+        display: {
+            left: ['close', 'thumbs', 'fullscreen'],
+            middle: [],
+            right: [],
+        },
+    },
+    tpl: {
+        main: `<div class="fancybox__container" role="dialog" aria-modal="true" aria-label="{{MODAL}}" tabindex="-1">
+<div class="fancybox__backdrop"></div>
+<div class="fancybox__carousel"></div>
+<div class="fancybox__caption"></div>
+<div class="fancybox__toolbar"></div>
+<div class="fancybox__footer"></div>
+</div>`,
+    },
+});
+// Start Fancybox on page load
+Fancybox.fromSelector('[data-fancybox]');
+
+        </script>
+    </body>
+</html>

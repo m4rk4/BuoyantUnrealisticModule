@@ -46,7 +46,11 @@ def get_content(url, args, site_json, save_debug=False):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": article_json['author']['author']}
+    item['author'] = {
+        "name": article_json['author']['author']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if article_json.get('tags'):
         item['tags'] = []
@@ -54,7 +58,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append(it['name'])
 
     if article_json.get('assetUrl'):
-        item['_image'] = article_json['assetUrl']
+        item['image'] = article_json['assetUrl']
 
     if article_json.get('seo'):
         item['summary'] = article_json['seo']

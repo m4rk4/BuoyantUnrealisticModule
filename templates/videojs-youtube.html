@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="https://unpkg.com/video.js/dist/video-js.min.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="player1">
+        <video id="yt_video" class="video-js vjs-16-9" controls preload="auto"></video>
+    </div>
+    <script src="https://unpkg.com/video.js/dist/video.js"></script>
+    <script src="https://unpkg.com/videojs-youtube/dist/Youtube.js"></script>
+    <script>
+        const player = videojs('yt_video', {
+          // playbackRates: [0.5, 1, 1.5, 2, 2.5],
+          "techOrder": ["html5", "youtube"],
+          "sources": [{ "type": "video/youtube", "src": "{{ args.src }}"}]
+        });
+        document.querySelectorAll('button.rate').forEach((b) => {
+          b.addEventListener('click', () => {
+            player.playbackRate(parseFloat(b.textContent));
+          });
+        });
+        player.one('play', function() {
+          console.log('You Tube allowed rates', player.tech(true).ytPlayer.getAvailablePlaybackRates());
+        })
+    </script>
+  </body>
+</html>

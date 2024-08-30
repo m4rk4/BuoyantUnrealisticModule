@@ -284,7 +284,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         if item.get('summary') and 'embed' not in args:
             summary_html = item['summary'].replace('\n', ' <br/> ')
-            summary_html = re.sub('https?://([^\s]+)', r'<a href="\1">\1</a>', summary_html)
+            summary_html = re.sub(r'https?://([^\s]+)', r'<a href="\1">\1</a>', summary_html)
             item['content_html'] += '<p>{}</p>'.format(summary_html)
 
     if playlist_id:
@@ -467,7 +467,7 @@ def get_content(url, args, site_json, save_debug=False):
         def replace_link(matchobj):
             return '<a href="{0}">{0}</a>'.format(matchobj.group(0))
 
-        summary_html = re.sub('https?:\/\/[^\s]+', replace_link, summary_html)
+        summary_html = re.sub(r'https?:\/\/[^\s]+', replace_link, summary_html)
         item['content_html'] += '<p>{}</p>'.format(summary_html)
     return item
 

@@ -177,10 +177,14 @@ def render_block(block, full_header=False, headline_url=''):
             logger.warning('unhandled UnstructuredBlock')
 
     elif block['__typename'] == 'Image':
-        images = []
-        for it in block['crops']:
-            images += it['renditions']
-        image = utils.closest_dict(images, 'width', 1000)
+        images = next((it for it in block['crops'] if ('name' in it and it['name'] == 'MASTER')), None)
+        if images:
+            image = utils.closest_dict(images['renditions'], 'width', 1000)
+        else:
+            images = []
+            for it in block['crops']:
+                images += it['renditions']
+            image = utils.closest_dict(images, 'width', 1000)
         captions = []
         if block.get('caption'):
             it = render_block(block['caption']).strip()
@@ -232,10 +236,33 @@ def render_block(block, full_header=False, headline_url=''):
         block_html += '</td></tr></table>'
 
     elif block['__typename'] == 'GridBlock':
-        block_html += '<div><strong>{}</strong><br/>'.format(block['caption'])
+        # block_html += '<div><strong>{}</strong><br/>'.format(block['caption'])
+        # for blk in block['gridMedia']:
+        #     block_html += render_block(blk)
+        # block_html += '</div>'
+        gallery_images = []
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for blk in block['gridMedia']:
-            block_html += render_block(blk)
-        block_html += '</div>'
+            if blk['__typename'] == 'Image':
+                captions = []
+                if blk.get('caption'):
+                    it = render_block(blk['caption']).strip()
+                    if it:
+                        captions.append(it)
+                if blk.get('credit'):
+                    captions.append(blk['credit'])
+                images = next((it for it in blk['crops'] if ('name' in it and it['name'] == 'MASTER')), None)
+                image = utils.closest_dict(images['renditions'], 'width', 1200)
+                thumb = utils.closest_dict(images['renditions'], 'width', 640)
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb['url'], ' | '.join(captions), link=image['url']) + '</div>'
+                gallery_images.append({"src": image['url'], "caption": " | ".join(captions), "thumb": thumb['url']})
+            else:
+                block_html += render_block(blk)
+        gallery_html += '</div>'
+        if block.get('caption'):
+            gallery_html += '<div style="padding-top:8px;"><small>{}</small></div>'.format(block['caption'])
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        block_html += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
     elif block['__typename'] == 'InteractiveBlock':
         block_html += render_block(block['media'])
@@ -468,13 +495,13 @@ def get_content(url, args, site_json, save_debug=False):
                 break
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
             item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
         item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
         if item.get('summary'):
             item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     if article_json.get('groupings'):

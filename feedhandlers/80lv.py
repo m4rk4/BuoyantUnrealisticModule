@@ -37,18 +37,18 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(api_json['meta']['article-article:modified_time']['content']).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
+    item['authors'] = []
     if api_json['aside'].get('author'):
-        item['author']['name'] = api_json['aside']['author']['name']
+        item['authors'].append({"name": api_json['aside']['author']['name']})
     if api_json['aside'].get('interviewer'):
-        if item.get('author'):
-            item['author']['name'] += ' (Interview by {})'.format(api_json['aside']['interviewer']['name'])
-        else:
-            item['author']['name'] += 'Interview by {}'.format(api_json['aside']['interviewer']['name'])
+        item['authors'].append({"name": api_json['aside']['interviewer']['name'] + ' (interviewer)'})
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
     item['tags'] = [it.strip() for it in api_json['meta']['meta-keywords']['content'].split(', ')]
 
-    item['_image'] = api_json['meta']['og-og:image']['content']
+    item['image'] = api_json['meta']['og-og:image']['content']
 
     item['content_html'] = ''
     if api_json.get('description'):

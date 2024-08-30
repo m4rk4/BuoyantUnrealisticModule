@@ -1,9 +1,9 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import brightcove, rss
 
 import logging
@@ -117,6 +117,13 @@ def get_item(article_json, args, site_json, save_debug):
     if article_json.get('keywords'):
         item['tags'] = article_json['keywords'].split(', ')
 
+    if article_json.get('summary'):
+        item['summary'] = article_json['summary']
+    elif article_json.get('meta_description'):
+        item['summary'] = article_json['meta_description']
+    elif article_json.get('story_teaser'):
+        item['summary'] = article_json['story_teaser']
+
     item['content_html'] = ''
     if article_json.get('story_teaser'):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['story_teaser'])
@@ -159,6 +166,16 @@ def get_item(article_json, args, site_json, save_debug):
                 item['content_html'] += '<p>{}</p>'.format(it['text'])
         item['content_html'] += add_gallery(item['url'], save_debug)
         item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
+        return item
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] += article_json['content']

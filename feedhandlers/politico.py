@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -79,6 +79,8 @@ def get_content(url, args, site_json, save_debug=False):
         item['tags'] = []
         for it in article_json['content']['topics']:
             item['tags'].append(it['label'])
+    elif api_json['meta'].get('content_topic'):
+        item['tags'] = api_json['meta']['content_topic'].split('|')
 
     item['content_html'] = ''
     if article_json['content'].get('dek'):
@@ -109,6 +111,11 @@ def get_content(url, args, site_json, save_debug=False):
     #         continue
     #     else:
     #         logger.warning('unhandled body block type {} in {}'.format(block['type'], item['url']))
+    if article_json.get('body') and '_image' not in item:
+        if article_json['body'][0]['content'].startswith('<img'):
+            m = re.search(r'src="([^"]+)"', article_json['body'][0]['content'])
+            if m:
+                item['_image'] = m.group(1)
 
     if article_json['content']['type'] == 'article':
         text = ''
@@ -150,6 +157,16 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     caption = ''
                 item['content_html'] += utils.add_image(resize_image(img_src), caption) + '<div>&nbsp;</div>'
+        return item
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     for el in story.find_all(class_=['ad', 'pb-fam', 'shifty-wrapper', 'story-intro', 'story-meta', 'story-related', 'story-supplement', 'twitter-authors']):

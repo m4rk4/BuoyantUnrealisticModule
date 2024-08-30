@@ -38,32 +38,32 @@ def get_content(url, args, site_json, save_debug=False):
     item['author'] = {}
     item['author']['name'] = audio_json['show']['title']
     item['author']['url'] = audio_json['show']['link']
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     # if audio_json.get('keywords'):
 
     if audio_json.get('image'):
-        item['_image'] = audio_json['image']
+        item['image'] = audio_json['image']
     elif audio_json['images'].get('original'):
-        item['_image'] = audio_json['images']['original']
+        item['image'] = audio_json['images']['original']
     elif audio_json['show'].get('image'):
-        item['_image'] = audio_json['show']['image']
+        item['image'] = audio_json['show']['image']
     elif audio_json['show']['images'].get('original'):
-        item['_image'] = audio_json['show']['images']['original']
+        item['image'] = audio_json['show']['images']['original']
 
     item['_audio'] = audio_json['url']
-    attachment = {}
-    attachment['url'] = item['_audio']
-    attachment['mime_type'] = 'audio/mpeg'
+    attachment = {
+        "url": item['_audio'],
+        "mime_type": "audio/mpeg"
+    }
     item['attachments'] = []
     item['attachments'].append(attachment)
 
     item['summary'] = audio_json['subtitle']
 
-    duration = utils.calc_duration(audio_json['duration'])
-    poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
+    item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], audio_json['duration'])
 
-    item['content_html'] = '<table style="width:100%;"><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></td><td style="vertical-align:top;"><a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a><br/>by <a href="{}">{}</a><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['url'], item['author']['name'], item['_display_date'], duration)
-
-    if not 'embed' in args:
+    if 'embed' not in args:
         item['content_html'] += '<p>' + item['summary'] + '</p>'
     return item

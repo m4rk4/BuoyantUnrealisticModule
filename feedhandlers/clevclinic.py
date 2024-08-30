@@ -27,7 +27,7 @@ def get_next_json(url, save_debug):
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-origin"
     }
-    r = requests.get(url, headers=headers, impersonate="chrome116", proxies=config.proxies)
+    r = requests.get(url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
     if not r or r.status_code != 200:
         logger.warning('unable to get next data from ' + url)
         return None

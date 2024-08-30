@@ -31,7 +31,7 @@ def get_api_json(url):
     buffer = BytesIO()
     c = Curl()
     c.setopt(CurlOpt.WRITEDATA, buffer)
-    c.setopt(CurlOpt.PROXY, b'http://127.0.0.1:25345')
+    c.setopt(CurlOpt.PROXY, config.http_proxy.encode())
     c.setopt(CurlOpt.URL, url.encode())
     c.setopt(CurlOpt.HTTPHEADER, headers)
     try:

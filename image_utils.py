@@ -1,6 +1,6 @@
-import av, re, requests, time
+import av, math, re
 from io import BytesIO
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter, ImageColor
 
 import utils
 
@@ -40,17 +40,17 @@ def text(s):
 
 def resize(im, width, height, scale):
     if scale:
-        h = (im.height * int(scale)) // 100
-        w = (im.width * int(scale)) // 100
+        h = math.ceil((im.height * float(scale)) / 100)
+        w = math.ceil((im.width * float(scale)) / 100)
     elif width and height:
         w = int(width)
         h = int(height)
     elif width:
         w = int(width)
-        h = (im.height * w) // im.width
+        h = math.ceil((im.height * w) / im.width)
     elif height:
         h = int(height)
-        w = (im.width * h) // im.height
+        w = math.ceil((im.width * h) / im.height)
     else:
         return im
     return im.resize((w, h), resample=Image.LANCZOS)
@@ -86,14 +86,25 @@ def crop(im, crop_args):
     return im.crop((x, y, x + w, y + h))
 
 
-def add_border(im, b, color):
+def add_border(im, border, color):
+    if border.isnumeric():
+        bx = int(border)
+        by = int(border)
+    else:
+        try:
+            b = tuple(map(int, border[1:-1].split(',')))
+            bx = b[0]
+            by = b[1]
+        except:
+            logger.warning('border should be specified as an integer or integer pair (x,y)')
+            return im
     w = im.width
     h = im.height
     if len(color) == 4:
-        new_im = Image.new("RGBA", (w + 2 * b, h + 2 * b), color)
+        new_im = Image.new("RGBA", (w + 2 * bx, h + 2 * by), color)
     else:
-        new_im = Image.new("RGB", (w + 2 * b, h + 2 * b), color)
-    new_im.paste(im, (b, b))
+        new_im = Image.new("RGB", (w + 2 * bx, h + 2 * by), color)
+    new_im.paste(im, (bx, by))
     return new_im
 
 
@@ -110,7 +121,7 @@ def add_mask(im, type):
     mask = Image.new('L', mask_size, 0)
     draw = ImageDraw.Draw(mask)
     draw.ellipse([(0, 0), mask_size], fill=255)
-    mask = mask.resize(im.size, Image.ANTIALIAS)
+    mask = mask.resize(im.size, Image.Resampling.LANCZOS)
     im.putalpha(mask)
     return True
 
@@ -153,10 +164,9 @@ def add_overlay(im, overlay, args):
         im_overlay = Image.open(overlay['url'])
 
     elif overlay.startswith('http'):
-        r = requests.get(overlay)
-        if r.status_code == 200:
-            io_overlay = BytesIO(r.content)
-            im_overlay = Image.open(io_overlay).convert("RGBA")
+        im_overlay = read_image(overlay)
+        if im_overlay:
+            im_overlay = im_overlay.convert("RGBA")
             im_overlay = resize(im_overlay, args.get('overlay_width'), args.get('overlay_height'), args.get('overlay_scale'))
 
     if im_overlay:
@@ -200,15 +210,13 @@ def read_image(img_src):
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
     }
+    if 'external-preview.redd.it' in img_src:
+        headers['accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
     im = None
-    for i in range(2):
-        r = requests.get(img_src, headers=headers)
-        if r.status_code == 200:
-            im_io = BytesIO(r.content)
-            im = Image.open(im_io)
-            break
-        else:
-            time.sleep(5)
+    img_content = utils.get_url_content(img_src, headers)
+    if img_content:
+        im_io = BytesIO(img_content)
+        im = Image.open(im_io)
     return im
 
 def get_image(args):
@@ -284,7 +292,39 @@ def get_image(args):
 
     # Do operations in the order of the args
     for arg, val in args.items():
-        if (arg == 'height' or arg == 'width' or arg == 'scale') and resized == False:
+        if arg == 'letterbox':
+            try:
+                b = tuple(map(int, args['letterbox'][1:-1].split(',')))
+                w = b[0]
+                h = b[1]
+            except:
+                logger.warning('letterbox should be specified as an integer pair (w,h)')
+                w = -1
+                h = -1
+            if w > 0 and h > 0:
+                scale = min(w / im.width, h / im.height) * 100
+                im = resize(im, '', '', scale)
+                if args.get('color'):
+                    if args['color'].startswith('#'):
+                        color = ImageColor.getcolor(args['color'], 'RGB')
+                    else:
+                        try:
+                            color = tuple(map(int, args['color'][1:-1].split(',')))
+                        except:
+                            logger.warning('invalid color ' + args['color'])
+                            color = (0, 0, 0, 0)
+                else:
+                    color = (0, 0, 0, 0)
+                if len(color) < 3:
+                    color = (0, 0, 0)
+                elif len(color) > 4:
+                    color = (0, 0, 0)
+                border = '({},{})'.format(math.ceil((w - im.width) / 2), math.ceil((h - im.height) / 2))
+                im = add_border(im, border, color)
+                mimetype = 'image/png'
+                resized = True
+                save = True
+        elif (arg == 'height' or arg == 'width' or arg == 'scale') and resized == False:
             im = resize(im, args.get('width'), args.get('height'), args.get('scale'))
             resized = True
             save = True
@@ -304,19 +344,35 @@ def get_image(args):
 
         elif arg == 'border':
             if args.get('color'):
-                color = tuple(map(int, args['color'][1:-1].split(',')))
+                if args['color'].startswith('#'):
+                    color = ImageColor.getcolor(args['color'], 'RGB')
+                else:
+                    try:
+                        color = tuple(map(int, args['color'][1:-1].split(',')))
+                    except:
+                        logger.warning('invalid color ' + args['color'])
+                        color = (0, 0, 0, 0)
             else:
                 color = (0, 0, 0, 0)
             if len(color) < 3:
                 color = (0, 0, 0)
             elif len(color) > 4:
                 color = (0, 0, 0)
-            im = add_border(im, int(val), color)
+            im = add_border(im, val, color)
             mimetype = 'image/png'
+            save = True
+
+        elif arg == 'rotate':
+            im = im.rotate(int(val), Image.NEAREST, expand=1)
+            save = True
+
+        elif arg == 'blur':
+            im = im.filter(ImageFilter.BLUR)
             save = True
 
     if save:
         im_io = BytesIO()
+        # print(im.mode)
         if im.mode in ['RGBA', 'P', 'LA']:
             im.save(im_io, 'PNG')
             mimetype = 'image/png'

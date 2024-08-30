@@ -116,6 +116,16 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('abstract'):
         item['summary'] = article_json['abstract']
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        return item
+
     item['content_html'] = ''
     if article_json.get('videoMetadata'):
         if article_json.get('thirdPartyVideoPlayer'):
@@ -132,11 +142,25 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled videoMetadata in ' + item['url'])
 
     if article_json.get('body'):
-        soup = BeautifulSoup(article_json['body'], 'lxml')
+        soup = BeautifulSoup(article_json['body'], 'html.parser')
+        for el in soup.find_all(class_=re.compile(r'tabula')):
+            el.decompose()
+
+        for el in soup.find_all(class_='buy-block-info'):
+            el.name = 'p'
+
+        for el in soup.find_all(class_='buy-block-promo'):
+            el.unwrap()
+
+        for el in soup.find_all('a', class_='buy-block-cta'):
+            new_html = utils.add_button(el['href'], el.string)
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+
         for el in soup.find_all('img'):
             new_html = add_media(el['data-document-id'])
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
@@ -149,7 +173,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if embed:
                     new_html = utils.add_embed(embed['postUrl'])
             if new_html:
-                new_el = BeautifulSoup(new_html, 'lxml')
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 if el.parent and el.parent.name == 'div':
                     el.parent.insert_after(new_el)
                     el.parent.decompose()

@@ -1,5 +1,8 @@
 import base64, feedparser, json, re
+import dateutil.parser
 from bs4 import BeautifulSoup
+from datetime import datetime, timezone
+from lxml import etree
 from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
 import config, utils
@@ -139,71 +142,131 @@ def get_feed(url, args, site_json, save_debug=False):
     feed = None
     split_url = urlsplit(url)
     if split_url.netloc == 'trends.google.com':
-        trends_txt = utils.get_url_html('https://trends.google.com/trends/api/dailytrends?hl=en-US&tz=240&geo=US&hl=en-US&ns=15')
-        if not trends_txt:
-            return None
-        n = trends_txt.find('{')
-        trends_json = json.loads(trends_txt[n:])
-        if save_debug:
-            utils.write_file(trends_json, './debug/feed.json')
-
-        feed_items = []
-        for day in trends_json['default']['trendingSearchesDays']:
-            for trend in day['trendingSearches']:
-                item = None
-                item_source = ''
-                content_html = '<h3>{} searches</h3><ul>'.format(trend['formattedTraffic'])
-                for article in trend['articles']:
-                    content_html += '<li><a href="{}">{}</a> &bull; {}</li>'.format(article['url'], article['title'], article['source'])
+        # https://trends.google.com/trending/rss?geo=US
+        trends_xml = utils.get_url_content(url)
+        if trends_xml:
+            if save_debug:
+                utils.write_file(trends_xml, './debug/feed.html')
+            feed_items = []
+            item = {}
+            parser = etree.HTMLParser()
+            tree = etree.fromstring(trends_xml, parser)
+            for event, element in etree.iterwalk(tree, events=('start', 'end')):
+                if event == 'start':
+                    if element.prefix:
+                        tag = element.tag.replace('{' + tree.nsmap[element.prefix] + '}', element.prefix + ':')
+                    else:
+                        tag = element.tag
+                    # print(tag)
+                    if tag == 'item':
+                        item = {}
+                        item['content_html'] = ''
                     if not item:
-                        if save_debug:
-                            logger.debug('trying to get content from ' + article['url'])
-                        item_source = article['source']
-                        item = utils.get_content(article['url'], {}, False)
-                queries = []
-                for query in trend['relatedQueries']:
-                    queries.append('<a href="https://trends.google.com{}">{}</a>'.format(query['exploreLink'], query['query']))
-                content_html += '</ul><p>Related queries: {}</p><hr/>'.format(', '.join(queries))
-                if item:
-                    content_html += '<h2><a href="{}">{}</a></h2>'.format(item['url'], item['title'])
-                    content_html += '<p>From {}<br/>By {}<br/>{}</p>'.format(item_source, item['author']['name'], item['_display_date'])
-                    item['content_html'] = content_html + item['content_html']
-                else:
+                        continue
+                    if tag == 'title':
+                        item['title'] = element.text
+                        item['url'] = 'https://trends.google.com/trends/explore?q={}&date=now%201-d&geo=US&hl=en-US'.format(quote_plus(element.text))
+                    elif tag == 'pubdate':
+                        dt = dateutil.parser.parse(element.text).astimezone(timezone.utc)
+                        item['date_published'] = dt.isoformat()
+                        item['_timestamp'] = dt.timestamp()
+                        item['_display_date'] = utils.format_display_date(dt)
+                        item['id'] = item['title'] + ' ' + str(item['_timestamp'])
+                    elif tag == 'ht:picture':
+                        item['_image'] = element.text
+                    elif tag == 'ht:approx_traffic':
+                        item['content_html'] += '<h2>Search volume:' + element.text + '</h2>'
+                    elif tag == 'ht:news_item_url':
+                        item['content_html'] += utils.add_embed(element.text)
+                elif event == 'end' and element.tag == 'item':
+                    feed_items.append(item)
                     item = {}
-                item['id'] = '{}-{}'.format(day['date'], quote_plus(trend['title']['query']))
-                item['url'] = trend['shareUrl']
-                item['title'] = trend['title']['query']
-                item['author'] = {"name": "Google Trends"}
-                feed_items.append(item)
-
-        feed = utils.init_jsonfeed(args)
-        feed['title'] = 'Google Trends'
-        feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
+            feed = utils.init_jsonfeed(args)
+            feed['title'] = 'Google Trends'
+            feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
 
     elif split_url.netloc == 'news.google.com':
+        # Top Stories: https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en
         #feed = rss.get_feed(url, args, site_json, save_debug, get_content)
-        news_feed = utils.get_url_html(url)
-        if not news_feed:
+        rss_html = utils.get_url_html(url)
+        if not rss_html:
             return None
+        if save_debug:
+            utils.write_file(rss_html, './debug/feed.html')
         try:
-            d = feedparser.parse(news_feed)
+            d = feedparser.parse(rss_html)
         except:
             logger.warning('Feedparser error ' + url)
             return None
+        page_html = utils.get_url_html(url.replace('/rss', ''))
+        if page_html:
+            page_soup = BeautifulSoup(page_html, 'lxml')
         feed_items = []
         for entry in d.entries:
-            if save_debug:
-                logger.debug('getting content for ' + entry.link)
-            item = get_content(entry.link, args, site_json, save_debug)
-            if not item and entry.description:
-                soup = BeautifulSoup(entry.description, 'html.parser')
-                for link in soup.find_all('a'):
-                    item = get_content(link, args, site_json, save_debug)
-                    if item:
-                        break
-            if item:
-                if utils.filter_item(item, args) == True:
-                    feed_items.append(item)
-        feed['title'] = 'Google News'
+            item = {}
+            item['id'] = entry.guid
+            if page_html:
+                el = page_soup.find('script', string=re.compile(item['id']))
+                if el:
+                    m = re.search(r'"{}".*?"channel_story_360:([^"]+)"'.format(item['id']), el.string)
+                    if m:
+                        item['url'] = 'https://news.google.com/stories/{}?hl=en-US&gl=US&ceid=US%3Aen'.format(m.group(1))
+            dt = dateutil.parser.parse(entry.published)
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+            item['author'] = {"name": "Google News"}
+            item['content_html'] = ''
+            if entry.description:
+                if 'url' in item:
+                    page_html = utils.get_url_html(item['url'])
+                    if page_html and save_debug:
+                        utils.write_file(page_html, './debug/page.html')
+                else:
+                    page_html = ''
+                # soup = BeautifulSoup(entry.description, 'html.parser')
+                # links = soup.find_all('a')
+                links = re.findall(r'<a[^>]+href="([^"]+)"', entry.description)
+                for link in links:
+                    if save_debug:
+                        logger.debug('finding content url for ' + link)
+                    content_url = ''
+                    paths = list(filter(None, urlsplit(link).path[1:].split('/')))
+                    id = paths[-1]
+                    if page_html:
+                        el = page_soup.find('script', string=re.compile(id))
+                        if el:
+                            m = re.search(r'"{}".*?"(https://[^"]+)"'.format(id), el.string)
+                            if m:
+                                content_url = m.group(1)
+                    if not content_url:
+                        logger.warning('unable to find content url for ' + link)
+                        continue
+                    if save_debug:
+                        logger.debug('getting content for ' + content_url)
+                    entry_item = utils.get_content(content_url, {"embed": True}, False)
+                    if entry_item:
+                        if 'title' not in item and 'title' in entry_item:
+                            item['title'] = entry_item['title']
+                        if '_image' not in item and '_image' in entry_item:
+                            item['_image'] = entry_item['_image']
+                        if 'summary' not in item and 'summary' in entry_item:
+                            item['summary'] = entry_item['summary']
+                            item['content_html'] += '<p>' + item['summary'] + '</p>'
+                        item['content_html'] += entry_item['content_html']
+            else:
+                entry_item = get_content(entry.link, {"embed": True}, site_json, save_debug)
+                if entry_item:
+                    if 'title' not in item and 'title' in entry_item:
+                        item['title'] = entry_item['title']
+                    if '_image' not in item and '_image' in entry_item:
+                        item['_image'] = entry_item['_image']
+                    if 'summary' not in item and 'summary' in entry_item:
+                        item['summary'] = entry_item['summary']
+                    item['content_html'] += entry_item['content_html']
+            if utils.filter_item(item, args) == True:
+                feed_items.append(item)
+        feed = utils.init_jsonfeed(args)
+        feed['title'] = d.feed.title
         feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

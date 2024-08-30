@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
@@ -121,14 +121,9 @@ def get_slideshow_content(url, args, site_json, save_debug):
     n = 1
     total = slideshow_json['slideshowImages']['pageInfo']['total']
     cursor = slideshow_json['slideshowImages']['pageInfo']['nextCursor']
-    item['content_html'] = ''
 
-    if 'embed' in args:
-        link = '{}/content?read&url={}'.format(config.server, quote_plus(item['url']))
-        caption = '<a href="{}">View slideshow: {} ({} images)</a>'.format(item['url'], item['title'], total)
-        item['content_html'] = utils.add_image(item['_image'], caption, link=link)
-        return item
-
+    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+    gallery_images = []
     while n <= total:
         if not slideshow_json:
             slideshow_json = get_slideshow_data(slug, cursor, 20)
@@ -137,13 +132,25 @@ def get_slideshow_content(url, args, site_json, save_debug):
             cursor = slideshow_json['slideshowImages']['pageInfo']['nextCursor']
             total = slideshow_json['slideshowImages']['pageInfo']['total']
         for image in slideshow_json['slideshowImages']['images']:
-            caption = '{} of {}'.format(n, total)
+            img_src = image['url']
+            thumb = image['url'] + '?width=640'
             if image.get('caption'):
-                caption += ': {}'.format(image['caption'])
-            item['content_html'] += utils.add_image(image['url'] + '?width=1000', caption)
-            item['content_html'] += '<div>&nbsp;</div>'
+                caption = image['caption']
+            else:
+                caption = ''
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
             n += 1
         slideshow_json = None
+    gallery_html += '</div>'
+    gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+    if 'embed' in args:
+        # link = '{}/content?read&url={}'.format(config.server, quote_plus(item['url']))
+        caption = '<a href="{}">View slideshow: {} ({} images)</a>'.format(item['url'], item['title'], total)
+        item['content_html'] = utils.add_image(item['_image'], caption, link=gallery_url)
+        return item
+    else:
+        item['content_html'] = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
     return item
 
 

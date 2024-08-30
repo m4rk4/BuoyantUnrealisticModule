@@ -1,4 +1,4 @@
-import html, re
+import html, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
@@ -203,7 +203,7 @@ def get_video(id, edition='US'):
 
 def get_gallery(id, edition='US'):
     query = '''
-    query GALLERY($id: ID!, $skip: Skip, $limit: Limit, $edition: EDITIONKEY!) {
+	query GALLERY($id: ID!, $skip: Skip, $limit: Limit, $edition: EDITIONKEY!) {
 		gallery(id: $id) {
 			id
 			title
@@ -233,6 +233,7 @@ def get_gallery(id, edition='US'):
 			branding {
 				brandingType
 				displayText
+				disclosureText
 				ads {
 					adKeywords
 				}
@@ -298,7 +299,7 @@ def get_gallery(id, edition='US'):
 
 def get_article(id, edition='US'):
     query = '''
-    query ARTICLE($id: ID!, $edition: EDITIONKEY!, $sanitizer: SANITIZATION_TYPE, $limit: Limit) {
+	query ARTICLE($id: ID!, $edition: EDITIONKEY!, $sanitizer: SANITIZATION_TYPE, $limit: Limit) {
 		article(id: $id) {
 			title
 			shortTitle
@@ -318,6 +319,7 @@ def get_article(id, edition='US'):
 			edition
 			publishDate
 			lastModDate
+			firstPublishDate
 			snipe
 			enableVideoPlaylist
 			thumbnail(edition: $edition) {
@@ -341,12 +343,17 @@ def get_article(id, edition='US'):
 			branding {
 				brandingType
 				displayText
+				disclosureText
 				ads {
 					adKeywords
 				}
 				adTracking {
 					advertiser
 				}
+			}
+			publishedByUsers {
+				id
+				fullName
 			}
 			show(edition: $edition) {
 				uri(edition: $edition)
@@ -449,6 +456,7 @@ def get_article(id, edition='US'):
 					duration
 					description
 					publishDate
+					webVttUri
 					expirationDate
 					thumbnail {
 						id
@@ -493,6 +501,7 @@ def get_article(id, edition='US'):
 					productKey
 					soldBy
 				}
+				checkoutCollectionKey
 			}
 		}
 	}
@@ -544,14 +553,18 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(article_json['lastModDate'].replace('Z', '+00:00'))
         item['date_modified'] = dt.isoformat()
 
+    authors = []
     item['author'] = {}
     if article_json.get('authors'):
-        authors = []
         for it in article_json['authors']:
             authors.append(it['fullName'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    elif article_json.get('publishedByUsers'):
+        for it in article_json['publishedByUsers']:
+            authors.append(it['fullName'])
     else:
         item['author']['name'] = 'E! Online'
+    if authors:
+        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
     if article_json.get('categories'):
         item['tags'] = []
@@ -624,13 +637,19 @@ def get_content(url, args, site_json, save_debug=False):
             elif segment['type'] == 'VERTICAL_GALLERY':
                 gallery_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, segment['gallery']['uri'])
                 gallery_url = '{}/content?read&url={}'.format(config.server, quote_plus(gallery_url))
-                item['content_html'] += '<table><tr><td><img src="{}" style="width:128px;" /></td><td><a href="{}"><span style="font-size:1.1em; font-weight:bold;">Gallery: {}</span></a></td></tr></table>'.format(resize_image(segment['gallery']['galleryitems']['nodes'][0]['image']['uri']), gallery_url, segment['gallery']['title'])
+                caption = '<a href="{}">Gallery: {}</a>'.format(gallery_url, segment['gallery']['title'])
+                item['content_html'] += utils.add_image(resize_image(segment['gallery']['galleryitems']['nodes'][0]['image']['uri']), caption, link=gallery_url)
 
             elif segment['type'] == 'SOCIAL_CONTENT':
                 if segment['socialContent']['type'] == 'twitter':
                     item['content_html'] += utils.add_embed(utils.get_twitter_url(segment['socialContent']['id']))
                 elif segment['socialContent']['type'] == 'youtube':
-                        item['content_html'] += utils.add_embed('https://www.youtube.com/embed/' + segment['socialContent']['id'])
+                    if 'oembedHtml' in segment['socialContent'] and segment['socialContent']['oembedHtml'].startswith('<iframe'):
+                        m = re.search(r'src="([^"]+)"', segment['socialContent']['oembedHtml'])
+                        if m:
+                            item['content_html'] += utils.add_embed(m.group(1))
+                    else:
+                        item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v=' + segment['socialContent']['id'])
                 else:
                     logger.warning('unhandled social content type {} in {}'.format(segment['socialContent']['type'], item['url']))
 
@@ -656,13 +675,27 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled segment type {} in {}'.format(segment['type'], item['url']))
 
     if article_json.get('galleryitems'):
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        gallery_images = []
         for it in article_json['galleryitems']['nodes']:
+            img_src = it['image']['uri']
+            thumb = resize_image(img_src, 640)
             desc = ''
             if it.get('title'):
                 desc += '<h4>{}</h4>'.format(it['title'])
             if it.get('caption'):
                 desc += it['caption']
-            item['content_html'] += add_image(it['image'], desc)
+            captions = []
+            if it['image'].get('title'):
+                captions.append(it['image']['title'])
+            if it['image'].get('agency'):
+                captions.append(it['image']['agency'])
+            caption = ' | '.join(captions)
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, desc=desc) + '</div>'
+            gallery_images.append({"src": img_src, "caption": caption, "desc": desc, "thumb": thumb})
+        gallery_html += '</div>'
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
     item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
     return item

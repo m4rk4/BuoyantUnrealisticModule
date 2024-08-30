@@ -56,7 +56,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     ld_json = []
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
         try:
-            ld = json.loads(el.string)
+            if 'ksl.com' in url:
+                ld = json.loads(el.string.replace('"" ', '","'))
+            else:
+                ld = json.loads(el.string)
             if isinstance(ld, list):
                 for it in ld:
                     if it.get('@graph'):
@@ -133,10 +136,20 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     else:
         oembed_json = None
 
+    data_layer = None
+    el = soup.find('script', string=re.compile(r'var tempDataLayer'))
+    if el:
+        m = re.search(r'var tempDataLayer = Object\((.*?)\);\n', el.string)
+        if m:
+            try:
+                data_layer = json.loads(m.group(1))
+            except:
+                logger.warning('unable to load tempDataLayer in ' + url)
+
     if site_json.get('wpjson_path') and 'embed' not in args:
         args_copy = args.copy()
         args_copy['embed'] = True
-        item = wp_posts.get_content(page_url, args_copy, site_json, save_debug)
+        item = wp_posts.get_content(page_url, args_copy, site_json, save_debug, soup)
     else:
         item = {}
 
@@ -163,25 +176,21 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if not item.get('id') and article_json and article_json.get('@id'):
             item['id'] = article_json['@id']
 
-    el = soup.find('link', attrs={"rel": "canonical"})
-    if el:
-        item['url'] = el['href']
+    if meta and meta.get('og:url'):
+        item['url'] = meta['og:url']
+    elif article_json and article_json.get('url'):
+        item['url'] = article_json['url']
+    elif article_json and article_json.get('mainEntityOfPage'):
+        if isinstance(article_json['mainEntityOfPage'], str):
+            item['url'] = article_json['mainEntityOfPage']
+        elif isinstance(article_json['mainEntityOfPage'], dict):
+            item['url'] = article_json['mainEntityOfPage']['@id']
     else:
-        if meta and meta.get('og:url'):
-            item['url'] = meta['og:url']
-        elif article_json and article_json.get('url'):
-            item['url'] = article_json['url']
-        elif article_json and article_json.get('mainEntityOfPage'):
-            if isinstance(article_json['mainEntityOfPage'], str):
-                item['url'] = article_json['mainEntityOfPage']
-            elif isinstance(article_json['mainEntityOfPage'], dict):
-                item['url'] = article_json['mainEntityOfPage']['@id']
+        el = soup.find('link', attrs={"rel": "canonical"})
+        if el:
+            item['url'] = el['href']
         else:
-            el = soup.find('link', attrs={"rel": "canonical"})
-            if el:
-                item['url'] = el['href']
-            else:
-                item['url'] = page_url
+            item['url'] = page_url
 
     if not item.get('id') and item.get('url'):
         item['id'] = item['url']
@@ -218,7 +227,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     if not item.get('date_published'):
         date = ''
-        if meta and meta.get('article:published_time'):
+        if data_layer and 'pageDetails' in data_layer and 'pubDate' in data_layer['pageDetails']:
+            date = data_layer['pageDetails']['pubDate']
+        elif meta and meta.get('article:published_time'):
             if isinstance(meta['article:published_time'], list):
                 date = meta['article:published_time'][0]
             else:
@@ -255,12 +266,24 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         date = el['content']
                     else:
                         date = el.get_text().strip()
+                    if site_json['date'].get('date_regex'):
+                        m = re.search(site_json['date']['date_regex'], date)
+                        if m:
+                            date = m.group(site_json['date']['date_regex_group'])
                     if site_json['date'].get('strptime'):
                         dt = datetime.strptime(date, site_json['date']['strptime'])
                     else:
                         dt = dateutil.parser.parse(date)
                     if not dt.tzname():
-                        dt = dt.replace(tzinfo=timezone.utc)
+                        dt_loc = dt
+                        if site_json['date'].get('tz'):
+                            if site_json['date']['tz'] == 'local':
+                                tz_loc = pytz.timezone(config.local_tz)
+                            else:
+                                tz_loc = pytz.timezone(site_json['date']['tz'])
+                            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                        else:
+                            dt = dt.replace(tzinfo=timezone.utc)
                     else:
                         dt = dt.astimezone(timezone.utc)
                     item['date_published'] = dt.isoformat()
@@ -281,7 +304,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
 
     if not item.get('date_modified'):
         date = ''
-        if meta and meta.get('article:modified_time'):
+        if data_layer and 'pageDetails' in data_layer and 'updatedDate' in data_layer['pageDetails']:
+            date = data_layer['pageDetails']['updatedDate']
+        elif meta and meta.get('article:modified_time'):
             if isinstance(meta['article:modified_time'], list):
                 date = meta['article:modified_time'][0]
             else:
@@ -395,6 +420,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 if isinstance(article_json['image'], dict):
                     if article_json['image'].get('url'):
                         item['_image'] = article_json['image']['url']
+                elif isinstance(article_json['image'], list):
+                    item['_image'] = article_json['image'][0]
                 elif isinstance(article_json['image'], str):
                     item['_image'] = article_json['image']
             if not item.get('_image') and article_json.get('thumbnailUrl'):
@@ -419,13 +446,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['summary'] = meta['twitter:description']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     gallery = ''
@@ -449,11 +470,19 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if site_json.get('lede_caption'):
             elements = utils.get_soup_elements(site_json['lede_caption'], soup)
             if elements:
-                caption = elements[0].decode_contents()
+                captions = []
+                for it in elements[0].find_all(class_=['content-image-caption', 'content-image-attribution']):
+                    captions.append(it.decode_contents())
+                if captions:
+                    caption = ' | '.join(captions)
+                else:
+                    caption = elements[0].decode_contents()
+
     lede = False
     if site_json.get('lede_video'):
         elements = utils.get_soup_elements(site_json['lede_video'], soup)
         if elements:
+            print(elements)
             el = elements[0]
             if el:
                 it = el.find(class_='jw-video-box')
@@ -463,8 +492,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 else:
                     it = el.find(id=re.compile(r'jw-player-'))
                     if it:
-                        if article_json.get('video'):
+                        if article_json.get('video') and article_json['video'].get('embedUrl'):
                             item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
+                            lede = True
+                        elif article_json.get('video') and article_json['video'].get('contentUrl'):
+                            item['content_html'] += utils.add_embed(article_json['video']['contentUrl'])
                             lede = True
                         else:
                             it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
@@ -474,20 +506,45 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                                     item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
                                     lede = True
                     else:
-                        it = el.find(class_='video-wrapper')
-                        if it and it.get('data-type') and it['data-type'] == 'youtube':
-                            item['content_html'] += utils.add_embed(it['data-src'])
-                            lede = True
+                        it = el.find(class_='mntl-jwplayer')
+                        if it and it.get('data-bgset'):
+                            m = re.search(r'/media/([^/]+)/', it['data-bgset'])
+                            if m:
+                                item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
+                                lede = True
                         else:
-                            if el.name == 'iframe':
-                                it = el
-                            else:
-                                it = el.find('iframe')
-                            if it:
-                                item['content_html'] += utils.add_embed(it['src'])
+                            it = el.find(class_='video-wrapper')
+                            if it and it.get('data-type') and it['data-type'] == 'youtube':
+                                item['content_html'] += utils.add_embed(it['data-src'])
                                 lede = True
                             else:
-                                logger.warning('unhandled lede video wrapper in ' + item['url'])
+                                if el.name == 'iframe':
+                                    it = el
+                                else:
+                                    it = el.find('iframe')
+                                if it:
+                                    item['content_html'] += utils.add_embed(it['src'])
+                                    lede = True
+                                else:
+                                    logger.warning('unhandled lede video wrapper in ' + item['url'])
+
+    if not lede and 'add_lede_video' in args and 'video' in article_json:
+        if isinstance(article_json['video'], list):
+            video = article_json['video'][0]
+        elif isinstance(article_json['video'], dict):
+            video = article_json['video']
+        else:
+            video = None
+        if video:
+            if '@type' in video and video['@type'] == 'VideoObject':
+                item['content_html'] += utils.add_video(video['contentUrl'], 'video/mp4', video.get('thumbnailUrl'), video.get('name'), use_videojs=True)
+            elif video.get('embedUrl'):
+                item['content_html'] += utils.add_embed(video['embedUrl'])
+                lede = True
+            elif video.get('contentUrl'):
+                item['content_html'] += utils.add_embed(video['contentUrl'])
+                lede = True
+
     if not lede and site_json.get('lede_img'):
         elements = utils.get_soup_elements(site_json['lede_img'], soup)
         if elements:
@@ -497,7 +554,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     it = el.find('li')
                     item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, caption, add_caption)
                     lede = True
-                    gallery = wp_posts.format_content(str(el), item, site_json, module_format_content)
+                    gallery = wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
                 elif el.find('img') or (el.get('style') and 'background-image' in el['style']):
                     item['content_html'] += wp_posts.add_image(el, el, base_url, site_json, caption, add_caption)
                     lede = True
@@ -515,16 +572,22 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 contents = utils.get_soup_elements(it, soup)
                 for el in contents:
                     if 'unwrap' in it and it['unwrap'] == False:
-                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content)
+                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
                     else:
-                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content, soup)
                 if it.get('separator'):
                     item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
 
     if site_json.get('content'):
-        contents = utils.get_soup_elements(site_json['content'], soup)
-        for el in contents:
-            item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+        if isinstance(site_json['content'], list):
+            for content in site_json['content']:
+                contents = utils.get_soup_elements(content, soup)
+                for el in contents:
+                    item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content, soup)
+        else:
+            contents = utils.get_soup_elements(site_json['content'], soup)
+            for el in contents:
+                item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content, soup)
 
     if site_json.get('add_content'):
         for it in site_json['add_content']:
@@ -534,9 +597,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
                 for el in contents:
                     if 'unwrap' in it and it['unwrap'] == False:
-                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content)
+                        item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
                     else:
-                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content)
+                        item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content, soup)
 
     if gallery:
         item['content_html'] += '<h3>Gallery</h3>' + gallery

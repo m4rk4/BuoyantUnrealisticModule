@@ -12,6 +12,107 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def make_article(article_json):
+    # https://x.com/X/status/1814437564989702557
+    article_html = ''
+    if article_json.get('cover_media'):
+        article_html += '<div><img src="{}?format=jpg&name=small" style="width:100%; border-radius:10px;"></div>'.format(article_json['cover_media']['media_info']['original_img_url'])
+    if article_json.get('title'):
+        article_html += '<div style="font-size:1.2em; font-weight:bold;">' + article_json['title'] + '</div>'
+    for block in article_json['content_state']['blocks']:
+        if block['type'] == 'atomic':
+            for entity in block['entityRanges']:
+                entity_value = next((it['value'] for it in article_json['content_state']['entityMap'] if int(it['key']) == entity['key']), None)
+                if entity_value['type'] == 'TWEET':
+                    tweet_item = get_content('https://twitter.com/__/status/' + entity_value['data']['tweetId'], {}, {}, False)
+                    if tweet_item:
+                        article_html += tweet_item['content_html']
+                elif entity_value['type'] == 'MEDIA':
+                    for media in entity_value['data']['mediaItems']:
+                        media_info = next((it['media_info'] for it in article_json['media_entities'] if it['media_id'] == media['mediaId']), None)
+                        if media_info['__typename'] == 'ApiImage':
+                            article_html += '<div><a href="{0}" target="_blank"><img src="{0}?format=jpg&name=small" style="width:100%; border-radius:10px;"></a></div>'.format(media_info['original_img_url'])
+                        elif media_info['__typename'] == 'ApiVideo':
+                            video = next((it for it in media_info['variants'] if it['content_type'].lower() == 'application/x-mpegurl'), None)
+                            if not video:
+                                videos = [it for it in media_info['variants'] if it['content_type'].lower() == 'video/mp4']
+                                video = utils.closest_dict(videos, 'bit_rate', 1000000)
+                            if video['content_type'] == 'video/mp4':
+                                video_src = video['url']
+                            else:
+                                video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video['url']), quote_plus(video['content_type']), quote_plus(media_info['preview_image']['original_img_url']))
+                            thumb = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(media_info['preview_image']['original_img_url'] + '?format=jpg&name=small'))
+                            article_html += '<div><a href="{}" target="_blank"><img src="{}" style="width:100%; border-radius:10px;"></a></div>'.format(video_src, thumb)
+                elif entity_value['type'] == 'DIVIDER':
+                        article_html += '<hr/>'
+                else:
+                    logger.warning('unhandled atomic entity value type ' + entity_value['type'])
+        else:
+            if len(block['entityRanges']) > 0 or len(block['inlineStyleRanges']) > 0:
+                entities = block['entityRanges'].copy() + block['inlineStyleRanges'].copy()
+                indices = []
+                for entity in entities:
+                    if 'style' in entity:
+                        if entity['style'] == 'Bold':
+                            entity['start_tag'] = '<b>'
+                            entity['end_tag'] = '</b>'
+                        elif entity['style'] == 'Italic':
+                            entity['start_tag'] = '<i>'
+                            entity['end_tag'] = '</i>'
+                        elif entity['style'] == 'Strikethrough':
+                            entity['start_tag'] = '<s>'
+                            entity['end_tag'] = '</s>'
+                        else:
+                            logger.warning('unhandled entity style ' + entity['style'])
+                    elif 'key' in entity:
+                        entity_value = next((it['value'] for it in article_json['content_state']['entityMap'] if int(it['key']) == entity['key']), None)
+                        if entity_value['type'] == 'LINK':
+                            entity['start_tag'] = '<a href="{}">'.format(entity_value['data']['url'])
+                            entity['end_tag'] = '</a>'
+                        elif entity_value['type'] == 'TWEMOJI':
+                            # use the default unicode emoji
+                            entity['from_index'] = -1
+                            entity['to_index'] = -1
+                            continue
+                        else:
+                            logger.warning('unhandled entity value type ' + entity_value['type'])
+                    entity['from_index'] = entity['offset']
+                    entity['to_index'] = entity['offset'] + entity['length']
+                    indices.append(entity['from_index'])
+                    indices.append(entity['to_index'])
+                # remove duplicates and sort
+                indices = sorted(list(set(indices)))
+                n = 0
+                text = ''
+                for i in indices:
+                    text += block['text'][n:i]
+                    from_entities = list(filter(lambda entities: entities['from_index'] == i and entities.get('start_tag'), entities))
+                    from_entities = sorted(from_entities, key=lambda x: x['to_index'])
+                    for j, entity in enumerate(from_entities):
+                        text += entity['start_tag']
+                        entity['order'] = i + j
+                    to_entities = list(filter(lambda entities: entities['to_index'] == i and entities.get('end_tag'), entities))
+                    to_entities = sorted(to_entities, key=lambda x: (x['from_index'], x['order']), reverse=True)
+                    for entity in to_entities:
+                        text += entity['end_tag']
+                    n = i
+                text += block['text'][n:]
+            else:
+                text = block['text']
+
+            if block['type'] == 'unstyled':
+                article_html += '<p>' + text + '</p>'
+            elif block['type'] == 'header-one':
+                article_html += '<div style="font-size:1.2em; font-weight:bold;">' + text + '</div>'
+            elif block['type'] == 'header-two':
+                article_html += '<div style="font-size:1.1em; font-weight:bold;">' + text + '</div>'
+            elif block['type'] == 'blockquote':
+                article_html += utils.add_blockquote(text, False)
+            else:
+                logger.warning('unhandled article block type ' + block['type'])
+    return article_html
+
+
 def replace_tombstone_entities(block):
     if not block.get('entities'):
         return block['text']
@@ -251,7 +352,7 @@ def make_card(card_json, tweet_json):
         card_desc = binding_values['event_subtitle']['string_value']
         img_src = binding_values['event_thumbnail']['image_value']['url']
 
-    elif re.search('poll\dchoice_text_only', card_json['name']):
+    elif re.search(r'poll\dchoice_text_only', card_json['name']):
         # https://twitter.com/elonmusk/status/1604617643973124097
         # https://twitter.com/TheMuse/status/783364112168415232
         card_type = 3
@@ -389,37 +490,116 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
             else:
                 text_html = text_html.replace(url['url'], '<a href="{}">{}</a>'.format(url['expanded_url'], url['display_url']))
 
-    if tweet_json.get('photos'):
-        for photo in tweet_json['photos']:
-            media_html += '<div><a href="{0}"><img width="100%" style="border-radius:10px" src="{0}" /></a></div>'.format(photo['url'])
-
-    if tweet_json.get('video'):
-        if tweet_json['video'].get('variants'):
-            video = next((it for it in tweet_json['video']['variants'] if it['type'].lower() == 'application/x-mpegurl'), None)
-            if not video:
-                videos = []
-                for it in tweet_json['video']['variants']:
-                    if it['type'] == 'video/mp4':
-                        m = re.search(r'/(\d+)x(\d+)/', it['src'])
-                        if m:
-                            videos.append({
-                                "src": it['src'],
-                                "type": it['type'],
-                                "width": m.group(1),
-                                "height": m.group(2),
-                            })
-                if videos:
-                    video = utils.closest_dict(videos, 'width', 640)
+    if tweet_json.get('mediaDetails'):
+        gallery_images = []
+        gallery_html = ''
+        n = len(tweet_json['mediaDetails'])
+        if n > 1:
+            gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        for media in tweet_json['mediaDetails']:
+            if media['type'] == 'video':
+                video_hls = next((it for it in media['video_info']['variants'] if it['content_type'].lower() == 'application/x-mpegurl'), None)
+                video_mp4 = utils.closest_dict(media['video_info']['variants'], 'bitrate', 1000000)
+                if video_hls or video_mp4:
+                    if video_hls:
+                        video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_hls['url']), quote_plus(video_hls['content_type']), quote_plus(media['media_url_https']))
+                    else:
+                        video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_mp4['url']), quote_plus(video_mp4['content_type']), quote_plus(media['media_url_https']))
+                    thumb = config.server + '/image?url=' + quote_plus(media['media_url_https'] + '?format=jpg&name=small')
+                    if media['original_info']['height'] > media['original_info']['width']:
+                        thumb += '&letterbox=%28640%2C640%29&color=%23444'
+                    thumb += '&overlay=video'
+                    if n == 1:
+                        media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>'.format(video_src, thumb)
+                    else:
+                        gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>'.format(video_src, thumb)
+                        if video_mp4:
+                            gallery_images.append({"src": video_mp4['url'], "caption": "", "thumb": thumb})
+                        else:
+                            caption = '<a href={}" target="_blank">Click to play video</a>'.format(video_src)
+                            gallery_images.append({"src": media['media_url_https'], "caption": caption, "thumb": thumb})
+            elif media['type'] == 'photo':
+                img_src = media['media_url_https']
+                thumb = img_src + '?format=jpg&name=small'
+                if media['original_info']['height'] > media['original_info']['width']:
+                    thumb = config.server + '/image?url=' + quote_plus(thumb) + '&letterbox=%28640%2C640%29&color=%23444'
+                if n == 1:
+                    media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>'.format(img_src, thumb)
                 else:
-                    video = [it for it in tweet_json['video']['variants'] if it['type'] == 'video/mp4'][-1]
-            if video:
-                media_html += utils.add_video(video['src'], video['type'], tweet_json['video']['poster'], img_style='border-radius:10px;')
-            else:
-                logger.warning('unhandled video variants')
-        else:
-            video_url = entities['media'][0]['expanded_url']
-            poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, tweet_json['video']['poster'])
-            media_html += utils.add_image(poster, '', link=video_url, img_style='border-radius:10px;')
+                    gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>'.format(img_src, thumb)
+                    gallery_images.append({"src": img_src, "caption": "", "thumb": thumb})
+        if n > 1:
+            gallery_html += '</div>'
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            media_html += gallery_html
+            media_html += '<div style="padding:8px; font-size:0.9em;"><a href="{}" target="_blank">View photo gallery</a></div>'.format(gallery_url)
+
+    # n = 0
+    # if tweet_json.get('photos'):
+    #     n += len(tweet_json['photos'])
+    # if tweet_json.get('video'):
+    #     n += 1
+    # gallery_images = []
+    # gallery_html = ''
+    # if n > 1:
+    #     gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+    #
+    # if tweet_json.get('photos'):
+    #     for photo in tweet_json['photos']:
+    #         img_src = photo['url']
+    #         thumb = img_src + '?format=jpg&name=small'
+    #         if n == 1:
+    #             media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>'.format(img_src, thumb)
+    #         else:
+    #             gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>'.format(img_src, thumb)
+    #             gallery_images.append({"src": img_src, "caption": "", "thumb": thumb})
+    #
+    # if tweet_json.get('video'):
+    #     if tweet_json['video'].get('variants'):
+    #         video = next((it for it in tweet_json['video']['variants'] if it['type'].lower() == 'application/x-mpegurl'), None)
+    #         if not video:
+    #             videos = []
+    #             for it in tweet_json['video']['variants']:
+    #                 if it['type'] == 'video/mp4':
+    #                     m = re.search(r'/(\d+)x(\d+)/', it['src'])
+    #                     if m:
+    #                         videos.append({
+    #                             "src": it['src'],
+    #                             "type": it['type'],
+    #                             "width": m.group(1),
+    #                             "height": m.group(2),
+    #                         })
+    #             if videos:
+    #                 video = utils.closest_dict(videos, 'width', 640)
+    #             else:
+    #                 video = [it for it in tweet_json['video']['variants'] if it['type'] == 'video/mp4'][-1]
+    #         if video:
+    #             if video['type'] == 'video/mp4':
+    #                 video_src = video['src']
+    #             else:
+    #                 video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video['src']), quote_plus(video['type']), quote_plus(tweet_json['video']['poster']))
+    #             thumb = config.server + '/image?url=' + quote_plus(tweet_json['video']['poster'] + '?format=jpg&name=small')
+    #             if tweet_json['video'].get('aspectRatio'):
+    #                 if tweet_json['video']['aspectRatio'][0] < tweet_json['video']['aspectRatio'][1]:
+    #                     thumb += '&letterbox=%28640%2C640%29&color=%23444'
+    #             thumb += '&overlay=video'
+    #             if n == 1:
+    #                 media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>'.format(video_src, thumb)
+    #             else:
+    #                 gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>'.format(video_src, thumb)
+    #                 gallery_images.append({"src": video_src, "caption": "", "thumb": thumb})
+    #         else:
+    #             logger.warning('unhandled video variants')
+    #     else:
+    #         video_url = entities['media'][0]['expanded_url']
+    #         poster = '{}/image?url={}&width=500&overlay=video'.format(config.server, tweet_json['video']['poster'])
+    #         media_html += utils.add_image(poster, '', link=video_url, img_style='border-radius:10px;')
+    #
+    # if n > 1:
+    #     gallery_html += '</div>'
+    #     gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+    #     media_html += gallery_html
+    #     media_html += '<div style="padding:8px; font-size:0.9em;"><a href="{}" target="_blank">View photo gallery</a></div>'.format(gallery_url)
 
     def replace_spaces(matchobj):
         sp = ''
@@ -432,6 +612,20 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
     text_html = text_html.strip()
     while text_html.endswith('<br />'):
         text_html = text_html[:-6]
+
+    tweet_article = None
+    if tweet_json.get('text') and tweet_json['text'].startswith('https://t.co/'):
+        entity = next((it for it in tweet_json['entities']['urls'] if it['url'] == tweet_json['text']), None)
+        if entity and '/article/' in entity['expanded_url']:
+            logger.debug('content is an article')
+            tweet_detail = get_tweet_result_by_api('https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_json['id_str']))
+            utils.write_file(tweet_detail, './debug/article.json')
+            try:
+                tweet_article = tweet_detail['data']['tweetResult']['result']['article']['article_results']['result']
+            except:
+                tweet_article = None
+    if tweet_article:
+        text_html = make_article(tweet_article)
 
     if tweet_json.get('card'):
         media_html += make_card(tweet_json['card'], tweet_json)
@@ -522,7 +716,10 @@ def get_tweet_json(tweet_id):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    tweet_id = paths[-1]
+    if 'threadreaderapp' in split_url.netloc:
+        tweet_id = paths[-1].replace('.html', '')
+    else:
+        tweet_id = paths[-1]
     if not tweet_id.isnumeric():
         logger.warning('error determining tweet id in ' + url)
 
@@ -658,13 +855,13 @@ def get_tweet_result_by_api(tweet_url):
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.0.0"
     }
-    r = requests.get(tweet_url + '?mx=2', impersonate='chrome116', headers=headers, proxies=config.proxies)
+    r = requests.get(tweet_url + '?mx=2', impersonate=config.impersonate, headers=headers, proxies=config.proxies)
     if r and r.status_code == 200:
         utils.write_file(r.text, './debug/twitter.html')
         soup = BeautifulSoup(r.text, 'lxml')
         el = soup.find('script', attrs={"src": re.compile(r'/client-web/main\.')})
         if el:
-            r = requests.get(el['src'], impersonate='chrome116', proxies=config.proxies)
+            r = requests.get(el['src'], impersonate=config.impersonate, proxies=config.proxies)
             if r and r.status_code == 200:
                 auth_tokens = re.findall(r'Bearer [^"]+', r.text)
         el = soup.find('script', string=re.compile(r'document.cookie'))
@@ -710,7 +907,7 @@ def get_tweet_result_by_api(tweet_url):
     for auth_token in reversed(auth_tokens):
         logger.debug('trying twitter auth_token ' + auth_token)
         headers['authorization'] = auth_token
-        r = requests.get(api_url, headers=headers, impersonate='chrome116', proxies=config.proxies)
+        r = requests.get(api_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
         if r and r.status_code == 200:
             return r.json()
         if r:

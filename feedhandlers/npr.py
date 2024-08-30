@@ -1,7 +1,7 @@
 import base64, json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -107,6 +107,17 @@ def get_content(url, args, site_json, save_debug=False):
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        return item
+
+
     item['content_html'] = ''
     if '/player/' in url:
         el = page_soup.find('script', string=re.compile(r'audioModel'))
@@ -162,7 +173,7 @@ def get_content(url, args, site_json, save_debug=False):
                     caption = ''
                     it = el.find(class_='caption')
                     if it and it.get_text().strip():
-                        caption = it.get_text().strip()
+                        caption = it.get_text().replace('hide caption', '').strip()
                     new_html = utils.add_image(img_src, caption)
             elif 'graphic' in el['class']:
                 it = el.find('img')
@@ -185,13 +196,13 @@ def get_content(url, args, site_json, save_debug=False):
                     m = re.search(r'nprdc.embedNote\("([^"]+)"', str(el))
                     if m:
                         new_html = utils.add_embed(m.group(1))
-                else:
-                    it = el.find('blockquote')
-                    if it:
-                        if 'tiktok-embed' in it['class']:
-                            new_html = utils.add_embed(it['cite'])
-                        elif 'instagram-media' in it['class']:
-                            new_html = utils.add_embed(it['data-instgrm-permalink'])
+                elif el.iframe:
+                    new_html = utils.add_embed(el.iframe['src'])
+                elif el.blockquote and el.blockquote.get('class'):
+                    if 'tiktok-embed' in it['class']:
+                        new_html = utils.add_embed(it['cite'])
+                    elif 'instagram-media' in it['class']:
+                        new_html = utils.add_embed(it['data-instgrm-permalink'])
                 if not new_html and not el.find(id='responsive-embed-headlines'):
                     logger.warning('unhandled bucketwrap statichtml in ' + item['url'])
             elif 'internallink' in el['class'] and 'insettwocolumn' in el['class'] or 'twitter' in el['class'] or 'youtube-video' in el['class']:

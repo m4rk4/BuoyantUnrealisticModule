@@ -1,13 +1,15 @@
-import glob, importlib, io, json, os, requests, sys
+import glob, importlib, io, json, os, re, requests, sys
 import logging, logging.handlers
-from flask import Flask, jsonify, render_template, redirect, request, send_file
+from curl_cffi import Curl, CurlInfo, CurlOpt
+from flask import Flask, jsonify, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
 from io import BytesIO
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from staticmap import StaticMap, CircleMarker
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, quote_plus, urlsplit
 
-import image_utils, utils
+import config, image_utils, utils
+from feedhandlers import ytdl
 
 app = Flask(__name__)
 CORS(app)
@@ -40,11 +42,6 @@ logging.getLogger('oauthlib').setLevel(logging.WARNING)
 @app.template_filter()
 def make_thumbnail(img_src):
     return '/image?url={}&height=100&crop=120,100'.format(quote(img_src))
-
-
-@app.route('/')
-def home():
-    return 'Hello! You must be lost :('
 
 
 @app.route('/feed', methods=['GET'])
@@ -226,9 +223,29 @@ def video():
 
     content = module.get_content(args['url'], args, site_json, save_debug)
     if not content.get('_video'):
-        return 'No audio sources found for this url'
+        return 'No video sources found for this url'
 
-    return redirect(content['_video'])
+    if 'novideojs' in args:
+        print('novideojs')
+        if '_video_mp4' in content:
+            video_url = content['_video_mp4']
+        else:
+            video_url = content['_video']
+    else:
+        video_url = config.server + '/videojs?src=' + quote_plus(content['_video'])
+        if content.get('_video_type'):
+            video_url += '&type=' + quote_plus(content['_video_type'])
+        elif '.m3u8' in content['_video']:
+            video_url += '&type=application%2Fx-mpegURL'
+        elif '.mp4' in content['_video']:
+            video_url += '&type=video%2Fmp4'
+        elif '.webm' in content['_video']:
+            video_url += '&type=video%2Fwebm'
+        if content.get('image'):
+            video_url += '&poster=' + quote_plus(content['image'])
+        elif content.get('_image'):
+            video_url += '&poster=' + quote_plus(content['_image'])
+    return redirect(video_url)
 
 
 @app.route('/videojs')
@@ -238,8 +255,11 @@ def videojs():
     if not video_args.get('src'):
         return 'No video src specified'
 
+    # if 'www.youtube.com' in video_args['src']:
+    #     return render_template('videojs-youtube.html', args=video_args)
+
     if not video_args.get('poster'):
-        video_args['poster'] = 'https://BuoyantUnrealisticModule.m4rk4.repl.co/static/video_poster-640x360.webp'
+        video_args['poster'] = config.server + '/static/video_poster-640x360.webp'
 
     if not video_args.get('type'):
         if '.mp4' in video_args['src'].lower():
@@ -251,6 +271,7 @@ def videojs():
         else:
             video_args['type'] = 'video/mp4'
 
+    # return render_template('videojs-test.html', args=video_args)
     return render_template('videojs.html', args=video_args)
 
 
@@ -332,12 +353,27 @@ def gallery():
         link = args['link']
     else:
         link = ''
+    images = []
     if args.get('images'):
         images = json.loads(args['images'])
-    else:
-        images = []
-    for image in images:
-        print(image['caption'])
+    elif args.get('url'):
+        if 'debug' in args:
+            save_debug = True
+        else:
+            save_debug = False
+        module, site_json = utils.get_module(args['url'], handler)
+        if not module:
+            return 'No content module for this url'
+        content = module.get_content(args['url'], args, site_json, save_debug)
+        if not content.get('_gallery'):
+            return 'No gallery sources found for this url'
+        images = content['_gallery']
+        if not link:
+            link = content['url']
+        if not title:
+            title = content['title']
+    if 'desc' in images[0]:
+        return render_template('gallery_desc.html', title=title, link=link, images=images)
     return render_template('gallery.html', title=title, link=link, images=images)
 
 
@@ -437,6 +473,89 @@ def send_src():
         return 'Something went wrong'
     f_io = BytesIO(r.content)
     return send_file(f_io, mimetype='text/html')
+
+# This is to bypass video content restricted by CORS (Access-Control-Allow-Origin) headers
+# https://github.com/ChopsKingsland/cors-proxy/blob/master/app.py
+@app.route('/<path:url>', methods=['GET'])
+def proxy(url):
+    m = re.search(r'^https?://[^/]+/proxy/(.*)', request.url)
+    if not m:
+        return 'Hello! You must be lost :('
+    proxy_url = m.group(1)
+    logger.debug('proxy url: ' + proxy_url)
+    headers = {}
+
+    if 'www.youtube.com/watch' in proxy_url:
+        content = ytdl.get_content(proxy_url, {"player_client": "mediaconnect"}, {"module": "ytdl"}, False)
+        if content and '_m3u8' in content:
+            f_io = BytesIO(content['_m3u8'].encode())
+            return send_file(f_io, mimetype='text/html')
+
+    if 'tt_chain_token' in proxy_url:
+        # For TikTok videos, need to add a cookie
+        # https://github.com/yt-dlp/yt-dlp/issues/9997#issuecomment-2175010516
+        m = re.search(r'tk=tt_chain_token_([^&]+)', proxy_url)
+        token = m.group(1)
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.74 Safari/537.36",
+            "Cookie": "tk={};".format(token)
+        }
+        proxy_url = proxy_url.replace('tt_chain_token_' + token, 'tk')
+
+    if '.m3u8' in proxy_url:
+        r = requests.get(proxy_url, headers=headers)
+        if r.status_code != 200:
+            logger.warning('requests error {} getting {}'.format(r.status_code, proxy_url))
+            if r.text:
+                f_io = BytesIO(r.text.encode())
+                return send_file(f_io, mimetype='text/html')
+            return 'Something went wrong ({})'.format(r.status_code), r.status_code
+        m3u8_playlist = r.text
+        # Rewrite playlist files to proxy the contents
+        m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
+        f_io = BytesIO(m3u8_playlist.encode())
+        return send_file(f_io, mimetype='text/html')
+        if False:
+            buffer = BytesIO()
+            c = Curl()
+            c.setopt(CurlOpt.WRITEDATA, buffer)
+            # c.setopt(CurlOpt.PROXY, config.http_proxy.encode())
+            c.setopt(CurlOpt.CAINFO, config.verify_path.encode())
+            c.setopt(CurlOpt.URL, proxy_url.encode())
+            if 'xxx-googlevideo.com' in proxy_url:
+                headers = [
+                    b"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    b"Accept-Language: en-us,en;q=0.5",
+                    b"Sec-Fetch-Mode: navigate",
+                    b"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.15 Safari/537.36"
+                ]
+                c.setopt(CurlOpt.HTTPHEADER, headers)
+            c.impersonate(config.impersonate)
+            try:
+                c.perform()
+            except Exception as e:
+                logger.warning('exception {} getting {}'.format(e.__class__.__name__, proxy_url))
+                return 'Something went wrong', 500
+            status_code = c.getinfo(CurlInfo.RESPONSE_CODE)
+            c.close()
+            if status_code == 200:
+                m3u8_playlist = buffer.getvalue().decode()
+                m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
+                f_io = BytesIO(m3u8_playlist.encode())
+                return send_file(f_io, mimetype='text/html')
+            return 'Something went wrong ({})'.format(status_code), status_code
+
+    r = requests.get(proxy_url, headers=headers, stream=True)
+    # Note on chunk size: https://stackoverflow.com/questions/34229349/flask-streaming-file-with-stream-with-context-is-very-slow
+    resp = Response(stream_with_context(r.iter_content(chunk_size=1024)), content_type=r.headers['content-type'], status=r.status_code)
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    return resp
+
+
+@app.route('/')
+def home():
+    return 'Hello! You must be lost :('
 
 
 if __name__ == '__main__':

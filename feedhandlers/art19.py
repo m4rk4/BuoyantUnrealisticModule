@@ -1,26 +1,13 @@
-import math, uuid
+import uuid
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
-import config, utils
+import utils
 
 import logging
 
 logger = logging.getLogger(__name__)
-
-
-def calc_duration(s):
-    duration = []
-    if s > 3600:
-        h = s / 3600
-        duration.append('{} hr'.format(math.floor(h)))
-        m = (s % 3600) / 60
-        duration.append('{} min'.format(math.ceil(m)))
-    else:
-        m = s / 60
-        duration.append('{} min'.format(math.ceil(m)))
-    return duration
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -59,8 +46,11 @@ def get_content(url, args, site_json, save_debug=False):
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt, False)
 
-        item['author'] = {}
-        item['author']['name'] = ep_json['content']['series_title']
+        item['author'] = {
+            "name": ep_json['content']['series_title']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
         if ep_json['content']['artwork'].get('episode'):
             images = ep_json['content']['artwork']['episode']
@@ -68,18 +58,20 @@ def get_content(url, args, site_json, save_debug=False):
             images = ep_json['content']['artwork']['show']
 
         img = utils.closest_dict(images, 'height', 640)
-        item['_image'] = img['url']
+        item['image'] = img['url']
 
         item['_audio'] = ep_json['content']['media']['mp3']['url']
+        attachment = {
+            "url": item['_audio']
+            "mime_type": "audio/mpeg"
+        }
+        item['attachments'] = []
+        item['attachments'].append(attachment)
 
         item['summary'] = ep_json['content']['episode_description']
 
-        duration = calc_duration(ep_json['content']['duration'])
-        poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"></a></td>'.format(item['url'], poster)
-        item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold; padding-bottom:8px;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        item['content_html'] += '<div style="padding-bottom:8px;">By <a href="{}">{}</a></div>'.format(ep_json['content']['series_show_page'], ep_json['content']['series_title'])
-        item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div></td></tr></table>'.format(item['_display_date'], ', '.join(duration))
+        item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], ep_json['content']['series_title'], ep_json['content']['series_show_page'], item['_display_date'], ep_json['content']['duration'])
+
         if not 'embed' in args and item.get('summary'):
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
 
@@ -104,6 +96,8 @@ def get_content(url, args, site_json, save_debug=False):
         show_json = utils.get_url_json('https://rss.art19.com/episodes?series_id={}&page%5Bnumber%5D=1&page%5Bsize%5D=10'.format(series_id))
         if not show_json:
             return None
+        if save_debug:
+            utils.write_file(show_json, './debug/show.json')
 
         ep_id = show_json['episodes'][0]['id']
         ep_json = utils.get_url_json('https://rss.art19.com/episodes/{}?content_only=true'.format(ep_id), headers=headers)
@@ -122,23 +116,21 @@ def get_content(url, args, site_json, save_debug=False):
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
-        item['author'] = {"name": ep_json['content']['series_title']}
+        item['author'] = {
+            "name": ep_json['content']['series_title']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
         img = utils.closest_dict(ep_json['content']['artwork']['series'], 'height', 640)
-        item['_image'] = img['url']
+        item['image'] = img['url']
 
         item['summary'] = ep_json['content']['series_description']
 
-        poster = '{}/image?height=128&url={}'.format(config.server, quote_plus(item['_image']))
-        item['content_html'] = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}"></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{0}">{2}</a></div></td></tr></table>'.format(item['url'], poster, item['title'])
-        item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;">Episodes:</div><table style="margin-left:10px;">'
+        item['content_html'] = utils.add_audio('', item['image'], item['title'], item['url'], '', '', '', '')
+        item['content_html'] += '<h3 style="margin:8px;">Latest episodes:</h3>'
+        item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), False), ep_json['content']['duration'], show_poster=False)
 
-        poster = '{}/static/play_button-48x48.png'.format(config.server)
-        duration = calc_duration(ep_json['content']['duration'])
-        dt = datetime.fromisoformat(ep_json['performed_at'].replace('Z', '+00:00'))
-        item['content_html'] += '<tr><td style="width:48px;"><a href="{}"><img src="{}" /></a></td><td><a href="{}">{}</a><br/><small>{} &bull; {}</small></td></tr>'.format(
-            ep_json['content']['media']['mp3']['url'], poster, ep_json['content']['episode_share_url'], ep_json['content']['episode_title'], utils.format_display_date(dt, False),
-            ', '.join(duration))
         if 'max' in args:
             n = min(int(args['max']), len(show_json['episodes']['items']))
         elif 'embed' in args:
@@ -150,14 +142,6 @@ def get_content(url, args, site_json, save_debug=False):
             ep_json = utils.get_url_json('https://rss.art19.com/episodes/{}?content_only=true'.format(ep_id), headers=headers)
             if not ep_json:
                 continue
-            poster = '{}/static/play_button-48x48.png'.format(config.server)
-            duration = calc_duration(ep_json['content']['duration'])
-            dt = datetime.fromisoformat(ep_json['performed_at'].replace('Z', '+00:00'))
-            item['content_html'] += '<tr><td style="width:48px;"><a href="{}"><img src="{}" /></a></td><td><a href="{}">{}</a><br/><small>{} &bull; {}</small></td></tr>'.format(
-                ep_json['content']['media']['mp3']['url'], poster, ep_json['content']['episode_share_url'], ep_json['content']['episode_title'], utils.format_display_date(dt, False),
-                ', '.join(duration))
-        if n < len(show_json['episodes']):
-            item['content_html'] += '<tr><td colspan="2"><a href="{}">View more episodes</a></td></tr>'.format(item['url'])
-        item['content_html'] += '</table>'
+            item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), False), ep_json['content']['duration'], show_poster=False)
 
     return item

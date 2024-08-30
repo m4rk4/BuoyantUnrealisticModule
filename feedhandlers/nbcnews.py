@@ -71,6 +71,8 @@ def render_contents(contents):
                 content_html += utils.add_embed(links[-1]['href'])
             elif content['widget']['name'] == 'CUSTOM_EMBED' and content['widget']['properties']['embed']['type'] == 'BLOCKQUOTE':
                 content_html += utils.add_pullquote(content['widget']['properties']['embed']['text'])
+            elif content['widget']['name'] == 'CUSTOM_EMBED' and content['widget']['properties']['embed']['type'] == 'PULL_QUOTE':
+                content_html += utils.add_pullquote(content['widget']['properties']['embed']['text'], content['widget']['properties']['embed'].get('attribution'))
             elif content['widget']['name'] == 'CUSTOM_EMBED' and content['widget']['properties']['embed']['type'] == 'SUMMARY_BOX':
                 content_html += '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;"><h3>{}</h3><ul>'.format(content['widget']['properties']['embed']['headline'])
                 for it in content['widget']['properties']['embed']['items']:

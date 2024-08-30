@@ -29,7 +29,7 @@ def get_api_json(api_path, data_type, id, filters=''):
     if filters:
         api_url += '?{}'.format(filters)
     # headers = {"cache-control": "max-age=0"}
-    # logger.debug('get_api_json: ' + api_url)
+    logger.debug('get_api_json: ' + api_url)
     api_json = utils.get_url_json(api_url)
     return api_json
 
@@ -233,7 +233,10 @@ def get_content(url, args, site_json, save_debug=False):
     if uuid:
         api_json = get_api_json(site_json['api_path'], page_type, uuid, '')
     elif node_id:
-        filters = 'filter[nid-filter][condition][path]=drupal_internal__nid&filter[nid-filter][condition][value]={}'.format(node_id)
+        if 'nid_path' in site_json:
+            filters = 'filter[nid-filter][condition][path]={}&filter[nid-filter][condition][value]={}'.format(site_json['nid_path'], node_id)
+        else:
+            filters = 'filter[nid-filter][condition][path]=drupal_internal__nid&filter[nid-filter][condition][value]={}'.format(node_id)
         api_json = get_api_json(site_json['api_path'], page_type, '', filters)
     else:
         logger.warning('unknown uuid or node id for ' + url)
@@ -339,6 +342,11 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
+    elif page_json['relationships'].get('author') and page_json['relationships']['author'].get('data'):
+        data = page_json['relationships']['author']['data']
+        api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+        if api_json:
+            authors.append(api_json['data']['attributes']['name'])
     item['author'] = {}
     if authors:
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
@@ -352,7 +360,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         if val.get('data'):
             if isinstance(val['data'], list):
                 for data in val['data']:
-                    if data['type'].startswith('taxonomy_term'):
+                    if data['type'].startswith('taxonomy_term') or data['type'] == 'topic':
                         api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
                         if api_json:
                             if api_json['data']['attributes']['name'] not in item['tags']:
@@ -382,6 +390,10 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         lede_html = data_html
     elif page_json['relationships'].get('field_main_hero_image') and page_json['relationships']['field_main_hero_image'].get('data'):
         data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], site_json['api_path'], caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html = data_html
+    elif page_json['relationships'].get('hero_image') and page_json['relationships']['hero_image'].get('data'):
+        data_html = get_field_data(page_json['relationships']['hero_image']['data'], site_json['api_path'], caption=caption)
         item['_image'], caption = get_img_src(data_html)
         lede_html = data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):

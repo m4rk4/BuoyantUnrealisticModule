@@ -148,6 +148,7 @@ def render_blocks(blocks, netloc, bg_color):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
+    netloc = split_url.netloc
     paths = list(filter(None, split_url.path.split('/')))
     m = re.search(r'/news/(\d+)/(\d+)/(\d+)', split_url.path)
     if not m:
@@ -157,7 +158,7 @@ def get_content(url, args, site_json, save_debug=False):
         slug = paths[-1][:-5]
     else:
         slug = paths[-1]
-    api_url = 'https://{}/api/v2/stories/{}-{}-{}/{}'.format(split_url.netloc, m.group(2), m.group(3), m.group(1), slug)
+    api_url = 'https://{}/api/v2/stories/{}-{}-{}/{}'.format(netloc, m.group(2), m.group(3), m.group(1), slug)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
@@ -166,7 +167,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = api_json['id']
-    item['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, api_json['contentUrl'])
+    item['url'] = '{}://{}{}'.format(split_url.scheme, netloc, api_json['contentUrl'])
     item['title'] = api_json['contentTitle']
 
     dt = datetime.fromisoformat(api_json['contentDate']).replace(tzinfo=timezone.utc)
@@ -188,7 +189,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append('{} {}'.format(it['firstName'], it['lastName']))
 
     if api_json.get('imageSource'):
-        item['_image'] = 'https://{}{}'.format(split_url.netloc, api_json['imageSource'])
+        item['_image'] = 'https://{}{}'.format(netloc, api_json['imageSource'])
 
     if api_json.get('teaser'):
         item['summary'] = api_json['teaser']
@@ -196,10 +197,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = ''
     if api_json.get('games'):
         for game in api_json['games']:
-            item['content_html'] += add_game_stats(game, api_json['globalSportMapName'], split_url.netloc, site_json['team'])
+            item['content_html'] += add_game_stats(game, api_json['globalSportMapName'], netloc, site_json['team'])
 
     if api_json.get('video') and api_json['video'].get('archive'):
-        item['content_html'] += add_video(api_json['video']['archive'], split_url.netloc)
+        item['content_html'] += add_video(api_json['video']['archive'], netloc)
     elif item.get('_image'):
         captions = []
         if api_json.get('imageCaption'):
@@ -219,10 +220,18 @@ def get_content(url, args, site_json, save_debug=False):
         def sub_iframe(match_obj):
             return utils.add_embed(match_obj.group(1)) + '<div>&nbsp;</div>'
         item['content_html'] = re.sub(r'<iframe[^>]+src="([^"]+)"[^>]*>.*?</iframe>', sub_iframe, item['content_html'])
+        def sub_image(match_obj):
+            nonlocal netloc
+            if match_obj.group(1).startswith('/'):
+                img_src = 'https://' + netloc + match_obj.group(1)
+            else:
+                img_src = match_obj.group(1)
+            return utils.add_image(img_src)
+        item['content_html'] = re.sub(r'<div[^>]+sidearm-story-image[^>]+><img[^>]+src="([^"]+)"[^>]*>.*?</div>', sub_image, item['content_html'])
     elif api_json.get('blocks'):
-        item['content_html'] += render_blocks(api_json['blocks'], split_url.netloc, site_json['bg_color'])
+        item['content_html'] += render_blocks(api_json['blocks'], netloc, site_json['bg_color'])
 
-    item['content_html'] = re.sub(r'href="(/[^"]+)"', r'href="https://{}\1"'.format(split_url.netloc), item['content_html'])
+    item['content_html'] = re.sub(r'href="(/[^"]+)"', r'href="https://{}\1"'.format(netloc), item['content_html'])
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 

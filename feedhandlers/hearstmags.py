@@ -1,9 +1,9 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -22,58 +22,86 @@ def resize_image(image, width=1000):
         img_src = 'https://hips.hearstapps.com/' + image['aws_url'].replace('https://', '')
     else:
         img_src = 'https://hips.hearstapps.com/hmg-prod{}'.format(image['pathname'])
+    if width < 0:
+        return img_src
     return resize_img_src(img_src, width)
 
 
-def add_image(image, attribs=None, gallery=False):
+def image_caption(image, attribs=None):
     captions = []
     if attribs and attribs.get('caption'):
         captions.append(attribs['caption'])
     if image.get('metadata') and image['metadata'].get('caption'):
-        captions.append(image['metadata']['caption'])
+        if not image['metadata']['caption'] in captions:
+            captions.append(image['metadata']['caption'])
     if image['image_metadata'].get('photo_credit'):
-        captions.append(image['image_metadata']['photo_credit'])
+        if not image['image_metadata']['photo_credit'] in captions:
+            captions.append(image['image_metadata']['photo_credit'])
     if image.get('source'):
-        captions.append(image['source']['title'])
+        if not image['source']['title'] in captions:
+            captions.append(image['source']['title'])
+    if image.get('photographer'):
+        if not image['photographer']['name'] in captions:
+            captions.append(image['photographer']['name'])
+    caption = ' | '.join(captions)
+    if caption.lower() == 'hearst owned':
+        caption = ''
+    return caption
 
-    if image.get('metadata') and image['metadata'].get('custom_tag'):
-        heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(image['metadata']['custom_tag'].upper())
+
+def add_image(image, attribs=None, gallery=False, add_desc=True):
+    caption = image_caption(image, attribs)
+
+    if image.get('metadata') and (image['metadata'].get('embed_image_link_url') or image['metadata'].get('slide_image_link_url')):
+        if image['metadata'].get('embed_image_link_url'):
+            link = image['metadata']['embed_image_link_url']
+            if image['metadata'].get('embed_image_link_title'):
+                link_title = image['metadata']['embed_image_link_title']
+            else:
+                link_title = 'View more photos'
+        else:
+            link = image['metadata']['slide_image_link_url']
+            if image['metadata'].get('slide_image_link_title'):
+                link_title = image['metadata']['slide_image_link_title']
+            else:
+                link_title = 'View more photos'
+        if caption:
+            caption += ' | '
+        caption += '<a href="{}">{}</a>'.format(link, link_title)
     else:
-        heading = ''
+        # Original image
+        link = resize_image(image, -1)
 
-    if image.get('metadata') and image['metadata'].get('embed_image_link_url'):
-        link = image['metadata']['embed_image_link_url']
-        captions.append('<a href="{}">View gallery</a>'.format(link))
-    else:
-        link = ''
-
+    heading = ''
     desc = ''
-    if image['metadata'].get('headline'):
-        desc += '<div style="text-align:center; font-size:1.3em; font-weight:bold">{}</div>'.format(image['metadata']['headline'])
-    if image['metadata'].get('dek'):
-        desc += image['metadata']['dek']
-        #for blk in image['metadata']['dekDom']['children']:
-            #desc += format_block(blk, None, netloc)
+    if add_desc:
+        if image.get('metadata') and image['metadata'].get('custom_tag'):
+            heading = '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(
+                image['metadata']['custom_tag'].upper())
+        if image['metadata'].get('headline'):
+            desc += '<div style="text-align:center; font-size:1.3em; font-weight:bold">{}</div>'.format(image['metadata']['headline'])
+        if image['metadata'].get('dek'):
+            desc += image['metadata']['dek']
+            #for blk in image['metadata']['dekDom']['children']:
+                #desc += format_block(blk, None, netloc)
 
     if gallery:
         fig_style = 'margin:0; padding:8px;'
     else:
         fig_style = ''
 
-    caption = ' | '.join(captions)
-    if caption.lower() == 'hearst owned':
-        caption = ''
-
     return utils.add_image(resize_image(image), caption, link=link, fig_style=fig_style, heading=heading, desc=desc)
 
 
 def add_product(product, outer_table=True):
-    product_html = ''
-    if outer_table:
-        product_html += '<table style="width:90%; margin-left:auto; margin-right:auto;">'
+    product_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+    # if outer_table:
+        # product_html += '<table style="width:90%; margin-left:auto; margin-right:auto;">'
 
-    product_html += '<tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td>'.format(resize_image(product['image'], 128))
+    # product_html += '<tr><td style="width:128px;"><img src="{}" style="width:128px;"/></td><td>'.format(resize_image(product['image'], 128))
+    product_html += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><img src="{}" style="width:100%" /></div>'.format(resize_image(product['image'], 256))
 
+    product_html += '<div style="flex:2; min-width:200px; margin:1em;">'
     if product.get('label'):
         product_html += '<div style="font-size:0.9em; font-weight:bold;">{}</div>'.format(product['label'])
 
@@ -85,28 +113,37 @@ def add_product(product, outer_table=True):
             name = product['custom_brand'] + ' ' + name
     product_html += '<div style="font-size:1.2em; font-weight:bold;">{}</div>'.format(name)
 
-    price = ''
-    if product['retailer'].get('price_currency'):
-        if product['retailer']['price_currency'] == 'USD':
-            price += '$'
-        else:
-            logger.warning('unhandled price currency ' + product['retailer']['price_currency'])
-    else:
-        price += 'Shop'
-    if product.get('custom_price'):
-        price += product['custom_price']
-    else:
-        if product['retailer']['price'] != '0.00':
-            price += product['retailer']['price']
-    if product['retailer'].get('display_name') and product['retailer']['display_name']:
-        price += ' at ' + product['retailer']['display_name']
-    else:
-        price += ' at ' + product['retailer']['retailer_name']
-    product_html += '<div style="width:fit-content; padding:4px; background-color:#59E7ED;"><a href="{}" style="text-decoration:none; color:black;">{}</a></div>'.format(product['retailer']['url'], price)
+    retailers = []
+    if product.get('retailer') and product['retailer'].get('id'):
+        retailers.append(product['retailer'])
+    if product.get('retailers'):
+        retailers += [it for it in product['retailers'] if it.get('id')]
 
-    product_html += '</td></tr>'
-    if outer_table:
-        product_html += '</table>'
+    for retailer in retailers:
+        price = ''
+        if retailer.get('price_currency'):
+            if retailer['price_currency'] == 'USD':
+                price += '$'
+            else:
+                logger.warning('unhandled price currency ' + retailer['price_currency'])
+        else:
+            price += 'Shop'
+        if product.get('custom_price'):
+            price += product['custom_price']
+        else:
+            if retailer['price'] != '0.00':
+                price += retailer['price']
+        if retailer.get('display_name') and retailer['display_name']:
+            price += ' at ' + retailer['display_name']
+        else:
+            price += ' at ' + retailer['retailer_name']
+        # product_html += '<div style="width:fit-content; padding:4px; background-color:#59E7ED;"><a href="{}" style="text-decoration:none; color:black;">{}</a></div>'.format(retailer['url'], price)
+        product_html += utils.add_button(retailer['url'], price, '#59E7ED', center=False)
+
+    product_html += '</div></div>'
+    # product_html += '</td></tr>'
+    # if outer_table:
+    #     product_html += '</table>'
     return product_html
 
 
@@ -156,14 +193,17 @@ def format_block(block, content, netloc):
                 logger.warning('unhandled image mediaid {}'.format(block['attribs']['mediaid']))
 
         elif block['name'] == 'gallery':
-            if block['response'].get('galleryTitle') and 'deals' in block['response']['galleryTitle']:
-                return ''
+            if block['response'].get('galleryTitle'):
+                if 'deals' in block['response']['galleryTitle']:
+                    return ''
+                else:
+                    block_html += '<h2>' + block['response']['galleryTitle'] + '</h2>'
             block_html += '<div style="display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center;">'
             #block_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
             for slide in block['response']['parsedSlides']:
                 if not slide:
                     continue
-                block_html += '<div style="width:50%; min-width:400px;">'
+                block_html += '<div style="flex:1; min-width:380px;">'
                 if (slide.get('__typename') and slide['__typename'] == 'Image') or (slide.get('media_type') and slide['media_type'] == 'image'):
                     block_html += add_image(slide, gallery=True)
                 elif (slide.get('__typename') and slide['__typename'] == 'Product') or slide.get('product_id'):
@@ -174,8 +214,13 @@ def format_block(block, content, netloc):
             block_html += '</div>'
 
         elif block['name'] == 'composite':
+            gallery_images = []
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
             for image in block['response']['media']:
-                block_html += add_image(image)
+                gallery_html += '<div style="flex:1; min-width:360px;">' + add_image(image) + '</div>'
+                gallery_images.append({"src": resize_image(image, -1), "caption": image_caption(image), "thumb": resize_image(image, 640)})
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            block_html += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
         elif block['name'] == 'loop':
             return utils.add_video(block['attribs']['src'], 'video/mp4', '', block['attribs']['caption'])
@@ -266,8 +311,9 @@ def format_block(block, content, netloc):
             else:
                 logger.warning('unhandled vehicle tag')
 
-        elif re.search(r'^(insurance-marketplace|poll|watch-next)$', block['name']):
+        elif re.search(r'^(insurance-marketplace(-plugin)?|poll|watch-next|recirculation|lotlinx-module-plugin)$', block['name']):
             return ''
+
         else:
             if not re.search(r'^(center|em|h\d|li|mark|ol|strong|sup|u|ul)$', block['name']):
                 logger.debug('unhandled tag ' + block['name'])
@@ -470,6 +516,16 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = content_json['metadata']['seo_meta_description']
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        return item
+
     item['content_html'] = ''
     if content_json['metadata'].get('dek'):
         item['content_html'] = content_json['metadata']['dek']
@@ -517,6 +573,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     if next_data['props']['pageProps'].get('introductionDom'):
         for block in next_data['props']['pageProps']['introductionDom']['children']:
+            item['content_html'] += format_block(block, content_json, split_url.netloc)
+
+    if next_data['props']['pageProps'].get('introductoryTextDom'):
+        for block in next_data['props']['pageProps']['introductoryTextDom']['children']:
             item['content_html'] += format_block(block, content_json, split_url.netloc)
 
     def sub_fractions(matchobj):
@@ -607,6 +667,38 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '</table>'
             else:
                 item['content_html'] += format_block(block, content_json, split_url.netloc)
+
+    if next_data['props']['pageProps'].get('slides'):
+        gallery_images = []
+        gallery_html = ''
+        if next_data['props']['pageProps']['displayType'] == 'gallery':
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        for slide in next_data['props']['pageProps']['slides']:
+            if slide['media_type'] == 'image':
+                if next_data['props']['pageProps']['displayType'] == 'listicle':
+                    if slide['metadata'].get('headline'):
+                        item['content_html'] += '<h2>' + slide['metadata']['headline'] + '</h2>'
+                    item['content_html'] += add_image(slide, add_desc=False)
+                    if slide['metadata'].get('dekDom') and slide['metadata']['dekDom'].get('children'):
+                        for block in slide['metadata']['dekDom']['children']:
+                            item['content_html'] += format_block(block, content_json, split_url.netloc)
+                elif next_data['props']['pageProps']['displayType'] == 'gallery':
+                    gallery_html += '<div style="flex:1; min-width:360px;">' + add_image(slide, add_desc=False)
+                    dek = ''
+                    if slide['metadata'].get('dekDom') and slide['metadata']['dekDom'].get('children'):
+                        for block in slide['metadata']['dekDom']['children']:
+                            dek += format_block(block, content_json, split_url.netloc)
+                    gallery_html += dek + '</div>'
+                    caption = image_caption(slide)
+                    if caption:
+                        if dek:
+                            dek += '<div><small>' + caption + '</small></div>'
+                        else:
+                            dek = caption
+                    gallery_images.append({"src": resize_image(slide, -1), "caption": dek, "thumb": resize_image(slide, 640)})
+        if gallery_html:
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item

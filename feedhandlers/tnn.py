@@ -64,6 +64,15 @@ def get_content(url, args, site_json, save_debug=False):
     elif content_type == 'liveblog':
         content_json = api_json['response']['sections']['live_blog']['data']
 
+    if content_json['cmstype'] == 'PHOTOGALLERYLISTSECTION':
+        api_url = '{}/request/photo-slides?origin=desktop&msid={}&country_code=US&type=photolisticle'.format(site_json['api_path'], content_json['msid'])
+        api_json = utils.get_url_json(api_url)
+        if not api_json:
+            return None
+        if save_debug:
+            utils.write_file(api_json, './debug/debug.json')
+        content_json = api_json['response']['sections']['photo_show']['data'][0]
+
     item = {}
     item['id'] = content_json['msid']
     item['title'] = content_json['title']
@@ -151,9 +160,9 @@ def get_content(url, args, site_json, save_debug=False):
                             caption = ''
                         item['content_html'] += utils.add_image(img_src, caption)
                 if block.get('htmlText') and block['htmlText'].strip():
-                    if block['ispara'] == True:
+                    if 'ispara' in block and block['ispara'] == True:
                         item['content_html'] += '<p>' + block['htmlText'] + '</p>'
-                    elif block['htmlText'].startswith('<strong>ALSO READ:') and block['htmlText'].endswith('</strong>'):
+                    elif (block['htmlText'].startswith('<strong>ALSO READ:') and block['htmlText'].endswith('</strong>')) or 'timesnownews.com/latest-news' in block['htmlText']:
                         pass
                     else:
                         item['content_html'] += block['htmlText']
@@ -189,45 +198,40 @@ def get_content(url, args, site_json, save_debug=False):
         if 'embed' not in args and content_json.get('synopsis'):
             item['summary'] = content_json['synopsis']
             item['content_html'] += '<p>' + re.sub(r'<br\s?/?>\s?<br\s?/?>', '</p><p>', item['summary']) + '</p>'
-    elif content_json['cmstype'] == 'PHOTOGALLERYSLIDESHOWSECTION':
+    elif content_json['cmstype'] == 'PHOTOGALLERYSLIDESHOWSECTION' or content_json['cmstype'] == 'PHOTOGALLERYLISTSECTION':
         if content_json.get('synopsis'):
             item['summary'] = content_json['synopsis']
             item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
-        item['content_html'] += '<h3><a href="GALLERY_URL">View photo gallery</a></h3>'
+        gallery_html = ''
         gallery_images = []
         for i, slide in enumerate(content_json['slides']):
             if slide['widgetType'] == 'PHOTO_SLIDE':
                 img_src = site_json['image_path'] + '/photo/msid-{0}/{0}.jpg'.format(slide['msid'])
+                thumb = img_src + '?quality=60'
                 if not item.get('_image'):
                     item['_image'] = img_src
                 if slide.get('agency') and slide['agency'].get('name'):
                     caption = slide['agency']['name']
                 else:
                     caption = ''
-                if i == 0:
-                    item['content_html'] += utils.add_image(img_src + '?quality=60', caption, link=img_src)
-                else:
-                    item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(img_src + '?quality=60', caption, link=img_src)
                 desc = ''
                 if slide.get('title'):
                     desc += '<p style="font-size:1.1em; font-weight:bold;">' + slide['title'] + '</p>'
                 if slide.get('synopsis'):
                     desc += slide['synopsis']
-                item['content_html'] += desc
-                if caption:
-                    desc += '<div><small>Credit: ' + caption + '</small></div>'
-                gallery_images.append({"src": img_src, "caption": desc, "thumb": img_src + '?quality=60'})
                 if i == 0:
-                    item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                    gallery_html += utils.add_image(img_src + '?quality=60', caption, link=img_src, desc=desc)
+                    gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
                 else:
-                    item['content_html'] += '</div>'
+                    gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, desc=desc) + '</div>'
+                gallery_images.append({"src": img_src, "caption": caption, "desc": desc, "thumb": thumb})
             elif slide['widgetType'] == 'ad':
                 pass
             else:
                 logger.warning('unhandled slide widgetType {} in {}'.format(slide['widgetType'], item['url']))
-        item['content_html'] += '</div>'
+        gallery_html += '</div>'
         gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
-        item['content_html'] = item['content_html'].replace('GALLERY_URL', gallery_url)
+        item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
     elif content_json['cmstype'] == 'LIVEBLOG':
         if content_json['metainfo'].get('Prefix') and content_json['metainfo']['Prefix'].get('value'):
             item['content_html'] += '<p><em>' + content_json['metainfo']['Prefix']['value'] + '</em></p>'
@@ -296,17 +300,32 @@ def get_content(url, args, site_json, save_debug=False):
                 item['_image'] = ld_json['mainEntityOfPage']['associatedMedia'][0]['contentUrl']
                 if ld_json.get('description'):
                     item['summary'] = ld_json['description']
-                print(ld_json['mainEntityOfPage']['associatedMedia'][-1])
-                for it in ld_json['mainEntityOfPage']['associatedMedia']:
+                # print(ld_json['mainEntityOfPage']['associatedMedia'][-1])
+                gallery_images = []
+                gallery_html = ''
+                for i, it in enumerate(ld_json['mainEntityOfPage']['associatedMedia']):
                     if it['@type'] == 'ImageObject':
-                        item['content_html'] += utils.add_image(it['contentUrl'])
+                        img_src = it['contentUrl']
+                        thumb = it['thumbnailUrl']
+                        desc = ''
                         if it.get('name'):
-                            item['content_html'] += '<p style="font-size:1.1em; font-weight:bold;">' + it['name'] + '</p>'
+                            desc += '<p style="font-size:1.1em; font-weight:bold;">' + it['name'] + '</p>'
                         if it.get('description'):
-                            item['content_html'] += '<p>' + it['description'] + '</p>'
+                            desc += '<p>' + it['description'] + '</p>'
                         elif it.get('caption'):
-                            item['content_html'] += '<p>' + it['caption'] + '</p>'
+                            desc += '<p>' + it['caption'] + '</p>'
+                        if i == 0:
+                            gallery_html += utils.add_image(thumb, link=img_src, desc=desc)
+                            gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        else:
+                            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src, desc=desc) + '</div>'
+                        gallery_images.append({"src": img_src, "caption": "", "desc": desc, "thumb": thumb})
+                gallery_html += '</div>'
+                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
                 break
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

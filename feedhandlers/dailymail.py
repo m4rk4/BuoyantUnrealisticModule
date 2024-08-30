@@ -1,8 +1,9 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -78,13 +79,23 @@ def get_content(url, args, site_json, save_debug=False):
     if item.get('_image'):
         item['content_html'] += utils.add_image(item['_image'])
 
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        return item
+
     body = soup.find(attrs={"itemprop": "articleBody"})
     if body:
         if save_debug:
             utils.write_file(str(body), './debug/debug.html')
 
         for el in body.find_all(class_=['art-ins', 'molads_ff', 'fff-inline', 'perform-player']):
-            # perform-player seems to be unrelated videos
+            # perform-play4er seems to be unrelated videos
             el.decompose()
 
         for el in body.find_all(class_='moduleFull'):
@@ -98,6 +109,9 @@ def get_content(url, args, site_json, save_debug=False):
                 el.parent.decompose()
             else:
                 el.decompose()
+
+        for el in body.find_all(attrs={"data-podcast-container": True}):
+            el.decompose()
 
         for el in body.find_all(class_='mol-img-group'):
             new_html = ''

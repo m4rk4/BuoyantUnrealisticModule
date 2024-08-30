@@ -16,7 +16,7 @@ def get_graphql_json(url):
         "accept-language": "en-US,en;q=0.9,de;q=0.8",
         "content-type": "application/json",
         "original-domain": "www.aljazeera.com",
-        "sec-ch-ua": "\"Chromium\";v=\"104\", \" Not A;Brand\";v=\"99\", \"Microsoft Edge\";v=\"104\"",
+        "sec-ch-ua": "\"Chromium\";v=\"116\", \" Not A;Brand\";v=\"99\", \"Microsoft Edge\";v=\"116\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
@@ -65,29 +65,25 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['modified_gmt'] + '+00:00')
     item['date_modified'] = dt.isoformat()
 
-    authors = []
+    item['authors'] = []
     if article_json.get('author'):
         for it in article_json['author']:
-            authors.append(it['name'])
+            item['authors'].append({"name": it['name']})
     elif article_json.get('source'):
         for it in article_json['source']:
-            authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'].append({"name": it['name']})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if article_json.get('tags'):
-        for it in article_json['tags']:
-            item['tags'].append(it['title'])
+        item['tags'] += [x['title'] for x in article_json['tags']]
     if article_json.get('categories'):
-        for it in article_json['categories']:
-            if it['name'] not in item['tags']:
-                item['tags'].append(it['name'])
+        item['tags'] += [x['name'] for x in article_json['categories'] if x['name'] not in item['tags']]
     if article_json.get('where'):
-        for it in article_json['where']:
-            if it['title'] not in item['tags']:
-                item['tags'].append(it['title'])
+        item['tags'] += [x['title'] for x in article_json['where'] if x['title'] not in item['tags']]
 
     item['content_html'] = ''
     if article_json.get('excerpt'):
@@ -95,7 +91,11 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     if article_json.get('featuredImage'):
-        item['_image'] = 'https://www.aljazeera.com{}?w=1000x'.format(article_json['featuredImage']['sourceUrl'])
+        item['image'] = 'https://www.aljazeera.com{}?w=1000x'.format(article_json['featuredImage']['sourceUrl'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json.get('featuredYoutube'):
         item['content_html'] += utils.add_embed(article_json['featuredYoutube'])
@@ -107,7 +107,7 @@ def get_content(url, args, site_json, save_debug=False):
             captions.append(article_json['featuredImage']['caption'])
         if article_json['featuredImage'].get('credit'):
             captions.append(article_json['featuredImage']['credit'])
-        item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
 
     item['content_html'] += wp_posts.format_content(article_json['content'], item)
 

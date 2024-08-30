@@ -1,9 +1,9 @@
 import json
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote_plus, urlencode, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import wp_posts
 
 import logging
@@ -42,7 +42,7 @@ def get_next_data(url, site_json):
             query['slug'] = paths[i + 1]
     if query:
         next_url += '?' + urlencode(query)
-    print(next_url)
+    # print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
@@ -88,11 +88,38 @@ def get_content(url, args, site_json, save_debug=False):
         for it in article_json['tags']:
             item['tags'].append(it['name'])
 
+    if article_json.get('head'):
+        head_soup = BeautifulSoup(article_json['head'], 'html.parser')
+    else:
+        head_soup = None
+
     if article_json.get('featuredImage'):
         item['_image'] = resize_image(article_json['featuredImage']['source'])
+    elif head_soup:
+        el = head_soup.find('meta', attrs={"property": "og:image"})
+        if el:
+            item['_image'] = el['content']
 
     if article_json.get('excerpt'):
         item['summary'] = article_json['excerpt']
+    elif head_soup:
+        el = head_soup.find('meta', attrs={"name": "description"})
+        if el:
+            item['summary'] = el['content']
+        else:
+            el = head_soup.find('meta', attrs={"property": "og:description"})
+            if el:
+                item['summary'] = el['content']
+
+    if 'embed' in args:
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     item['content_html'] = ''
     if article_json.get('video'):

@@ -1,9 +1,9 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlencode, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -177,13 +177,13 @@ def get_content(url, args, site_json, save_debug=False, site_id=''):
             caption = 'Photo by <a href="{}">{}</a> on <a href="https://unsplash.com/">Unsplash</a>'.format(post_json['heroUnsplashImage']['user']['url'], post_json['heroUnsplashImage']['user']['name'])
 
     if 'embed' in args:
-        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; border:1px solid black;">'
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
-            item['content_html'] += '<div style="flex:1; min-width:400px; margin:auto;"><img src="{}" style="display:block; width:100%;"/></div>'.format(item['_image'])
-        item['content_html'] += '<div style="flex:1; min-width:256px; margin:auto; padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>By {}</div>'.format(item['url'], item['title'], item['author']['name'])
-        if post_json.get('subtitle'):
-            item['content_html'] += '<div><em>{}</em></div>'.format(post_json['subtitle'])
-        item['content_html'] += '</div></div>'
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] = ''

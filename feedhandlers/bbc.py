@@ -47,7 +47,7 @@ def get_initial_data(url):
     article_html = utils.get_url_html(url)
     if not article_html:
         return None
-    m = re.search('window\.__INITIAL_DATA__="(.+?)";<\/script>', article_html)
+    m = re.search(r'window\.__INITIAL_DATA__="(.+?)";<\/script>', article_html)
     if not m:
         logger.warning('unable to find __INITIAL_DATA__ in ' + url)
         return None
@@ -150,7 +150,7 @@ def get_av_content(url, args, site_json, save_debug=False):
 def render_contents(content_blocks, body_intro=False, heading=0):
     content_html = ''
     for block in content_blocks:
-        if block['type'] == 'headline' or block['type'] == 'timestamp' or block['type'] == 'byline' or block['type'] == 'advertisement' or block['type'] == 'links':
+        if block['type'] == 'headline' or block['type'] == 'timestamp' or block['type'] == 'byline' or block['type'] == 'subByline' or block['type'] == 'advertisement' or block['type'] == 'links':
             continue
         elif block['type'] == 'text':
             content_html += render_contents(block['model']['blocks'], block['model'].get('bodyIntro'), heading)
@@ -205,24 +205,29 @@ def render_contents(content_blocks, body_intro=False, heading=0):
             caption = ''
             blk = next((it for it in block['model']['blocks'] if it['type'] == 'media'), None)
             if blk:
-                video_id = blk['model']['blocks'][0]['model']['versions'][0]['versionId']
-                media_url = 'https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/{}/format/json/cors/1'.format(video_id)
-                # print(media_url)
-                media_json = utils.get_url_json(media_url)
-                if media_json:
-                    # utils.write_file(media_json, './debug/video.json')
-                    media = next((it for it in media_json['media'] if it['type'] == 'video/mp4'), None)
-                    if media:
-                        for connection in media['connection']:
-                            if connection['transferFormat'] == 'hls' and connection['protocol'] == 'https':
-                                video_src = connection['href']
-                                break
-                poster = blk['model']['blocks'][0]['model']['imageUrl'].replace('$recipe', '1024xn')
-                caption = blk['model']['blocks'][0]['model']['title']
-            if video_src:
-                content_html += utils.add_video(video_src, 'application/x-mpegURL', poster, caption)
-            else:
-                logger.warning('unhandled video content')
+                if blk['model']['blocks'][0]['model']['versions'][0]['availableTerritories']['nonUk'] == True:
+                    video_id = blk['model']['blocks'][0]['model']['versions'][0]['versionId']
+                    media_url = 'https://open.live.bbc.co.uk/mediaselector/6/select/version/2.0/mediaset/pc/vpid/{}/format/json/cors/1'.format(video_id)
+                    # print(media_url)
+                    media_json = utils.get_url_json(media_url)
+                    if media_json:
+                        # utils.write_file(media_json, './debug/video.json')
+                        media = next((it for it in media_json['media'] if it['type'] == 'video/mp4'), None)
+                        if media:
+                            for connection in media['connection']:
+                                if connection['transferFormat'] == 'hls' and connection['protocol'] == 'https':
+                                    video_src = connection['href']
+                                    break
+                    poster = blk['model']['blocks'][0]['model']['imageUrl'].replace('$recipe', '1024xn')
+                    caption = blk['model']['blocks'][0]['model']['title']
+                    if video_src:
+                        content_html += utils.add_video(video_src, 'application/x-mpegURL', poster, caption)
+                    else:
+                        logger.warning('unhandled video content')
+                else:
+                    poster = blk['model']['blocks'][0]['model']['imageUrl'].replace('$recipe', '1024xn')
+                    caption = '<em>Video unavailable</em> | ' + blk['model']['blocks'][0]['model']['title']
+                    content_html += utils.add_image(poster, caption)
         elif block['type'] == 'social':
             if block['model']['source'] == 'twitter':
                 content_html += utils.add_embed(block['model']['href'])
@@ -301,9 +306,28 @@ def get_content(url, args, site_json, save_debug=False):
 
     if metadata.get('indexImage'):
         item['_image'] = metadata['indexImage']['originalSrc']
+    elif page_json.get('headerContents'):
+        if page_json['contents'][0]['type'] == 'image' or page_json['contents'][0]['type'] == 'video':
+            block = page_json['contents'][0]
+        else:
+            block = next((it for it in page_json['headerContents'] if it['type'] == 'image'), None)
+        if block:
+            image = render_contents([block])
+            m = re.search(r'src="([^"]+)"', image)
+            if m:
+                item['_image'] = m.group(1)
 
     if metadata.get('description'):
         item['summary'] = metadata['description']
+    else:
+        for block in page_json['contents']:
+            if block['type'] == 'text':
+                break
+        if block['type'] == 'text':
+            text = render_contents([block])
+            m = re.search(r'<p>(.*?)</p>', text)
+            if m:
+                item['summary'] = m.group(1)
 
     item['tags'] = []
     if page_json.get('section'):
@@ -320,10 +344,13 @@ def get_content(url, args, site_json, save_debug=False):
                 item['tags'].append(it['title'])
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], urlsplit(item['url']).netloc, item['url'], item['title'])
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
         if item.get('summary'):
             item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] = ''
@@ -331,6 +358,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += render_contents(page_json['headerContents'])
 
     item['content_html'] += render_contents(page_json['contents'])
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
 
     if next_data['pageProps']['type'] == 'video':
         m = re.search(r'Video by ([^\.<]+)', item['content_html'])

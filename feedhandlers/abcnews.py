@@ -16,42 +16,39 @@ def resize_image(img_src):
 
 def add_video(video_id, poster='', embed=True, save_debug=False):
     # optionally add &format=mp4
-    video_json = utils.get_url_json('https://abcnews.go.com/video/itemfeed?id={}'.format(video_id))
+    video_url = 'https://abcnews.go.com/video/itemfeed?id={}'.format(video_id)
+    video_json = utils.get_url_json(video_url)
     if not video_json:
         return ''
     if save_debug:
         utils.write_file(video_json, './debug/video.json')
 
-    video_src = ''
-    for video in video_json['channel']['item']['media-group']['media-content']:
-        if video['@attributes']['type'] == 'video/mp4' and video['@attributes']['isLive'] == 'false':
-            video_src = video['@attributes']['url']
-            break
-    if not video_src:
-        return ''
+    video = next((it for it in video_json['channel']['item']['media-group']['media-content'] if '@attributes' in it and it['@attributes']['type'] == 'application/x-mpegURL'), None)
+    if not video:
+        video = next((it for it in video_json['channel']['item']['media-group']['media-content'] if '@attributes' in it and it['@attributes']['type'] == 'video/mp4'), None)
+        if not video:
+            logger.warning('unhandled video format in ' + video_url)
+            return ''
 
     if not poster:
-        poster = resize_image(video_json['channel']['item']['thumb'])
+        poster = video_json['channel']['item']['thumb']
 
-    title = video_json['channel']['item']['media-group'].get('media-title').strip()
-    desc = video_json['channel']['item']['media-group'].get('media-description').strip()
+    title = video_json['channel']['item']['media-group'].get('media-title')
+    desc = video_json['channel']['item']['media-group'].get('media-description')
     if embed:
-        if title and desc:
-            caption = '{}. {}'.format(title, desc)
-        elif title:
-            caption = title
+        if title:
+            caption = title.strip()
         elif desc:
-            caption = desc
+            caption = desc.strip()
         else:
             caption = ''
-        video_html = utils.add_video(video_src, 'video/mp4', poster, caption)
+        video_html = utils.add_video(video['@attributes']['url'], video['@attributes']['type'], poster, caption, use_videojs=True)
     else:
-        video_html = utils.add_video(video_src, 'video/mp4', poster)
+        video_html = utils.add_video(video['@attributes']['url'], video['@attributes']['type'], poster, use_videojs=True)
         if title:
-            video_html += '<h3>{}</h3>'.format(title)
+            video_html += '<h3>{}</h3>'.format(title.strip())
         if desc:
-            video_html += '<p>{}</p>'.format(desc)
-
+            video_html += '<p>{}</p>'.format(desc.strip())
     return video_html
 
 
@@ -95,34 +92,40 @@ def get_item(content_json, content_id, args, site_json, save_debug):
         if not utils.check_age(item, args):
             return None
 
-    name = ''
+    item['authors'] = []
     if beta_content.get('byline'):
-        name = re.sub(r'^By ', '', beta_content['byline'], flags=re.I)
+        item['author'] = {
+            "name": re.sub(r'^By ', '', beta_content['byline'], flags=re.I)
+        }
+        item['authors'].append(item['author'])
     elif item_content.get('abcn:authors'):
-        authors = []
         for author in item_content['abcn:authors']:
             if author['abcn:author'].get('abcn:author-name'):
                 if isinstance(author['abcn:author']['abcn:author-name'], dict):
                     name = author['abcn:author']['abcn:author-name']['name'].strip()
                 else:
                     name = author['abcn:author']['abcn:author-name'].strip()
-                if name:
-                    authors.append(name.title())
+                item['authors'].append({"name": name.title()})
             elif author['abcn:author'].get('abcn:author-provider'):
                 if isinstance(author['abcn:author']['abcn:author-provider'], dict):
                     name = author['abcn:author']['abcn:author-provider']['name'].strip()
                 else:
                     name = author['abcn:author']['abcn:author-provider'].strip()
-                if name:
-                    authors.append(name.title())
-        if authors:
-            name = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    if (not name) and item_content.get('byline'):
-        name = item_content['byline'].strip()
-    if not name:
-        name = 'ABCNews'
-    item['author'] = {}
-    item['author']['name'] = name
+                item['authors'].append({"name": name.title()})
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+    if 'author' not in item:
+        if item_content.get('byline'):
+            item['author'] = {
+                "name": item_content['byline'].strip()
+            }
+        else:
+            item['author'] = {
+                "name": "ABCNews"
+            }
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if beta_content.get('keywords'):
@@ -131,9 +134,9 @@ def get_item(content_json, content_id, args, site_json, save_debug):
         item['tags'].append(item_content['abcn:section'])
 
     if beta_content.get('image'):
-        item['_image'] = resize_image(beta_content['image'])
+        item['image'] = resize_image(beta_content['image'])
     elif content_json.get('abcn:images'):
-        item['_image'] = resize_image(item_content['abcn:images'][0]['abcn:image']['url'])
+        item['image'] = resize_image(item_content['abcn:images'][0]['abcn:image']['url'])
 
     if beta_content.get('description'):
         item['summary'] = beta_content['description']
@@ -151,13 +154,7 @@ def get_item(content_json, content_id, args, site_json, save_debug):
         return item
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     if item_content['abcn:contentType'] == 'imagemaster':
@@ -179,10 +176,7 @@ def get_item(content_json, content_id, args, site_json, save_debug):
 
     lead_video = ''
     if item_content.get('abcn:videos'):
-        if item.get('_image'):
-            lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], poster=item['_image'], save_debug=save_debug)
-        else:
-            lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], save_debug=save_debug)
+        lead_video = add_video(item_content['abcn:videos'][0]['abcn:video']['videoId'], save_debug=save_debug)
 
     if lead_video:
         item['content_html'] += lead_video

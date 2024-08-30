@@ -92,6 +92,7 @@ __all__ = [
     'eurogamer',
     'eurosport',
     'extractor',
+    'eviemag',
     'f1',
     'facebook',
     'fastcompany',
@@ -232,6 +233,7 @@ __all__ = [
     'reddit',
     'rekt',
     'reuters',
+    "rg",
     'rollingstone',
     'rss',
     'rumble',
@@ -333,5 +335,6 @@ __all__ = [
     'yahoo',
     'yougov',
     'youtube',
+    'ytdl',
     'zdnet'
 ]

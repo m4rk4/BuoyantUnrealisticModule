@@ -1,3 +1,4 @@
+from __future__ import unicode_literals
 import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
@@ -9,8 +10,7 @@ from urllib3.util import Retry
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config
-import utils
-from feedhandlers import instagram, twitter, vimeo, youtube
+from feedhandlers import twitter, vimeo, youtube
 
 import logging
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 def get_site_json(url):
   split_url = urlsplit(url)
+  netloc = split_url.netloc
   tld = tldextract.extract(url.strip())
   if tld.domain == 'youtu' and tld.suffix == 'be':
     domain = 'youtu.be'
@@ -32,30 +33,38 @@ def get_site_json(url):
 
   site_json = None
   sites_json = read_json_file('./sites.json')
-  if sites_json.get(domain):
+  if domain in sites_json:
     if isinstance(sites_json[domain], dict):
       site_json = sites_json[domain]
     elif isinstance(sites_json[domain], list):
       for it in sites_json[domain]:
         default_site = None
-        if it.get(split_url.netloc):
-          site_json = it[split_url.netloc]
-        elif it.get('default'):
+        if netloc in it:
+          site_json = it[netloc]
+        elif 'default' in it:
           site_json = it['default']
         if not site_json and default_site:
           site_json = default_site
 
+  if site_json and 'same' in site_json:
+    domain = site_json['same']['domain']
+    netloc = site_json['same']['netloc']
+    if isinstance(sites_json[domain], dict):
+      site_json = sites_json[domain]
+    elif isinstance(sites_json[domain], list):
+      for it in sites_json[domain]:
+        default_site = None
+        if netloc in it:
+          site_json = it[netloc]
+        elif 'default' in it:
+          site_json = it['default']
+        if not site_json and default_site:
+          site_json = default_site
+
+
+
   if not site_json:
-    if domain in sites_json['wp-posts']['sites']:
-      site_json = {
-          "module": "wp_posts",
-          "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
-          "posts_path": "/wp/v2/posts",
-          "feeds": [
-            "{}://{}/feed".format(split_url.scheme, split_url.netloc)
-          ]
-      }
-    elif url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
+    if url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
       site_json = {
           "module": "wp_posts",
           "wpjson_path": "{}://{}/wp-json".format(split_url.scheme, split_url.netloc),
@@ -199,7 +208,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
   r = None
   try:
     if use_curl_cffi:
-      r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+      r = curl_cffi_requests.get(url, impersonate=config.impersonate, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     else:
       r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=certifi.where())
     r.raise_for_status()
@@ -214,7 +223,8 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if use_curl_cffi:
       logger.warning('curl_cffi request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
     else:
-      if not use_curl_cffi and e.__class__.__name__ == 'SSLError':
+      logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
+      if e.__class__.__name__ == 'SSLError':
         try:
           r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=config.verify_path)
           r.raise_for_status()
@@ -230,7 +240,8 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying curl_cffi')
       try:
-        r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
+        r = curl_cffi_requests.get(url, impersonate=config.impersonate, proxies=config.proxies)
+        # r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
         r.raise_for_status()
       except Exception as e:
         if r != None:
@@ -285,7 +296,10 @@ def get_browser_request(url, get_json=False, save_screenshot=False):
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url, get_json=True)
-
+  if not use_proxy and site_json and site_json.get('use_proxy'):
+    use_proxy = site_json['use_proxy']
+  if not use_curl_cffi and site_json and site_json.get('use_curl_cffi'):
+    use_curl_cffi = site_json['use_curl_cffi']
   r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404 or r.status_code == 500):
     try:
@@ -305,6 +319,10 @@ def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redir
     ua = site_json['user_agent']
   else:
     ua = user_agent
+  if not use_proxy and site_json and site_json.get('use_proxy'):
+    use_proxy = site_json['use_proxy']
+  if not use_curl_cffi and site_json and site_json.get('use_curl_cffi'):
+    use_curl_cffi = site_json['use_curl_cffi']
   r = get_request(url, ua, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
@@ -503,7 +521,7 @@ def url_exists(url):
   except Exception as e:
     if e.__class__.__name__ == 'SSLError':
       try:
-        r = curl_cffi_requests.get(url, impersonate="chrome116", proxies=config.proxies)
+        r = curl_cffi_requests.get(url, impersonate=config.impersonate, proxies=config.proxies)
         if r.status_code == 301 and r.headers.get('location'):
           r = requests.head(r.headers['location'], proxies=config.proxies)
         return r.status_code == requests.codes.ok
@@ -547,10 +565,18 @@ def read_file(filename):
 def closest_value(lst, target):
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i]) - target))]
 
-def closest_dict(lst_of_dict, k, target):
-  lst = [it for it in lst_of_dict if it.get(k)]
-  if not lst:
+def closest_dict(lst_of_dict, k, target, greater_than=False):
+  # remove items with out the key
+  k_lst = [it for it in lst_of_dict if it.get(k)]
+  if not k_lst:
     return None
+  if greater_than:
+    # remove items with values less than target
+    lst = [it for it in k_lst if int(it[k]) >= target]
+    if not lst:
+      lst = k_lst
+  else:
+    lst = k_lst
   return lst[min(range(len(lst)), key = lambda i: abs(int(lst[i][k]) - target))]
 
 def image_from_srcset(srcset, target):
@@ -558,6 +584,7 @@ def image_from_srcset(srcset, target):
   # Two types of srcset:
   #  Absolute width: elva-fairy-480w.jpg 480w, elva-fairy-800w.jpg 800w
   #  Relative width: elva-fairy-320w.jpg, elva-fairy-480w.jpg 1.5x, elva-fairy-640w.jpg 2x
+  # TODO: use parser from https://github.com/surfly/srcset
   base_width = -1
   images = []
   srcset = srcset.strip()
@@ -610,7 +637,7 @@ def image_from_srcset(srcset, target):
       image['width'] = int(image['width'] * base_width)
 
   if images:
-    image = closest_dict(images, 'width', target)
+    image = closest_dict(images, 'width', target, True)
     return image['src']
   return ''
 
@@ -854,24 +881,27 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   fig_html += '</figure>'
   return fig_html
 
-def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg'):
+
+def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, desc=''):
   audio_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
 
-  if poster:
+  if poster and show_poster == True:
     audio_html += '<div style="flex:1; min-width:128px; max-width:160px;">'
   else:
     audio_html += '<div style="flex:1; min-width:48px; max-width:64px;">'
 
   if audio_src:
-    audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
-
-  if poster:
-    if audio_src:
-      audio_html += '<img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/></a>'.format(config.server, quote_plus(poster))
+    if poster:
+      audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
     else:
-      audio_html += '<img src="{}/image?url={}&width=160" style="width:100%;"/></a>'.format(config.server, quote_plus(poster))
+      audio_html += '<a href="{}/videojs?src={}&type={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type))
+
+  if poster and show_poster == True:
+    if audio_src:
+      audio_html += '<img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/>'.format(config.server, quote_plus(poster))
+    else:
+      audio_html += '<img src="{}/image?url={}&width=160" style="width:100%;"/>'.format(config.server, quote_plus(poster))
   else:
-    # audio_html += '<img src="{}/image?width=160&height=160{}" style="width:100%;"/>'.format(config.server, overlay)
     audio_html += '<img src="{}/static/play_button-64x64.png" style="width:100%;"/>'.format(config.server)
 
   if audio_src:
@@ -888,7 +918,7 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     audio_html += '</div>'
 
   if author:
-    audio_html += '<div>by '
+    audio_html += '<div style="margin:4px 0 4px 0;">'
     if author_url:
       audio_html += '<a href="{}">{}</a>'.format(author_url, author)
     else:
@@ -915,22 +945,27 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
       if isinstance(duration, str):
         audio_html += duration
       else:
-        audio_html += utils.calc_duration(duration)
+        audio_html += calc_duration(duration)
     audio_html += '</div>'
+
+  if desc:
+    audio_html += '<div style="font-size:0.8em;">' + desc + '</div>'
 
   audio_html += '</div></div>'
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False):
-  video_src = ''
+def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False, use_proxy=False):
+  if use_proxy:
+    video_src = config.server + '/proxy/' + video_url
+  else:
+    video_src = video_url
+
   if video_type == 'video/mp4' or video_type == 'video/webm':
     if use_videojs:
-      video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
-    else:
-      video_src = video_url
+      video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
   elif video_type.lower() == 'application/x-mpegurl' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
-    video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_url), quote_plus(video_type), quote_plus(poster))
+    video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
     content = vimeo.get_content(video_url, {}, {}, False)
@@ -938,7 +973,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       poster = content['_image']
     video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
     if not caption:
-      caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(content['title'], video_url)
+      caption = '{} | <a href="{}" target="_blank">Watch on Vimeo</a>'.format(content['title'], video_url)
 
   elif video_type == 'youtube':
     content = youtube.get_content(video_url, {}, {}, False)
@@ -948,14 +983,14 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       #video_src = '{}/video?url={}'.format(config.server, quote_plus(video_url))
       video_src = video_url
       if not caption:
-        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(content['title'], video_url)
+        caption = '{} | <a href="{}" target="_blank">Watch on YouTube</a>'.format(content['title'], video_url)
 
   else:
     logger.warning('unknown video type {} for {}'.format(video_type, video_url))
     return ''
 
   if not video_src:
-    return '<p><em>Unable to embed video from <a href="{0}">{0}</a></em></p>'.format(video_url)
+    return '<p><em>Unable to embed video from <a href="{0}" target="_blank">{0}</a></em></p>'.format(video_url)
 
   if poster:
     poster = '{}/image?url={}&width={}'.format(config.server, quote_plus(poster), width)
@@ -1102,7 +1137,7 @@ def add_button(link, text, button_color='gray', text_color='white', center=True,
   button += '"><a href="{}" style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
   return button
 
-def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label=''):
+def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False):
   # num_stars is a float
   star_html = '<div style="text-align:center; color:{}; font-size:{};">'.format(star_color, star_size)
   if label:
@@ -1115,7 +1150,8 @@ def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label=
       # star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, {} {}%, transparent {}%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, 100 - x, x)
       star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(90deg, {0} 0%, {0} {1}%, transparent {1}%, transparent 100%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, x)
     else:
-      star_html += '☆'
+      if not no_empty:
+        star_html += '☆'
   star_html += '</div>'
   return star_html
 
@@ -1175,32 +1211,46 @@ def add_embed(url, args={}, save_debug=False):
 
   page_html = get_url_html(embed_url)
   if page_html:
-    soup = BeautifulSoup(page_html, 'html.parser')
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('meta', attrs={"property": "og:title"})
+    if el:
+      title = el['content'].strip()
+    else:
+      el = soup.find('title')
+      if el:
+        title = el.get_text().strip()
+      else:
+        title = ''
+
     el = soup.find('meta', attrs={"property": "og:image"})
     if el:
       img_src = el['content']
-      el = soup.find('meta', attrs={"property": "og:title"})
-      if el:
-        title = el['content'].strip()
-      else:
-        el = soup.find('title')
-        if el:
-          title = el.get_text().strip()
-        else:
-          title = embed_url
-      el = soup.find('meta', attrs={"property": "og:description"})
+    else:
+      img_src = ''
+
+    el = soup.find('meta', attrs={"property": "og:description"})
+    if el:
+      desc = el['content'].strip()
+    else:
+      el = soup.find('meta', attrs={"name": "description"})
       if el:
         desc = el['content'].strip()
       else:
-        el = soup.find('meta', attrs={"name": "description"})
-        if el:
-          desc = el['content'].strip()
-        else:
-          desc = ''
-      embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div>'.format(embed_url, img_src, title)
+        desc = ''
+
+      # embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div>'.format(embed_url, img_src, title)
+      # if desc:
+      #   embed_html += '<div>{}</div>'.format(desc)
+      # embed_html += '<small>{}</small></td></tr></table>'.format(urlsplit(embed_url).netloc)
+
+    if title:
+      embed_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+      if img_src:
+        embed_html += '<a href="{}" target="_blank"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(embed_url, img_src)
+      embed_html += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}" target="_blank">{}</a></div>'.format(urlsplit(embed_url).netloc, embed_url, title)
       if desc:
-        embed_html += '<div>{}</div>'.format(desc)
-      embed_html += '<small>{}</small></td></tr></table>'.format(urlsplit(embed_url).netloc)
+        embed_html += '<p style="font-size:0.9em;">{}</p>'.format(desc)
+      embed_html += '</div></div><div>&nbsp;</div>'
       return embed_html
 
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
@@ -1214,6 +1264,17 @@ def get_content(url, args, save_debug=False):
       args_copy.update(site_json['args'])
   return module.get_content(url, args_copy, site_json, save_debug)
 
+def format_embed_preview(item):
+  content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+  if item.get('_image'):
+    content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+  elif item.get('image'):
+    content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['image'])
+  content_html += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+  if item.get('summary'):
+    content_html += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+  content_html += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+  return content_html
 def get_ld_json(url):
   page_html = get_url_html(url)
   if not page_html:
@@ -1302,7 +1363,12 @@ def get_bing_cache(url, slug=-1, save_debug=False):
     "x-edge-shopping-flag": "0",
     "x-search-safesearch": "Moderate"
   }
-  bing_html = get_url_html(bing_url, headers=headers)
+  # bing_html = get_url_html(bing_url, headers=headers)
+  r = curl_cffi_requests.get(bing_url, impersonate=config.impersonate, proxies=config.proxies)
+  if r.status_code != 200:
+    logger.warning('curl cffi requests error {} getting {}'.format(r.status_code, bing_url))
+    return ''
+  bing_html = r.text
   if not bing_html:
     return ''
   if save_debug:

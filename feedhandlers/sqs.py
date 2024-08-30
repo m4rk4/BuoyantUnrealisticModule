@@ -177,16 +177,23 @@ def get_content(url, args, site_json, save_debug=False):
         elif 'sqs-block-embed' in block['class']:
             if block.get('data-block-json'):
                 data_json = json.loads(block['data-block-json'])
+                # print(data_json)
                 if data_json.get('providerName') and data_json['providerName'] == 'Twitter':
                     item['content_html'] += utils.add_embed(data_json['url'])
                     continue
                 elif data_json.get('html'):
-                    if re.search(r'disqus', data_json['html'], flags=re.I):
+                    if re.search(r'twitter-tweet', data_json['html'], flags=re.I):
+                        m = re.findall(r'href="([^"]+)"', data_json['html'])
+                        item['content_html'] += utils.add_embed(m[-1])
                         continue
                     elif re.search(r'iframe', data_json['html']):
-                        embed_soup = BeautifulSoup(data_json['html'], 'html.parser')
-                        it = embed_soup.find('iframe')
-                        item['content_html'] += utils.add_embed(it['src'])
+                        # embed_soup = BeautifulSoup(data_json['html'], 'html.parser')
+                        # it = embed_soup.find('iframe')
+                        # item['content_html'] += utils.add_embed(it['src'])
+                        m = re.search(r'<iframe[^>]+src="([^"]+)"', data_json['html'])
+                        item['content_html'] += utils.add_embed(m.group(1))
+                        continue
+                    elif re.search(r'disqus', data_json['html'], flags=re.I):
                         continue
             logger.warning('unhandled sqs-block-embed in ' + item['url'])
 
@@ -209,6 +216,8 @@ def get_content(url, args, site_json, save_debug=False):
 
         elif 'sqs-block-code' in block['class']:
             if block.find(class_='adsbygoogle'):
+                continue
+            elif block.find('script', src=re.compile(r'apps.elfsight.com')):
                 continue
             elif block.find('iframe'):
                 it = block.find('iframe')
@@ -274,7 +283,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.2em; font-weight:bold;">{}</div><div>By {}</div><div><a href="{}">Buy on Amazon</a></div></div>'.format(data_json['amazonProduct']['title'], data_json['amazonProduct']['manufacturer'], utils.clean_url(data_json['amazonProduct']['detailPageUrl']))
                 item['content_html'] += '</div>'
 
-        elif 'sqs-block-spacer' in block['class']:
+        elif 'sqs-block-newsletter' in block['class'] or 'sqs-block-spacer' in block['class']:
             pass
 
         else:

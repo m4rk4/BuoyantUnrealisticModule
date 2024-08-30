@@ -67,12 +67,26 @@ def add_video(el_button, base_url, site_json):
     if el_button.get('data-c-vpdata'):
         video_json = json.loads(el_button['data-c-vpdata'])
         if video_json:
-            video_url = video_json['url']
-            if video_url.startswith('/'):
-                video_url = base_url + video_url
-            video_item = get_content(video_url, {}, site_json, False)
-            if video_item:
-                video_html = utils.add_video(video_item['_video'], 'video/mp4', video_item['_image'], video_item['summary'])
+            poster = video_json['image']['url']
+            if poster.startswith('/'):
+                poster = base_url + poster
+            if video_json.get('title'):
+                caption = video_json['title']
+            elif video_json.get('headline'):
+                caption = video_json['headline']
+            else:
+                caption = ''
+            if video_json.get('hlsURL'):
+                video_html = utils.add_video(video_json['hlsURL'], 'application/x-mpegURL', poster, caption)
+            elif video_json.get('mp4URL'):
+                video_html = utils.add_video(video_json['mp4URL'], 'video/mp4', poster, caption, use_proxy=True)
+            elif video_json.get('url'):
+                video_url = video_json['url']
+                if video_url.startswith('/'):
+                    video_url = base_url + video_url
+                video_item = get_content(video_url, {"embed": True}, site_json, False)
+                if video_item:
+                    video_html = video_item['content_html']
     return video_html
 
 
@@ -92,16 +106,15 @@ def get_gallery_content_old(gallery_soup):
     return gallery_html
 
 
-def get_gallery_content(gallery_id, site_code, embed=False):
-    api_url = 'https://api.gannett-cdn.com/thorium/gallery/?apiKey=TGgXAxAcR3ktiGl6cRsHSGsLS6ySi6yz&site-code={}&id={}'.format(site_code, gallery_id)
+def get_gallery_content(item, site_code, embed=False):
+    api_url = 'https://api.gannett-cdn.com/thorium/gallery/?apiKey=TGgXAxAcR3ktiGl6cRsHSGsLS6ySi6yz&site-code={}&id={}'.format(site_code, item['id'])
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return ''
     # utils.write_file(api_json, './debug/gallery.json')
     images = api_json['data']['asset']['links']['assets']
-    gallery_images = []
+    item['_gallery'] = []
     gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-    title = api_json['data']['asset']['headline'] + ' ({} images)'.format(len(images))
     for image in images:
         img = next((it for it in image['asset']['crops'] if it['name'] == 'bestCrop'), None)
         thumb = resize_image(img['path'], 600, img['width'], img['height'])
@@ -111,16 +124,15 @@ def get_gallery_content(gallery_id, site_code, embed=False):
         if image['asset'].get('byline'):
             captions.append(image['asset']['byline'])
         caption = ' | '.join(captions)
-        gallery_images.append({"src": img['path'], "caption": caption, "thumb": thumb})
+        item['_gallery'].append({"src": img['path'], "caption": caption, "thumb": thumb})
         gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img['path']) + '</div>'
     gallery_html += '</div>'
-    # gallery_html = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', gallery_html)
-    gallery_url = '{}/gallery?images={}&title={}&link={}'.format(config.server, quote_plus(json.dumps(gallery_images)), quote_plus(title), quote_plus(api_json['data']['asset']['pageURL']['long']))
+    gallery_url = '{}/gallery?url={}'.format(config.server, quote_plus(api_json['data']['asset']['pageURL']['long']))
     if not embed:
-        content_html = '<h2><a href="{}">View Photo Gallery</a> ({} images)</h2>'.format(gallery_url, len(images))
+        content_html = '<h2><a href="{}" target="_blank">View Photo Gallery</a> ({} images)</h2>'.format(gallery_url, len(images))
         content_html += gallery_html
     else:
-        caption = '<a href="{}">View Photo Gallery</a> ({} images): {}'.format(gallery_url, len(images), api_json['data']['asset']['headline'])
+        caption = '<a href="{}" target="_blank">View Photo Gallery</a> ({} images): {}'.format(gallery_url, len(images), api_json['data']['asset']['headline'])
         content_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_url)
     return content_html
 
@@ -129,9 +141,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     split_url = urlsplit(url)
     if split_url.netloc == 'data.usatoday.com':
         return None
+
     paths = list(filter(None, split_url.path[1:].split('/')))
     base_url = split_url.scheme + '://' + split_url.netloc
     tld = tldextract.extract(url)
+
+    if 'embed' in paths:
+        args['embed'] = True
 
     if 'restricted' in paths or 'offers-reg' in paths:
         # https://www.beaconjournal.com/restricted/?return=https%3A%2F%2Fwww.beaconjournal.com%2Fstory%2Fsports%2Fhigh-school%2Ftrack-field%2F2023%2F05%2F20%2Fohsaa-track-and-field-hudson-ohio-high-school-nordonia-district%2F70226336007%2F
@@ -169,10 +185,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         paths = list(filter(None, split_url.path.split('/')))
         article_id = paths[-1]
         m = re.search(r'"siteCode[":\\]+(\w{4})', article_html)
-        if not m:
+        if m:
+            site_code = m.group(1)
+        elif 'site_code' in site_json:
+            site_code = site_json['site_code']
+        else:
             logger.warning('unable to determine siteCode for ' + url)
             return None
-        site_code = m.group(1)
         api_url = 'https://api.gannett-cdn.com/argon/video/{}?apiKey=f6YYPA1hPnB9Y9chky5GOmrZKmaguLVh&site-code={}&url={}'.format(article_id, site_code, url)
         api_json = utils.get_url_json(api_url)
         if not api_json:
@@ -242,19 +261,32 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         if el:
             item['_image'] = el['content']
 
+    if article_json.get('hlsURL'):
+        item['_video'] = article_json['hlsURL']
+        item['_video_type'] = 'application/x-mpegURL'
     if article_json.get('mp4URL'):
-        item['_video'] = article_json['mp4URL']
+        if '_video' not in item:
+            item['_video'] = article_json['mp4URL']
+            item['_video_type'] = 'video/mp4'
+        else:
+            item['_video_mp4'] = article_json['mp4URL']
 
     item['summary'] = article_json['promoBrief']
 
+    if article_json['type'] == 'video':
+        item['content_html'] = utils.add_video(item['_video'], item['_video_type'], item['_image'], item['title'], use_videojs=True)
+        if 'embed' not in args and 'summary' in item:
+            item['content_html'] += '<p>{}</p>'.format(item['summary'])
+        return item
+
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
             item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
         item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
         if item.get('summary'):
             item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] = ''
@@ -264,11 +296,8 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         # Subheadline
         item['content_html'] += '<p><em>{}</em></p>'.format(el.decode_contents())
 
-    if article_json['type'] == 'video':
-        item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'])
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
-    elif article_json['type'] == 'gallery':
-        item['content_html'] += get_gallery_content(item['id'], site_code)
+    if article_json['type'] == 'gallery':
+        item['content_html'] += get_gallery_content(item, site_code)
     else:
         # article_json['type'] == 'text'
         article = soup.find(class_='gnt_ar_b')

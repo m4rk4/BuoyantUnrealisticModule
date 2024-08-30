@@ -63,28 +63,31 @@ def get_content(url, args, site_json, save_debug):
 
     item['author'] = {}
     item['author']['name'] = vimeo_json['video']['owner']['name']
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if vimeo_json['video']['thumbs'].get('base'):
-        item['_image'] = vimeo_json['video']['thumbs']['base'] + '_1000'
+        item['image'] = vimeo_json['video']['thumbs']['base'] + '_1000'
 
     if not vimeo_json['video'].get('live_event'):
-        if vimeo_json['request']['files'].get('progressive'):
-            video = utils.closest_dict(vimeo_json['request']['files']['progressive'], 'width', 640)
-            video_type = 'video/mp4'
-        elif vimeo_json['request']['files'].get('hls'):
+        if vimeo_json['request']['files'].get('hls'):
             for key, val in vimeo_json['request']['files']['hls']['cdns'].items():
                 video = val
                 video_type = 'application/x-mpegURL'
                 break
+        elif vimeo_json['request']['files'].get('progressive'):
+            video = utils.closest_dict(vimeo_json['request']['files']['progressive'], 'width', 640)
+            video_type = 'video/mp4'
         item['_video'] = video['url']
         caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(item['title'], player_url)
         if args and args.get('embed'):
             video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
-            item['content_html'] = utils.add_video(video_src, video_type, item['_image'], caption)
+            poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, quote_plus(item['image']))
+            item['content_html'] = utils.add_image(poster, caption, link=video_src)
         else:
-            item['content_html'] = utils.add_video(video['url'], video_type, item['_image'], caption)
+            item['content_html'] = utils.add_video(video['url'], video_type, item['image'], caption)
     else:
-        poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(item['_image']))
+        poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(item['image']))
         item['content_html'] = utils.add_image(poster, 'Live event: {}'.format(item['title']), link=item['url'])
     return item
 

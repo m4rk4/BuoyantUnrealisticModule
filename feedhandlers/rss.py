@@ -100,7 +100,7 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
       dt = datetime(*ts[0:7]).replace(tzinfo=timezone.utc)
       item['date_published'] = dt.isoformat()
       item['_timestamp'] = dt.timestamp()
-      item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+      item['_display_date'] = utils.format_display_date(dt)
 
     # Check age
     if args.get('age'):
@@ -113,7 +113,10 @@ def get_feed(url, args, site_json, save_debug=False, func_get_content=None):
         item['tags'].append(tag.term)
 
     if 'media_thumbnail' in entry:
-      item['image'] = entry.media_thumbnail[0]['url']
+      if 'url' in entry.media_thumbnail[0]:
+        item['image'] = entry.media_thumbnail[0]['url']
+      elif 'href' in entry.media_thumbnail[0]:
+        item['image'] = entry.media_thumbnail[0]['href']
 
     if 'summary' in entry:
       item['summary'] = entry.summary

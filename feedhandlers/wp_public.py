@@ -40,6 +40,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['author'] = {"name": '{} {}'.format(post_json['author']['first_name'], post_json['author']['last_name'])}
     elif post_json['author'].get('name'):
         item['author'] = {"name": post_json['author']['name']}
+    if 'author' in item:
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if post_json.get('categories'):
@@ -52,21 +55,21 @@ def get_content(url, args, site_json, save_debug=False):
         del item['tags']
 
     if post_json.get('featured_image'):
-        item['_image'] = post_json['featured_image']
+        item['image'] = post_json['featured_image']
     elif post_json.get('post_thumbnail'):
-        item['_image'] = post_json['post_thumbnail']['URL']
+        item['image'] = post_json['post_thumbnail']['URL']
     elif post_json.get('attachments'):
         for key, val in post_json['attachments'].items():
             if val.get('mime_type') and 'image' in val['mime_type']:
-                item['_image'] = val['URL']
+                item['image'] = val['URL']
                 break
 
     if post_json.get('excerpt'):
         item['summary'] = post_json['excerpt']
 
     item['content_html'] = ''
-    if 'add_lede_img' in args and item.get('_image'):
-        item['content_html'] += utils.add_image(item['_image'])
+    if 'add_lede_img' in args and 'image' in item:
+        item['content_html'] += utils.add_image(item['image'])
 
     item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
     return item

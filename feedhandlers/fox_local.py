@@ -101,13 +101,13 @@ def get_article_content(article_json, args, site_json, save_debug=False):
             item['_image'] = article_json['fn__image']['url']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
         if item.get('_image'):
             item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
         item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
         if item.get('summary'):
             item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
         return item
 
     item['content_html'] = ''
@@ -143,9 +143,9 @@ def render_components(components):
             component_html += '<h{0}>{1}</h{0}>'.format(component['content']['rank'], component['content']['text'])
         elif component['content_type'] == 'image':
             captions = []
-            if component['content'].get('caption').strip():
+            if component['content'].get('caption') and component['content']['caption'].strip():
                 captions.append(component['content']['caption'].strip())
-            if component['content'].get('copyright').strip():
+            if component['content'].get('copyright') and component['content']['copyright'].strip():
                 captions.append(component['content']['copyright'].strip())
             component_html += utils.add_image(component['content']['url'], ' | '.join(captions))
         elif component['content_type'] == 'image_gallery':

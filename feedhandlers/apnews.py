@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 def add_media(media):
     if media['type'] == 'Photo':
         size = utils.closest_value(media['imageRenderedSizes'], 1000)
-        url = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
-        media_html = utils.add_image(url, media['flattenedCaption'])
+        img_src = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+        size = max(media['imageRenderedSizes'])
+        link = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+        media_html = utils.add_image(img_src, media.get('flattenedCaption'), link=link)
     elif media['type'] == 'Video' and media.get('jwVideoStatus'):
         media_html = utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(media['jwMediaId']))
     elif media['type'] == 'YouTube':
@@ -54,13 +56,15 @@ def get_item(content_data, args, site_json, save_debug=False):
 
     item['author'] = {}
     if content_data.get('bylines'):
-        m = re.search(r'^By\s(.*)', content_data['bylines'], flags=re.I)
+        m = re.search(r'^By\s*(.*)', content_data['bylines'], flags=re.I)
         if m:
             item['author']['name'] = m.group(1).title().replace('And', 'and')
         else:
             item['author']['name'] = content_data['bylines'].title().replace('And', 'and')
     else:
         item['author']['name'] = 'AP News'
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if content_data.get('tagObjs'):
         item['tags'] = []
@@ -68,18 +72,12 @@ def get_item(content_data, args, site_json, save_debug=False):
             item['tags'].append(tag['name'])
 
     if content_data.get('leadPhotoId'):
-        item['_image'] = get_image_url(content_data['leadPhotoId'])
+        item['image'] = get_image_url(content_data['leadPhotoId'])
 
     item['summary'] = content_data['flattenedFirstWords']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:80%; margin-right:auto; margin-left:auto; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     story_soup = BeautifulSoup(content_data['storyHTML'], 'html.parser')
@@ -167,18 +165,71 @@ def get_item(content_data, args, site_json, save_debug=False):
         media = next((it for it in content_data['media'] if it['id'] == content_data['leadPhotoId']), None)
         if media:
             item['content_html'] = add_media(media)
-    elif item.get('_image'):
-        item['content_html'] = utils.add_image(item['_image'])
+    elif item.get('image'):
+        item['content_html'] = utils.add_image(item['image'])
 
     item['content_html'] += str(story_soup)
 
-    if content_data.get('media'):
+    gallery_images = []
+    gallery_html = ''
+    n = 0
+    if content_data.get('media') and len(content_data['media']) > 1:
         for media in content_data['media']:
-            exists = re.search(media['id'], item['content_html'])
-            if not exists and media.get('externalId'):
-                exists = re.search(media['externalId'], item['content_html'])
-            if not exists:
-                item['content_html'] += add_media(media)
+            m = re.search(media['id'], item['content_html'])
+            if not m and media.get('externalId'):
+                m = re.search(media['externalId'], item['content_html'])
+            if not m:
+                n += 1
+            if media['type'] == 'Photo':
+                size = utils.closest_value(media['imageRenderedSizes'], 600)
+                thumb = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+                size = max(media['imageRenderedSizes'])
+                src = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+                if media.get('flattenedCaption'):
+                    caption = media['flattenedCaption']
+                else:
+                    caption = ''
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=src) + '</div>'
+                gallery_images.append({"src": src, "caption": caption, "thumb": thumb})
+            elif media['type'] == 'Video' and media.get('jwVideoStatus'):
+                media_item = utils.get_content('https://cdn.jwplayer.com/v2/media/' + media['jwMediaId'], {"embed": True}, False)
+                if media_item:
+                    size = max(media['imageRenderedSizes'])
+                    thumb = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+                    src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(media_item['_video']), quote_plus(media_item['_video_type']), quote_plus(thumb))
+                else:
+                    src = config.server + '/video?url=' + quote_plus('https://cdn.jwplayer.com/v2/media/' + media['jwMediaId'])
+                size = utils.closest_value(media['imageRenderedSizes'], 600)
+                thumb = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+                thumb = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(thumb))
+                if media.get('flattenedCaption'):
+                    caption = media['flattenedCaption']
+                else:
+                    caption = ''
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=src) + '</div>'
+                if media_item and media_item['_video_type'] == 'video/mp4':
+                    gallery_images.append({"src": media_item['_video'], "caption": caption, "thumb": thumb})
+                elif media_item and '_video_mp4' in media_item:
+                    gallery_images.append({"src": media_item['_video_mp4'], "caption": caption, "thumb": thumb})
+                else:
+                    gallery_images.append({"src": src, "caption": caption, "thumb": thumb})
+            elif media['type'] == 'YouTube':
+                size = utils.closest_value(media['imageRenderedSizes'], 600)
+                thumb = media['gcsBaseUrl'] + str(size) + media['imageFileExtension']
+                thumb = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(thumb))
+                src = config.server + '/video?url=' + quote_plus('https://www.youtube.com/watch?v=' + media['externalId'])
+                if media.get('flattenedCaption'):
+                    caption = media['flattenedCaption']
+                else:
+                    caption = ''
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=src) + '</div>'
+                gallery_images.append({"src": src + '&novideojs', "caption": caption, "thumb": thumb})
+            else:
+                logger.warning('unhandled media type {} in {}'.format(media['type'], item['url']))
+    if n > 0:
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">' + gallery_html + '</div>'
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
@@ -186,7 +237,7 @@ def get_item(content_data, args, site_json, save_debug=False):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    m = re.search('([0-9a-f]+)\/?$', split_url.path)
+    m = re.search(r'([0-9a-f]+)\/?$', split_url.path)
     if not m:
         logger.warning('unable to parse article id from ' + url)
         return None

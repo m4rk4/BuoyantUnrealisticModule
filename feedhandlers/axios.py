@@ -12,17 +12,24 @@ logger = logging.getLogger(__name__)
 
 
 def add_image(image):
-    caption = format_blocks(image['caption'])
-    if caption.startswith('<p>'):
-        caption = caption.replace('<p>', '')
-        caption = caption.replace('</p>', '<br/><br/>')
-        if caption.endswith('<br/><br/>'):
-            caption = caption[:-10]
-    if image['crops']['16x9'].get('videos'):
-        img_src = image['crops']['16x9']['url']
+    if image.get('crops'):
+        if image['crops']['16x9'].get('videos'):
+            img_src = image['crops']['16x9']['url']
+        else:
+            img = utils.closest_dict(image['crops']['16x9']['sizes'], 'width', 1000)
+            img_src = img['url']
     else:
-        img = utils.closest_dict(image['crops']['16x9']['sizes'], 'width', 1000)
-        img_src = img['url']
+        logger.warning('unknown image src ' + str(image))
+        return ''
+    if image.get('caption'):
+        caption = format_blocks(image['caption'])
+        if caption.startswith('<p>'):
+            caption = caption.replace('<p>', '')
+            caption = caption.replace('</p>', '<br/><br/>')
+            if caption.endswith('<br/><br/>'):
+                caption = caption[:-10]
+    else:
+        caption = ''
     return utils.add_image(img_src, caption)
 
 
@@ -47,7 +54,10 @@ def format_styles(block, entities):
                 continue
     if block.get('entityRanges'):
         for rng in block['entityRanges']:
-            entity = entities[rng['key']]
+            if isinstance(entities, list):
+                entity = entities[rng['key']]
+            elif isinstance(entities, dict):
+                entity = entities[str(rng['key'])]
             if entity['type'] == 'LINK':
                 if entity['data'].get('href'):
                     href = entity['data']['href']
@@ -164,23 +174,44 @@ def get_item(content_json, args, site_json, save_debug):
         item['title'] = content_json['headline']
     elif content_json.get('subject_line'):
         item['title'] = content_json['subject_line']
+    elif content_json.get('subjectLine'):
+        item['title'] = content_json['subjectLine']
 
-    dt = datetime.fromisoformat(content_json['published_date'].replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
+    if content_json.get('published_date'):
+        dt = datetime.fromisoformat(content_json['published_date'])
+    elif content_json.get('publishedDate'):
+        dt = datetime.fromisoformat(content_json['publishedDate'])
+    else:
+        dt = None
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
     if content_json.get('last_published'):
-        dt = datetime.fromisoformat(content_json['last_published'].replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(content_json['last_published'])
         item['date_modified'] = dt.isoformat()
     elif content_json.get('last_updated'):
-        dt = datetime.fromisoformat(content_json['last_updated'].replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(content_json['last_updated'])
         item['date_modified'] = dt.isoformat()
 
+    item['author'] = {}
+    item['author']['name'] = ''
     authors = []
     for author in content_json['authors']:
-      authors.append(author['display_name'])
-    item['author'] = {}
+        if author.get('display_name'):
+            authors.append(author['display_name'])
+        elif author.get('displayName'):
+            authors.append(author['displayName'])
     item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+
+    if content_json.get('editors'):
+        authors = []
+        for author in content_json['editors']:
+            if author.get('display_name'):
+                authors.append(author['display_name'])
+            elif author.get('displayName'):
+                authors.append(author['displayName'])
+        item['author']['name'] += ' (Edited by ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)) + ')'
 
     item['tags'] = []
     if content_json.get('primary_tag'):
@@ -209,14 +240,20 @@ def get_item(content_json, args, site_json, save_debug):
 
     item['content_html'] = ''
     if content_json.get('primary_image'):
-        item['_image'] = content_json['primary_image']['base_image_url']
-        item['content_html'] += add_image(content_json['primary_image'])
+        if content_json['primary_image'].get('base_image_url'):
+            item['_image'] = content_json['primary_image']['base_image_url']
+        elif content_json['primary_image'].get('baseImageUrl'):
+            item['_image'] = content_json['primary_image']['baseImageUrl']
+        if not content_json.get('subscription'):
+            # Newsletters don't get a lede photo
+            item['content_html'] += add_image(content_json['primary_image'])
     elif content_json.get('social_image'):
         item['_image'] = content_json['social_image']['base_image_url']
 
     if content_json.get('intro'):
-        item['content_html'] += format_blocks(content_json['intro'])
-        item['content_html'] += '<hr/>'
+        item['content_html'] += format_blocks(content_json['intro']) + '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+    elif content_json.get('introHtml'):
+        item['content_html'] += content_json['introHtml'] + '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
 
     if content_json.get('blocks'):
         item['content_html'] += format_blocks(content_json['blocks'])
@@ -224,13 +261,16 @@ def get_item(content_json, args, site_json, save_debug):
     if content_json.get('chunks'):
         for chunk in content_json['chunks']:
             item['content_html'] += '<h3>{}</h3>'.format(chunk['headline'])
-            if chunk.get('primary_image'):
+            if chunk.get('primary_image') and chunk['primary_image'].get('id'):
                 item['content_html'] += add_image(chunk['primary_image'])
             item['content_html'] += format_blocks(chunk['blocks'])
             item['content_html'] += '<hr/>'
 
     if content_json.get('outro'):
-        item['content_html'] += format_blocks(content_json['outro'])
+        item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>' + format_blocks(content_json['outro'])
+    elif content_json.get('outroHtml'):
+        item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>' + content_json['outroHtml']
+
     return item
 
 
@@ -254,10 +294,10 @@ def get_next_data(url, site_json):
     path += '.json'
     next_url = '{}://{}/_next/data/{}{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, query)
     # print(next_url)
-    next_data = utils.get_url_json(next_url, user_agent='googlebot')
+    next_data = utils.get_url_json(next_url, site_json=site_json)
     if not next_data:
         #logger.debug('scraper error {} - getting NEXT_DATA from {}'.format(r.status_code, url))
-        page_html = utils.get_url_html(url)
+        page_html = utils.get_url_html(url, site_json=site_json)
         if not page_html:
             page_html = utils.get_url_html(url, user_agent='googlecache')
             if not page_html:

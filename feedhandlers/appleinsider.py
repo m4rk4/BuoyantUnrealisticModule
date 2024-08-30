@@ -48,15 +48,17 @@ def get_item(article_json, args, site_json, save_debug):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": article_json['author']}
+    item['author'] = {
+        "name": article_json['author']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if article_json.get('tags'):
-        item['tags'] = []
-        for it in article_json['tags']:
-            item['tags'].append(it['term']['name'])
+        item['tags'] = [x['term']['name'] for x in article_json['tags']]
 
     if article_json.get('firstImage'):
-        item['_image'] = article_json['firstImage']
+        item['image'] = article_json['firstImage']
 
     if article_json.get('summary'):
         item['summary'] = article_json['summary']
@@ -74,6 +76,16 @@ def get_item(article_json, args, site_json, save_debug):
     item['content_html'] = re.sub(r'\r\n', '', item['content_html'])
 
     soup = BeautifulSoup(item['content_html'], 'html.parser')
+
+    if 'image' not in item:
+        el = soup.find('img')
+        if el:
+            item['image'] = el['src']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     for el in soup.find_all('div', attrs={"align": "center"}):
         new_html = ''
         if el.iframe:
@@ -107,11 +119,6 @@ def get_item(article_json, args, site_json, save_debug):
         href = utils.get_redirect_url(el['href'])
         el.attrs = {}
         el['href'] = href
-
-    if not item.get('_image'):
-        el = soup.find('img')
-        if el:
-            item['_image'] = el['src']
 
     if article_json.get('reviewStars') and article_json['reviewStars']['score'] != '0.0':
         el = soup.find('figure')

@@ -113,6 +113,7 @@ def get_content(url, args, site_json, save_debug=False):
         soup = BeautifulSoup(article_json['html'], 'html.parser')
 
     item = {}
+    page_html = ''
     if article_json and article_json.get('gaCustomDimensions'):
         item['id'] = article_json['gaCustomDimensions']['postID']
         item['url'] = article_json['gaCustomDimensions']['location']
@@ -145,7 +146,7 @@ def get_content(url, args, site_json, save_debug=False):
         page_html = utils.get_url_html(url)
         if not page_html:
             return None
-        soup = BeautifulSoup(page_html, 'html.parser')
+        soup = BeautifulSoup(page_html, 'lxml')
         ld_json = None
         for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
             ld_json = json.loads(el.string)
@@ -201,6 +202,32 @@ def get_content(url, args, site_json, save_debug=False):
         if caption == 'null':
             caption = ''
         item['content_html'] += utils.add_image(item['_image'], caption)
+
+    if 'embed' in args:
+        if 'summary' not in item:
+            page_html = utils.get_url_html(item['url'])
+            if not page_html:
+                return None
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('meta', attrs={"property": "og:description"})
+            if el:
+                item['summary'] = el['content']
+            else:
+                el = soup.find('meta', attrs={"name": "description"})
+                if el:
+                    item['summary'] = el['content']
+                else:
+                    el = soup.find('meta', attrs={"name": "twitter:description"})
+                    if el:
+                        item['summary'] = el['content']
+        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+        if item.get('_image'):
+            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
+        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
+        if item.get('summary'):
+            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
+        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div>'.format(config.server, quote_plus(item['url']))
+        return item
 
     el = soup.find(class_='w-rating-widget')
     if el:

@@ -72,17 +72,23 @@ def get_content(url, args, site_json, save_debug=False):
         item['author']['name'] = el.get_text()
     else:
         item['author']['name'] = page_data['content']['contributor']
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = page_data['content']['keywords'].split('|')
     item['tags'].append(page_data['content']['contentCategory'])
 
     el = soup.find('meta', attrs={"property": "og:image"})
     if el:
-        item['_image'] = el['content']
+        item['image'] = el['content']
 
     el = soup.find('meta', attrs={"property": "og:description"})
     if el:
         item['summary'] = el['content']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     article_body = soup.find(class_='article-content')
     content_html = article_body.decode_contents()
@@ -104,6 +110,8 @@ def get_content(url, args, site_json, save_debug=False):
                 nav = None
 
     article_body = BeautifulSoup(content_html, 'html.parser')
+    if save_debug:
+        utils.write_file(str(article_body), './debug/debug.html')
 
     for el in article_body.find_all('aside'):
         el.decompose()
@@ -124,6 +132,14 @@ def get_content(url, args, site_json, save_debug=False):
         el.attrs = {}
         el['border'] = ''
         el['style'] = 'width:100%; border-collapse:collapse;'
+        for i, it in enumerate(el.find_all('tr')):
+            if i % 2 == 0:
+                it['style'] = ('line-height:2em; background-color:#ccc'
+                               ';')
+            else:
+                it['style'] = 'line-height:2em;'
+        for it in el.find_all(['td', 'th']):
+            it['style'] = 'border:1px solid black;'
         if el.get('class') and 'specifications' in el['class']:
             it = el.find('tr')
             if it.th and re.search(r'Specs at a glance', it.th.get_text(), flags=re.I):
@@ -151,12 +167,21 @@ def get_content(url, args, site_json, save_debug=False):
         el.decompose()
 
     for el in article_body.find_all(class_='gallery'):
+        gallery_images = []
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for li in el.find_all('li'):
             img_src = li['data-src']
+            if li.get('data-responsive'):
+                thumb = utils.image_from_srcset(li['data-responsive'], 640)
+            else:
+                thumb = img_src
             caption = get_caption(li)
-            new_el = BeautifulSoup(utils.add_image(img_src, caption) + '<br/>', 'html.parser')
-            el.insert_before(new_el)
-        el.decompose()
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(img_src, caption) + '</div>'
+            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        gallery_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
+        new_el = BeautifulSoup(gallery_html, 'html.parser')
+        el.replace_with(new_el)
 
     for el in article_body.find_all('figure', class_=['image', 'intro-image']):
         img_src = el.img['src']

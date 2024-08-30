@@ -227,7 +227,7 @@ def get_page_soup(url, site_json):
     }
     # page_html = utils.get_url_html(url, headers)
     # page_html = utils.get_url_html(url, headers=headers, use_proxy=True, use_curl_cffi=True)
-    r = requests.get(url, impersonate="chrome116", proxies=config.proxies)
+    r = requests.get(url, impersonate=config.impersonate, proxies=config.proxies)
     if r.status_code == 200:
         page_html = r.text
         utils.write_file(page_html, './debug/debug.html')

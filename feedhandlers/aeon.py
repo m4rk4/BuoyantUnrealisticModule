@@ -1,4 +1,4 @@
-import re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
@@ -25,16 +25,17 @@ def get_next_data(url, site_json):
     next_url = '{}://{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
-        page_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', page_html)
-        if m and m.group(1) != site_json['buildId']:
-            logger.debug('updating {} buildId'.format(split_url.netloc))
-            site_json['buildId'] = m.group(1)
-            utils.update_sites(url, site_json)
-            next_url = '{}://{}/_next/data/{}/{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
-            next_data = utils.get_url_json(next_url)
-            if not next_data:
-                return None
+        page_html = utils.get_url_html(url, site_json=site_json)
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('script', id='__NEXT_DATA__')
+            if el:
+                next_data = json.loads(el.string)
+                if next_data['buildId'] != site_json['buildId']:
+                    logger.debug('updating {} buildId'.format(split_url.netloc))
+                    site_json['buildId'] = next_data['buildId']
+                    utils.update_sites(url, site_json)
+                return next_data['props']
     return next_data
 
 
@@ -62,18 +63,20 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(article_json['updatedAt'].replace('Z', '+00:00'))
         item['date_modified'] = dt.isoformat()
 
-    authors = []
+    item['authors'] = []
     if article_json.get('authors'):
         for it in article_json['authors']:
-            authors.append(it['name'])
+            item['authors'].append({"name": it['name']})
     elif article_json.get('credits'):
-        authors.append(BeautifulSoup(article_json['credits'].replace('\n', ', '), 'html.parser').get_text().strip())
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
+        soup = BeautifulSoup(article_json['credits'].replace('\n', ', '), 'html.parser')
+        for el in soup.find_all('p'):
+            item['authors'].append({"name": el.get_text().strip()})
     if article_json.get('editor'):
-        item['author']['name'] += ' (edited by {})'.format(article_json['editor']['name'])
+        item['authors'].append({"name": article_json['editor']['name'] + ' (editor)'})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if article_json.get('tags'):
@@ -103,6 +106,8 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += utils.add_embed('https://player.vimeo.com/video/' + article_json['hosterId'])
         else:
             logger.warning('unhandled video hoster {} in {}'.format(article_json['hoster'], item['url']))
+        if 'embed' in args:
+            return item
         if article_json.get('standfirstShort'):
             item['content_html'] += '<h2>{}</h2>'.format(article_json['standfirstShort'])
         if article_json.get('description'):
@@ -127,16 +132,20 @@ def get_content(url, args, site_json, save_debug=False):
         image = None
     if image:
         if image.get('url'):
-            item['_image'] = image['url']
+            item['image'] = image['url']
         if image.get('urls'):
-            item['_image'] = image['urls']['header']
+            item['image'] = image['urls']['header']
         if image.get('caption'):
             caption = re.sub(r'^<p>(.*)</p>$', r'\1', image['caption'])
         elif article_json.get('thumbnailAttribution'):
             caption = re.sub(r'^<p>(.*)</p>$', r'\1', article_json['thumbnailAttribution'])
         else:
             caption = ''
-        item['content_html'] += utils.add_image(item['_image'], caption)
+        item['content_html'] += utils.add_image(item['image'], caption)
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     body = ''
     if article_json.get('body'):
