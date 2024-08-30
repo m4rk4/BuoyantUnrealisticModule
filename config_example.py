@@ -29,7 +29,7 @@ proxies = {
 }
 
 # path to the local pem file
-verify_path = "C:\\Users\\mark.arigo\\AppData\\Roaming\\pip\\mcafee_uce.pem"
+verify_path = "C:\\Users\\windows.login\\AppData\\Roaming\\pip\\mcafee_uce.pem"
 
 # lat, lon coordinates for default location
 location = ["38.897957", "-77.036560"]
