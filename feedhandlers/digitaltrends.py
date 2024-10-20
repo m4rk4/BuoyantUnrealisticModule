@@ -47,14 +47,18 @@ def format_content(soup, item, site_json):
                     offer_price = offer_json['data']['offers'][0]['price']
                     offer_url = utils.get_redirect_url(offer_json['data']['offers'][0]['url'])
                     tld = tldextract.extract(offer_url)
-                    new_html += '<div style="text-align:center; margin:1em;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
+                    # new_html += '<div style="text-align:center; margin:1em;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
+                    text = '${} AT {}'.format(offer_price, tld.domain.upper())
+                    new_html += utils.add_button(offer_url, text, '#cc311e')
                 else:
                     new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
                     for offer in offer_json['data']['offers']:
                         offer_price = offer['price']
                         offer_url = utils.get_redirect_url(offer['url'])
                         tld = tldextract.extract(offer_url)
-                        new_html += '<div style="flex:1; min-width:256px; margin:1em; text-align:center;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
+                        # new_html += '<div style="flex:1; min-width:256px; margin:1em; text-align:center;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
+                        text = '${} AT {}'.format(offer_price, tld.domain.upper())
+                        new_html += utils.add_button(offer_url, text, '#cc311e')
                     new_html += '</div>'
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
@@ -164,10 +168,10 @@ def format_content(soup, item, site_json):
             new_html += '<div style="font-size:1.2em; font-weight:bold; text-align:center;">{}</div>'.format(it.get_text().strip())
         it = el.find(class_='b-review__rating')
         if it:
-            n = len(it.find_all(class_='b-stars__s--2')) + 0.5*len(it.find_all(class_='b-stars__s--1'))
-            new_html += '<div style="text-align:center;"><span style="font-size:2em; font-weight:bold;">{}</span>&nbsp;/&nbsp;'.format(n)
-            n = len(it.find_all(class_='b-stars__s'))
-            new_html += '{}</div>'.format(n)
+            tot = len(it.find_all(class_='b-stars__s'))
+            n = len(it.find_all(class_='b-stars__s--2')) + 0.5 * len(it.find_all(class_='b-stars__s--1'))
+            new_html += utils.add_stars(n, tot)
+            new_html += '<div style="text-align:center; margin:8px;"><span style="font-size:2em; font-weight:bold;">{}</span>&nbsp;/&nbsp;{}</div>'.format(n, tot)
         it = el.find(class_='b-review__award')
         if it:
             if it.get_text().strip() == 'DT Editors\' Choice':
@@ -178,13 +182,19 @@ def format_content(soup, item, site_json):
                 logger.warning('unknown b-review__award in ' + item['url'])
         it = el.find(class_='b-review__quote')
         if it:
-            new_html += '<div style="text-align:center"><em>{}</em></div>'.format(it.get_text().strip())
+            new_html += '<div style="text-align:center; margin:8px;"><em>{}</em></div>'.format(it.get_text().strip())
         new_html += '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
         for it in el.find_all(class_='b-review__list'):
-            new_html += '<div style="flex:1; min-width:256px;"><span style="font-size:1.2em; font-weight:bold;">{}</span>'.format(it.find(class_='b-review__label').get_text().strip())
+            text = it.find(class_='b-review__label').get_text().strip()
+            new_html += '<div style="flex:1; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;">{}</div>'.format(text)
             ul = it.find(class_='b-review__list-inner')
-            ul.attrs = {}
-            new_html += str(ul) + '</div>'
+            if text.lower() == 'pros':
+                new_html += '<ul style=\'list-style-type:"✅&nbsp;"\'>'
+            elif text.lower() == 'cons':
+                new_html += '<ul style=\'list-style-type:"❌&nbsp;"\'>'
+            else:
+                new_html += '<ul>'
+            new_html += ul.decode_contents() + '</ul></div>'
         new_html += '</div>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)

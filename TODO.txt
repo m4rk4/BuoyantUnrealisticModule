@@ -1,3 +1,8 @@
+FIX:
+mashable.com
+lifehacker.com
+
+
 Weather Underground
 https://dsx.weather.com/cms/v4/assets/en_US?q=source_guid%3A%24in(%272024-03-12-severe-thunderstorm-heavy-rain-flooding-plains-south%27)&api=7bb1c920-7027-4289-9c96-ae5e263980bc
 https://dsx.weather.com/cms/v4/assets/en_US?q=type%3A%24in(%27article%27)%3Btags.keyword%3A%24in(%27wunderground%27)&api=7bb1c920-7027-4289-9c96-ae5e263980bc&pg=0%2C20&sort=-publishdate
@@ -490,7 +495,7 @@ https://www.artisana.ai/articles/politicians-may-get-free-pass-under-metas-ai-ge
 
 Texas Tribune
 https://www.texastribune.org/api/v2/articles/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url&limit=5&front_page=true
-https://www.texastribune.org/api/v2/articles/43737/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url,authors,tags,placeholders
+https://www.texastribune.org/api/v2/articles/43737/?fields=id,headline,ap_pub_date,sitewide_image,ap_updated_date,url,authors,placeholders,series,tags
 placeholders don't show element contents??
 
 
@@ -569,3 +574,60 @@ timeline:
     <p>Lorem ipsum dolor sit amet, quo ei simul congue exerci, ad nec admodum perfecto mnesarchum, vim ea mazim fierent detracto. Ea quis iuvaret expetendis his, te elit voluptua dignissim per, habeo iusto primis ea eam.</p>
 </div></td></tr>
 </table>
+
+
+
+
+function p(e) {
+    for (var t,
+             n,
+             r = function(e, t) { return e >>> t | e << 32 - t},
+             i = Math.pow,
+             o = i(2, 32),
+             a = "",
+             s = [],
+             l = 8 * e.length,
+             c = p.h = p.h || [],
+             u = p.k = p.k || [],
+             d = u.length,
+             f = {},
+             h = 2;
+             d < 64;
+         h++)
+         if (!f[h]) {
+            for (t = 0; t < 313; t += h)
+                f[t] = h;
+            c[d] = i(h, .5) * o | 0,
+            u[d++] = i(h, 1 / 3) * o | 0
+         }
+         for (e += ""; e.length % 64 - 56; )
+            e += "\0";
+         for (t = 0; t < e.length; t++) {
+            if ((n = e.charCodeAt(t)) >> 8)
+                return "";
+            s[t >> 2] |= n << (3 - t) % 4 * 8
+         }
+                for (s[s.length] = l / o | 0,
+                s[s.length] = l,
+                n = 0; n < s.length; ) {
+                    var v = s.slice(n, n += 16)
+                      , g = c;
+                    for (c = c.slice(0, 8),
+                    t = 0; t < 64; t++) {
+                        var m = v[t - 15]
+                          , y = v[t - 2]
+                          , b = c[0]
+                          , w = c[4]
+                          , S = c[7] + (r(w, 6) ^ r(w, 11) ^ r(w, 25)) + (w & c[5] ^ ~w & c[6]) + u[t] + (v[t] = t < 16 ? v[t] : v[t - 16] + (r(m, 7) ^ r(m, 18) ^ m >>> 3) + v[t - 7] + (r(y, 17) ^ r(y, 19) ^ y >>> 10) | 0);
+                        (c = [S + ((r(b, 2) ^ r(b, 13) ^ r(b, 22)) + (b & c[1] ^ b & c[2] ^ c[1] & c[2])) | 0].concat(c))[4] = c[4] + S | 0
+                    }
+                    for (t = 0; t < 8; t++)
+                        c[t] = c[t] + g[t] | 0
+                }
+                for (t = 0; t < 8; t++)
+                    for (n = 3; n + 1; n--) {
+                        var E = c[t] >> 8 * n & 255;
+                        a += (E < 16 ? 0 : "") + E.toString(16)
+                    }
+                return a
+            }

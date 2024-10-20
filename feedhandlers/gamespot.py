@@ -12,8 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    page_data = None
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+    soup = BeautifulSoup(page_html, 'lxml')
+
     ld_json = None
+    for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
+        ld_json = json.loads(el.string)
+        if ld_json.get('@type') and ld_json['@type'] == 'NewsArticle':
+            break
+        else:
+            ld_json = None
+
+    page_data = None
     if '/articles/' in url:
         headers = {
             "accept": "application/json, text/javascript, */*; q=0.01",
@@ -33,22 +47,17 @@ def get_content(url, args, site_json, save_debug=False):
         page_data = utils.post_url(url, data={'ajax': 1}, headers=headers)
         if not page_data:
             return None
-        if save_debug:
-            utils.write_file(page_data, './debug/debug.json')
         soup = BeautifulSoup(page_data['content'], 'html.parser')
-    else:
-        page_html =utils.get_url_html(url)
-        if not page_html:
-            return None
-        soup = BeautifulSoup(page_html, 'lxml')
-        el = soup.find('script', attrs={"type": "application/ld+json"})
-        if el:
-            ld_json = json.loads(el.string)
-            if save_debug:
-                utils.write_file(ld_json, './debug/debug.json')
 
     if not page_data and not ld_json:
         return None
+
+    if save_debug:
+        if page_data:
+            utils.write_file(page_data, './debug/debug.json')
+        if ld_json:
+            utils.write_file(ld_json, './debug/ld_json.json')
+        utils.write_file(str(soup), './debug/debug.html')
 
     item = {}
     if page_data:
@@ -56,25 +65,40 @@ def get_content(url, args, site_json, save_debug=False):
         item['url'] = 'https://www.gamespot.com' + page_data['url']
         item['title'] = page_data['title']
     elif ld_json:
-        split_url = urlsplit(url)
-        paths = list(filter(None, split_url.path[1:].split('/')))
         item['id'] = paths[-1]
         item['url'] = ld_json['url']
         item['title'] = ld_json['headline']
 
-    el = soup.find('time')
-    if el:
-        dt = datetime.fromisoformat(el['datetime']).astimezone(timezone.utc)
+    if ld_json and ld_json.get('datePublished'):
+        dt = datetime.fromisoformat(ld_json['datePublished'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
+        if ld_json.get('dateModified'):
+            dt = datetime.fromisoformat(ld_json['dateModified'])
+            item['date_modified'] = dt.isoformat()
+    else:
+        el = soup.find('time', attrs={"datetime": True})
+        if el:
+            dt = datetime.fromisoformat(el['datetime']).astimezone(timezone.utc)
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
 
-    authors = []
-    for el in soup.find_all(class_='byline-author__name'):
-        authors.append(el.get_text().strip())
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if ld_json and ld_json.get('author'):
+        item['author'] = {
+            "name": ld_json['author']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    else:
+        item['authors'] = []
+        for el in soup.find_all(class_='byline-author__name'):
+            item['authors'].append({"name": el.get_text().strip()})
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
 
     if page_data:
         item['tags'] = []
@@ -89,19 +113,26 @@ def get_content(url, args, site_json, save_debug=False):
     # TODO: ld_json['keywords']
 
     if ld_json and ld_json.get('image'):
-        item['_image'] = ld_json['image']['url']
+        item['image'] = ld_json['image']['url']
+
+    if ld_json and ld_json.get('description'):
+        item['summary'] = ld_json['description']
 
     item['content_html'] = ''
     el = soup.find(class_='news-deck')
     if el:
-        item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())
+        if 'summary' not in item:
+            item['summary'] = el.get_text()
+        item['content_html'] += '<p><em>' + el.get_text() + '</em></p>'
 
     el = soup.find(id='kubrick-lead')
     if el and el.get('style'):
         m = re.search(r'background-image:\s?url\(([^\)]+)\)', el['style'])
         if m:
-            item['_image'] = m.group(1)
-            item['content_html'] += utils.add_image(m.group(1))
+            item['image'] = m.group(1)
+            item['content_html'] += utils.add_image(item['image'])
+    elif 'image' in item:
+        item['content_html'] += utils.add_image(item['image'])
 
     if '/articles/' in item['url']:
         body = soup.find(class_='content-entity-body')
@@ -132,10 +163,8 @@ def get_content(url, args, site_json, save_debug=False):
                     for it in  el['data-img-src'].split(','):
                         new_html += utils.add_image(it)
             elif el['data-embed-type'] == 'imageGallery':
-                # Seem to be related gallery links
-                # it = el.find(class_='image-gallery__header')
-                # if it:
-                #     print(it.get_text())
+                # Seems to be related gallery
+                el.decompose()
                 continue
             elif el['data-embed-type'] == 'video':
                 if el.get('data-src') and 'youtube' in el['data-src']:

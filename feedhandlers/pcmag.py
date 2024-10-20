@@ -42,7 +42,7 @@ def get_content(url, args, site_json, save_debug=False):
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
         ld_json = json.loads(el.string)
         if ld_json.get('@type'):
-            if ld_json['@type'] == 'Article':
+            if ld_json['@type'] == 'Article' or ld_json['@type'] == 'NewsArticle':
                 break
             elif ld_json['@type'] == 'Product' and ld_json.get('review'):
                 ld_json = ld_json['review']
@@ -151,7 +151,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in article.children:
         # print('\nchild')
-        # print(el)
+        # print(el.name)
         if el.name == 'div':
             if el.has_attr('x-data'):
                 el.decompose()
@@ -196,6 +196,9 @@ def get_content(url, args, site_json, save_debug=False):
                     el.decompose()
                 else:
                     logger.warning('unhandled video-container in ' + item['url'])
+        elif el.name == 'section':
+            if el.find(attrs={"data-parent-group": "author-bio"}):
+                el.decompose()
 
     if '/reviews/' in url:
         review_html = ''

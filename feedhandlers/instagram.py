@@ -2,7 +2,6 @@ import json, random, re, string
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 from datetime import datetime, timezone
-from duckduckgo_search import DDGS
 from urllib.parse import parse_qs, quote_plus, urlencode, urlsplit
 
 import config, utils
@@ -13,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False, ig_data=None):
+    # coauthor_producers: https://www.instagram.com/reel/C-og7SCvHby/
+    # no ig_data, Collab: https://www.instagram.com/reel/DAGp2djvfAu/
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     # ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
@@ -92,78 +93,77 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         if ig_data:
             ig_data = ig_data['shortcode_media']
 
-    avatars = []
-    users = []
-    names = []
-    verified = []
+    item = {}
+    item['id'] = ig_url
+    item['url'] = ig_url
+
+    item['authors'] = []
     if ig_data:
         if save_debug:
             utils.write_file(ig_data, './debug/instagram.json')
         if ig_data.get('owner'):
-            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['owner']['profile_pic_url']))
-            users.append(ig_data['owner']['username'])
+            user = {}
+            user['name'] = ig_data['owner']['username']
+            user['avatar'] = ig_data['owner']['profile_pic_url']
             if ig_data['owner'].get('full_name'):
-                names.append('<br/><small>' + ig_data['owner']['full_name'] + '</small>')
+                user['full_name'] = ig_data['owner']['full_name']
             else:
-                name = search_for_fullname('https://www.instagram.com/{}/'.format(ig_data['owner']['username']))
-                if name:
-                    names.append('<br/><small>' + name + '</small>')
-                else:
-                    names.append('')
-            if ig_data['owner'].get('is_verified'):
-                verified.append(' &#9989;')
-            else:
-                verified.append('')
+                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+            user['verified'] = ig_data['owner'].get('is_verified')
+            item['authors'].append(user)
         elif ig_data.get('user'):
-            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(ig_data['user']['profile_pic_url']))
-            users.append(ig_data['user']['username'])
-            names.append('')
-            verified.append('')
-        avatars.append(avatar)
+            user = {}
+            user['name'] = ig_data['user']['username']
+            user['avatar'] = ig_data['user']['profile_pic_url']
+            if ig_data['user'].get('full_name'):
+                user['full_name'] = ig_data['user']['full_name']
+            else:
+                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+            user['verified'] = ig_data['user'].get('is_verified')
+            item['authors'].append(user)
+        if ig_data.get('coauthor_producers'):
+            for it in ig_data['coauthor_producers']:
+                user = {}
+                user['name'] = it['username']
+                user['avatar'] = it['profile_pic_url']
+                if it.get('full_name'):
+                    name = it['full_name']
+                else:
+                    name = search_for_fullname('https://www.instagram.com/{}/'.format(it['username']))
+                user['full_name'] = name
+                user['verified'] = it.get('is_verified')
+                item['authors'].append(user)
     else:
         el = soup.find(class_='Avatar')
         if el:
-            avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
-            avatars.append(avatar)
-            el = soup.select('div.HeaderText > a.Username')
-            users.append(el[0].find(class_='UsernameText').get_text())
-            name = search_for_fullname(utils.clean_url(el[0]['href']))
-            if name:
-                names.append('<br/><small>' + name + '</small>')
-            else:
-                names.append('')
-            it = el[0].find('i', class_='VerifiedSprite')
-            if it and 'Verified' in it.get_text():
-                verified.append(' &#9989;')
-            else:
-                verified.append('')
+            user = {}
+            it = soup.select('div.HeaderText > a.Username')
+            user['name'] = it[0].find(class_='UsernameText').get_text()
+            user['avatar'] = el.img['src']
+            user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+            user['verified'] = False
+            for it in soup.select('span.Username:has(+ i.VerifiedSprite)'):
+                if it.get_text().strip() == user['name']:
+                    user['verified'] = True
+            item['authors'].append(user)
         else:
-            for el in soup.find_all(class_='CollabAvatar'):
-                avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(el.img['src']))
-                avatars.append(avatar)
+            for el in soup.find_all('a', class_='CollabAvatar'):
+                user = {}
                 m = re.search(r'^/([^/]+)/', urlsplit(el['href']).path)
-                if m:
-                    users.append(m.group(1))
-                    name = search_for_fullname(utils.clean_url(el['href']))
-                    if name:
-                        names.append('<br/><small>' + name + '</small>')
-                    else:
-                        names.append('')
-                    verified.append('')
+                user['name'] = m.group(1)
+                user['avatar'] = el.img['src']
+                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+                user['verified'] = False
+                for it in soup.select('span.Username:has(+ i.VerifiedSprite)'):
+                    if it.get_text().strip() == user['name']:
+                        user['verified'] = True
+                item['authors'].append(user)
 
-    username = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(users))
-    title = '{} posted on Instagram'.format(username)
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
-    item = {}
-    item['id'] = ig_url
-    item['url'] = ig_url
-    if len(title) > 50:
-        item['title'] = title[:50] + '...'
-    else:
-        item['title'] = title
-
-    item['author'] = {}
-    item['author']['name'] = username
+    item['title'] = item['author']['name'] + ' posted on Instagram'
 
     tags = []
     post_caption = ''
@@ -214,8 +214,13 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
 
             # Remove username from beginning of caption
             el = caption.find('a', class_='CaptionUsername')
-            if el and el.get_text() == username:
-                el.decompose()
+            # if el and el.get_text() == username:
+            #     el.decompose()
+            if el:
+                for user in item['authors']:
+                    if user['name'] == el.get_text():
+                        el.decompose()
+                        break
 
             # Remove comment section
             el = caption.find(class_='CaptionComments')
@@ -239,10 +244,14 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 a.string = a.get_text()
 
             if str(caption):
-                title = '{} posted: {}'.format(username, caption.get_text())
                 post_caption = str(caption)
-            while post_caption.startswith('<br/>'):
-                post_caption = post_caption[5:]
+                while post_caption.startswith('<br/>'):
+                    post_caption = post_caption[5:]
+
+    if post_caption:
+        item['title'] += ': ' + BeautifulSoup(post_caption, 'html.parser').get_text().strip()
+        if len(item['title']) > 100:
+            item['title'] = item['title'][:100] + '...'
 
     post_media = ''
     if ig_data:
@@ -289,10 +298,10 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         else:
             el = soup.find('img', class_='EmbeddedMediaImage')
             if el:
-                item['_image'] = el['src']
+                item['_image'] = 'https://wsrv.nl/?url=' + quote_plus(el['src'])
                 poster = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(item['_image']))
                 caption = '<div style="padding:0 8px 0 8px;"><small><a href="{}">Watch on Instagram</a></small></div>'.format(ig_url)
-                post_media += '<div><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(ig_url, config.server, poster, caption)
+                post_media += '<div><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a></div>{}<div>&nbsp;</div>'.format(ig_url, poster, caption)
 
     elif media_type == 'GraphSidecar' or media_type == 'XDTGraphSidecar':
         if ig_data:
@@ -343,11 +352,20 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
     #item['content_html'] = '<table style="table-layout:fixed; width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
     item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px black;">'
-    for i in range(len(users)):
-        if i == 0:
-            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{4}" target="_blank"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatars[i], users[i], verified[i], names[i], item['url'])
+    for i, user in enumerate(item['authors']):
+        avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(user['avatar']))
+        if user['verified']:
+            verified = ' &#9989;'
         else:
-            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatars[i], users[i], verified[i], names[i])
+            verified = ''
+        if user['full_name']:
+            name = '<br/><small>' + user['full_name'] + '</small>'
+        else:
+            name = ''
+        if i == 0:
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{4}" target="_blank"><img src="https://static.cdninstagram.com/rsrc.php/v3/yI/r/VsNE-OHk_8a.png"/></a></tr>'.format(avatar, user['name'], verified, name, item['url'])
+        else:
+            item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td colspan="2" style="text-align:left; vertical-align:middle;"><a href="https://www.instagram.com/{1}" target="_blank"><b>{1}</b></a>{2}{3}</td></tr>'.format(avatar, user['name'], verified, name)
 
     item['content_html'] += '<tr><td colspan="3" style="padding:0;">'
     if post_media:
@@ -940,16 +958,16 @@ def rand_str(n):
 
 
 def search_for_fullname(url):
-    # print(url)
-    results = DDGS().text(url, max_results=5)
     if url.endswith('/'):
         ig_url = url[:-1].lower()
     else:
         ig_url = url.lower()
+    results = utils.search_for(url)
     if results:
         for result in results:
             if ig_url in result['href'].lower():
                 # print(result)
                 m = re.search(r'^(.*?)\s\(@', result['title'])
-                return m.group(1)
+                if m:
+                    return m.group(1)
     return ''

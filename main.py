@@ -1,15 +1,17 @@
-import glob, importlib, io, json, os, re, requests, sys
+import asyncio, glob, importlib, io, json, os, re, sys
+# import certifi, primp
+# import requests
+from curl_cffi import requests
 import logging, logging.handlers
-from curl_cffi import Curl, CurlInfo, CurlOpt
 from flask import Flask, jsonify, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
 from io import BytesIO
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import Playwright, async_playwright
 from staticmap import StaticMap, CircleMarker
-from urllib.parse import parse_qs, quote, quote_plus, urlsplit
+from urllib.parse import quote, quote_plus
 
 import config, image_utils, utils
-from feedhandlers import ytdl
+from feedhandlers import google, ytdl
 
 app = Flask(__name__)
 CORS(app)
@@ -36,6 +38,9 @@ logging.getLogger('websockets').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('requests_oauthlib').setLevel(logging.WARNING)
 logging.getLogger('oauthlib').setLevel(logging.WARNING)
+logging.getLogger('duckduckgo_search').setLevel(logging.WARNING)
+logging.getLogger('rquest').setLevel(logging.WARNING)
+logging.getLogger('primp').setLevel(logging.WARNING)
 #logging.getLogger('flask_cors').setLevel(logging.DEBUG)
 
 
@@ -195,15 +200,29 @@ def audio():
     if not content.get('_audio'):
         return 'No audio sources found for this url'
 
-    return redirect(content['_audio'])
+    audio_url = config.server + '/videojs?src=' + quote_plus(content['_audio'])
+    if content.get('_audio_type'):
+        audio_url += '&type=' + quote_plus(content['_video_type'])
+    else:
+        audio_url += '&type=audio%2Fmpeg'
+    if content.get('image'):
+        audio_url += '&poster=' + quote_plus(content['image'])
+    elif content.get('_image'):
+        audio_url += '&poster=' + quote_plus(content['_image'])
+    return redirect(audio_url)
 
 
 @app.route('/video', methods=['GET'])
 def video():
     args = request.args
-
     if not args.get('url'):
         return 'No url specified'
+    url = args['url']
+
+    if 'novideojs' in args or 'amp;novideojs' in args:
+        novideojs = True
+    else:
+        novideojs = False
 
     if 'debug' in args:
         save_debug = True
@@ -217,15 +236,15 @@ def video():
     else:
         handler = ''
 
-    module, site_json = utils.get_module(args['url'], handler)
+    module, site_json = utils.get_module(url, handler)
     if not module:
         return 'No content module for this url'
 
-    content = module.get_content(args['url'], args, site_json, save_debug)
+    content = module.get_content(url, args, site_json, save_debug)
     if not content.get('_video'):
         return 'No video sources found for this url'
 
-    if 'novideojs' in args:
+    if novideojs:
         print('novideojs')
         if '_video_mp4' in content:
             video_url = content['_video_mp4']
@@ -245,18 +264,18 @@ def video():
             video_url += '&poster=' + quote_plus(content['image'])
         elif content.get('_image'):
             video_url += '&poster=' + quote_plus(content['_image'])
+
     return redirect(video_url)
 
 
 @app.route('/videojs')
 def videojs():
+    # m3u8 test streams: https://test-streams.mux.dev/
+    # Big Buck Bunny: https://download.blender.org/peach/bigbuckbunny_movies/
     args = request.args
     video_args = args.copy()
     if not video_args.get('src'):
         return 'No video src specified'
-
-    # if 'www.youtube.com' in video_args['src']:
-    #     return render_template('videojs-youtube.html', args=video_args)
 
     if not video_args.get('poster'):
         video_args['poster'] = config.server + '/static/video_poster-640x360.webp'
@@ -268,49 +287,62 @@ def videojs():
             video_args['type'] = 'video/webm'
         elif '.m3u8' in video_args['src'].lower():
             video_args['type'] = 'application/x-mpegURL'
+        elif '.avi' in video_args['src'].lower():
+            video_args['type'] = 'video/x-msvideo'
+        elif '.mov' in video_args['src'].lower():
+            video_args['type'] = 'video/mp4'
         else:
             video_args['type'] = 'video/mp4'
 
-    # return render_template('videojs-test.html', args=video_args)
+    if video_args.get('player'):
+        if video_args['player'] == 'hlsjs':
+            return render_template('video-hlsjs.html', args=video_args)
+        elif video_args['player'] == 'shaka':
+            return render_template('shaka-player.html', args=video_args)
+        elif video_args['player'] == 'vidstack':
+            return render_template('video-vidstack.html', args=video_args)
+        elif video_args['player'] == 'openplayer':
+            return render_template('openplayer.html', args=video_args)
+        elif video_args['player'] == 'plyr':
+            return render_template('video-plyr.html', args=video_args)
+        elif video_args['player'] == 'test':
+            return render_template('videojs-test.html', args=video_args)
     return render_template('videojs.html', args=video_args)
 
 
-@app.route('/openplayer')
-def openplayer():
+@app.route('/playlist')
+def playlist():
     args = request.args
-    player_args = args.copy()
-    if player_args.get('url'):
-        item = utils.get_content(player_args['url'], {}, False)
-        if not item:
-            return 'Unable to get url content'
-        if player_args.get('content_type'):
-            if player_args['content_type'] == 'video':
-                player_args['src'] = item['_video']
-            elif player_args['content_type'] == 'audio':
-                player_args['src'] = item['_audio']
+    if args.get('title'):
+        title = args['title']
+    else:
+        title = ''
+    if args.get('link'):
+        link = args['link']
+    else:
+        link = ''
+    if args.get('tracks'):
+        tracks = json.loads(args['tracks'])
+        content = None
+    elif args.get('url'):
+        if 'debug' in args:
+            save_debug = True
         else:
-            if item.get('_video'):
-                player_args['src'] = item['_video']
-            elif item.get('_audio'):
-                player_args['src'] = item['_audio']
-
-    if not player_args.get('src'):
-        return 'No player source was found'
-
-    if not player_args.get('poster'):
-        player_args['poster'] = '/static/video_poster-640x360.webp'
-
-    if not player_args.get('src_type'):
-        if '.mp4' in player_args['src'].lower():
-            player_args['src_type'] = 'video/mp4'
-        elif '.webm' in player_args['src'].lower():
-            player_args['src_type'] = 'video/webm'
-        elif '.m3u8' in player_args['src'].lower():
-            player_args['src_type'] = 'application/x-mpegURL'
-        else:
-            player_args['src_type'] = 'video/mp4'
-
-    return render_template('openplayer.html', args=player_args)
+            save_debug = False
+        module, site_json = utils.get_module(args['url'], handler)
+        if not module:
+            return 'No content module for this url'
+        content = module.get_content(args['url'], args, site_json, save_debug)
+        if not content.get('_playlist'):
+            return 'No playlist found for this url'
+        tracks = content['_playlist']
+        if not link:
+            link = content['url']
+        if not title:
+            title = content['title']
+    else:
+        return 'No playlist tracks or content url given'
+    return render_template('playlist.html', tracks=tracks, content=content, title=title, link=link)
 
 
 @app.route('/debug')
@@ -409,58 +441,94 @@ def map():
     return send_file(im_io, mimetype='image/png')
 
 
+# Make sure playwright browsers are installed
+#   playwright install
+# Or from script:
+# import install_playwright
+# from playwright.sync_api import sync_playwright
+# with sync_playwright() as p:
+#     install_playwright.install(p.webkit)
+#     install_playwright.install(p.chromium)
+#     install_playwright.install(p.firefox)
+#
+# async_playwright in Flask example: https://stackoverflow.com/questions/47841985/make-a-python-asyncio-call-from-a-flask-route
+async def get_screenshot(url, args):
+    async with async_playwright() as playwright:
+        # Device emulation: https://playwright.dev/python/docs/emulation
+        # https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json
+        if 'device' in args and args['device'] in playwright.devices:
+            device = playwright.devices[args['device']]
+            browser_name = device['default_browser_type']
+        elif 'browser' in args:
+            device = None
+            browser_name = args['browser']
+        else:
+            device = None
+            browser_name = 'chromium'
+
+        if browser_name == 'chromium' or browser_name == 'chrome':
+            engine = playwright.chromium
+            if not device:
+                device = playwright.devices['Desktop Chrome']
+        elif browser_name == 'webkit' or browser_name == 'safari':
+            engine = playwright.webkit
+            if not device:
+                device = playwright.devices['Desktop Safari']
+        elif browser_name == 'firefox':
+            engine = playwright.firefox
+            if not device:
+                device = playwright.devices['Desktop Firefox']
+        else:
+            engine = playwright.chromium
+            if not device:
+                device = playwright.devices['Desktop Chrome']
+
+        browser = await engine.launch()
+        context = await browser.new_context(**device)
+        page = await context.new_page()
+
+        if 'networkidle' in args:
+            await page.goto(url, wait_until="networkidle")
+        else:
+            await page.goto(url)
+
+        if 'waitfor' in args:
+            await page.wait_for_selector(args['waitfor'])
+
+        if 'waitfortime' in args:
+            await page.wait_for_timeout(int(args['waitfortime']))
+
+        if 'locator' in args:
+            ss = await page.locator(args['locator']).screenshot()
+        else:
+            ss = await page.screenshot()
+
+        if not ss:
+            await context.close()
+            await browser.close()
+            return None
+
+        im_io = BytesIO()
+        im_io.write(ss)
+        im_io.seek(0)
+
+        await context.close()
+        await browser.close()
+    return im_io
+
+
 @app.route('/screenshot')
 def screenshot():
-    # Make sure playwright browsers are installed
-    #   playwright install
-    # Or from script:
-    # import install_playwright
-    # from playwright.sync_api import sync_playwright
-    # with sync_playwright() as p:
-    #     install_playwright.install(p.webkit)
-    #     install_playwright.install(p.chromium)
-    #     install_playwright.install(p.firefox)
     args = request.args
     if not args.get('url'):
         return 'No url specified'
-    if 'width' in args:
-        width = int(args['width'])
-    else:
-        width = 800
-    if 'height' in args:
-        height = int(args['height'])
-    else:
-        height = 800
-    with sync_playwright() as playwright:
-        engine = None
-        if 'browser' in args:
-            if args['browser'] == 'chrome' or args['browser'] == 'chromium':
-                engine = playwright.chromium
-            elif args['browser'] == 'firefox':
-                engine = playwright.firefox
-        if not engine:
-            engine = playwright.webkit
-        browser = engine.launch()
-        context = browser.new_context(viewport={"width": width, "height": height}, ignore_https_errors=True)
-        page = context.new_page()
-        if args.get('networkidle'):
-            page.goto(args['url'], wait_until="networkidle")
-        else:
-            page.goto(args['url'])
-        if args.get('waitfor'):
-            page.wait_for_selector(args['waitfor'])
-        if args.get('waitfortime'):
-            page.wait_for_timeout(int(args['waitfortime']))
-        if args.get('locator'):
-            ss = page.locator(args['locator']).screenshot()
-        else:
-            ss = page.screenshot()
-    if not ss:
+    # https://github.com/microsoft/playwright-python/issues/723
+    loop = asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(loop)
+    ss_io = loop.run_until_complete(get_screenshot(args['url'], args))
+    if not ss_io:
         return 'Something went wrong'
-    im_io = BytesIO()
-    im_io.write(ss)
-    im_io.seek(0)
-    return send_file(im_io, mimetype='image/png')
+    return send_file(ss_io, mimetype='image/png')
 
 
 @app.route('/send_src')
@@ -483,13 +551,29 @@ def proxy(url):
         return 'Hello! You must be lost :('
     proxy_url = m.group(1)
     logger.debug('proxy url: ' + proxy_url)
-    headers = {}
+    headers = None
 
     if 'www.youtube.com/watch' in proxy_url:
         content = ytdl.get_content(proxy_url, {"player_client": "mediaconnect"}, {"module": "ytdl"}, False)
         if content and '_m3u8' in content:
             f_io = BytesIO(content['_m3u8'].encode())
             return send_file(f_io, mimetype='text/html')
+
+    if 'drive.google.com/' in proxy_url:
+        # Google drive videos need to be requested with the headers & cookies
+        content = google.get_content(proxy_url, {}, {"module": "google"}, False)
+        if content and '_video' in content:
+            proxy_url = content['_video']
+            if '_video_headers' in content:
+                headers = content['_video_headers']
+
+    if 'manifest.googlevideo.com/api' in proxy_url:
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-us,en;q=0.5",
+            "Sec-Fetch-Mode": "navigate",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
+        }
 
     if 'tt_chain_token' in proxy_url:
         # For TikTok videos, need to add a cookie
@@ -503,52 +587,33 @@ def proxy(url):
         }
         proxy_url = proxy_url.replace('tt_chain_token_' + token, 'tk')
 
-    if '.m3u8' in proxy_url:
-        r = requests.get(proxy_url, headers=headers)
+    if '.m3u8' in proxy_url and not proxy_url.endswith('.ts'):
+        # This doen't reliably work for youtube m3u8 urls. They return 403 for methods here, but work fine in the console or module
+        # r = requests.get(proxy_url, headers=headers)
+        if headers:
+            r = requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+        else:
+            r = requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies)
         if r.status_code != 200:
             logger.warning('requests error {} getting {}'.format(r.status_code, proxy_url))
             if r.text:
                 f_io = BytesIO(r.text.encode())
-                return send_file(f_io, mimetype='text/html')
+                return send_file(f_io, mimetype='text/plain')
             return 'Something went wrong ({})'.format(r.status_code), r.status_code
         m3u8_playlist = r.text
         # Rewrite playlist files to proxy the contents
         m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
         f_io = BytesIO(m3u8_playlist.encode())
-        return send_file(f_io, mimetype='text/html')
-        if False:
-            buffer = BytesIO()
-            c = Curl()
-            c.setopt(CurlOpt.WRITEDATA, buffer)
-            # c.setopt(CurlOpt.PROXY, config.http_proxy.encode())
-            c.setopt(CurlOpt.CAINFO, config.verify_path.encode())
-            c.setopt(CurlOpt.URL, proxy_url.encode())
-            if 'xxx-googlevideo.com' in proxy_url:
-                headers = [
-                    b"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    b"Accept-Language: en-us,en;q=0.5",
-                    b"Sec-Fetch-Mode: navigate",
-                    b"User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.15 Safari/537.36"
-                ]
-                c.setopt(CurlOpt.HTTPHEADER, headers)
-            c.impersonate(config.impersonate)
-            try:
-                c.perform()
-            except Exception as e:
-                logger.warning('exception {} getting {}'.format(e.__class__.__name__, proxy_url))
-                return 'Something went wrong', 500
-            status_code = c.getinfo(CurlInfo.RESPONSE_CODE)
-            c.close()
-            if status_code == 200:
-                m3u8_playlist = buffer.getvalue().decode()
-                m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
-                f_io = BytesIO(m3u8_playlist.encode())
-                return send_file(f_io, mimetype='text/html')
-            return 'Something went wrong ({})'.format(status_code), status_code
+        return send_file(f_io, mimetype='text/plain')
 
-    r = requests.get(proxy_url, headers=headers, stream=True)
+    # r = requests.get(proxy_url, headers=headers, stream=True)
+    if headers:
+        r = requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
+    else:
+        r = requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     # Note on chunk size: https://stackoverflow.com/questions/34229349/flask-streaming-file-with-stream-with-context-is-very-slow
-    resp = Response(stream_with_context(r.iter_content(chunk_size=1024)), content_type=r.headers['content-type'], status=r.status_code)
+    resp = Response(stream_with_context(r.iter_content(chunk_size=1024)), status=r.status_code)
+    resp.headers['Content-Type'] = r.headers['content-type']
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
 

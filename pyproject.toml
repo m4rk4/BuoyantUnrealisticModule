@@ -5,10 +5,10 @@ description = ""
 authors = ["m4rk4 <<>>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 Flask = "*"
-flask-cors = "^4"
-av = "^12"
+flask-cors = "*"
+av = "*"
 bs4 = "^0"
 feedparser = "^6"
 install-playwright = "^0"
@@ -23,11 +23,11 @@ pycryptodome = "^3"
 pytest-playwright = "^0"
 python-dateutil = "^2"
 pytz = "*"
-requests = {extras = ["socks"], version = "^2"}
+requests = {extras = ["socks"], version = "*"}
 tldextract = "^5"
 # https://github.com/psf/requests/issues/6443
 # urllib3 = "^1.26"
-urllib3 = "^2"
+urllib3 = "*"
 cloudscraper = "*"
 staticmap = "^0.5"
 pytube = "*"
@@ -39,12 +39,15 @@ config = "^0.5.1"
 playwright = "^1"
 image-utils = "^0"
 js2py = "*"
-curl-cffi = "^0"
+curl-cffi = "*"
 certifi = "*"
 pygal = "*"
 duckduckgo-search = "*"
+#yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
 yt-dlp = "*"
-httpx = "^0.27.0"
+podcastparser = "^0"
+stpyv8 = "*"
+herbal = "^0.1.3"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

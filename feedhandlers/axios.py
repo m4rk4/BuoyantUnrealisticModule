@@ -194,24 +194,22 @@ def get_item(content_json, args, site_json, save_debug):
         dt = datetime.fromisoformat(content_json['last_updated'])
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    item['author']['name'] = ''
-    authors = []
+    item['authors'] = []
     for author in content_json['authors']:
         if author.get('display_name'):
-            authors.append(author['display_name'])
+            item['authors'].append({"name": author['display_name']})
         elif author.get('displayName'):
-            authors.append(author['displayName'])
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
+            item['authors'].append({"name": author['displayName']})
     if content_json.get('editors'):
-        authors = []
         for author in content_json['editors']:
             if author.get('display_name'):
-                authors.append(author['display_name'])
+                item['authors'].append({"name": author['display_name'] + ' (editor)'})
             elif author.get('displayName'):
-                authors.append(author['displayName'])
-        item['author']['name'] += ' (Edited by ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)) + ')'
+                item['authors'].append({"name": author['displayName'] + ' (editor)'})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if content_json.get('primary_tag'):
@@ -241,14 +239,14 @@ def get_item(content_json, args, site_json, save_debug):
     item['content_html'] = ''
     if content_json.get('primary_image'):
         if content_json['primary_image'].get('base_image_url'):
-            item['_image'] = content_json['primary_image']['base_image_url']
+            item['image'] = content_json['primary_image']['base_image_url']
         elif content_json['primary_image'].get('baseImageUrl'):
-            item['_image'] = content_json['primary_image']['baseImageUrl']
+            item['image'] = content_json['primary_image']['baseImageUrl']
         if not content_json.get('subscription'):
             # Newsletters don't get a lede photo
             item['content_html'] += add_image(content_json['primary_image'])
     elif content_json.get('social_image'):
-        item['_image'] = content_json['social_image']['base_image_url']
+        item['image'] = content_json['social_image']['base_image_url']
 
     if content_json.get('intro'):
         item['content_html'] += format_blocks(content_json['intro']) + '<div>&nbsp;</div><hr/><div>&nbsp;</div>'

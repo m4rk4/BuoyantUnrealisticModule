@@ -9,35 +9,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def text(s):
-    WIDTH = 3
-    HEIGHT = 2
-    PIXEL_SCALE = 200
-
-    surface = cairo.ImageSurface(cairo.FORMAT_RGB24, WIDTH * PIXEL_SCALE, HEIGHT * PIXEL_SCALE)
-    ctx = cairo.Context(surface)
-    ctx.scale(PIXEL_SCALE, PIXEL_SCALE)
-
-    ctx.rectangle(0, 0, WIDTH, HEIGHT)
-    ctx.set_source_rgb(0.8, 0.8, 1)
-    ctx.fill()
-
-    # Drawing code
-    ctx.set_source_rgb(1, 0, 0)
-    ctx.set_font_size(0.75)
-    ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-    ctx.move_to(0, 0.6)
-    ctx.show_text("Outline")
-
-    ctx.move_to(0, 1.2)
-    ctx.text_path("Outline")
-    ctx.set_line_width(0.02)
-    ctx.stroke()
-    # End of drawing code
-
-    surface.write_to_png('text.png')
-
-
 def resize(im, width, height, scale):
     if scale:
         h = math.ceil((im.height * float(scale)) / 100)
@@ -158,9 +129,9 @@ def add_overlay(im, overlay, args):
             {"width": 32, "height": 32, "url": "./static/play_button-32x32.png"}
         ]
         if im.height < im.width:
-            overlay = utils.closest_dict(overlays, 'height', im.height // 5)
+            overlay = utils.closest_dict(overlays, 'height', im.height // 3, greater_than=True)
         else:
-            overlay = utils.closest_dict(overlays, 'height', im.width // 5)
+            overlay = utils.closest_dict(overlays, 'height', im.width // 3, greater_than=True)
         im_overlay = Image.open(overlay['url'])
 
     elif overlay.startswith('http'):
@@ -213,7 +184,10 @@ def read_image(img_src):
     if 'external-preview.redd.it' in img_src:
         headers['accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
     im = None
-    img_content = utils.get_url_content(img_src, headers)
+    if 'www.cbc.ca' in img_src:
+        img_content = utils.get_url_content(img_src, headers=headers, use_proxy=True, use_curl_cffi=True)
+    else:
+        img_content = utils.get_url_content(img_src, headers=headers)
     if img_content:
         im_io = BytesIO(img_content)
         im = Image.open(im_io)
@@ -382,3 +356,32 @@ def get_image(args):
 
     im_io.seek(0)
     return im_io, mimetype
+
+
+# def text(s):
+#     WIDTH = 3
+#     HEIGHT = 2
+#     PIXEL_SCALE = 200
+#
+#     surface = cairo.ImageSurface(cairo.FORMAT_RGB24, WIDTH * PIXEL_SCALE, HEIGHT * PIXEL_SCALE)
+#     ctx = cairo.Context(surface)
+#     ctx.scale(PIXEL_SCALE, PIXEL_SCALE)
+#
+#     ctx.rectangle(0, 0, WIDTH, HEIGHT)
+#     ctx.set_source_rgb(0.8, 0.8, 1)
+#     ctx.fill()
+#
+#     # Drawing code
+#     ctx.set_source_rgb(1, 0, 0)
+#     ctx.set_font_size(0.75)
+#     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+#     ctx.move_to(0, 0.6)
+#     ctx.show_text("Outline")
+#
+#     ctx.move_to(0, 1.2)
+#     ctx.text_path("Outline")
+#     ctx.set_line_width(0.02)
+#     ctx.stroke()
+#     # End of drawing code
+#
+#     surface.write_to_png('text.png')

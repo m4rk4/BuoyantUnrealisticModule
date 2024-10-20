@@ -41,8 +41,11 @@ def get_content(url, args, site_json, save_debug=False):
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    item['author']['name'] = post_json['author']['displayName']
+    item['author'] = {
+        "name": post_json['author']['displayName']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = []
     if post_json.get('categories'):
@@ -52,11 +55,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     if post_json.get('assetUrl'):
         if post_json['assetUrl'].endswith('/'):
-            item['_image'] = utils.get_redirect_url(post_json['assetUrl'])
-            if 'no-image' in item['_image']:
-                del item['_image']
+            item['image'] = utils.get_redirect_url(post_json['assetUrl'])
+            if 'no-image' in item['image']:
+                del item['image']
         else:
-            item['_image'] = post_json['assetUrl']
+            item['image'] = post_json['assetUrl']
 
     if post_json.get('excerpt'):
         soup = BeautifulSoup(post_json['excerpt'], 'html.parser')
@@ -94,8 +97,8 @@ def get_content(url, args, site_json, save_debug=False):
         el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
 
     blocks = soup.find_all('div', class_='sqs-block')
-    if item.get('_image') and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
-        item['content_html'] += utils.add_image(item['_image'])
+    if 'image' in item and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
+        item['content_html'] += utils.add_image(item['image'])
 
     for block in blocks:
         if 'sqs-block-html' in block['class'] or 'sqs-block-markdown' in block['class']:
@@ -185,6 +188,10 @@ def get_content(url, args, site_json, save_debug=False):
                     if re.search(r'twitter-tweet', data_json['html'], flags=re.I):
                         m = re.findall(r'href="([^"]+)"', data_json['html'])
                         item['content_html'] += utils.add_embed(m[-1])
+                        continue
+                    elif re.search(r'instagram-media', data_json['html'], flags=re.I):
+                        m = re.search(r'data-instgrm-permalink="([^"]+)"', data_json['html'])
+                        item['content_html'] += utils.add_embed(m.group(1))
                         continue
                     elif re.search(r'iframe', data_json['html']):
                         # embed_soup = BeautifulSoup(data_json['html'], 'html.parser')

@@ -84,12 +84,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_modified'] = dt.isoformat()
 
     if post_json.get('authors'):
-        authors = []
-        for it in post_json['authors']:
-            authors.append(it['name'])
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-
+        item['authors'] = [{"name": x['name']} for x in post_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if post_json.get('categories'):
@@ -108,12 +106,12 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     if post_json.get('featuredImg'):
-        item['_image'] = resize_image(post_json['featuredImg']['src'])
+        item['image'] = resize_image(post_json['featuredImg']['src'])
         if post_json['featuredImg'].get('caption'):
             caption = re.sub(r'</?p>', '', post_json['featuredImg']['caption'].strip())
         else:
             caption = ''
-        item['content_html'] += utils.add_image(item['_image'], caption)
+        item['content_html'] += utils.add_image(item['image'], caption)
 
     content_html = ''
     for content in post_json['content']:
@@ -198,7 +196,7 @@ def get_content(url, args, site_json, save_debug=False):
         el.decompose()
 
     for el in soup.find_all(class_=True):
-        if 'wp-block-heading' in el['class'] or 'wp-block-separator' in el['class']:
+        if 'wp-block-heading' in el['class'] or 'wp-block-separator' in el['class'] or 'wp-block-list' in el['class']:
             el.attrs = {}
         else:
             logger.warning('unhandled element {} with class {} in {}'.format(el.name, el['class'], url))
@@ -213,18 +211,7 @@ def get_feed(url, args, site_json, save_debug=False):
 
 def get_next_json(url, save_debug):
     headers = {
-        "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        # "next-router-state-tree": "%5B%22%22%2C%7B%22children%22%3A%5B%5B%22idOrSlug%22%2C%22technology%22%2C%22d%22%5D%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%5D%7D%5D%7D%2Cnull%2Cnull%2Ctrue%5D",
-        "next-url": "/technology",
-        "priority": "u=1, i",
         "rsc": "1",
-        "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin"
     }
     r = requests.get(url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
     if not r or r.status_code != 200:

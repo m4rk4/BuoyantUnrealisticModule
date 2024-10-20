@@ -97,11 +97,15 @@ def render_card(card, conversion_cards):
             m = re.search(r'src="([^"]+)"', card[1]['content'])
             card_html = utils.add_embed(m.group(1))
         elif card[1]['class'] == 'other':
-            m = re.search(r'^<iframe.*src="([^"]+)"', card[1]['content'])
-            if m:
+            if 'tiktok-embed' in card[1]['content']:
+                m = re.search(r'cite="([^"]+)"', card[1]['content'])
                 card_html = utils.add_embed(m.group(1))
             else:
-                logger.warning('unhandled pt-video-card class ' + card[1]['class'])
+                m = re.search(r'^<iframe.*src="([^"]+)"', card[1]['content'])
+                if m:
+                    card_html = utils.add_embed(m.group(1))
+                else:
+                    logger.warning('unhandled pt-video-card class ' + card[1]['class'])
         else:
             logger.warning('unhandled pt-video-card class ' + card[1]['class'])
 
@@ -200,23 +204,22 @@ def get_content(url, args, site_json, save_debug=False):
     elif article_json.get('longHeadline'):
         item['title'] = article_json['longHeadline'].strip()
 
-    dt = datetime.fromisoformat(article_json['publicationDate'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['publicationDate'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    item['_display_date'] = utils.format_display_date(dt)
     if article_json.get('modifiedDate'):
-        dt = datetime.fromisoformat(article_json['modifiedDate'].replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(article_json['modifiedDate'])
         item['date_modified'] = dt.isoformat()
     elif article_json.get('updated_at'):
-        dt = datetime.fromisoformat(article_json['updated_at'].replace('Z', '+00:00'))
+        dt = datetime.fromisoformat(article_json['updated_at'])
         item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for author in article_json['authors']:
-        authors.append(author['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if article_json.get('authors'):
+        item['authors'] = [{"name": x['name']} for x in article_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if article_json.get('tags'):
         item['tags'] = []

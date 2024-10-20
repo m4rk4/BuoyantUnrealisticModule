@@ -138,13 +138,18 @@ def get_content(url, args, site_json, save_debug=False):
         if not source:
             source = mp4_sources[0]
 
+    if args.get('caption'):
+        caption = args['caption']
+    else:
+        caption = item['title']
+
     if source:
         item['_video'] = source['src']
-        item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], item['title'])
+        item['content_html'] = utils.add_video(source['src'], source['type'], item['_image'], caption)
     else:
         logger.warning('unknown video source for ' + item['url'])
         poster = '{}/image?url={}&width=1200&overlay=video'.format(config.server, quote_plus(item['_image']))
-        item['content_html'] = utils.add_image(poster, item['title'], link=item['url'])
+        item['content_html'] = utils.add_image(poster, caption, link=item['url'])
 
     if not 'embed' in args or 'add_summary' in args:
         item['content_html'] += '<p>{}</p>'.format(item['summary'])

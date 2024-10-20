@@ -1,6 +1,7 @@
 import re
 import dateutil.parser
 from bs4 import BeautifulSoup
+from datetime import datetime
 from urllib.parse import urlsplit
 
 import utils
@@ -114,13 +115,22 @@ def get_content(url, args, site_json, save_debug=False):
     item['_display_date'] = utils.format_display_date(dt)
     # TODO: dateModified from schema
 
+    if api_json.get('schema'):
+        schema = next((it for it in api_json['schema'] if '@type' in it and it['@type'] == 'Article'), None)
+    else:
+        schema = None
+    if schema and schema.get('dateModified'):
+        dt = datetime.fromisoformat(schema['dateModified'])
+        item['date_modified'] = dt.isoformat()
+
     if api_json['template'].get('contributors'):
-        authors = []
+        item['authors'] = []
         for it in api_json['template']['contributors']:
-            authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'].append({"name": it['name']})
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'].replace(',', '&#44;') for x in item['authors']])).replace('&#44;', ',')
+            }
 
     item['tags'] = []
     if api_json['template'].get('keywords'):
@@ -139,13 +149,13 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     if api_json['template'].get('featuredImage'):
-        item['_image'] = api_json['template']['featuredImage']['src'] + '?width=1200&auto=webp&quality=70&format=jpg'
+        item['image'] = api_json['template']['featuredImage']['src'] + '?width=1200&auto=webp&quality=70&format=jpg'
         captions = []
         if api_json['template']['featuredImage'].get('caption'):
             captions.append(api_json['template']['featuredImage']['caption'])
         if api_json['template']['featuredImage'].get('creditTo'):
             captions.append(api_json['template']['featuredImage']['creditTo'])
-        item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
 
     if api_json['template'].get('atAGlance'):
         item['content_html'] += '<h2>At a Glance</h2><ul>'

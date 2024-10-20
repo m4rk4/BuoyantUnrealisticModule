@@ -139,7 +139,7 @@ def format_body(body_json):
                     video_json = utils.get_url_json('https://player.cnevids.com/embed-api.json?videoId=' + m.group(2))
                     if video_json:
                         # Order of preference
-                        for video_type in ['video/mp4', 'video/webm', 'application/x-mpegURL']:
+                        for video_type in ['application/x-mpegURL', 'video/mp4', 'video/webm']:
                             for it in video_json['video']['sources']:
                                 if it['type'] == video_type:
                                     video_src = it['src']
@@ -269,9 +269,6 @@ def format_body(body_json):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    if re.search(r'wired\.com/\d+/\d+/geeks-guide', url):
-        return wp_posts.get_content(url, args, site_json, save_debug)
-
     article_json = None
     clean_url = utils.clean_url(url)
     if not '/www.newyorker.com/' in clean_url:
@@ -305,19 +302,20 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['coreDataLayer']['content']['modifiedDate'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    authors = []
+    item['authors'] = []
     if article_json.get('article') and article_json['article']['headerProps'].get('contributors'):
         for key, val in article_json['article']['headerProps']['contributors'].items():
             for it in val['items']:
                 if key == 'author':
-                    authors.append(it['name'])
+                    item['authors'].append({"name": it['name']})
                 else:
-                    authors.append('{} ({})'.format(it['name'], key))
+                    item['authors'].append({"name": '{} ({})'.format(it['name'], key)})
     elif article_json['coreDataLayer']['content'].get('authorNames'):
-        item['author']['name'] = article_json['coreDataLayer']['content']['authorNames']
-    if authors:
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'].append({"name": article_json['coreDataLayer']['content']['authorNames']})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     omit_tags = []
@@ -330,7 +328,7 @@ def get_content(url, args, site_json, save_debug=False):
     if not item.get('tags'):
         del item['tags']
 
-    item['_image'] = article_json['head.og.image']
+    item['image'] = article_json['head.og.image']
     item['summary'] = article_json['head.description']
     item['content_html'] = ''
 
@@ -370,9 +368,9 @@ def get_content(url, args, site_json, save_debug=False):
                     for it in video_json['video']['sources']:
                         if it['type'].find('mp4') > 0:
                             item['content_html'] += utils.add_video(it['src'], it['type'], video_json['video']['poster_frame'], video_json['video']['title'])
-    elif item.get('_image'):
+    elif 'image' in item:
         if '/cartoons/' not in item['url']:
-            item['content_html'] += utils.add_image(item['_image'])
+            item['content_html'] += utils.add_image(item['image'])
 
     if page_type == 'review':
         item['content_html'] += '<h3>Rating: {}/{}</h3><p><em>PROS:</em> {}</p><p><em>CONS:</em> {}</p><div>&nbsp;</div><hr/><div>&nbsp;</div>'.format(

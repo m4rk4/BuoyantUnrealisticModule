@@ -178,6 +178,7 @@ def get_content(url, args, site_json, save_debug=False):
             caption = get_caption(li)
             gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(img_src, caption) + '</div>'
             gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+        gallery_html += '</div>'
         gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
         gallery_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
         new_el = BeautifulSoup(gallery_html, 'html.parser')

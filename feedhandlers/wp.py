@@ -234,6 +234,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 date = meta['article:published_time'][0]
             else:
                 date = meta['article:published_time']
+        elif meta and meta.get('published_at'):
+            if isinstance(meta['published_at'], list):
+                date = meta['published_at'][0]
+            else:
+                date = meta['published_at']
         elif article_json and article_json.get('datePublished'):
             date = article_json['datePublished']
         else:
@@ -251,11 +256,15 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if date:
             try:
                 if date.isnumeric():
-                    dt = datetime.fromtimestamp(int(date)).replace(tzinfo=timezone.utc)
+                    dt = datetime.fromtimestamp(int(date))
                 else:
-                    dt = datetime.fromisoformat(date).astimezone(timezone.utc)
+                    dt = datetime.fromisoformat(date)
             except:
                 dt = dateutil.parser.parse(date)
+            if not dt.tzinfo:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
@@ -316,6 +325,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 date = meta['og:updated_time'][0]
             else:
                 date = meta['og:updated_time']
+        elif meta and meta.get('updated_at'):
+            if isinstance(meta['updated_at'], list):
+                date = meta['updated_at'][0]
+            else:
+                date = meta['updated_at']
         elif article_json and article_json.get('dateModified'):
             date = article_json['dateModified']
         if date:
@@ -336,6 +350,10 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         author = it.get_text().strip()
                         if author not in authors:
                             authors.append(author)
+                if not authors and 'author_regex' in site_json['author']:
+                    m = re.search(site_json['author']['author_regex'], el.get_text().strip())
+                    if m:
+                        authors.append(m.group(site_json['author']['author_regex_group']))
                 if not authors and el.get_text().strip():
                     author = re.sub(r'^By:?\s*(.*?)[\s\W]*$', r'\1', el.get_text().strip(), flags=re.I)
                 if author:
@@ -537,7 +555,16 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             video = None
         if video:
             if '@type' in video and video['@type'] == 'VideoObject':
-                item['content_html'] += utils.add_video(video['contentUrl'], 'video/mp4', video.get('thumbnailUrl'), video.get('name'), use_videojs=True)
+                if 'jwplayer' in video['contentUrl']:
+                    item['content_html'] += utils.add_embed(video['contentUrl'])
+                else:
+                    poster = ''
+                    if video.get('thumbnailUrl'):
+                        if isinstance(video['thumbnailUrl'], str):
+                            poster = video['thumbnailUrl']
+                        elif isinstance(video['thumbnailUrl'], list):
+                            poster = video['thumbnailUrl'][-1]
+                    item['content_html'] += utils.add_video(video['contentUrl'], 'video/mp4', poster, video.get('name'), use_videojs=True)
             elif video.get('embedUrl'):
                 item['content_html'] += utils.add_embed(video['embedUrl'])
                 lede = True
@@ -571,6 +598,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             if it['position'] == 'top':
                 contents = utils.get_soup_elements(it, soup)
                 for el in contents:
+                    # print(el)
                     if 'unwrap' in it and it['unwrap'] == False:
                         item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
                     else:

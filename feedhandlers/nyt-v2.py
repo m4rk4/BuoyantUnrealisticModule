@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss, wirecutter
+from feedhandlers import athletic, rss, wirecutter
 
 import logging
 
@@ -391,6 +391,9 @@ def get_content(url, args, site_json, save_debug=False):
     if site_json.get('exclude_paths') and list(set(paths) & set(site_json['exclude_paths'])):
         logger.debug('skipping ' + url)
         return None
+    elif paths[0] == 'athletic':
+        sites_json = utils.read_json_file('./sites.json')
+        return athletic.get_content(url, args, sites_json['theathletic'], save_debug)
     elif 'wirecutter' in paths:
         return wirecutter.get_content(url, args, site_json, save_debug)
 
@@ -716,7 +719,10 @@ def get_live_feed(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    if '/live/' in args['url']:
+    if '/athletic/' in args['url']:
+        sites_json = utils.read_json_file('./sites.json')
+        return athletic.get_feed(url, args, sites_json['theathletic'], save_debug)
+    elif '/live/' in args['url']:
         collection = get_live_feed(url, args, site_json, save_debug)
         if save_debug:
             utils.write_file(collection, './debug/feed.json')

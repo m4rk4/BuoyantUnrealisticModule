@@ -935,7 +935,8 @@ def get_content(url, args, site_json, save_debug=False):
             api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['story']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         else:
             query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
-            if re.search(r'ajc\.com|daytondailynews\.com', split_url.netloc):
+            # if re.search(r'ajc\.com|daytondailynews\.com|springfieldnewssun\.com', split_url.netloc):
+            if '"ID"' in query:
                 query = query.replace('ID', paths[-1])
             api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:

@@ -1,4 +1,4 @@
-import base64, certifi, js2py, json, math, pytz, random, re, requests, time
+import base64, certifi, json, math, pytz, random, re, requests, STPyV8, time
 from bs4 import BeautifulSoup, Comment
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -383,8 +383,10 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     decrypted_content = decryptor.update(content) + decryptor.finalize()
     b64_content = base64.b64encode(decrypted_content).decode('utf-8')
     # TODO: convert this function to Python
-    decode_b64 = js2py.eval_js('''
-    function a(e) {
+    # TODO: untested using STPyV8
+    with STPyV8.JSContext() as ctxt:
+        decode_b64 = ctxt.eval('''
+    ( (e) => {
         if ("string" !== typeof e)
             return null;
         if (0 === e.length)
@@ -446,8 +448,9 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
             d = o;
         return v
     }
-    ''')
-    return decode_b64(b64_content)
+        ''')
+        decoded = decode_b64(b64_content)
+    return decoded
 
 
 def get_datadome_cookie():

@@ -1,6 +1,7 @@
-import re
+import json, re
+from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -10,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_next_json(url, site_json):
+def get_next_data(url, site_json):
     split_url = urlsplit(url)
     if split_url.path.endswith('/'):
         path = split_url.path[:-1]
@@ -20,21 +21,22 @@ def get_next_json(url, site_json):
         path += '.json'
     else:
         path = '.json'
-
     next_url = '{}://{}/_next/data/{}/en{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path)
-    next_json = utils.get_url_json(next_url, retries=1)
-    if not next_json:
-        logger.debug('updating {} buildId'.format(split_url.netloc))
-        article_html = utils.get_url_html(url)
-        m = re.search(r'"buildId":"([^"]+)"', article_html)
-        if m and site_json['buildId'] != m.group(1):
-            site_json['buildId'] = m.group(1)
+    next_data = utils.get_url_json(next_url, retries=1)
+    if not next_data:
+        page_html = utils.get_url_html(url)
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            logger.warning('unable to find __NEXT_DATA__ in ' + url)
+            return None
+        next_data = json.loads(el.string)
+        if next_data['buildId'] != site_json['buildId']:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
+            site_json['buildId'] = next_data['buildId']
             utils.update_sites(url, site_json)
-            next_url = '{}://{}/_next/data/{}/en{}'.format(split_url.scheme, split_url.netloc, m.group(1), path)
-            next_json = utils.get_url_json(next_url)
-            if not next_json:
-                return None
-    return next_json
+        return next_data['props']
+    return next_data
 
 
 def add_image(image):
@@ -65,8 +67,23 @@ def format_block(block):
         content_html += add_image(block['image'])
 
     elif block['resource'] == 'nc-gallery':
+        gallery_images = []
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for image in block['items']:
-            content_html += add_image(image) + '<br/>'
+            if image.get('srcSet'):
+                thumb = utils.image_from_srcset(image['srcSet'], 640)
+            else:
+                thumb = image['src']
+            captions = []
+            if image.get('caption'):
+                captions.append(image['caption'])
+            if image.get('credits'):
+                for it in image['credits']:
+                    captions.append(it['title'])
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, ' | '.join(captions), link=image['src']) + '</div>'
+            gallery_images.append({"src": image['src'], "caption": ' | '.join(captions), "thumb": thumb})
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        content_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
     elif block['resource'] == 'nc-img-comparison':
         content_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
@@ -273,11 +290,11 @@ def format_block(block):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    next_json = get_next_json(url, site_json)
-    if not next_json:
+    next_data = get_next_data(url, site_json)
+    if not next_data:
         return None
 
-    page_json = next_json['pageProps']['page']
+    page_json = next_data['pageProps']['page']
     if save_debug:
         utils.write_file(page_json, './debug/debug.json')
 
@@ -297,21 +314,28 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(meta['content'])
         item['date_modified'] = dt.isoformat()
 
+    item['authors'] = []
     if page_json.get('authors'):
-        authors = []
         if page_json['authors'].get('authoredBy'):
             for it in page_json['authors']['authoredBy']:
-                authors.append(it['name'])
+                item['authors'].append({"name": it['name']})
         if page_json['authors'].get('reviewedBy'):
             for it in page_json['authors']['reviewedBy']:
-                authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                item['authors'].append({"name": it['name']})
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
     elif page_json.get('meta') and page_json['meta'].get('dataLayer') and page_json['meta']['dataLayer'].get('author'):
-        item['author'] = {"name": page_json['meta']['dataLayer']['author']}
+        item['author'] = {
+            "name": page_json['meta']['dataLayer']['author']
+        }
+        item['authors'].append(item['author'])
     else:
-        item['author'] = {"name": "Android Authority"}
+        item['author'] = {
+            "name": "Android Authority"
+        }
+        item['authors'].append(item['author'])
 
     if page_json['meta'].get('subscribeTags'):
         item['tags'] = list(set(page_json['meta']['subscribeTags']))
@@ -320,7 +344,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     meta = next((it for it in page_json['head']['metaTags'] if it.get('property') == 'og:image'), None)
     if meta:
-        item['_image'] = meta['content']
+        item['image'] = meta['content']
 
     meta = next((it for it in page_json['head']['metaTags'] if it.get('name') == 'description'), None)
     if meta:
@@ -334,9 +358,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     if page_json.get('image'):
         item['content_html'] += add_image(page_json['image'])
-    elif item.get('_image'):
+    elif item.get('image'):
         if page_json.get('blocks') and not (page_json['blocks'][0].get('image') or page_json['blocks'][0].get('video')):
-            item['content_html'] += utils.add_image(item['_image'])
+            item['content_html'] += utils.add_image(item['image'])
 
     if page_json.get('review'):
         item['content_html'] += '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'

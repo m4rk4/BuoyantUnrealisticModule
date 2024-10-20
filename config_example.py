@@ -35,9 +35,12 @@ verify_path = "C:\\Users\\windows.login\\AppData\\Roaming\\pip\\mcafee_uce.pem"
 location = ["38.897957", "-77.036560"]
 
 # impersonate target for curl_cffi
-impersonate = "chrome116"
+impersonate = "chrome110"
 
 # For Twitter api - doesn't work after Twitter changes https://github.com/zedeus/nitter/issues/983
 # generate with twitter_api.get_guest_account()
 twitter_oauth_token = ''
 twitter_oauth_token_secret = ''
+
+# searXNG instance from https://searx.space/
+searxng_host = 'https://searx.tiekoetter.com'

@@ -36,6 +36,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
 
     image = utils.closest_dict(video_json['playlist'][0]['images'], 'width', 1080)
+    item['image'] = image['src']
     item['_image'] = image['src']
 
     video = next((it for it in video_json['playlist'][0]['sources'] if it['type'] == 'application/vnd.apple.mpegurl'), None)
@@ -63,7 +64,7 @@ def get_content(url, args, site_json, save_debug=False):
     if video_json['playlist'][0].get('description'):
         item['summary'] = video_json['playlist'][0]['description']
 
-    item['content_html'] = utils.add_video(item['_video'], item['_video_type'], item['_image'], 'Watch: ' + item['title'])
+    item['content_html'] = utils.add_video(item['_video'], item['_video_type'], item['image'], 'Watch: ' + item['title'])
 
     if 'embed' not in args and 'summary' in item:
         item['content_html'] += '<p>' + item['summary'] + '</p>'

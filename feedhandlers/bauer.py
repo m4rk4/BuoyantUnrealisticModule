@@ -103,14 +103,25 @@ def get_content(url, args, site_json, save_debug=False):
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
     if article_json.get('author'):
-        item['author']['name'] = article_json['author']['fullname']
+        item['author'] = {
+            "name": article_json['author']['fullname']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     elif article_json.get('author_custom'):
-        authors = [it.strip() for it in article_json['author_custom'].split(',')]
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = []
+        for it in article_json['author_custom'].split(','):
+            item['authors'].append({"name": it.strip()})
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = urlsplit(item['url']).netloc
+        item['author'] = {
+            "name": urlsplit(item['url']).netloc
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     for it in article_json['categories']:
@@ -132,13 +143,17 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = article_json['nutshell']
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['nutshell'])
     elif article_json.get('excerpt'):
+        item['summary'] = article_json['excerpt']
         if not article_json['excerpt'].endswith('...'):
-            item['summary'] = article_json['excerpt']
             item['content_html'] += '<p><em>{}</em></p>'.format(article_json['excerpt'])
 
     if article_json.get('heroImage'):
-        item['_image'] = resize_image(article_json['heroImage'][0]['image'])
+        item['image'] = resize_image(article_json['heroImage'][0]['image'])
         item['content_html'] += add_image(article_json['heroImage'][0])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json.get('rating'):
         text = ''

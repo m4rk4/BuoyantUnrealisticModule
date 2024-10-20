@@ -107,11 +107,18 @@ def get_post_content(post, url, args, save_debug):
         item['title'] = post['fields']['hed']
 
     if post['fields'].get('authors'):
-        authors = []
-        for it in post['fields']['authors']:
-            authors.append(it['fields']['name'])
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['fields']['name']} for x in post['fields']['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+
+    item['tags'] = []
+    if post['fields'].get('primaryCategory') and post['fields']['primaryCategory'].get('fields'):
+        item['tags'].append(post['fields']['primaryCategory']['fields']['title'])
+    if post['metadata'].get('tags'):
+        item['tags'] += [x['sys']['id'] for x in post['metadata']['tags'] if x['sys']['type'] == 'Link' and x['sys']['linkType'] == 'Tag']
+    if len(item['tags']) == 0:
+        del item['tags']
 
     if post['fields'].get('dek'):
         if not item.get('summary'):
@@ -138,26 +145,30 @@ def get_article_content(article, url, args, save_debug):
         item['date_modified'] = dt.isoformat()
 
     if article['fields'].get('author'):
-        item['author'] = {"name": article['fields']['author']['fields']['name']}
+        item['author'] = {
+            "name": article['fields']['author']['fields']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     if article['metadata'].get('tags'):
-        item['tags'] = []
-        for it in article['metadata']['tags']:
-            if it['sys']['type'] == 'Link' and it['sys']['linkType'] == 'Tag':
-                item['tags'].append(it['sys']['id'])
+        item['tags'] = [x['sys']['id'] for x in article['metadata']['tags'] if x['sys']['type'] == 'Link' and x['sys']['linkType'] == 'Tag']
 
     item['content_html'] = ''
 
     if article['fields'].get('siteImage') and article['fields']['siteImage'].get('fields'):
-        item['_image'] = 'https:' + article['fields']['siteImage']['fields']['file']['url']
-        item['content_html'] += utils.add_image(item['_image'], article['fields']['siteImage']['fields'].get('description'))
-    elif article['fields'].get('quickPostSourceMedia') and article['fields'][
-        'quickPostSourceMedia'].get('fields'):
-        item['_image'] = 'https:' + article['fields']['quickPostSourceMedia']['fields']['file']['url']
-        item['content_html'] += utils.add_image(item['_image'], article['fields']['quickPostSourceMedia']['fields'].get('description'))
+        item['image'] = 'https:' + article['fields']['siteImage']['fields']['file']['url']
+        item['content_html'] += utils.add_image(item['image'], article['fields']['siteImage']['fields'].get('description'))
+    elif article['fields'].get('quickPostSourceMedia') and article['fields']['quickPostSourceMedia'].get('fields'):
+        item['image'] = 'https:' + article['fields']['quickPostSourceMedia']['fields']['file']['url']
+        item['content_html'] += utils.add_image(item['image'], article['fields']['quickPostSourceMedia']['fields'].get('description'))
     elif article['fields'].get('image') and article['fields']['image'].get('fields'):
-        item['_image'] = 'https:' + article['fields']['image']['fields']['file']['url']
-        # item['content_html'] += utils.add_image(item['_image'], article['fields']['image']['fields'].get('description'))
+        if article['fields']['image']['fields'].get('imgixImage'):
+            item['image'] = article['fields']['image']['fields']['imgixImage']['src']
+            item['content_html'] += utils.add_image(item['image'], article['fields']['image']['fields'].get('caption'))
+        elif article['fields']['image']['fields'].get('file'):
+            item['image'] = 'https:' + article['fields']['image']['fields']['file']['url']
+            item['content_html'] += utils.add_image(item['image'], article['fields']['image']['fields'].get('description'))
 
     if article['fields'].get('dropCap'):
         dropcap = article['fields']['dropCap']
@@ -221,12 +232,16 @@ def get_newsletter_content(newsletter, url, args, save_debug):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": "Sherwood News"}
+    item['author'] = {
+        "name": "Sherwood News"
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['content_html'] = ''
     if newsletter['fields'].get('openingMedia') and newsletter['fields']['openingMedia'].get('fields'):
-        item['_image'] = 'https:' + newsletter['fields']['openingMedia']['fields']['file']['url']
-        item['content_html'] += utils.add_image(item['_image'], newsletter['fields']['openingMedia']['fields'].get('description'))
+        item['image'] = 'https:' + newsletter['fields']['openingMedia']['fields']['file']['url']
+        item['content_html'] += utils.add_image(item['image'], newsletter['fields']['openingMedia']['fields'].get('description'))
 
     if newsletter['fields'].get('openingWordsRichText') and newsletter['fields']['openingWordsRichText'].get('content'):
         for content in newsletter['fields']['openingWordsRichText']['content']:
@@ -263,6 +278,7 @@ def get_newsletter_content(newsletter, url, args, save_debug):
             for content in section['fields']['fact']['content']:
                 item['content_html'] += render_content(content)
     return item
+
 
 def get_content(url, args, site_json, save_debug=False):
     next_data = get_next_data(url, site_json)

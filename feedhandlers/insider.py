@@ -51,19 +51,20 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_modified'] = dt.isoformat()
 
     content_html = ''
-    authors = []
+    item['authors'] = []
     if content_json['relationships']['authors'].get('bylineAuthors'):
-        for author in content_json['relationships']['authors']['bylineAuthors']:
-            authors.append(author['attributes']['label'])
-        for author in content_json['relationships']['authors']['data']:
-            if author['attributes']['label'] not in authors:
-                content_html += '<p><strong>{}</strong>&nbsp;&#9989;<br/><small>{}</small></p>'.format(author['attributes']['title'], author['attributes']['description'])
+        for it in content_json['relationships']['authors']['bylineAuthors']:
+            item['authors'].append({"name": it['attributes']['label']})
+        for it in content_json['relationships']['authors']['data']:
+            if it['attributes']['label'] not in [x['name'] for x in item['authors']]:
+                content_html += '<p><strong>{}</strong>&nbsp;&#9989;<br/><small>{}</small></p>'.format(it['attributes']['title'], it['attributes']['description'])
     else:
-        for author in content_json['relationships']['authors']['data']:
-            authors.append(author['attributes']['label'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        for it in content_json['relationships']['authors']['data']:
+            item['authors'].append({"name": it['attributes']['label']})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if content_json['attributes'].get('categories'):
         item['tags'] = content_json['attributes']['categories'].copy()
@@ -82,19 +83,13 @@ def get_content(url, args, site_json, save_debug=False):
 
     if content_json['attributes'].get('hero'):
         if content_json['attributes']['hero']['type'] == 'image':
-            item['_image'] = content_json['attributes']['hero']['links']['self']
+            item['image'] = content_json['attributes']['hero']['links']['self']
             content_html += add_image(content_json['attributes']['hero'])
     elif content_json['relationships']['images'].get('data'):
-        item['_image'] = content_json['relationships']['images']['data'][0]['links']['self']
+        item['image'] = content_json['relationships']['images']['data'][0]['links']['self']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     soup = BeautifulSoup(content_json['attributes']['content'], 'html.parser')
@@ -120,11 +115,11 @@ def get_content(url, args, site_json, save_debug=False):
             it = utils.get_content('https://cdn.jwplayer.com/v2/media/{}'.format(
                 content_json['relationships']['video']['data']['meta']['jwplayer']['assetID']), {"embed": True}, False)
             if it:
-                item['_image'] = it['_image']
+                item['image'] = it['image']
                 content_html = it['content_html'] + content_html
 
     soup = BeautifulSoup(content_html, 'html.parser')
-    for el in soup.find_all(class_=["ad", "ad-wrapper"]):
+    for el in soup.find_all(class_=["ad", "ad-wrapper", "app-ad-callout-wrapper"]):
         el.decompose()
 
     for el in soup.find_all('p', class_='drop-cap'):

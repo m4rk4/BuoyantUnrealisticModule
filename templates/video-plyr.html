@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <link href="https://cdn.plyr.io/3.7.8/plyr.css" rel="stylesheet" />
+  </head>
+  <body>
+    <video id="player" playsinline crossorigin controls preload="auto" data-poster="{{ args.poster }}">
+        <source src="{{ args.src }}" type="{{ args.type }}" />
+    </video>
+    <noscript>
+      <p>To view this video please enable JavaScript</p>
+    </noscript>
+    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+    <script>
+        // Change the second argument to your options:
+        // https://github.com/sampotts/plyr/#options
+        const player = new Plyr('#player');
+    </script>
+  </body>
+</html>

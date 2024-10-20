@@ -60,6 +60,9 @@ def render_content(node, links):
                 content_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled iframe content: ' + node['value'])
+        elif node['value'].startswith('<blockquote') and 'twitter-tweet' in node['value']:
+            m = re.findall(r'href="([^"]+)"', node['value'])
+            content_html += utils.add_embed(m[-1])
         else:
             if not node.get('marks') and node['value'].startswith('https://'):
                 content_html += utils.add_embed(node['value'])
@@ -89,7 +92,7 @@ def render_content(node, links):
             heading += render_content(content, links)
         if n == 5 and heading.startswith('“') and heading.endswith('”'):
             content_html += utils.add_pullquote(heading)
-        elif n == 6 and (heading.startswith('<figure') or heading.startswith('<div')):
+        elif n == 6 and (heading.startswith('<figure') or heading.startswith('<div') or heading.startswith('<table')):
             content_html += heading
         else:
             content_html += '<h{0}>{1}</h{0}>'.format(min(3, n), heading)

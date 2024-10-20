@@ -153,7 +153,7 @@ def get_story(story_json, args, site_json, save_debug=False):
         el.decompose()
 
     if story_json.get('images'):
-        for el in story_soup.find_all(re.compile('photo\d+')):
+        for el in story_soup.find_all(re.compile(r'photo\d+')):
             m = re.search(r'\d+$', el.name)
             if m:
                 n = int(m.group(0)) - 1
@@ -165,12 +165,12 @@ def get_story(story_json, args, site_json, save_debug=False):
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
     else:
-        for el in story_soup.find_all(re.compile('photo\d*')):
+        for el in story_soup.find_all(re.compile(r'photo\d*')):
             logger.warning('unhandled photo element {} in {}'.format(el.name, url))
             el.decompose()
 
     if story_json.get('video'):
-        for el in story_soup.find_all(re.compile('video\d*')):
+        for el in story_soup.find_all(re.compile(r'video\d*')):
             m = re.search(r'\d+$', el.name)
             if m:
                 n = int(m.group(0)) - 1
@@ -185,12 +185,12 @@ def get_story(story_json, args, site_json, save_debug=False):
             else:
                 logger.warning('video index out of range in ' + url)
     else:
-        for el in story_soup.find_all(re.compile('video\d*')):
+        for el in story_soup.find_all(re.compile(r'video\d*')):
             logger.warning('unhandled video element {} in {}'.format(el.name, url))
             el.decompose()
 
     if story_json.get('inlines'):
-        for el in story_soup.find_all(re.compile('inline\d*')):
+        for el in story_soup.find_all(re.compile(r'inline\d*')):
             m = re.search(r'\d+$', el.name)
             if m:
                 n = int(m.group(0)) - 1
@@ -247,7 +247,7 @@ def get_story(story_json, args, site_json, save_debug=False):
             else:
                 logger.warning('inline index out of range in ' + url)
     else:
-        for el in story_soup.find_all(re.compile('inline\d*')):
+        for el in story_soup.find_all(re.compile(r'inline\d*')):
             logger.warning('unhandled inline element {} in {}'.format(el.name, url))
             el.decompose()
 
@@ -292,9 +292,9 @@ def get_content(url, args, site_json, save_debug=False):
             if api_json:
                 story_json = api_json['content']
     elif '/video/' in url:
-        m = re.search('id=(\d+)', url)
+        m = re.search(r'id=(\d+)', url)
         if not m:
-            m = re.search('\/_\/id\/(\d+)', url)
+            m = re.search(r'\/_\/id\/(\d+)', url)
         if m:
             id = m.group(1)
             api_url = 'http://api-app.espn.com/v1/video/clips/' + id

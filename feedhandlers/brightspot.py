@@ -574,7 +574,7 @@ def get_item(article_json, args, site_json, save_debug):
         dt = datetime.fromisoformat(article_json['dateModifiedISO'].replace('Z', '+00:00'))
         item['date_modified'] = dt.isoformat()
     elif article_json.get('updateDate'):
-        date = re.sub('(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([-+])(\d+)', r'\1-\2-\3T\4:\5:\6\7\8:00', article_json['updateDate'])
+        date = re.sub(r'(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})([-+])(\d+)', r'\1-\2-\3T\4:\5:\6\7\8:00', article_json['updateDate'])
         dt = datetime.fromisoformat(date).astimezone(timezone.utc)
         item['date_modified'] = dt.isoformat()
 
@@ -775,21 +775,22 @@ def get_item(article_json, args, site_json, save_debug):
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.insert_after(new_el)
         if el.parent and el.parent.name == 'p':
-            el.parent.insert_after(new_el)
-            el.parent.decompose()
+            el.parent.replace_with(new_el)
         else:
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
 
     for el in soup.find_all('iframe'):
         new_html = utils.add_embed(el['src'])
         new_el = BeautifulSoup(new_html, 'html.parser')
         if el.parent and el.parent.name == 'p':
-            el.parent.insert_after(new_el)
-            el.parent.decompose()
+            el.parent.replace_with(new_el)
         else:
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
+
+    for el in soup.find_all('blockquote', class_='instagram-media'):
+        new_html = utils.add_embed(el['data-instgrm-permalink'])
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
 
     for el in soup.find_all(class_='dropcap-image'):
         el.decompose()
@@ -799,8 +800,7 @@ def get_item(article_json, args, site_json, save_debug):
         new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', str(el), 1)
         new_html += '<span style="clear:left;"></span>'
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        el.replace_with(new_el)
 
     for el in soup.find_all('script'):
         el.decompose()
@@ -812,6 +812,27 @@ def get_item(article_json, args, site_json, save_debug):
         it = el.find_parent('p')
         if it:
             it.decompose()
+
+    if site_json:
+        if site_json.get('rename'):
+            for it in site_json['rename']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.name = it['name']
+
+        if site_json.get('replace'):
+            for it in site_json['replace']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.replace_with(BeautifulSoup(it['new_html'], 'html.parser'))
+
+        if site_json.get('decompose'):
+            for it in site_json['decompose']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.decompose()
+
+        if site_json.get('unwrap'):
+            for it in site_json['unwrap']:
+                for el in utils.get_soup_elements(it, soup):
+                    el.unwrap()
 
     content_html = str(soup)
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', content_html)

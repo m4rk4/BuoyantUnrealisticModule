@@ -101,11 +101,15 @@ def get_content(url, args, site_json, save_debug=False):
         item['_image'] = '{}/screenshot?url={}&locator=%23g-index-box'.format(config.server, quote_plus(url))
         item['content_html'] = utils.add_image(item['_image'], link=url)
         return item
+    elif '/interactive/' in url:
+        logger.warning('unhandled url ' + url)
+        return None
 
-    page_html = utils.get_url_html(url)
+    # page_html = utils.get_url_html(url, headers={"user-agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 8_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12F70 Safari/600.1.4 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)"})
+    page_html = utils.get_url_html(url, user_agent='grapeshot')
     if save_debug:
         utils.write_file(page_html, './debug/debug.html')
-    soup = BeautifulSoup(page_html, 'html.parser')
+    soup = BeautifulSoup(page_html, 'lxml')
     next_data = soup.find('script', id='__NEXT_DATA__')
     if not next_data:
         return None
@@ -113,18 +117,21 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(next_json, './debug/debug.json')
 
+    bing_html = ''
     if next_json['props']['pageProps'].get('walled') and next_json['props']['pageProps']['walled'] == True:
-        logger.debug('article is paywalled, trying to find bing cached version')
-        bing_html = utils.get_bing_cache(url, '', save_debug)
-        if bing_html:
-            if save_debug:
-                utils.write_file(bing_html, './debug/bing.html')
-            soup = BeautifulSoup(bing_html, 'html.parser')
-            next_data = soup.find('script', id='__NEXT_DATA__')
-            if next_data:
-                next_json = json.loads(next_data.string)
-                if save_debug:
-                    utils.write_file(next_json, './debug/debug.json')
+        logger.debug('article is paywalled')
+        # TODO: Bing no longer caches economist articles
+        # logger.debug('article is paywalled, trying to find bing cached version')
+        # bing_html = utils.get_bing_cache(url, '', save_debug)
+        # if bing_html:
+        #     if save_debug:
+        #         utils.write_file(bing_html, './debug/bing.html')
+        #     soup = BeautifulSoup(bing_html, 'html.parser')
+        #     next_data = soup.find('script', id='__NEXT_DATA__')
+        #     if next_data:
+        #         next_json = json.loads(next_data.string)
+        #         if save_debug:
+        #             utils.write_file(next_json, './debug/debug.json')
 
     item = {}
 

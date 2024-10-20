@@ -44,6 +44,7 @@ def get_img_src(image, width=1000):
             img_src = image['url']
     return img_src
 
+
 def add_image(image, orig_size=False):
     captions = []
     if image.get('captionText'):
@@ -84,13 +85,14 @@ def get_photo_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(date).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for author in ld_json['author']:
-        authors.append(author['name'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = []
+    for it in ld_json['author']:
+        item['authors'].append({"name": it['name']})
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
-    item['_image'] = ld_json['image']
+    item['image'] = ld_json['image']
 
     el = soup.find('script', type='application/insights+json')
     if el:
@@ -127,6 +129,7 @@ def get_photo_content(url, args, site_json, save_debug=False):
         caption = ' | '.join(captions)
         item['content_html'] += utils.add_image(image['src'], caption) + '<br/>'
     return item
+
 
 def get_content(url, args, site_json, save_debug=False):
     if '/photo/' in url:
@@ -171,11 +174,17 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['dateModified'].replace('Z', '+00:00'))
     item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for author in article_json['authors']:
-        authors.append(author['displayName'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if article_json.get('authors'):
+        item['authors'] = [{"name": x['displayName']} for x in article_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+    else:
+        item['author'] = {
+            "name": "The Atlantic"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if article_json.get('primaryChannel'):
@@ -202,13 +211,13 @@ def get_content(url, args, site_json, save_debug=False):
 
     if article_json.get('leadArt'):
         if re.search(r'LeadArtImage', article_json['leadArt']['__typename']):
-            item['_image'] = article_json['leadArt']['image']['url']
+            item['image'] = article_json['leadArt']['image']['url']
             content_html += add_image(article_json['leadArt']['image'])
         elif article_json['leadArt']['__typename'] == 'Cinemagraph':
-            item['_image'] = article_json['leadArt']['horizontalPoster']['url']
+            item['image'] = article_json['leadArt']['horizontalPoster']['url']
             content_html += add_video(article_json['leadArt'])
     else:
-        item['_image'] = article_json['shareImageDefault']['url']
+        item['image'] = article_json['shareImageDefault']['url']
 
     is_floating = False
     for content in article_json['content']:
@@ -238,7 +247,7 @@ def get_content(url, args, site_json, save_debug=False):
             content_html += '</p>'
 
         elif content['__typename'] == 'ArticleHeading':
-            m = re.search('\d+$', content['headingSubtype'])
+            m = re.search(r'\d+$', content['headingSubtype'])
             content_html += '<h{0}>{1}</h{0}>'.format(m.group(0), content['innerHtml'])
 
         elif content['__typename'] == 'ArticlePullquote':

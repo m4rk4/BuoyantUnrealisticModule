@@ -1,9 +1,9 @@
 import json, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
     split_url = urlsplit(img_src)
-    return 'https://{}{}?fm=jpg&fl=progressive&w={}&fit=pad'.format(split_url.netloc, split_url.path, width)
+    if width > 0:
+        return 'https://{}{}?fm=jpg&fl=progressive&w={}&fit=pad'.format(split_url.netloc, split_url.path, width)
+    else:
+        return 'https://{}{}?quality=90&strip=all'.format(split_url.netloc, split_url.path, width)
 
 
 def add_image(image):
@@ -21,15 +24,29 @@ def add_image(image):
     if image.get('caption'):
         if image['caption'].get('plaintext'):
             captions.append(image['caption']['plaintext'])
-        else:
-            caption = re.sub(r'^<em>(.*)</em>$', r'\1', image['caption']['html'])
-            caption = caption.replace('</em>', '<EM>').replace('<em>', '</EM>')
-            captions.append(caption)
+        elif image['caption'].get('html'):
+            # caption = re.sub(r'^<em>(.*)</em>$', r'\1', image['caption']['html'])
+            # caption = caption.replace('</em>', '<EM>').replace('<em>', '</EM>')
+            # captions.append(caption)
+            captions.append(image['caption']['html'])
+        elif image.get('image') and image['image'].get('caption') and image['image']['caption'].get('plaintext'):
+            captions.append(image['image']['caption']['plaintext'])
+        elif image.get('image') and image['image'].get('caption') and image['image']['caption'].get('html'):
+            # caption = re.sub(r'^<em>(.*)</em>$', r'\1', image['image']['caption']['html'])
+            # caption = caption.replace('</em>', '<EM>').replace('<em>', '</EM>')
+            # captions.append(caption)
+            captions.append(image['image']['caption']['html'])
+
     if image.get('credit'):
         if image['credit'].get('plaintext'):
             captions.append(image['credit']['plaintext'])
-        else:
+        elif image['credit'].get('plaintext'):
             captions.append(image['credit']['html'])
+        elif image.get('image') and image['image'].get('credit') and image['image']['credit'].get('plaintext'):
+            captions.append(image['image']['credit']['plaintext'])
+        elif image.get('image') and image['image'].get('credit') and image['image']['credit'].get('html'):
+            captions.append(image['image']['credit']['html'])
+
     if image.get('url'):
         img_src = image['url']
     elif image.get('variantUrl'):
@@ -43,6 +60,7 @@ def add_image(image):
     else:
         logger.warning('unknown image src')
         img_src = ''
+
     return utils.add_image(img_src, ' | '.join(captions))
 
 
@@ -107,20 +125,45 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryImage' or component['__typename'] == 'CoreImageBlockType' or component['__typename'] == 'LedeMediaImageType':
         content_html += add_image(component)
 
-    elif component['__typename'] == 'EntryBodyImageGroup':
-        if component.get('ImageGroupTwoUp'):
-            for it in component['ImageGroupTwoUp']:
-                content_html += add_image(it)
+    elif component['__typename'] == 'LedeMediaEmbedType':
+        if component['provider'] == 'youtube':
+            m = re.search(r'src="([^"]+)"', component['embedHtml'])
+            content_html += utils.add_embed(m.group(1))
         else:
-            logger.warning('unhandled EntryBodyImageGroup')
+            logger.warning('unhandled LedeMediaEmbedType provider ' + component['provider'])
 
     elif component['__typename'] == 'EntryBodyImageComparison':
         content_html += '<figure style="margin:0; padding:0;"><img loading="lazy" style="width:50%;" src="{}" /><img loading="lazy" style="width:50%;" src="{}" /><figcaption><small>{}</small></figcaption></figure>'.format(component['imageComparison']['firstImage']['asset']['url'], component['imageComparison']['secondImage']['asset']['url'], component['imageComparison']['caption']['html'])
 
-    elif component['__typename'] == 'EntryBodyGallery':
-        content_html += '<h3>{}</h3>'.format(component['gallery']['title'])
-        for it in component['gallery']['images']:
-            content_html += add_image(it)
+    elif component['__typename'] == 'EntryBodyGallery' or component['__typename'] == 'ImageSliderBlockType' or (component['__typename'] == 'EntryBodyImageGroup' and component.get('ImageGroupTwoUp')):
+        if component['__typename'] == 'EntryBodyGallery':
+            images = component['gallery']['images']
+            gallery_title = component['gallery']['title']
+        elif component['__typename'] == 'ImageSliderBlockType':
+            images = component['images']
+            gallery_title = 'View photo gallery'
+        elif component['__typename'] == 'EntryBodyImageGroup':
+            images = component['ImageGroupTwoUp']
+            gallery_title = ''
+        gallery_images = []
+        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        for it in images:
+            image_html = add_image(it)
+            m = re.search(r'src="([^"]+)"', image_html)
+            img_src = resize_image(m.group(1), 0)
+            thumb = resize_image(m.group(1), 720)
+            m = re.search(r'<figcaption><small>(.*?)</small></figcaption>', image_html)
+            if m:
+                caption = m.group(1)
+            else:
+                caption = ''
+            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+        gallery_html += '</div>'
+        if gallery_title:
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            content_html += '<h3><a href="{}" target="_blank">{}</a></h3>'.format(gallery_url, gallery_title)
+        content_html += gallery_html
 
     elif component['__typename'] == 'EntryLeadImage':
         content_html += add_image(component['standard'])
@@ -147,7 +190,7 @@ def render_body_component(component):
                 content_html += utils.add_embed(soup.blockquote['data-instgrm-permalink'])
             elif provider == 'tiktok':
                 content_html += utils.add_embed(soup.blockquote['cite'])
-            elif provider == 'spotify':
+            elif provider == 'spotify' or provider == 'youtube':
                 content_html += utils.add_embed(soup.iframe['src'])
             else:
                 logger.warning('unhandled {} provider {}'.format(component['__typename'], provider))
@@ -282,6 +325,29 @@ def render_body_component(component):
                 price = float(it['price'])
             content_html += '<td colspan="2" style="padding-top:8px;"><div style="width:250px; padding:10px; margin:auto; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white; text-decoration:none;">${:.2f} at {}</a></div></td>'.format(utils.get_redirect_url(it['url']), price, it['name'])
         content_html += '</tr></table>'
+
+    elif component['__typename'] == 'ProductBlockType':
+        content_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+        if component['product'].get('image'):
+            if component['product']['image']['thumbnails'].get('square') and component['product']['image']['thumbnails']['square'].get('url'):
+                content_html += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['square']['url'])
+            elif component['product']['image']['thumbnails'].get('horizontal') and component['product']['image']['thumbnails']['horizontal'].get('url'):
+                content_html += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['horizontal']['url'])
+        content_html += '<div style="flex:2; min-width:256px;">'
+        content_html += '<div style="font-size:1.05em; font-weight:bold;"><a href="{}" target="_blank">{}</a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['title'])
+        if component['product'].get('description') and component['product']['description'].get('html'):
+            content_html += '<div>' + component['product']['description']['html'] + '</div>'
+        # TODO: pros & cons
+        for it in component['product']['retailLinks']:
+            content_html += utils.add_button(it['url'], '${} at {}'.format(it['price'], it['retailer']))
+        content_html += '</div></div><div>&nbsp;</div>'
+
+    elif component['__typename'] == 'HighlightBlockType':
+        # https://www.polygon.com/tabletop-games/464798/halo-flashpoint-review-mantic-miniatures-skirmish
+        content_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;>'
+        for it in component['children']:
+            content_html += render_body_component(it)
+        content_html += '</div><div>&nbsp;</div>'
 
     elif component['__typename'] == 'EntryBodySidebar':
         for it in component['sidebar']['body']:

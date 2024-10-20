@@ -87,23 +87,30 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         dt = datetime.fromisoformat(ld_json['dateModified'])
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
     if isinstance(ld_json['author'], dict):
-        item['author']['name'] = ld_json['author']['name']
+        item['author'] = {
+            "name": ld_json['author']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     elif isinstance(ld_json['author'], list):
-        authors = []
-        for it in ld_json['author']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
+        item['authors'] = [{"name": x['name'].replace(',', '&#44;')} for x in ld_json['author']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']])).replace('&#44;', ',')
+        }
 
     if ld_json.get('keywords'):
         item['tags'] = ld_json['keywords'].copy()
 
     if ld_json.get('image'):
-        item['_image'] = ld_json['image'][0]
+        item['image'] = ld_json['image'][0]
 
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     el = soup.find('p', class_='strapline')
@@ -131,7 +138,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             el.decompose()
         for el in content.find_all('aside', class_='recommendation'):
             el.decompose()
-        for el in content.find_all(class_=['apester-media', 'apester-unit', 'desktop_mpu']):
+        for el in content.find_all(class_=['apester-media', 'apester-unit', 'desktop_mpu', 'injection_placeholder']):
             el.decompose()
         for el in content.find_all(attrs={"data-type": "targeting"}):
             el.decompose()
@@ -164,14 +171,20 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             el.insert(0, soup.new_tag('hr'))
             el.unwrap()
 
-        for el in content.find_all('blockquote', class_='pullquote', recursive=False):
-            new_html = utils.add_pullquote(el.decode_contents())
+        for el in content.find_all('bloc'
+                                   'kquote', class_='pullquote', recursive=False):
+            if el.cite:
+                author = el.cite.decode_contents()
+                el.cite.decompose()
+                new_html = utils.add_pullquote(el.decode_contents(), author)
+            else:
+                new_html = utils.add_pullquote(el.decode_contents())
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
 
         for el in content.find_all('blockquote', class_=False, recursive=False):
-            if not el.find('a', href=re.compile('www\.gamesindustry\.biz/newsletters')):
+            if not el.find('a', href=re.compile(r'www\.gamesindustry\.biz/newsletters')):
                 new_html = utils.add_blockquote(el.decode_contents())
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)

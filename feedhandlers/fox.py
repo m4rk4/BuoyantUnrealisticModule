@@ -83,22 +83,32 @@ def get_video_content(url, args, site_json, save_debug=False):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    item['author'] = {}
     if video_json.get('dc-creator'):
-        item['author']['name'] = video_json['dc-creator']
+        item['author'] = {
+            "name": video_json['dc-creator']
+        }
     elif video_json.get('dc-contributor'):
-        item['author']['name'] = video_json['dc-contributor']
+        item['author'] = {
+            "name": video_json['dc-contributor']
+        }
     elif video_json.get('dc-source'):
-        item['author']['name'] = video_json['dc-source']
+        item['author'] = {
+            "name": video_json['dc-source']
+        }
     elif video_json.get('publisher'):
-        item['author']['name'] = video_json['publisher']
+        item['author'] = {
+            "name": video_json['publisher']
+        }
+    if 'author' in item:
+        item['authors'] = []
+        item['authors'].append(item['author'])
     item['tags'] = []
     for cat in video_json['category']:
         for it in cat.split('|'):
             tag = it.replace('_', ' ')
             if tag not in item['tags'] and 'ad supported' not in tag and tag != 'personality':
                 item['tags'].append(tag)
-    item['_image'] = video_json['media-group']['media-thumbnail']['@attributes']['url']
+    item['image'] = video_json['media-group']['media-thumbnail']['@attributes']['url']
     item['summary'] = video_json['description']
     video = None
     for video_type in ['video/mp4', 'application/x-mpegURL']:
@@ -108,7 +118,7 @@ def get_video_content(url, args, site_json, save_debug=False):
                 break
         if video:
             break
-    item['content_html'] = utils.add_video(video['url'], video['type'], item['_image'], item['summary'])
+    item['content_html'] = utils.add_video(video['url'], video['type'], item['image'], item['summary'])
     return item
 
 
@@ -179,19 +189,20 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(date).astimezone(timezone.utc)
         item['date_modified'] = dt.isoformat()
 
-    authors = []
+    item['authors'] = []
     if article_json.get('fn__contributors'):
-        for author in article_json['fn__contributors']:
-            authors.append(author['full_name'])
+        for it in article_json['fn__contributors']:
+            item['authors'].append({"name": it['full_name']})
     elif article_json.get('spark_persons'):
-        for author in article_json['spark_persons']:
-            authors.append(author['full_name'])
+        for it in article_json['spark_persons']:
+            item['authors'].append({"name": it['full_name']})
     if article_json.get('fn__additional_authors'):
-        for author in article_json['fn__additional_authors']:
-            authors.append(author)
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        for it in article_json['fn__additional_authors']:
+            item['authors'].append({"name": it})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if article_json.get('tags'):
@@ -203,16 +214,22 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('thumbnail'):
         if article_json['thumbnail']['content_type'] == 'image':
             if article_json['thumbnail'].get('content'):
-                item['_image'] = article_json['thumbnail']['content']['url']
+                item['image'] = article_json['thumbnail']['content']['url']
             else:
-                item['_image'] = article_json['thumbnail']['url']
+                item['image'] = article_json['thumbnail']['url']
         elif article_json['thumbnail']['content_type'] == 'video':
-            item['_image'] = article_json['thumbnail']['content']['thumbnail']
+            item['image'] = article_json['thumbnail']['content']['thumbnail']
         else:
             logger.debug('unhandled thumbnail type {} in {}'.format( article_json['thumbnail']['content_type'], item['url']))
 
     if article_json.get('dek'):
         item['summary'] = article_json['dek']
+    elif article_json.get('standfirst'):
+        item['summary'] = article_json['standfirst']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if article_json.get('standfirst'):
@@ -291,7 +308,7 @@ def get_content(url, args, site_json, save_debug=False):
 
             else:
                 logger.warning('unhandled event_odds type {} in {}'.format(component['content']['odds_type'], item['url']))
-        elif component['content_type'] == 'credible' or component['content_type'] == 'favorite':
+        elif component['content_type'] == 'credible' or component['content_type'] == 'favorite' or component['content_type'] == 'cultivate_forecast':
             pass
         else:
             logger.warning('unhandled content type {} in {}'.format(component['content_type'], item['url']))
@@ -369,13 +386,3 @@ def get_feed(url, args, site_json, save_debug=False):
     feed = utils.init_jsonfeed(args)
     feed['items'] = items.copy()
     return feed
-
-
-def test_handler():
-    # https://www.foxnews.com/story/foxnews-com-rss-feeds
-    # https://www.foxsports.com/rss-feeds
-    feeds = ['https://moxie.foxnews.com/feedburner/latest.xml',
-             'https://moxie.foxbusiness.com/feedburner/latest.xml',
-             'https://api.foxsports.com/v2/content/optimized-rss?partnerKey=MB0Wehpmuj2lUhuRhQaafhBjAJqaPU244mlTDK1i&size=30']
-    for url in feeds:
-        get_feed({"url": url}, True)

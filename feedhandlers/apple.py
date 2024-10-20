@@ -269,12 +269,14 @@ def get_podcast_episode(episode):
     item['url'] = episode['attributes']['url']
     item['title'] = episode['attributes']['name']
 
-    dt = datetime.fromisoformat(episode['attributes']['releaseDateTime'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(episode['attributes']['releaseDateTime'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+    item['_display_date'] = utils.format_display_date(dt, False)
 
-    item['author'] = {"name": episode['attributes']['artistName']}
+    item['author'] = {
+        "name": episode['attributes']['artistName']
+    }
 
     item['tags'] = []
     if episode['attributes'].get('genreNames'):
@@ -284,10 +286,10 @@ def get_podcast_episode(episode):
     if not item.get('tags'):
         del item['tags']
 
-    item['_image'] = episode['attributes']['artwork']['url']
+    item['image'] = episode['attributes']['artwork']['url'].replace('{w}', '160').replace('{h}', '160').replace('{f}', 'jpg')
     item['_audio'] = utils.get_redirect_url(episode['attributes']['assetUrl'])
     item['_duration'] = utils.calc_duration(float(episode['attributes']['durationInMilliseconds']) / 1000)
-    item['summary'] = episode['attributes']['description']['standard']
+    item['summary'] = episode['attributes']['description']['standard'].replace('\n', '<br/>')
     return item
 
 
@@ -325,45 +327,53 @@ def get_podcast(url, args, site_json, save_debug):
         # poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(item['_image'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')))
         # desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a> &#8226; {}<br/>{} &#8226; {}<br/>{}</small>'.format(item['url'], item['title'], show['attributes']['url'], show['attributes']['name'], item['author']['name'], item['_display_date'], item['_duration'], item['tags'][0])
         # item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(item['_audio'], poster, desc)
-        poster = item['_image'].replace('{w}', '160').replace('{h}', '160').replace('{f}', 'jpg')
-        item['content_html'] = utils.add_audio(item['_audio'], poster, item['title'], item['url'], show['attributes']['name'], show['attributes']['url'], item['_display_date'], item['_duration'])
-        if not 'embed' in args:
+        item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], show['attributes']['name'], show['attributes']['url'], item['_display_date'], item['_duration'])
+        if 'summary' in item and 'embed' not in args:
             item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
-
     else:
         item = {}
         item['id'] = show['id']
         item['url'] = show['attributes']['url']
         item['title'] = show['attributes']['name']
-        item['author'] = {"name": show['attributes']['artistName']}
+        item['author'] = {
+            "name": show['attributes']['artistName']
+        }
         item['tags'] = show['attributes']['genreNames'].copy()
-        item['_image'] = show['attributes']['artwork']['url']
+        item['image'] = show['attributes']['artwork']['url'].replace('{w}', '160').replace('{h}', '160').replace('{f}', 'jpg')
+        poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(item['image']))
+
         if show['attributes'].get('description'):
-            item['summary'] = show['attributes']['description']['standard']
+            item['summary'] = show['attributes']['description']['standard'].replace('\n', '<br/>')
         elif show['attributes'].get('editorialNotes'):
-            item['summary'] = show['attributes']['editorialNotes']['standard']
+            item['summary'] = show['attributes']['editorialNotes']['standard'].replace('\n', '<br/>')
 
-        poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(item['_image'].replace('{w}', '128').replace('{h}', '128').replace('{f}', 'jpg')))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>by <a href="{}">{}</a><br/>{}</small>'.format(item['url'], item['title'], show['attributes']['url'], item['author']['name'], item['tags'][0])
-        item['content_html'] = '<div><img style="float:left; margin-right:8px;" src="{}"/><div>{}</div><div style="clear:left;"></div></div>'.format(poster, desc)
-
-        item['content_html'] += '<blockquote style="border-left:3px solid #ccc; margin-top:4px; margin-left:1.5em; padding-left:0.5em;"><h4 style="margin-top:0; margin-bottom:1em;">Episodes:</h4>'
-        if 'embed' in args:
-            n = 5
+        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+        item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}/playlist?url={}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), poster)
+        item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+        item['content_html'] += '<div style="margin:4px 0 4px 0;">By {}</div>'.format(item['author']['name'])
+        if item.get('summary'):
+            item['content_html'] += '<div style="margin:4px 0 4px 0; font-size:0.8em;">{}</div>'.format(item['summary'])
+        item['content_html'] += '</div></div>'
+        item['content_html'] += '<h3>Episodes:</h3>'
+        item['_playlist'] = []
+        if 'max' in args:
+            n = int(args['max'])
+        elif 'embed' in args:
+            n = 3
         else:
             n = 10
-        for i, episode in enumerate(show['relationships']['episodes']['data']):
-            if i == n:
-                break
-            episode_item = get_podcast_episode(episode)
-            poster = '{}/static/play_button-48x48.png'.format(config.server)
-            desc = '<h5 style="margin-top:0; margin-bottom:0;"><a href="{}">{}</a></h5><small>{} &#8226; {}</small>'.format(episode_item['url'], episode_item['title'], episode_item['_display_date'], episode_item['_duration'])
-            item['content_html'] += '<div style="margin-bottom:1em;"><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(episode_item['_audio'], poster, desc)
-
-        item['content_html'] += '</blockquote>'
-
-        if not 'embed' in args:
-            item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
+        n = min(n, len(show['relationships']['episodes']['data']))
+        for ep in show['relationships']['episodes']['data'][:n]:
+            episode = get_podcast_episode(ep)
+            item['_playlist'].append({
+                "src": episode['_audio'],
+                "name": episode['title'],
+                "artist": episode['_display_date'],
+                "image": episode['image']
+            })
+            item['content_html'] += utils.add_audio(episode['_audio'], episode['image'], episode['title'], episode['url'], '', '', episode['_display_date'], episode['_duration'], show_poster=False)
+        if n < len(show['relationships']['episodes']['data']):
+            item['content_html'] += '<div><a href="{}">View more episodes</a></div>'.format(item['url'])
     return item
 
 

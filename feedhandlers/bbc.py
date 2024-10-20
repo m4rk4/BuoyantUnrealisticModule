@@ -108,7 +108,11 @@ def get_av_content(url, args, site_json, save_debug=False):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": "BBC News"}
+    item['author'] = {
+        "name": "BBC News"
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = []
     for it in article_json['data']['initialItem']['mediaItem']['metadata']['items']:
@@ -123,7 +127,7 @@ def get_av_content(url, args, site_json, save_debug=False):
         if m:
             images.append({"width": m.group(1), "url": it})
     if images:
-        item['_image'] = utils.closest_dict(images, 'width', 1000)['url']
+        item['image'] = utils.closest_dict(images, 'width', 1000)['url']
 
     item['summary'] = article_json['data']['initialItem']['structuredData']['description']
 
@@ -301,11 +305,11 @@ def get_content(url, args, site_json, save_debug=False):
                 m = re.search(r'<p>(.*?)</p>', byline)
                 if m:
                     item['author']['name'] = m.group(1)
-    if not item['author'].get('name'):
+    if 'name' not in item['author']:
         item['author']['name'] = 'BBC'
 
     if metadata.get('indexImage'):
-        item['_image'] = metadata['indexImage']['originalSrc']
+        item['image'] = metadata['indexImage']['originalSrc']
     elif page_json.get('headerContents'):
         if page_json['contents'][0]['type'] == 'image' or page_json['contents'][0]['type'] == 'video':
             block = page_json['contents'][0]
@@ -315,7 +319,7 @@ def get_content(url, args, site_json, save_debug=False):
             image = render_contents([block])
             m = re.search(r'src="([^"]+)"', image)
             if m:
-                item['_image'] = m.group(1)
+                item['image'] = m.group(1)
 
     if metadata.get('description'):
         item['summary'] = metadata['description']
@@ -344,13 +348,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['tags'].append(it['title'])
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     item['content_html'] = ''
@@ -364,6 +362,8 @@ def get_content(url, args, site_json, save_debug=False):
         m = re.search(r'Video by ([^\.<]+)', item['content_html'])
         if m:
             item['author']['name'] = m.group(1)
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     return item
 

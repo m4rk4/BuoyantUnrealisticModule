@@ -1,6 +1,6 @@
 import base64, basencode, json, math, random, re
 from bs4 import BeautifulSoup
-from curl_cffi import requests
+from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
@@ -438,14 +438,20 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
     text_html = tweet_json['text'].strip()
     i = tweet_json['display_text_range'][0]
     j = tweet_json['display_text_range'][1]
-    if j > 0 and i < j and (text_html[i:j][-1] == '…' or (text_html[i:j][-1] == ' ' and text_html[i:j][-2] == '…')):
+    # if j > 0 and i < j and (text_html[i:j][-1] == '…' or (text_html[i:j][-1] == ' ' and text_html[i:j][-2] == '…')):
+    if 'note_tweet' in tweet_json and tweet_json['note_tweet'].get('id'):
         logger.warning('truncated text - getting tweet detail from api')
         tweet_detail = get_tweet_result_by_api('https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_json['id_str']))
         if tweet_detail:
-            utils.write_file(tweet_detail, './debug/tweet.json')
             try:
-                text_html = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['text']
-                entities = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
+                if tweet_detail['data']['tweetResult']['result'].get('note_tweet'):
+                    text_html = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['text']
+                    entities = tweet_detail['data']['tweetResult']['result']['note_tweet']['note_tweet_results']['result']['entity_set']
+                elif tweet_detail['data']['tweetResult']['result'].get('tweet') and tweet_detail['data']['tweetResult']['result']['tweet'].get('note_tweet'):
+                    text_html = tweet_detail['data']['tweetResult']['result']['tweet']['note_tweet']['note_tweet_results']['result']['text']
+                    entities = tweet_detail['data']['tweetResult']['result']['tweet']['note_tweet']['note_tweet_results']['result']['entity_set']
+                else:
+                    logger.warning('unhandled tweetResult')
             except:
                 logger.warning('failed to get full text')
                 pass
@@ -509,10 +515,15 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
                     if media['original_info']['height'] > media['original_info']['width']:
                         thumb += '&letterbox=%28640%2C640%29&color=%23444'
                     thumb += '&overlay=video'
-                    if n == 1:
-                        media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>'.format(video_src, thumb)
+                    if tweet_json['user']['screen_name'].lower() not in media['expanded_url'].lower():
+                        media_user = list(filter(None, urlsplit(media['expanded_url']).path[1:].split('/')))[0]
+                        caption = '<div><small>From <a href="{}">@{}</a></small></div>'.format(media['expanded_url'], media_user)
                     else:
-                        gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>'.format(video_src, thumb)
+                        caption = ''
+                    if n == 1:
+                        media_html += '<div><a href="{}" target="_blank"><img style="width:100%; border-radius:10px;" src="{}" /></a></div>{}'.format(video_src, thumb, caption)
+                    else:
+                        gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%; border-radius:10px;" /></a></div>{}'.format(video_src, thumb, caption)
                         if video_mp4:
                             gallery_images.append({"src": video_mp4['url'], "caption": "", "thumb": thumb})
                         else:
@@ -733,7 +744,7 @@ def get_content(url, args, site_json, save_debug=False):
         # https://twitter.com/gerald1064/status/1537123311041355776
         item = {}
         item['id'] = tweet_id
-        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="text-align:center;">{}</td></tr></table>'.format(replace_tombstone_entities(tweet_json['tombstone']['text']))
+        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="text-align:center;">{}</td></tr></table><div>&nbsp;</div>'.format(replace_tombstone_entities(tweet_json['tombstone']['text']))
         return item
 
     tweet_user = tweet_json['user']['screen_name']
@@ -837,43 +848,91 @@ def get_feed(url, args, site_json, save_debug=False):
 
 def get_tweet_result_by_api(tweet_url):
     logger.debug('get_tweet_result_by_api:' + tweet_url)
-    auth_tokens = None
-    guest_token = ''
-    headers = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "priority": "u=0, i",
-        "sec-ch-ua": "\"Microsoft Edge\";v=\"116\", \"Chromium\";v=\"116\", \"Not.A/Brand\";v=\"24\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36 Edg/116.0.0.0"
-    }
-    r = requests.get(tweet_url + '?mx=2', impersonate=config.impersonate, headers=headers, proxies=config.proxies)
-    if r and r.status_code == 200:
-        utils.write_file(r.text, './debug/twitter.html')
-        soup = BeautifulSoup(r.text, 'lxml')
-        el = soup.find('script', attrs={"src": re.compile(r'/client-web/main\.')})
-        if el:
-            r = requests.get(el['src'], impersonate=config.impersonate, proxies=config.proxies)
-            if r and r.status_code == 200:
-                auth_tokens = re.findall(r'Bearer [^"]+', r.text)
-        el = soup.find('script', string=re.compile(r'document.cookie'))
-        if el:
-            m = re.search(r'gt=(\d+)', el.string)
-            if m:
-                guest_token = m.group(1)
-    if not (auth_tokens and guest_token):
-        logger.warning('unable to determine auth and guest tokens for ' + tweet_url)
-        # print(str(auth_tokens))
-        # print(str(guest_token))
+    r = curl_cffi_requests.get(tweet_url + '?mx=2', impersonate=config.impersonate, proxies=config.proxies)
+    if r.status_code != 200:
         return None
+    page_html = r.text
+
+    # extract the guest token
+    m = re.search(r'document\.cookie="gt=(\d+)', page_html)
+    if not m:
+        logger.warning('unable to determine guest token for ' + tweet_url)
+        return None
+    guest_token = m.group(1)
+    logger.debug('using guest token ' + guest_token)
+
+    # Bearer tokens are in the main.xxxxxxx.js script
+    m = re.search(r'https://[^/]+/responsive-web/client-web/main\.[a-f0-9]+\.js', page_html)
+    if not m:
+        logger.warning('unable to determine main.js script in ' + tweet_url)
+        return None
+    r = curl_cffi_requests.get(m.group(0), impersonate=config.impersonate, proxies=config.proxies)
+    if r.status_code != 200:
+        return None
+    main_js = r.text
+    auth_tokens = re.findall(r'Bearer[^"]+', main_js)
+    if not auth_tokens:
+        logger.warning('unable to determine Bearer tokens in ' + m.group(0))
+        return None
+
+    variables = {
+        "tweetId": tweet_url.split('/')[-1],
+        "withCommunity": False,
+        "includePromotedContent": False,
+        "withVoice": False
+    }
+    features = {
+        "creator_subscriptions_tweet_preview_api_enabled": True,
+        "communities_web_enable_tweet_community_results_fetch": True,
+        "c9s_tweet_anatomy_moderator_badge_enabled": True,
+        "articles_preview_enabled": True,
+        "responsive_web_edit_tweet_api_enabled": True,
+        "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+        "view_counts_everywhere_api_enabled": True,
+        "longform_notetweets_consumption_enabled": True,
+        "responsive_web_twitter_article_tweet_consumption_enabled": True,
+        "tweet_awards_web_tipping_enabled": False,
+        "creator_subscriptions_quote_tweet_preview_enabled": False,
+        "freedom_of_speech_not_reach_fetch_enabled": True,
+        "standardized_nudges_misinfo": True,
+        "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+        "rweb_video_timestamps_enabled": True,
+        "longform_notetweets_rich_text_read_enabled": True,
+        "longform_notetweets_inline_media_enabled": True,
+        "rweb_tipjar_consumption_enabled": True,
+        "responsive_web_graphql_exclude_directive_enabled": True,
+        "verified_phone_label_enabled": False,
+        "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+        "responsive_web_graphql_timeline_navigation_enabled": True,
+        "responsive_web_enhance_cards_enabled": False
+    }
+    field_toggles = {
+        "withArticleRichContentState": True,
+        "withArticlePlainText": False,
+        "withGrokAnalyze": False,
+        "withDisallowedReplyControls": False
+    }
+    api_url = 'https://api.x.com/graphql/sCU6ckfHY0CyJ4HFjPhjtg/TweetResultByRestId?variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&features=' + quote_plus(json.dumps(features, separators=(',', ':'))) + '&fieldToggles=' + quote_plus(json.dumps(field_toggles, separators=(',', ':')))
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "content-type": "application/json",
+        "priority": "u=1, i",
+        "x-guest-token": guest_token,
+        "x-twitter-active-user": "yes",
+        "x-twitter-client-language": "en"
+    }
+    for token in reversed(auth_tokens):
+        logger.debug('trying twitter auth token ' + token)
+        headers['authorization'] = token
+        r = curl_cffi_requests.get(api_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+        if r and r.status_code == 200:
+            utils.write_file(r.json(), './debug/tweet-api.json')
+            return r.json()
+        if r:
+            logger.debug('TweetResultByRestId status code {}'.format(r.status_code))
+        else:
+            logger.debug('TweetResultByRestId failed')
 
     # x-client-transaction-id doesn't seem necessary
     # Here's details on reverse engineering: https://antibot.blog/twitter/
@@ -882,38 +941,6 @@ def get_tweet_result_by_api(tweet_url):
     # https://github.com/dimdenGD/OldTwitter/blob/535b762525ceb888003f90aa92dfdcdc10e5a237/scripts/twchallenge.js
     # random_data = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=70))
     # transaction_id = base64.urlsafe_b64encode(random_data.encode()).decode().replace('=', '')
-
-    logger.debug('twitter guest token ' + guest_token)
-
-    tweet_id = tweet_url.split('/')[-1]
-    api_url = "https://api.twitter.com/graphql/7xflPyRiUxGVbJd4uWmbfg/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22{}%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22tweetypie_unmention_optimization_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_media_interstitial_enabled%22%3Atrue%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Atrue%2C%22withArticlePlainText%22%3Afalse%7D".format(tweet_id)
-    headers = {
-        "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "authorization": "",
-        "content-type": "application/json",
-        "priority": "u=1, i",
-        "sec-ch-ua": "\"Chromium\";v=\"124\", \"Microsoft Edge\";v=\"124\", \"Not-A.Brand\";v=\"99\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-site",
-        # "x-client-transaction-id": transaction_id,
-        "x-guest-token": guest_token,
-        "x-twitter-active-user": "yes",
-        "x-twitter-client-language": "en"
-    }
-    for auth_token in reversed(auth_tokens):
-        logger.debug('trying twitter auth_token ' + auth_token)
-        headers['authorization'] = auth_token
-        r = requests.get(api_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
-        if r and r.status_code == 200:
-            return r.json()
-        if r:
-            logger.debug('TweetResultByRestId status code {}'.format(r.status_code))
-        else:
-            logger.debug('TweetResultByRestId failed')
     return None
 
 # https://twitter.com/tracewoodgrains/status/1783701072894193994

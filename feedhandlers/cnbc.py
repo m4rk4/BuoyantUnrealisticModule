@@ -210,16 +210,18 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(re.sub(r'\+(\d\d)(\d\d)$', r'+\1:\2', page_json['dateLastPublished']))
     item['date_modified'] = dt.isoformat()
 
-    authors = []
+    item['authors'] = []
     if page_json['authorFormatted'] != 'NA':
         for it in page_json['authorFormatted'].split('|'):
-            authors.append(it.title())
+            item['authors'].append({"name": it.title()})
     elif page_json.get('creatorOverwrite'):
         for it in page_json['creatorOverwrite'].split('|'):
-            authors.append(it.title())
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'].append({"name": it.title()})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+        # TODO: add org to item['authors']
         if page_json.get('sourceOrganization') and not re.search(r'CNBC', page_json['sourceOrganization'][0]['tagName']):
             item['author']['name'] += ' ({})'.format(page_json['sourceOrganization'][0]['tagName'])
 
@@ -229,17 +231,11 @@ def get_content(url, args, site_json, save_debug=False):
     if not item.get('tags'):
         del item['tags']
 
-    item['_image'] = page_json['promoImage']['url']
+    item['image'] = page_json['promoImage']['url']
     item['summary'] = page_json['description']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     item['content_html'] = ''

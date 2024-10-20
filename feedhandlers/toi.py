@@ -1,7 +1,7 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote_plus, urlencode, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -12,87 +12,71 @@ logger = logging.getLogger(__name__)
 
 
 def get_photostory_content(url, args, site_json, save_debug):
-    page_html = utils.get_url_html(url, user_agent='googlebot')
-    if not page_html:
+    m = re.search(r'/(\d+)\.cms', url)
+    if not m:
+        logger.warning('unhandled url ' + url)
         return None
-
-    article_json = None
-    gallery_json = None
-    soup = BeautifulSoup(page_html, 'lxml')
-    for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
-        ld_json = json.loads(el.string)
-        if ld_json.get('@type'):
-            if ld_json['@type'] == 'NewsArticle':
-                article_json = ld_json
-                if save_debug:
-                    utils.write_file(article_json, './debug/debug.json')
-            elif ld_json['@type'] == 'MediaGallery':
-                gallery_json = ld_json
-                if save_debug:
-                    utils.write_file(gallery_json, './debug/gallery.json')
-    if not article_json:
-        logger.warning('unable to find article ld+json data in ' + url)
+    api_url = 'https://global-feed.indiatimes.com/wufs/feed/show/photo?pc=toi&dm=t&msid={}&client=toi&pp=20'.format(m.group(1))
+    content_json = utils.get_url_json(api_url)
+    if not content_json:
         return None
+    if save_debug:
+        utils.write_file(content_json, './debug/debug.json')
 
     item = {}
-    m = re.search(r'/(\d+)\.cms', url)
-    item['id'] = m.group(1)
-    item['url'] = article_json['mainEntityOfPage']['@id']
-    item['title'] = article_json['headline']
+    item['id'] = content_json['id']
+    item['url'] = content_json['pwa_meta']['canonical']
+    item['title'] = content_json['pwa_meta']['title']
 
-    dt = datetime.fromisoformat(article_json['datePublished']).astimezone(timezone.utc)
+    dt = datetime.fromisoformat(content_json['pwa_meta']['dlseo']).astimezone(timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['dateModified']).astimezone(timezone.utc)
+    dt = datetime.fromisoformat(content_json['pwa_meta']['luseo']).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
-    if article_json.get('author') and article_json['author'].get('name'):
-        item['author']['name'] = article_json['author']['name']
+    if content_json['metaInfo'].get('PhotographerByline'):
+        item['author']['name'] = content_json['metaInfo']['PhotographerByline']
+    elif content_json.get('agency') and content_json['agency'].get('name'):
+        item['author']['name'] = content_json['agency']['name']
+    elif content_json.get('ag'):
+        item['author']['name'] = content_json['ag']
+    elif content_json.get('createdby'):
+        item['author']['name'] = content_json['createdby']
     else:
-        item['author']['name'] = 'ETimes'
+        item['author']['name'] = urlsplit(url).netloc
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
-    if article_json.get('keywords'):
-        item['tags'] = [it.strip() for it in article_json['keywords'].split(',')]
+    item['tags'] = [x['name'] for x in content_json['pwa_meta']['sec_hierarchy']]
+    if content_json['pwa_meta'].get('key'):
+        item['tags'] += [x.strip() for x in content_json['pwa_meta']['key'].split(',')]
 
-    item['_image'] = article_json['image']['url']
+    item['image'] = content_json['pwa_meta']['ogimg']
 
-    if article_json.get('description'):
-        item['summary'] = article_json['description']
+    item['summary'] = content_json['pwa_meta']['seodescription']
 
-    item['content_html'] = ''
-    if gallery_json:
-        for media in gallery_json['mainEntityOfPage']['associatedMedia']:
-            if media['@type'] == 'ImageObject':
-                img_src = 'https://static.toiimg.com' + media['contentUrl']
-                desc = ''
-                name = ''
-                if media.get('name'):
-                    name = media['name']
-                    desc += '<h3>{}</h3>'.format(name)
-                if media.get('description') and media['description'] != name:
-                    desc += '<p>{}</p>'.format(media['description'])
-                elif media.get('caption') and media['caption'] != name:
-                    desc += '<p>{}</p>'.format(media['caption'])
-                item['content_html'] += utils.add_image(img_src, desc=desc)
-    else:
-        for i, el in enumerate(soup.find_all(attrs={"data-plugin": "photodata"})):
-            img_src = 'https://static.toiimg.com/photo/{}.cms'.format(el['msid'])
-            heading = ''
-            desc = ''
-            it = el.find(class_='story_count')
-            if it:
-                it.decompose()
-            it = el.find(attrs={"data-plugin": "story_title"})
-            if it:
-                heading = '<h3>{}. {}</h3>'.format(i+1, it.get_text())
-            it = el.find(class_='readmore_span')
-            if it:
-                desc = '<p>{}</p>'.format(it.decode_contents())
-            item['content_html'] += utils.add_image(img_src, heading=heading, desc=desc)
+    gallery_images = []
+    gallery_html = ''
+    for i, it in enumerate(content_json['items']):
+        img_src = 'https://static.toiimg.com/photo/{0}/{0}.jpg'.format(it['id'])
+        thumb = 'https://static.toiimg.com/thumb/{}.jpg?imgsize={}&width=420&height={}&resizemode=76'.format(it['id'], it['imgsize'], int(420 * float(it['imgratio'])))
+        caption = ''
+        desc = ''
+        if it.get('hl'):
+            desc += '<h3>' + it['hl'] + '</h3>'
+        if it.get('cap'):
+            desc += re.sub(r'^null', '', it['cap'])
+        if i == 0:
+            gallery_html += utils.add_image(img_src, caption, link=img_src, desc=desc)
+            gallery_html += '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        else:
+            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, desc=desc) + '</div>'
+        gallery_images.append({"src": img_src, "caption": "", "desc": desc, "thumb": thumb})
+    gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+    item['content_html'] = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
@@ -168,16 +152,18 @@ def get_video_content(video_id, args, site_json, save_debug):
         caption = video_json['name']
     else:
         caption = item['title']
+
     poster = 'https:' + video_json['poster']
-    video_src = utils.closest_dict(video_json['flavors'], 'bitrate', 500)
-    if video_src and video_src['type'] == 'mp4':
-        item['_video'] = 'https:' + video_src['url']
-        item['content_html'] = utils.add_video(item['_video'], 'video/mp4', poster, caption)
+
+    video = next((it for it in video_json['flavors'] if it['type'] == 'hls'), None)
+    if video:
+        item['_video'] = 'https:' + video['url']
+        item['content_html'] = utils.add_video(item['_video'], 'application/x-mpegURL', poster, caption)
     else:
-        video_src = next((it for it in video_json['flavors'] if it['type'] == 'hls'), None)
-        if video_src:
-            item['_video'] = 'https:' + video_src['url']
-            item['content_html'] = utils.add_video(item['_video'], 'application/x-mpegURL', poster, caption)
+        video = utils.closest_dict(video_json['flavors'], 'bitrate', 1000)
+        if video and video['type'] == 'mp4':
+            item['_video'] = 'https:' + video['url']
+            item['content_html'] = utils.add_video(item['_video'], 'video/mp4', poster, caption, use_videojs=True)
         else:
             logger.warning('unknown video source for ' + item['url'])
             return item
@@ -187,15 +173,85 @@ def get_video_content(video_id, args, site_json, save_debug):
     return item
 
 
+def get_html_content(url, args, site_json, save_debug):
+    # https://frontend-api-navik.indiatimes.com/v1/api/content/detail/643198?is_amp_story=1&locale_id=1
+    m = re.search(r'(\d+)\.html', url)
+    if not m:
+        logger.warning('unhandled url ' + url)
+        return None
+    api_url = 'https://frontend-api-navik.indiatimes.com/v1/api/content/detail/{}?is_amp_story=1&locale_id=1'.format(m.group(1))
+    api_json = utils.get_url_json(api_url)
+    if not api_json:
+        return None
+    if save_debug:
+        utils.write_file(api_json, './debug/debug.json')
+
+    content_json = api_json['data']['content']
+    item = {}
+    item['id'] = content_json['content_id']
+    item['url'] = 'https://' + urlsplit(url).netloc + content_json['guid']
+    item['title'] = content_json['headline1']
+
+    dt = datetime.fromisoformat(content_json['date_data']['publish_date_meta']).astimezone(timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
+    dt = datetime.fromisoformat(content_json['date_data']['updated_at_meta']).astimezone(timezone.utc)
+    item['date_modified'] = dt.isoformat()
+
+    item['authors'] = [{"name": x['name']} for x in api_json['data']['authors']]
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
+
+    item['tags'] = []
+    if content_json.get('categories'):
+        item['tags'] += [x['name'] for x in content_json['categories']]
+    if content_json.get('tags'):
+        item['tags'] += [x['name'] for x in content_json['tags']]
+
+    item['content_html'] = ''
+    if content_json.get('summary'):
+        item['summary'] = content_json['summary']
+        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
+
+    if content_json.get('media'):
+        for it in content_json['media']:
+            if it['path'].startswith('/content/'):
+                item['image'] = 'https://im.indiatimes.in' + it['media_path']
+                item['content_html'] += utils.add_image(item['image'], it.get('credits'))
+                break
+
+    soup = BeautifulSoup(api_json['data']['detail']['description'], 'html.parser')
+    for el in soup.find_all('blockquote', class_='instagram-media'):
+        new_html = utils.add_embed(el['data-instgrm-permalink'])
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all('blockquote', class_='reddit-embed-bq'):
+        new_html = utils.add_embed(el.a['href'])
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all(['script', 'style']):
+        el.decompose()
+
+    item['content_html'] += str(soup)
+    return item
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    if paths[-2] == 'videoshow':
+    if paths[-1].endswith('.html'):
+        return get_html_content(url, args, site_json, save_debug)
+    elif paths[-2] == 'videoshow':
         return get_video_content(paths[-1].split('.')[0], args, site_json, save_debug)
     elif paths[-2] == 'photostory':
         return get_photostory_content(url, args, site_json, save_debug)
 
     api_url = 'https://toifeeds.indiatimes.com/treact/feeds/toi/web/show/news?version=v2&path=/{}/{}'.format(paths[-2], paths[-1])
+    print(api_url)
     content_json = utils.get_url_json(api_url, user_agent='facebook')
     if not content_json:
         return None
@@ -214,16 +270,22 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(content_json['seo']['dateModified']).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
+    item['authors'] = []
     if content_json.get('authors'):
-        authors = []
-        for it in content_json['authors']:
-            authors.append(it['name'])
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in content_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     elif content_json.get('ag'):
-        item['author'] = {"name": content_json['ag']}
+        item['author'] = {
+            "name": content_json['ag']
+        }
+        item['authors'].append(item['author'])
     elif content_json.get('getAuthorWidgetDetails') and content_json['getAuthorWidgetDetails'].get('name'):
-        item['author'] = {"name": content_json['getAuthorWidgetDetails']['name']}
+        item['author'] = {
+            "name": content_json['getAuthorWidgetDetails']['name']
+        }
+        item['authors'].append(item['author'])
     else:
         logger.warning('unknown author for ' + item['url'])
 

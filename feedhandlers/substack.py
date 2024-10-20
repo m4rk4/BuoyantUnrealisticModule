@@ -238,6 +238,12 @@ def get_post(post_json, args, site_json, save_debug):
             el.insert_after(new_el)
             el.decompose()
 
+        for el in soup.find_all(class_='apple-podcast-container'):
+            new_html = utils.add_embed(el.iframe['src'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
+
         for el in soup.find_all(class_='tiktok-wrap'):
             new_html = ''
             if el.get('data-attrs'):
@@ -253,6 +259,15 @@ def get_post(post_json, args, site_json, save_debug):
                 el.decompose()
             else:
                 logger.warning('unhandled tiktok-wrap in ' + item['url'])
+
+        for el in soup.find_all(class_='datawrapper-wrap'):
+            if el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                new_html = utils.add_embed(data_json['url'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled datawrapper-wrap in ' + item['url'])
 
         for el in soup.find_all(class_='embedded-post-wrap'):
             new_html = ''

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def resize_image(img_src, secret_key, width=1092):
     # search secretKey
     split_url = urlsplit(img_src)
-    m = re.search('/\d{4}/\d\d/\d\d/.*', split_url.path)
+    m = re.search(r'/\d{4}/\d\d/\d\d/.*', split_url.path)
     if not m:
         logger.warning('unhandled image source ' + img_src)
         return img_src
@@ -46,22 +46,23 @@ def get_content(url, args, site_json, save_debug=False):
         api_url = '{}/composer/{}/pages/gallery/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
     elif '/video/' in split_url.path or '/videos/' in split_url.path:
         api_url = '{}/composer/{}/pages/video/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
-    elif tld.domain == 'cnet' and ('/reviews/' in url or re.search(r'-review/?$', split_url.path)):
-        page_html = utils.get_url_html(url)
-        if not page_html:
-            return None
-        soup = BeautifulSoup(page_html, 'lxml')
-        el = soup.find('meta', attrs={"name": "postId"})
-        if not el:
-            logger.warning('unknown postId in ' + url)
-            return None
-        slug = el['content']
-        el = soup.find('link', attrs={"rel": "canonical"})
-        if el:
-            url = el['href']
-        api_url = '{}/reviews/{}/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
+    # elif tld.domain == 'cnet' and ('/reviews/' in url or re.search(r'-review/?$', split_url.path)):
+    #     page_html = utils.get_url_html(url)
+    #     if not page_html:
+    #         return None
+    #     soup = BeautifulSoup(page_html, 'lxml')
+    #     el = soup.find('meta', attrs={"name": "postId"})
+    #     if not el:
+    #         logger.warning('unknown postId in ' + url)
+    #         return None
+    #     slug = el['content']
+    #     el = soup.find('link', attrs={"rel": "canonical"})
+    #     if el:
+    #         url = el['href']
+    #     api_url = '{}/reviews/{}/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
     else:
         api_url = '{}/composer/{}/pages/article/{}/web?contentOnly=true&apiKey={}'.format(site_json['api_path'], tld.domain, slug, site_json['api_key'])
+    # print(api_url)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
@@ -332,14 +333,17 @@ def get_content(url, args, site_json, save_debug=False):
 
             elif el['shortcode'] == 'chart':
                 chart_json = json.loads(el['chart'].replace('&quot;', '"'))
-                utils.write_file(chart_json, './debug/chart.json')
+                # utils.write_file(chart_json, './debug/chart.json')
                 new_html = '<h2>{}</h2>'.format(chart_json['chartName'])
                 if chart_json.get('chart'):
-                    new_html += '<table>'
-                    for row in chart_json['chart']:
-                        new_html += '<tr>'
+                    new_html += '<table style="width:100%; border-collapse:collapse;">'
+                    for i, row in enumerate(chart_json['chart']):
+                        if i % 2 == 0:
+                            new_html += '<tr style="background-color:#aaa;">'
+                        else:
+                            new_html += '<tr>'
                         for it in row:
-                            new_html += '<td style="padding:8px;">{}</td>'.format(it)
+                            new_html += '<td style="padding:12px 8px; border:1px solid black;">{}</td>'.format(it)
                         new_html += '</tr>'
                     new_html += '</table>'
                 elif chart_json.get('products'):
@@ -389,14 +393,18 @@ def get_content(url, args, site_json, save_debug=False):
                     shortcode_json = json.loads(el['merchantoffers'].replace('&quot;', '"'))
                     for it in shortcode_json:
                         if it.get('offerPrice'):
-                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(it['rawUrl'], float(it['offerPrice']), it['offerMerchant'])
+                            label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
+                            new_html += utils.add_button(it['rawUrl'], label)
                         else:
-                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(it['rawUrl'], it['offerMerchant'])
-                new_html += '<hr/>'
+                            label = 'View at ' + it['offerMerchant']
+                            new_html += utils.add_button(it['rawUrl'], label)
+                new_html += '<hr/><div>&nbsp;</div>'
 
             elif el['shortcode'] == 'reviewcard':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
                 #utils.write_file(shortcode_json, './debug/shortcode.json')
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;">'
+
                 img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
                 captions = []
                 if shortcode_json['imageGroup'].get('caption'):
@@ -407,49 +415,70 @@ def get_content(url, args, site_json, save_debug=False):
                         captions.append(shortcode_json['imageGroup']['caption'])
                 if shortcode_json['imageGroup'].get('credit'):
                     captions.append(shortcode_json['imageGroup']['credit'])
-                new_html = utils.add_image(img_src, ' | '.join(captions))
-                new_html += '<div style="text-align:center;"><h3>{}</h3>'.format(shortcode_json['productName'])
+                new_html += '<div style="flex:1; min-width:256px;"><img src="{}" style="width:100%;">'.format(img_src)
+                if captions:
+                    new_html += '<div><small>{}</small></div>'.format(' | '.join(captions))
+
+                new_html += '<div style="text-align:center; padding-top:8px; font-size:1.1em; font-weight:bold;">{}</div>'.format(shortcode_json['productName'])
                 if shortcode_json.get('rating'):
-                    new_html += '<span style="font-size:2em; font-weight:bold;">{}</span>/10'.format(shortcode_json['rating'])
+                    new_html += '<div style="text-align:center; padding-top:8px; font-size:2em; font-weight:bold;">{}</div>'.format(shortcode_json['rating'])
                 new_html += '</div>'
-                new_html += '<h4 style="margin-bottom:0;">&#128077;&nbsp;Pros</h4><ul>'
+
+                new_html += '<div style="flex:1; min-width:256px;">'
+                new_html += '<div style="font-weight:bold;">Like</div><ul style=\'list-style-type:"👍&nbsp;"\'>'
                 for it in list(filter(None, shortcode_json['like'].split('~'))):
                     new_html += '<li>{}</li>'.format(it.strip())
-                new_html += '</ul><h4 style="margin-bottom:0;">&#128078;&nbsp;Cons</h4><ul>'
+                new_html += '</ul><div style="font-weight:bold;">Don\'t Like</div><ul style=\'list-style-type:"👎&nbsp;"\'>'
                 for it in list(filter(None, shortcode_json['dislike'].split('~'))):
                     new_html += '<li>{}</li>'.format(it.strip())
-                new_html += '</ul>'
+                new_html += '</ul></div>'
+
+                new_html += '<div style="flex:1; min-width:256px;">'
                 if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
                     for it in shortcode_json['techProd']['resellers']:
-                        new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(utils.get_redirect_url(it['url']), int(it['price'])/100, it['name'])
+                        offer_url = utils.get_redirect_url(it['url'])
+                        label = '${:.2f} at {}'.format(int(it['price']) / 100, it['name'])
+                        new_html += utils.add_button(offer_url, label)
                 else:
                     for it in shortcode_json['merchantOffers']:
+                        offer_url = it['rawUrl']
                         if it.get('offerPrice'):
-                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(it['rawUrl'], float(it['offerPrice']), it['offerMerchant'])
+                            label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
                         else:
-                            new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(it['rawUrl'], it['offerMerchant'])
+                            label = 'View at ' + it['offerMerchant']
+                        new_html += utils.add_button(offer_url, label)
+                new_html += '</div></div><div>&nbsp;</div>'
 
             elif el['shortcode'] == 'newscard':
                 new_html += utils.add_blockquote('<h3 style="margin-bottom:0;">What\'s happening</h3><p>{}</p><h3 style="margin-bottom:0;">Why it matters</h3><p>{}</p>'.format(el['whathappening'], el['whymatters']))
 
             elif el['shortcode'] == 'buybutton':
-                new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;">{}</a></div>'.format(el['button-url'], el['button-text'])
+                new_html += utils.add_button(el['button-url'], el['button-text'])
 
             elif el['shortcode'] == 'commercebutton':
-                new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;">{}</a></div>'.format(el['raw-url'], el['button-text'])
+                new_html += utils.add_button(el['raw-url'], el['button-text'])
 
             elif el['shortcode'] == 'commercepromo':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
                 # utils.write_file(shortcode_json, './debug/shortcode.json')
-                new_html += '<table><tr><td><img src="{}" width="200px"/></td><td><strong>{}</strong><br/>'.format(resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key, 200), shortcode_json['hed'])
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;">'
+                img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key, 360)
+                new_html += '<div style="flex:1; min-width:160px;"><img src="{}" style="width:100%;"></div>'.format(img_src)
+                new_html += '<div style="flex:2; min-width:256px;"><div style="font-size:1.05em; font-weight:bold;">{}</div>'.format(shortcode_json['hed'])
                 if shortcode_json.get('offerPrice') and shortcode_json['offerPrice'] != 'undefined':
-                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(shortcode_json['offerUrl'], float(shortcode_json['offerPrice']), shortcode_json['offerMerchant'])
+                    offer_url = shortcode_json['offerUrl']
+                    label = '${:.2f} at {}'.format(float(shortcode_json['offerPrice']), shortcode_json['offerMerchant'])
+                    new_html += utils.add_button(offer_url, label)
                 elif shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
-                    promo_url = utils.get_redirect_url(shortcode_json['techProd']['resellers'][0]['url'])
-                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center;"><a href="{}" style="color:white;">${:.2f} at {}</a></div>'.format(promo_url, int(shortcode_json['techProd']['resellers'][0]['price'])/100, shortcode_json['techProd']['resellers'][0]['name'])
+                    for it in shortcode_json['techProd']['resellers']:
+                        offer_url = utils.get_redirect_url(it['url'])
+                        label = '${:.2f} at {}'.format(int(it['price']) / 100, it['name'])
+                        new_html += utils.add_button(offer_url, label)
                 else:
-                    new_html += '<div style="width:250px; padding:10px; margin-bottom:1em; background-color:red; text-align:center; color:white;"><a href="{}" style="color:white;"> View at {}</a></div>'.format(shortcode_json['offerUrl'], shortcode_json['offerMerchant'])
-                new_html += '</td></tr></table>'
+                    offer_url = shortcode_json['offerUrl']
+                    label = 'View at ' + shortcode_json['offerMerchant']
+                    new_html += utils.add_button(offer_url, label)
+                new_html += '</div></div><div>&nbsp;</div>'
 
             elif el['shortcode'] == 'pinbox':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
@@ -462,7 +491,10 @@ def get_content(url, args, site_json, save_debug=False):
             elif el['shortcode'] == 'codesnippet':
                 if el['encoding'] == 'base64':
                     code = base64.b64decode(el['code']).decode('utf-8')
-                    if re.search(r'https://joinsubtext\.com/|myFinance-widget', code):
+                    if 'infogram-embed' in code:
+                        m = re.search(r'data-id="([^"]+)"', code)
+                        new_html = utils.add_embed('https://e.infogram.com/{}?src=embed'.format(m.group(1)))
+                    elif re.search(r'https://joinsubtext\.com/|myFinance-widget', code):
                         el.decompose()
                         continue
                     elif re.search(r'^<(h\d|br)\b', code):
@@ -495,6 +527,17 @@ def get_content(url, args, site_json, save_debug=False):
             if new_html:
                 el.insert_after(BeautifulSoup(new_html, 'html.parser'))
                 el.decompose()
+
+
+        for el in soup.find_all('table', attrs={"data-title": True}):
+            el['style'] = 'width:100%; border-collapse:collapse;'
+            for i, it in enumerate(el.find_all('tr')):
+                if i % 2 == 0:
+                    it['style'] = 'background-color:#aaa;'
+                else:
+                    it['style'] = ''
+            for it in el.find_all(['td', 'th']):
+                it['style'] = 'padding:12px 8px; border:1px solid black;'
 
         for el in soup.select('p > strong:-soup-contains("Also:")'):
             it = el.find_parent('p')

@@ -1,7 +1,7 @@
-import html, pytz, re
+import hashlib, math, random, re, uuid
 from bs4 import BeautifulSoup
-from datetime import datetime
-from urllib.parse import quote_plus, unquote_plus, urlsplit
+from datetime import datetime, timezone
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -66,8 +66,8 @@ def render_content(content):
     elif content_type == 'omny':
         content_html += utils.add_embed(content['clipURL'])
 
-    elif content_type == 'podcast-episode-listen':
-        content_html += add_podcast(content['selectedPodcast']['podcastData']['podcastId'], content['selectedPodcast']['podcastData']['episodeId'])
+    # elif content_type == 'podcast-episode-listen':
+    #     content_html += add_podcast(content['selectedPodcast']['podcastData']['podcastId'], content['selectedPodcast']['podcastData']['episodeId'])
 
     elif content_type == 'html-embed':
         soup = BeautifulSoup(content['text'], 'html.parser')
@@ -87,248 +87,298 @@ def render_content(content):
     return content_html
 
 
-def get_page_json(url):
+def make_aud_headers():
+    # https://www.audacy.com/assets-a2/maina7fef96da064e66c7f69.js
+    # function f() {
+    #     var e = Date.now();
+    #     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (function(t) {
+    #         var n = (e + 16 * Math.random()) % 16 | 0;
+    #         return e = Math.floor(e / 16),
+    #         ("x" === t ? n : 3 & n | 8).toString(16)
+    #     }
+    #     ))
+    # }
+    e = int(datetime.now(timezone.utc).timestamp() * 1000)
+    correlation_id = ''
+    for c in 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx':
+        n = int((e + 16 * random.random()) % 16) | 0
+        e = math.floor(e / 16)
+        if c == 'x':
+            correlation_id += hex(n)[2:]
+        elif c == 'y':
+            correlation_id += hex(3 & n | 8)[2:]
+        else:
+            correlation_id += c
+
+    # with STPyV8.JSContext() as ctxt:
+    #     ctxt.eval('''function p(e){for(var t,n,r=function(e,t){return e>>>t|e<<32-t},i=Math.pow,o=i(2,32),a="",s=[],l=8*e.length,c=p.h=p.h||[],u=p.k=p.k||[],d=u.length,f={},h=2;d<64;h++)if(!f[h]){for(t=0;t<313;t+=h)f[t]=h;c[d]=i(h,.5)*o|0,u[d++]=i(h,1/3)*o|0}for(e+="";e.length%64-56;)e+="\0";for(t=0;t<e.length;t++){if((n=e.charCodeAt(t))>>8)return"";s[t>>2]|=n<<(3-t)%4*8}for(s[s.length]=l/o|0,s[s.length]=l,n=0;n<s.length;){var v=s.slice(n,n+=16),g=c;for(c=c.slice(0,8),t=0;t<64;t++){var m=v[t-15],y=v[t-2],b=c[0],w=c[4],S=c[7]+(r(w,6)^r(w,11)^r(w,25))+(w&c[5]^~w&c[6])+u[t]+(v[t]=t<16?v[t]:v[t-16]+(r(m,7)^r(m,18)^m>>>3)+v[t-7]+(r(y,17)^r(y,19)^y>>>10)|0);(c=[S+((r(b,2)^r(b,13)^r(b,22))+(b&c[1]^b&c[2]^c[1]&c[2]))|0].concat(c))[4]=c[4]+S|0}for(t=0;t<8;t++)c[t]=c[t]+g[t]|0}for(t=0;t<8;t++)for(n=3;n+1;n--){var E=c[t]>>8*n&255;a+=(E<16?0:"")+E.toString(16)}return a}''')
+    #     token = ctxt.eval('p("' + correlation_id + '")')
+    token = hashlib.sha256(correlation_id.encode()).hexdigest()
+
     headers = {
-        "accept": "application/json",
-        "accept-language": "en-US,en;q=0.9,de;q=0.8",
-        "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Microsoft Edge\";v=\"99\"",
+        "accept": "*/*",
+        "accept-language": "en-US",
+        "aud-client-session-id": str(uuid.uuid4()),
+        "aud-correlation-id": correlation_id,
+        "aud-platform": "WEB",
+        "aud-platform-variant": "NONE",
+        "aud-user-token": 'f8k:' + token[3:35],
+        "content-type": "application/json",
+        "priority": "u=1, i",
+        "sec-ch-ua": "\"Chromium\";v=\"128\", \"Not;A=Brand\";v=\"24\", \"Microsoft Edge\";v=\"128\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
-        "sec-fetch-site": "same-origin",
-        "x-amphora-page-json": "true",
+        "sec-fetch-site": "same-site"
     }
-    return utils.get_url_json(utils.clean_url(url) + '?json', headers=headers)
-
-
-def add_podcast(podcast_id, episode_id):
-    if podcast_id:
-        api_url = 'https://api.radio.com/v1/podcasts/{}'.format(podcast_id)
-        api_json = utils.get_url_json(api_url)
-        if not api_json:
-            return None
-        url = 'https://www.audacy.com/podcasts/{}'.format(api_json['data']['attributes']['site_slug'])
-
-    if episode_id:
-        api_url = 'https://api.radio.com/v1/episodes/{}'.format(episode_id)
-        api_json = utils.get_url_json(api_url)
-        if not api_json:
-            return ''
-        url += '/{}'.format(api_json['data']['attributes']['site_slug'])
-
-    item = get_podcast_content(url, {"embed":True}, False)
-    if not item:
-        return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(url)
-    return item['content_html']
-
-
-def get_podcast_content(url, args, site_json, save_debug):
-    page_json = get_page_json(url)
-    if not page_json:
-        return None
-    if save_debug:
-        utils.write_file(page_json, './debug/debug.json')
-
-    item = {}
-    content_type = get_content_type(page_json['main'][0])
-    if content_type == 'podcast-episode-page':
-        episode_json = page_json['main'][0]['podcastEpisodeLead']['_computed']
-        item['id'] = episode_json['episode']['id']
-        item['url'] = 'https://www.audacy.com/podcasts/{}/{}'.format(episode_json['podcast']['site_slug'], episode_json['episode']['site_slug'])
-        item['title'] = episode_json['title']
-        dt = datetime.fromisoformat(episode_json['episode']['published_date'].replace('Z', '+00:00'))
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt)
-        item['author'] = {}
-        item['author']['name'] = episode_json['podcast']['title']
-        item['author']['url'] = 'https://www.audacy.com/podcasts/' + episode_json['podcast']['site_slug']
-        item['tags'] = [episode_json['category']]
-        item['summary'] = episode_json['description']
-        item['_image'] = episode_json['imageURL']
-        item['_audio'] = episode_json['episode']['audio_url']
-        item['_duration'] = episode_json['duration_seconds_formatted']
-        poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small><a href="{}">{}</a><br/>{} &#8226; {}<br/>{}</small>'.format(item['url'], item['title'], item['author']['url'], item['author']['name'], utils.format_display_date(dt, False), item['_duration'], item['tags'][0])
-        item['content_html'] = '<div><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(item['_audio'], poster, desc)
-        if not 'embed' in args:
-            item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
-
-    elif content_type == 'podcast-show-page':
-        podcast_json = page_json['main'][0]['podcastLead']['_computed']
-        item['id'] = podcast_json['podcast']['id']
-        item['url'] = 'https://www.audacy.com/podcasts/' + podcast_json['podcast']['site_slug']
-        item['title'] = podcast_json['title']
-        item['author'] = {}
-        item['author']['name'] = item['title']
-        item['author']['url'] = item['url']
-        item['tags'] = [podcast_json['category']]
-        item['summary'] = podcast_json['description']
-        item['_image'] = podcast_json['imageURL']
-
-        poster = '{}/image?url={}&height=128'.format(config.server, quote_plus(item['_image']))
-        desc = '<h4 style="margin-top:0; margin-bottom:0.5em;"><a href="{}">{}</a></h4><small>Category: {}</small>'.format(item['url'], item['title'], item['tags'][0])
-        item['content_html'] = '<div><img style="float:left; margin-right:8px;" src="{}"/><div>{}</div><div style="clear:left;"></div></div>'.format(poster, desc)
-        item['content_html'] += '<blockquote style="border-left:3px solid #ccc; margin-top:4px; margin-left:1.5em; padding-left:0.5em;"><h4 style="margin-top:0; margin-bottom:1em;">Episodes:</h4>'
-
-        if 'embed' in args:
-            n = 5
-        else:
-            n = 10
-        for i, episode in enumerate(page_json['main'][0]['episodeList']['_computed']['episodes']):
-            if i == n:
-                break
-            dt = datetime.fromisoformat(episode['attributes']['published_date'].replace('Z', '+00:00'))
-            if not item.get('_timestamp'):
-                item['date_published'] = dt.isoformat()
-                item['_timestamp'] = dt.timestamp()
-                item['_display_date'] = utils.format_display_date(dt)
-            elif item['_timestamp'] < dt.timestamp():
-                item['date_published'] = dt.isoformat()
-                item['_timestamp'] = dt.timestamp()
-                item['_display_date'] = utils.format_display_date(dt)
-
-            poster = '{}/static/play_button-48x48.png'.format(config.server)
-            desc = '<h5 style="margin-top:0; margin-bottom:0;"><a href="https://www.audacy.com{}">{}</a></h5><small>{} &#8226; {}</small>'.format(episode['attributes']['episode_detail_url'], episode['attributes']['title'], utils.format_display_date(dt, False), episode['attributes']['duration_seconds_formatted'])
-            item['content_html'] += '<div style="margin-bottom:1em;"><a href="{}"><img style="float:left; margin-right:8px;" src="{}"/></a><div style="overflow:hidden;">{}</div><div style="clear:left;"></div></div>'.format(episode['attributes']['audio_url'], poster, desc)
-        item['content_html'] += '</blockquote>'
-        if not 'embed' in args:
-            item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
-    return item
+    return headers
 
 
 def get_content(url, args, site_json, save_debug=False):
-    if '/podcasts/' in url:
-        return get_podcast_content(url, args, site_json, save_debug)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if paths[0] == 'station' or paths[0] == 'podcast':
+        headers = make_aud_headers()
+        api_url = 'https://api.audacy.com/experience/v1/page?path={}&marketIds=401-592|401-561|401-1277|401-7'.format(quote_plus(split_url.path))
+        # print(api_url)
+        page_json = utils.get_url_json(api_url, headers=headers)
+        if not page_json:
+            return None
+        if save_debug:
+            utils.write_file(page_json, './debug/debug.json')
+        content_json = page_json['contentObj']
 
-    page_json = get_page_json(url)
-    if not page_json:
-        return None
-    if save_debug:
-        utils.write_file(page_json, './debug/debug.json')
+        item = {}
+        if page_json['type'] == 'EPISODE':
+            item['id'] = content_json['id']
+            item['url'] = 'https://www.audacy.com' + content_json['url']
+            if content_json.get('title'):
+                item['title'] = content_json['title']
+            dt = datetime.fromisoformat(content_json['publishDate'])
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt, False)
+            if not item.get('title'):
+                item['title'] = item['_display_date']
+            item['author'] = {
+                "name": content_json['parentShow']['title'],
+                "url": "https://www.audacy.com" + content_json['parentShow']['url']
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
+            if content_json['parentShow'].get('genres'):
+                item['tags'] = content_json['parentShow']['genres'].copy()
+            item['summary'] = ''
+            if content_json.get('description'):
+                item['summary'] += '<p>' + content_json['description'] + '</p>'
+            if content_json['entitySubtype'] == 'BROADCAST_SHOW_EPISODE':
+                api_url = 'https://api.audacy.com/experience/v1/content/{}/chapters'.format(content_json['id'])
+                chapters_json = utils.get_url_json(api_url, headers=headers)
+                if chapters_json:
+                    item['summary'] += '<h3>Chapters</h3><table style="border-collapse:collapse; border:1px solid black;">'
+                    for i, chapter in enumerate(chapters_json['chapters']):
+                        if i % 2 == 0:
+                            row_style = ' style="background-color:#ccc;"'
+                        else:
+                            row_style = ''
+                        dt = datetime.fromtimestamp(chapter['startOffset'])
+                        item['summary'] += '<tr{}><td style="white-space:nowrap; text-align:right; padding:8px;">{}</td><td style="padding:8px;">{}</td><td style="white-space:nowrap; text-align:left; padding:8px;">{}</td></tr>'.format(row_style,dt.strftime('%I:%M %p').strip('0'), chapter['title'], utils.calc_duration(chapter['duration']))
+                    item['summary'] += '</table>'
+            item['image'] = content_json['parentImage']['square']
+            if content_json['streamUrl'].get('default'):
+                audio_src = content_json['streamUrl']['default']
+                audio_type = 'audio/mpeg'
+            elif content_json['streamUrl'].get('m3u8'):
+                audio_src = content_json['streamUrl']['m3u8']
+                audio_type = 'application/x-mpegURL'
+                item['_audio_type'] = 'application/x-mpegURL'
+            item['_audio'] = audio_src
+            attachment = {}
+            attachment['url'] = audio_src
+            attachment['mime_type'] = audio_type
+            item['attachments'] = []
+            item['attachments'].append(attachment)
+            item['content_html'] = utils.add_audio(audio_src, item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], content_json['durationSeconds'], audio_type=audio_type)
+            if 'embed' not in args and 'summary' in item:
+                item['content_html'] += item['summary']
 
-    article_json = page_json['main'][0]
+        elif page_json['type'] == 'SHOW':
+            item['id'] = content_json['id']
+            item['url'] = 'https://www.audacy.com' + content_json['url']
+            item['title'] = content_json['title']
+            if content_json.get('parentStation'):
+                item['author'] = {
+                    "name": content_json['parentStation']['title'],
+                    "url": "https://www.audacy.com" + content_json['parentStation']['url']
+                }
+            else:
+                item['author'] = {
+                    "name": content_json['title'],
+                    "url": "https://www.audacy.com" + content_json['url']
+                }
+            item['authors'] = []
+            item['authors'].append(item['author'])
+            if content_json.get('genres'):
+                item['tags'] = content_json['genres'].copy()
+            if content_json.get('description'):
+                item['summary'] = content_json['description']
+            item['image'] = content_json['images']['square']
+            item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+            item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(item['url'], item['image'])
+            item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+            if content_json.get('parentStation'):
+                item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
+            item['content_html'] += '</div></div>'
+            if 'embed' not in args and 'summary' in item:
+                item['content_html'] += item['summary']
+            api_url = 'https://api.audacy.com/experience/v1/content/{}/episodes?page=0&sort=DATE_DESC'.format(content_json['id'])
+            episodes_json = utils.get_url_json(api_url, headers=headers)
+            if episodes_json:
+                if save_debug:
+                    utils.write_file(episodes_json, './debug/podcast.json')
+                item['content_html'] += '<h3>Episodes:</h3>'
+                n = 0
+                for episode in episodes_json['results']:
+                    dt = datetime.fromisoformat(episode['publishDate'])
+                    if dt > datetime.now(timezone.utc):
+                        continue
+                    if 'date_published' not in item:
+                        item['date_published'] = dt.isoformat()
+                        item['_timestamp'] = dt.timestamp()
+                        item['_display_date'] = utils.format_display_date(dt, False)
+                    if episode.get('title'):
+                        title = episode['title']
+                    else:
+                        title = utils.format_display_date(dt, False)
+                    if episode['streamUrl'].get('default'):
+                        audio_src = episode['streamUrl']['default']
+                        audio_type = 'audio/mpeg'
+                    elif episode['streamUrl'].get('m3u8'):
+                        audio_src = episode['streamUrl']['m3u8']
+                        audio_type = 'application/x-mpegURL'
+                    item['content_html'] += utils.add_audio(audio_src, episode['parentImage']['square'], title, 'https://www.audacy.com' + episode['url'], '', '', utils.format_display_date(dt, False), episode['durationSeconds'], audio_type=audio_type, show_poster=False)
+                    if n == 4:
+                        break
+                    else:
+                        n += 1
 
-    item = {}
-    item['id'] = article_json['_ref']
-    item['url'] = article_json['canonicalUrl'].replace('http:', 'https:')
-    item['title'] = article_json['headline']
+        elif page_json['type'] == 'STATION':
+            item['id'] = content_json['id']
+            item['url'] = 'https://www.audacy.com' + content_json['url']
+            item['title'] = content_json['title']
+            item['author'] = {
+                "name": content_json['title'],
+                "url": "https://www.audacy.com" + content_json['url']
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
+            if content_json.get('genres'):
+                item['tags'] = content_json['genres'].copy()
+            if content_json.get('description'):
+                item['summary'] = content_json['description']
+            item['image'] = content_json['images']['square']
+            if content_json.get('streamUrl'):
+                if content_json['streamUrl'].get('default'):
+                    audio_src = content_json['streamUrl']['default']
+                    audio_type = 'audio/mpeg'
+                elif content_json['streamUrl'].get('m3u8'):
+                    audio_src = content_json['streamUrl']['m3u8']
+                    audio_type = 'application/x-mpegURL'
+                    item['_audio_type'] = 'application/x-mpegURL'
+                elif content_json['streamUrl'].get('aac'):
+                    audio_src = content_json['streamUrl']['aac']
+                    audio_type = 'audio/aac'
+                    item['_audio_type'] = 'audio/aac'
+                item['_audio'] = audio_src
+                attachment = {}
+                attachment['url'] = audio_src
+                attachment['mime_type'] = audio_type
+                item['attachments'] = []
+                item['attachments'].append(attachment)
+            if '_audio' in item:
+                title = ''
+                api_url = 'https://api.audacy.com/experience/v1/content/{}/schedule'.format(item['id'])
+                schedule_json = utils.get_url_json(api_url, headers=headers)
+                if schedule_json:
+                    for show in schedule_json['schedule']:
+                        dt = datetime.now(timezone.utc)
+                        dt_pub = datetime.fromisoformat(show['publishDate'])
+                        dt_end = datetime.fromisoformat(show['endDateTime'])
+                        if dt > dt_pub and dt < dt_end:
+                            title = 'Live: <a href="https://www.audacy.com{}">{}</a>'.format(show['url'], show['parentTitle'])
+                            break
+                item['content_html'] = utils.add_audio(audio_src, item['image'], item['title'], item['url'], '', '', title, -1, audio_type=audio_type)
+            else:
+                item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+                item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(item['url'], item['image'])
+                item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+                item['content_html'] += '</div></div>'
+            if 'embed' not in args and 'summary' in item:
+                item['content_html'] += item['summary']
 
-    if article_json.get('firstPublishedDate'):
-        dt = datetime.fromisoformat(article_json['firstPublishedDate'].replace('Z', '+00:00'))
     else:
-        dt = datetime.fromisoformat(article_json['date'])
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['dateModified'].replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
+        headers = {
+            "accept": "application/json",
+            "accept-language": "en-US,en;q=0.9,de;q=0.8",
+            "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Microsoft Edge\";v=\"99\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "x-amphora-page-json": "true",
+        }
+        page_json = utils.get_url_json(utils.clean_url(url) + '?json', headers=headers)
+        if not page_json:
+            return None
+        if save_debug:
+            utils.write_file(page_json, './debug/debug.json')
+        content_json = page_json['main'][0]
 
-    authors = []
-    for author in article_json['authors']:
-        authors.append(author['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item = {}
+        item['id'] = content_json['_ref']
+        item['url'] = content_json['canonicalUrl'].replace('http:', 'https:')
+        item['title'] = content_json['headline']
 
-    if article_json.get('tags') and article_json['tags'].get('textTags'):
-        item['tags'] = article_json['tags']['textTags'].copy()
+        if content_json.get('firstPublishedDate'):
+            dt = datetime.fromisoformat(content_json['firstPublishedDate']).astimezone(timezone.utc)
+        else:
+            dt = datetime.fromisoformat(content_json['date']).astimezone(timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        if content_json.get('dateModified'):
+            dt = datetime.fromisoformat(content_json['dateModified']).astimezone(timezone.utc)
+            item['date_modified'] = dt.isoformat()
 
-    if article_json.get('feedImg'):
-        item['_image'] = article_json['feedImg']['url']
-    elif article_json.get('feedImgUrl'):
-        item['_image'] = article_json['feedImgUrl']
+        item['authors'] = []
+        for it in content_json['authors']:
+            item['authors'].append({"name": it['name']})
+        if len(item['authors']) > 0:
+            item['author'] = {}
+            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
 
-    item['summary'] = article_json['pageDescription']
+        if content_json.get('tags') and content_json['tags'].get('textTags'):
+            item['tags'] = content_json['tags']['textTags'].copy()
 
-    item['content_html'] = ''
-    if article_json.get('lead'):
-        if  get_content_type(article_json['lead'][0]) == 'omny':
-            if article_json.get('feedImg'):
-                item['content_html'] += render_content(article_json['feedImg']) + '<br/>'
-            elif article_json.get('feedImgUrl'):
-                item['content_html'] += utils.add_image(article_json['feedImgUrl']) + '<br/>'
-        for content in article_json['lead']:
+        if content_json.get('feedImg'):
+            item['image'] = content_json['feedImg']['url']
+        elif content_json.get('feedImgUrl'):
+            item['image'] = content_json['feedImgUrl']
+
+        item['summary'] = content_json['pageDescription']
+
+        item['content_html'] = ''
+        if content_json.get('lead'):
+            for content in content_json['lead']:
+                item['content_html'] += render_content(content)
+
+        for content in content_json['content']:
             item['content_html'] += render_content(content)
-
-    for content in article_json['content']:
-        item['content_html'] += render_content(content)
-
-    if article_json.get('slides'):
-        for slide in article_json['slides']:
-            item['content_html'] += '<h2>{}</h2>'.format(slide['title'].replace('<br />', ''))
-            for content in slide['slideEmbed']:
-                item['content_html'] += render_content(content)
-            for content in slide['description']:
-                item['content_html'] += render_content(content)
-
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    page_json = get_page_json(args['url'])
-    if not page_json:
-        return None
-    if save_debug:
-        utils.write_file(page_json, './debug/feed.json')
-
-    content_type = get_content_type(page_json['main'][0])
-    if content_type == 'section-front' or content_type == 'station-front':
-        main_content = page_json['main'][0]['mainContent']
-    elif content_type == 'topic-page':
-        main_content = []
-        main_content.append(page_json['main'][0]['twoColumnComponent'])
-    else:
-        logger.warning('unhandled feed page type {} in {}'.format(content_type, args['url']))
-        return None
-
-    articles = []
-    for content in main_content:
-        content_type = get_content_type(content)
-        if content_type == 'multi-column' or content_type == 'two-column-component' or content_type == 'latest-content':
-            for key, val in content.items():
-                if re.search(r'col\d|(first|second|third)Column', key):
-                    for column in val:
-                        if column['_computed'].get('articles'):
-                            for article in column['_computed']['articles']:
-                                articles.append(article)
-                        if column['_computed'].get('content'):
-                            for article in column['_computed']['content']:
-                                articles.append(article)
-
-    n = 0
-    items = []
-    for article in articles:
-        if save_debug:
-            logger.debug('getting contents for ' + article['canonicalUrl'])
-        item = get_content(article['canonicalUrl'], args, site_json, save_debug)
-        if item:
-            if '/topic/' not in args['url'] and not item['url'].startswith(args['url'].lower()):
-                continue
-            if utils.filter_item(item, args) == True:
-                items.append(item)
-                n += 1
-                if 'max' in args:
-                    if n == int(args['max']):
-                        break
-            else:
-                logger.debug('skipping ' + item['url'])
-
-    feed = utils.init_jsonfeed(args)
-    if page_json['main'][0]['_computed'].get('isStation'):
-        title = page_json['main'][0]['stationName']
-    else:
-        title = 'Audacy'
-    if page_json['main'][0].get('title'):
-        if title:
-            title += ' > '
-        title += page_json['main'][0]['title'].title()
-    elif page_json.get('pageHeader') and page_json['pageHeader'][0].get('plaintextPrimaryHeadline'):
-        if title:
-            title += ' > '
-        title += page_json['pageHeader'][0]['plaintextPrimaryHeadline']
-    feed['title'] = title
-    feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
-    return feed
+    # TODO
+    return None

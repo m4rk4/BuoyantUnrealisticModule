@@ -1,7 +1,6 @@
-import html, json, re
+import json, pytz
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import quote_plus
+from datetime import datetime
 
 import config, utils
 
@@ -12,46 +11,55 @@ logger = logging.getLogger(__name__)
 
 def get_content(url, args, site_json, save_debug=False):
     # https://share.transistor.fm/e/602f95a2/dark
+    # https://share.transistor.fm/e/6a7ad271
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
-    soup = BeautifulSoup(page_html, 'html.parser')
-    el = soup.find(attrs={"x-data": "transistor.audioEmbedPlayer"})
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('div', id='embed-player')
     if not el:
-        logger.warning('unable to find transistor.audioEmbedPlayer in ' + url)
+        logger.warning('unable to find embed-player in ' + url)
         return None
-    data_json = json.loads(html.unescape(el['data-episodes']))
+    i = el['x-data'].find('{')
+    j = el['x-data'].rfind('}') + 1
+    audio_json = json.loads(el['x-data'][i:j])
     if save_debug:
-        utils.write_file(data_json, './debug/audio.json')
-    audio_json = data_json[0]
+        utils.write_file(audio_json, './debug/audio.json')
+    ep_json = audio_json['episodes'][0]
 
     item = {}
-    item['id'] = audio_json['id']
-    item['url'] = audio_json['share_url']
-    item['title'] = audio_json['title']
+    item['id'] = ep_json['id']
+    item['url'] = ep_json['share_url']
+    item['title'] = ep_json['title']
 
-    dt = datetime.strptime(audio_json['formatted_published_at'], '%B %d, %Y')
+    tz_loc = pytz.timezone(config.local_tz)
+    dt_loc = datetime.strptime(ep_json['formatted_published_at'], '%B %d, %Y')
+    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt, False)
 
-    item['author'] = {"name": audio_json['author']}
+    item['author'] = {
+        "name": audio_json['title'],
+        "url": audio_json['website']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
-    item['_image'] = audio_json['artwork']
-    poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
+    item['image'] = ep_json['artwork']
 
-    item['_audio'] = audio_json['trackable_media_url']
+    item['_audio'] = ep_json['trackable_media_url']
     attachment = {}
     attachment['url'] = item['_audio']
     attachment['mime_type'] = 'audio/mpeg'
     item['attachments'] = []
     item['attachments'].append(attachment)
 
-    item['summary'] = audio_json['formatted_summary']
+    item['summary'] = ep_json['formatted_summary']
 
-    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/><small>{}</small><br/><small>{}&nbsp;&bull;&nbsp;{}</small></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['name'], item['_display_date'], audio_json['duration_in_mmss'])
-    if 'embed' not in args:
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], ep_json['duration'])
+    if 'embed' not in args and ep_json.get('description'):
+        item['content_html'] += '<p>' + ep_json['description'] + '</p>'
     return item
 
 

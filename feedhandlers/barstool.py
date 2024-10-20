@@ -74,7 +74,11 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(story_json['updated_at'])
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {"name": story_json['author']['name']}
+    item['author'] = {
+        "name": story_json['author']['name']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = []
     for it in story_json['category']:
@@ -88,7 +92,20 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append(it['tag'])
 
     if story_json.get('thumbnail'):
-        item['_image'] = story_json['thumbnail']['raw']
+        item['image'] = story_json['thumbnail']['raw']
+
+    soup = BeautifulSoup(story_json['post_type_meta']['standard_post']['raw_content'], 'html.parser')
+    for el in soup.find_all(id='Article-Ad-Placeholder'):
+        el.decompose()
+
+    for el in soup.find_all('p'):
+        if el.get_text().strip():
+            item['summary'] = el.get_text().strip()
+            break
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if 'video' in paths:
@@ -100,10 +117,6 @@ def get_content(url, args, site_json, save_debug=False):
                 if not video:
                     video = video_json['sources']
             item['content_html'] = utils.add_video(video['src'], video['type'], video_json['poster'], video_json['name'])
-
-    soup = BeautifulSoup(story_json['post_type_meta']['standard_post']['raw_content'], 'html.parser')
-    for el in soup.find_all(id='Article-Ad-Placeholder'):
-        el.decompose()
 
     for el in soup.find_all(class_='oembed__wrapper'):
         new_html = ''
@@ -130,7 +143,7 @@ def get_content(url, args, site_json, save_debug=False):
                 img_src = el.img['src']
             it = el.find(class_='image-attribution')
             if it:
-                caption = el.decode_contents()
+                caption = it.decode_contents()
             else:
                 caption = ''
             new_html = utils.add_image(img_src, caption)

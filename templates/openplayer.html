@@ -4,15 +4,28 @@
     <meta charset="UTF-8">
     <title>Title</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.css" />
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        .op-player__fit--wrapper {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
 </head>
 <body>
-    <video class="op-player__media" id="player" controls playsinline poster="{{ args.poster }}">
-        <source src="{{ args.src }}" type="{{ args.src_type }}" />
-    </video>
+    <div id="video-wrapper" style="width: 100vw; height: 100vh;">
+        <video class="op-player__media" id="player" controls playsinline poster="{{ args.poster }}">
+            <source src="{{ args.src }}" type="{{ args.src_type }}" />
+        </video>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
     <script>
-        // Check the `API and events` link below for more options
-           const player = new OpenPlayerJS('player');
+           const player = new OpenPlayerJS('player', {
+               mode: 'fit'
+           });
            player.init();
     </script>
 </body>

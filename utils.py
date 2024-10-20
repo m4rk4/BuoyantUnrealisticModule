@@ -3,6 +3,7 @@ import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, py
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime
+from duckduckgo_search import DDGS
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from requests.adapters import HTTPAdapter
@@ -173,6 +174,7 @@ def requests_retry_session(retries=4):
 
 def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False):
   # https://www.whatismybrowser.com/guides/the-latest-user-agent/
+  # https://developers.whatismybrowser.com/
   if user_agent == 'desktop':
     ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
   elif user_agent == 'mobile':
@@ -190,15 +192,25 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
   elif user_agent == 'facebook':
     # https://gitlab.com/magnolia1234/bypass-paywalls-chrome-clean/-/blob/master/background.js
     ua = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
+  elif user_agent == 'applebot':
+    # https://support.apple.com/en-us/119829
+    ua = 'Mozilla/5.0 (Device; OS_version) AppleWebKit/WebKit_version (KHTML, like Gecko)Version/Safari_version [Mobile/Mobile_version] Safari/WebKit_version (Applebot/Applebot_version; +http://www.apple.com/go/applebot)'
+  elif user_agent == 'bingbot':
+    ua = 'Mozilla/5.0 (compatible; bingbot/2.0 http://www.bing.com/bingbot.htm)'
+  elif user_agent == 'grapeshot':
+    ua = 'Mozilla/5.0 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)'
+  elif user_agent == 'none':
+    ua = ''
   else: # Googlebot
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 
-  if headers:
+  if headers and ua:
     if not (headers.get('user-agent') or headers.get('User-Agent') or headers.get('sec-ch-ua')):
       headers['user-agent'] = ua
-  else:
-    headers = {}
-    headers['user-agent'] = ua
+  elif ua:
+    headers = {
+      "user-agent": ua
+    }
 
   if use_proxy:
     proxies = config.proxies
@@ -348,6 +360,8 @@ def find_redirect_url(url):
       return m.group(1)
   elif 'play.podtrac.com' in split_url.netloc:
     return 'https://' + '/'.join(paths[1:])
+  elif split_url.netloc == 'dts.podtrac.com' and 'redirect.mp3' in paths:
+    return 'https://' + '/'.join(paths[1:])
   elif 'injector.simplecastaudio.com' in split_url.path:
     m = re.search(r'injector\.simplecastaudio\.com/.*', split_url.path)
     return 'https://' + m.group(0)
@@ -412,6 +426,10 @@ def find_redirect_url(url):
           link = soup.find('a')
           if link:
             return get_redirect_url(link['href'])
+    elif split_url.netloc == 'tidd.ly':
+      r = requests.get(url)
+      if r.status_code == 200:
+        return r.url
     elif split_url.netloc == 'howl.me':
       pass
     else:
@@ -473,36 +491,64 @@ def get_url_title_desc(url):
     desc = None
   return title, desc
 
-def post_url(url, data=None, json_data=None, headers=None, r_text=False):
-  try:
-    if data:
-      if headers:
-        r = requests.post(url, data=data, headers=headers)
+def post_url(url, data=None, json_data=None, headers=None, r_text=False, use_proxy=False, use_curl_cffi=False, site_json=None):
+  if use_proxy:
+    proxies = config.proxies
+  else:
+    proxies = None
+  if use_curl_cffi:
+    try:
+      if data:
+        if headers:
+          r = curl_cffi_requests.post(url, data=data, headers=headers, impersonate=config.impersonate, proxies=proxies)
+        else:
+          r = curl_cffi_requests.post(url, data=data, impersonate=config.impersonate, proxies=proxies)
+      elif json_data:
+        if headers:
+          r = curl_cffi_requests.post(url, json=json_data, headers=headers, impersonate=config.impersonate, proxies=proxies)
+        else:
+          r = curl_cffi_requests.post(url, json=json_data, impersonate=config.impersonate, proxies=proxies)
       else:
-        r = requests.post(url, data=data)
-    elif json_data:
-      if headers:
-        r = requests.post(url, json=json_data, headers=headers)
+        if headers:
+          r = curl_cffi_requests.post(url, headers=headers, impersonate=config.impersonate, proxies=proxies)
+        else:
+          r = curl_cffi_requests.post(url, impersonate=config.impersonate, proxies=proxies)
+      r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+      status_code = e.response.status_code
+      logger.warning('curl_cffi status code {} requesting {}'.format(e.response.status_code, url))
+      if status_code != 402:
+        return None
+  else:
+    try:
+      if data:
+        if headers:
+          r = requests.post(url, data=data, headers=headers)
+        else:
+          r = requests.post(url, data=data)
+      elif json_data:
+        if headers:
+          r = requests.post(url, json=json_data, headers=headers)
+        else:
+          r = requests.post(url, json=json_data)
       else:
-        r = requests.post(url, json=json_data)
-    else:
-      if headers:
-        r = requests.post(url, headers=headers)
-      else:
-        r = requests.post(url)
-    r.raise_for_status()
-  except requests.exceptions.HTTPError as e:
-    status_code = e.response.status_code
-    logger.warning('HTTPError {} requesting {}'.format(e.response.status_code, url))
-    # 402 Payment Required. Try skipping and processing the json anyway.
-    if status_code != 402:
+        if headers:
+          r = requests.post(url, headers=headers)
+        else:
+          r = requests.post(url)
+      r.raise_for_status()
+    except requests.exceptions.HTTPError as e:
+      status_code = e.response.status_code
+      logger.warning('HTTPError {} requesting {}'.format(e.response.status_code, url))
+      # 402 Payment Required. Try skipping and processing the json anyway.
+      if status_code != 402:
+        return None
+    except requests.exceptions.ConnectionError:
+      logger.warning('ConnectionError requesting {}'.format(url))
       return None
-  except requests.exceptions.ConnectionError:
-    logger.warning('ConnectionError requesting {}'.format(url))
-    return None
-  except requests.exceptions.Timeout:
-    logger.warning('Timeout error requesting {}'.format(url))
-    return None
+    except requests.exceptions.Timeout:
+      logger.warning('Timeout error requesting {}'.format(url))
+      return None
   if r_text:
     return r.text
   else:
@@ -567,7 +613,7 @@ def closest_value(lst, target):
 
 def closest_dict(lst_of_dict, k, target, greater_than=False):
   # remove items with out the key
-  k_lst = [it for it in lst_of_dict if it.get(k)]
+  k_lst = [it for it in lst_of_dict if it.get(k) != None]
   if not k_lst:
     return None
   if greater_than:
@@ -805,6 +851,11 @@ def add_pullquote(quote, author=''):
   m = re.search(r'^("|“|‘|&#34;)(.*)("|”|’|&#34;)$', quote)
   if m:
     quote = m.group(2)
+  if not author:
+    m = re.search(r'\s\u2013\s([^\u2013]+)$', quote)
+    if m and len(m.group(1).split(' ')) <= 3:
+      author = m.group(1)
+      quote = quote.replace(m.group(0), '')
   pullquote = open_pullquote() + quote + close_pullquote(author)
   return pullquote
 
@@ -882,7 +933,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   return fig_html
 
 
-def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, desc=''):
+def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, desc='', use_video_js=True):
   audio_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
 
   if poster and show_poster == True:
@@ -891,18 +942,26 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     audio_html += '<div style="flex:1; min-width:48px; max-width:64px;">'
 
   if audio_src:
-    if poster:
-      audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
+    if use_video_js and audio_type != 'audio_redirect':
+      if poster:
+        audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
+      else:
+        audio_html += '<a href="{}/videojs?src={}&type={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type))
+    elif audio_type == 'audio_redirect':
+      audio_html += '<a href="{}/audio?url={}" target="_blank">'.format(config.server, quote_plus(audio_src))
     else:
-      audio_html += '<a href="{}/videojs?src={}&type={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type))
+      audio_html += '<a href="{}" target="_blank">'.format(audio_src)
 
   if poster and show_poster == True:
     if audio_src:
       audio_html += '<img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/>'.format(config.server, quote_plus(poster))
     else:
       audio_html += '<img src="{}/image?url={}&width=160" style="width:100%;"/>'.format(config.server, quote_plus(poster))
-  else:
+  elif audio_src:
     audio_html += '<img src="{}/static/play_button-64x64.png" style="width:100%;"/>'.format(config.server)
+  else:
+    # transparent circle
+    audio_html += '<span style="height:64px; width:64px; background-color:rgba(0,0,0,0); border-radius:50%; display:inline-block;"></span>'
 
   if audio_src:
     audio_html += '</a>'
@@ -925,15 +984,17 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
       audio_html += author
     audio_html += '</div>'
 
-  if (isinstance(duration, int) or isinstance(duration, float)):
-    if duration > 0:
+  has_duration = False
+  try:
+    # duration is an int or float
+    d = float(duration)
+    if d > 0:
       has_duration = True
-    else:
-      has_duration = False
-  elif isinstance(duration, str) and len(duration) > 0:
+  except:
+    # duration is string
+    d = -1
+    if len(duration) > 0:
       has_duration = True
-  else:
-    has_duration = False
 
   if date or has_duration:
     audio_html += '<div style="font-size:0.9em;">'
@@ -942,10 +1003,10 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     if date and has_duration:
       audio_html += '&nbsp;&bull;&nbsp;'
     if has_duration:
-      if isinstance(duration, str):
-        audio_html += duration
+      if d > 0:
+        audio_html += calc_duration(d)
       else:
-        audio_html += calc_duration(duration)
+        audio_html += duration
     audio_html += '</div>'
 
   if desc:
@@ -1134,12 +1195,15 @@ def add_button(link, text, button_color='gray', text_color='white', center=True,
   button = '<div style="margin:0.5em;'
   if center:
     button += ' text-align:center;'
-  button += '"><a href="{}" style="text-decoration:none;"><span style="{}">{}</span></a></div>'.format(link, style, text)
+  button += '"><a href="{}" style="text-decoration:none;" target="_blank"><span style="{}">{}</span></a></div>'.format(link, style, text)
   return button
 
-def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False):
+def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False, center=True):
   # num_stars is a float
-  star_html = '<div style="text-align:center; color:{}; font-size:{};">'.format(star_color, star_size)
+  star_html = '<div style="'
+  if center:
+    star_html += 'text-align:center; '
+  star_html += 'color:{}; font-size:{};">'.format(star_color, star_size)
   if label:
     star_html += label
   for i in range(1, max_stars + 1):
@@ -1319,16 +1383,49 @@ def get_soup_elements(tag, soup):
       elements = soup.find_all(attrs=tag['attrs'])
   return elements
 
-def calc_duration(s):
+def calc_duration(seconds, include_sec=False, time_format=','):
   duration = []
-  if s > 3600:
-    h = s / 3600
-    duration.append('{} hr'.format(math.floor(h)))
-    m = (s % 3600) / 60
-    duration.append('{} min'.format(math.ceil(m)))
+  if seconds > 3600:
+    h = seconds / 3600
+    if time_format == ':':
+      duration.append(str(math.floor(h)))
+    else:
+      duration.append('{} hr'.format(math.floor(h)))
+    m = (seconds % 3600) / 60
+    if include_sec:
+      if time_format == ':':
+        duration.append(str(math.floor(m)).zfill(2))
+      else:
+        duration.append('{} min'.format(math.floor(m)))
+      s = (seconds % 3600) % 60
+      if time_format == ':':
+        duration.append(str(round(s)).zfill(2))
+      else:
+        duration.append('{} sec'.format(round(s)))
+    else:
+      if time_format == ':':
+        duration.append(str(math.ceil(m)).zfill(2))
+      else:
+        duration.append('{} min'.format(math.ceil(m)))
   else:
-    m = s / 60
-    duration.append('{} min'.format(math.ceil(m)))
+    m = seconds / 60
+    if include_sec:
+      if time_format == ':':
+        duration.append(str(math.floor(m)))
+      else:
+        duration.append('{} min'.format(math.floor(m)))
+      s = (seconds % 3600) % 60
+      if time_format == ':':
+        duration.append(str(round(s)).zfill(2))
+      else:
+        duration.append('{} sec'.format(round(s)))
+    else:
+      if time_format == ':':
+        duration.append(str(math.ceil(m)))
+      else:
+        duration.append('{} min'.format(math.ceil(m)))
+  if time_format == ':':
+    return ':'.join(duration)
   return ', '.join(duration)
 
 
@@ -1392,3 +1489,52 @@ def get_bing_cache(url, slug=-1, save_debug=False):
           return ''
   logger.warning('no bing search result found for ' + url)
   return ''
+
+def search_for(search_query):
+  try:
+    results = DDGS().text(search_query, max_results=10)
+    return results
+  except Exception as e:
+    logger.debug('DDGS exception {} searching for {}'.format(e.__class__.__name__, search_query))
+
+  headers = {
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+    "cache-control": "max-age=0",
+    "content-type": "application/x-www-form-urlencoded",
+    "priority": "u=0, i",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "document",
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-site": "same-origin",
+    "sec-fetch-user": "?1",
+    "upgrade-insecure-requests": "1",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
+  }
+  data = {
+      'q': search_query,
+      'category_general': 1,
+      'pageno': 1,
+      'language': 'all',
+      'time_range': '',
+      'safesearch': 0,
+      'theme': 'simple'
+  }
+  r = requests.post(config.searxng_host + '/search', data=data, headers=headers)
+  if r.status_code != 200:
+    return None
+  results = []
+  soup = BeautifulSoup(r.text, 'lxml')
+  for el in soup.find_all('article', class_='result'):
+    result = {}
+    if el.h3:
+      result['href'] = el.h3.a['href']
+      result['title'] = el.h3.a.get_text().strip()
+    it = el.find('p', class_='content')
+    if it:
+      result['content'] = it.decode_contents().strip()
+    if result:
+      results.append(result)
+  return results
