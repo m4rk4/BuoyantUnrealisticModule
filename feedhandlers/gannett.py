@@ -111,12 +111,14 @@ def get_gallery_content(item, site_code, embed=False):
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return ''
-    # utils.write_file(api_json, './debug/gallery.json')
+    utils.write_file(api_json, './debug/gallery.json')
     images = api_json['data']['asset']['links']['assets']
     item['_gallery'] = []
     gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
     for image in images:
         img = next((it for it in image['asset']['crops'] if it['name'] == 'bestCrop'), None)
+        if not img:
+            img = next((it for it in image['asset']['crops'] if it['name'] == '16_9'), None)
         thumb = resize_image(img['path'], 600, img['width'], img['height'])
         captions = []
         if image['asset'].get('caption'):
@@ -133,7 +135,7 @@ def get_gallery_content(item, site_code, embed=False):
         content_html += gallery_html
     else:
         caption = '<a href="{}" target="_blank">View Photo Gallery</a> ({} images): {}'.format(gallery_url, len(images), api_json['data']['asset']['headline'])
-        content_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_url)
+        content_html = utils.add_image(item['_gallery'][0]['src'], caption, link=gallery_url)
     return content_html
 
 
@@ -160,7 +162,11 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
         return usatoday_sportswire.get_content(url, args, site_json, save_debug)
 
-    article_html = utils.get_url_html(url, user_agent='googlebot')
+    if tld.subdomain and tld.subdomain != 'www':
+        article_url = '{}://www.{}.{}{}'.format(split_url.scheme, tld.domain, tld.suffix, split_url.path)
+    else:
+        article_url = url
+    article_html = utils.get_url_html(article_url, user_agent='twitterbot')
     if not article_html:
         return None
     if save_debug:

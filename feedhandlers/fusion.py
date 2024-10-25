@@ -187,6 +187,8 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += audio_html
             else:
                 logger.warning('unhandled custom_embed inline_audio')
+        elif element['subtype'] == 'videoplayer' and element['embed']['config'].get('videoCode'):
+            element_html += utils.add_embed(element['embed']['config']['videoCode'])
         elif element['subtype'] == 'oovvuu-video':
             video_json = utils.get_url_json('https://playback.oovvuu.media/embed/d3d3LnRoZXN0YXIuY29t/{}'.format(element['embed']['config']['embedId']))
             if video_json:
@@ -389,12 +391,17 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += '<h{0}>{1}</h{0}>'.format(element['level'], element['content'])
 
     elif element['type'] == 'oembed_response':
-        if element['raw_oembed'].get('_id') and element['raw_oembed']['_id'].startswith('http'):
+        if element.get('subtype'):
+            if element['subtype'] == 'instagram' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube':
+                element_html += utils.add_embed(element['referent']['id'])
+            else:
+                logger.warning('unhandled oembed_response subtype ' + element['subtype'])
+        elif element['raw_oembed'].get('_id') and element['raw_oembed']['_id'].startswith('http'):
             element_html += utils.add_embed(element['raw_oembed']['_id'])
         elif element['raw_oembed'].get('url') and element['raw_oembed']['url'].startswith('http'):
             element_html += utils.add_embed(element['raw_oembed']['url'])
         else:
-            logger.warning('unknown raw_oembed url')
+            logger.warning('unhandled oembed_response url')
 
     elif element['type'] == 'list':
         if element['list_type'] == 'unordered':
@@ -444,13 +451,20 @@ def process_content_element(element, url, site_json, save_debug):
             captions.append(element['credits_caption_display'])
         else:
             if element.get('caption') and element['caption'] != '-':
-                captions.append(element['caption'])
-            if element.get('credits') and element['credits'].get('by') and element['credits']['by'][0].get('byline'):
-                if element['credits']['by'][0]['byline'] == 'Fanatics':
-                    # Skip ad
-                    img_src = ''
-                else:
-                    captions.append(element['credits']['by'][0]['byline'])
+                captions.append(
+                    re.sub(r'^<p>|</p>$', '', element['caption'])
+                )
+            if element.get('credits'):
+                if element['credits'].get('by') and element['credits']['by'][0].get('byline'):
+                    if element['credits']['by'][0]['byline'] == 'Fanatics':
+                        # Skip ad
+                        img_src = ''
+                    else:
+                        captions.append(element['credits']['by'][0]['byline'])
+                elif element['credits'].get('affiliation'):
+                    captions.append(
+                        re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation']]))
+                    )
         caption = ' | '.join(captions)
         #if element.get('subtitle') and element['subtitle'].strip():
         #    caption = '<strong>{}.</strong> '.format(element['subtitle'].strip()) + caption
@@ -893,6 +907,9 @@ def get_item(content, url, args, site_json, save_debug):
         return item
 
     item['content_html'] = get_content_html(content, url, site_json, save_debug)
+
+    if content.get('label') and content['label'].get('read_it_at_url'):
+        item['content_html'] += utils.add_embed(content['label']['read_it_at_url']['text'])
     return item
 
 
@@ -1027,6 +1044,9 @@ def get_feed(url, args, site_json, save_debug=False):
             tag = paths[-1]
             source = site_json['stock_symbol_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['stock_symbol_feed']['query'])).replace('SYMBOL', tag).replace('PATH', path).replace('%20', ' ')
+        elif split_url.netloc == 'www.thedailybeast.com' and split_url.path.startswith('/cheat-sheet'):
+            source = site_json['cheat-sheet']['source']
+            query = re.sub(r'\s', '', json.dumps(site_json['cheat-sheet']['query']))
         else:
             if site_json.get('section_feed'):
                 source = site_json['section_feed']['source']
@@ -1083,7 +1103,9 @@ def get_feed(url, args, site_json, save_debug=False):
 
     feed_title = ''
     if isinstance(feed_content, dict):
-        if feed_content.get('content_elements'):
+        if split_url.netloc == 'www.thedailybeast.com' and split_url.path.startswith('/cheat-sheet'):
+            content_elements = feed_content['cheatsheet']['content_elements']
+        elif feed_content.get('content_elements'):
             content_elements = feed_content['content_elements']
         elif feed_content.get('stories'):
             content_elements = feed_content['stories']

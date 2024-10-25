@@ -197,6 +197,8 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = 'Mozilla/5.0 (Device; OS_version) AppleWebKit/WebKit_version (KHTML, like Gecko)Version/Safari_version [Mobile/Mobile_version] Safari/WebKit_version (Applebot/Applebot_version; +http://www.apple.com/go/applebot)'
   elif user_agent == 'bingbot':
     ua = 'Mozilla/5.0 (compatible; bingbot/2.0 http://www.bing.com/bingbot.htm)'
+  elif user_agent == 'twitterbot':
+    ua = 'Mozilla/5.0 (compatible; Twitterbot/1.0)'
   elif user_agent == 'grapeshot':
     ua = 'Mozilla/5.0 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)'
   elif user_agent == 'none':
@@ -1221,7 +1223,7 @@ def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label=
 
 
 def add_embed(url, args={}, save_debug=False):
-  embed_url = url
+  embed_url = url.strip()
   if url.startswith('//'):
     embed_url = 'https:' + url
 
@@ -1276,46 +1278,48 @@ def add_embed(url, args={}, save_debug=False):
   page_html = get_url_html(embed_url)
   if page_html:
     soup = BeautifulSoup(page_html, 'lxml')
+    item = {}
+    el = soup.find('meta', attrs={"property": "og:url"})
+    if el:
+      item['url'] = el['content'].strip()
+    else:
+      el = soup.find('meta', attrs={"name": "twitter:url"})
+      if el:
+        item['url'] = el['content'].strip()
+      else:
+        item['url'] = embed_url
+
     el = soup.find('meta', attrs={"property": "og:title"})
     if el:
-      title = el['content'].strip()
+      item['title'] = el['content'].strip()
     else:
-      el = soup.find('title')
+      el = soup.find('meta', attrs={"name": "twitter:title"})
       if el:
-        title = el.get_text().strip()
+        item['title'] = el['content'].strip()
       else:
-        title = ''
+        el = soup.find('title')
+        if el:
+          item['title'] = el.get_text().strip()
+        else:
+          item['title'] = url
 
     el = soup.find('meta', attrs={"property": "og:image"})
     if el:
-      img_src = el['content']
+      item['image'] = el['content']
     else:
-      img_src = ''
+      el = soup.find('meta', attrs={"name": "twitter:image"})
+      if el:
+        item['image'] = el['content'].strip()
 
     el = soup.find('meta', attrs={"property": "og:description"})
     if el:
-      desc = el['content'].strip()
+      item['summary'] = el['content'].strip()
     else:
       el = soup.find('meta', attrs={"name": "description"})
       if el:
-        desc = el['content'].strip()
-      else:
-        desc = ''
+        item['summary'] = el['content'].strip()
 
-      # embed_html = '<table><tr><td style="width:128px;"><a href="{0}"><img src="{1}" style="width:128px;"/></a></td><td><div style="font-size:1.2em; font-weight:bold;"><a href="{0}">{2}</a></div>'.format(embed_url, img_src, title)
-      # if desc:
-      #   embed_html += '<div>{}</div>'.format(desc)
-      # embed_html += '<small>{}</small></td></tr></table>'.format(urlsplit(embed_url).netloc)
-
-    if title:
-      embed_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-      if img_src:
-        embed_html += '<a href="{}" target="_blank"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(embed_url, img_src)
-      embed_html += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}" target="_blank">{}</a></div>'.format(urlsplit(embed_url).netloc, embed_url, title)
-      if desc:
-        embed_html += '<p style="font-size:0.9em;">{}</p>'.format(desc)
-      embed_html += '</div></div><div>&nbsp;</div>'
-      return embed_html
+    return format_embed_preview(item, False)
 
   return '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(embed_url)
 
@@ -1328,17 +1332,24 @@ def get_content(url, args, save_debug=False):
       args_copy.update(site_json['args'])
   return module.get_content(url, args_copy, site_json, save_debug)
 
-def format_embed_preview(item):
+def format_embed_preview(item, content_link=True):
   content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
   if item.get('_image'):
     content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
   elif item.get('image'):
     content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['image'])
-  content_html += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
+  if not item.get('summary') and not content_link:
+    style = 'margin:8px 8px 16px 8px;'
+  else:
+    style = 'margin:8px 8px 0 8px;'
+  content_html += '<div style="{}"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(style, item['url']).netloc, item['url'], item['title'])
   if item.get('summary'):
     content_html += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-  content_html += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+  if content_link:
+    content_html += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p>'.format(config.server, quote_plus(item['url']))
+  content_html += '</div></div><div>&nbsp;</div>'
   return content_html
+
 def get_ld_json(url):
   page_html = get_url_html(url)
   if not page_html:

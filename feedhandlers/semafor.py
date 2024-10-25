@@ -324,14 +324,17 @@ def get_article(article_json, args, site_json, save_debug):
         item['date_modified'] = dt.isoformat()
 
     if article_json.get('author'):
-        item['author'] = {"name": article_json['author']['name']}
+        item['author'] = {
+            "name": article_json['author']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     elif article_json.get('authors'):
-        authors = []
-        for it in article_json['authors']:
-            authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name'] for x in article_json['authors']}]
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
 
     # TODO: tags
     item['tags'] = []
@@ -342,13 +345,17 @@ def get_article(article_json, args, site_json, save_debug):
     if not item.get('tags'):
         del item['tags']
 
-    item['content_html'] = ''
-    if article_json.get('ledePhoto') and article_json['ledePhoto'].get('asset'):
-        item['_image'] = resize_image(article_json['ledePhoto'])
-        item['content_html'] += add_image(article_json['ledePhoto'], resize_image)
-
     if article_json.get('seoDescription'):
         item['summary'] = article_json['seoDescription']
+
+    item['content_html'] = ''
+    if article_json.get('ledePhoto') and article_json['ledePhoto'].get('asset'):
+        item['image'] = resize_image(article_json['ledePhoto'])
+        item['content_html'] += add_image(article_json['ledePhoto'], resize_image)
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json.get('intro') and article_json['intro'].get('body'):
         for block in article_json['intro']['body']:

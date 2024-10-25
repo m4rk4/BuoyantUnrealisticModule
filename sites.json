@@ -13847,6 +13847,14 @@
         "module": "ghost",
         "post_filters": []
     },
+    "lewoniewski": {
+        "feeds": [
+            "https://en.lewoniewski.info/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://en.lewoniewski.info/wp-json"
+    },
     "lfpress": {
         "args": {
             "add_subtitle": true
@@ -13904,6 +13912,9 @@
             },
             "tag": "li"
         }
+    },
+    "lifehacker": {
+        "module": "mashable"
     },
     "lifewire": {
         "clear_attrs": true,
@@ -14825,6 +14836,9 @@
         "image_url": "https://mary.codes",
         "module": "gatsby",
         "page_data_prefix": ""
+    },
+    "mashable": {
+        "module": "mashable"
     },
     "massive-report": {
         "args": {
@@ -21000,6 +21014,14 @@
     "rivervalleydemocratgazette": {
         "module": "ellington"
     },
+    "rmondello": {
+        "feeds": [
+            "https://rmondello.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://rmondello.com/wp-json"
+    },
     "roadandtrack": {
         "module": "hearstmags"
     },
@@ -25088,7 +25110,60 @@
         "wpjson_path": "https://thecyberexpress.com/wp-json"
     },
     "thedailybeast": {
-        "module": "dailybeast"
+        "api_url": "https://www.thedailybeast.com/pf/api/v3/content/fetch/",
+        "arc_site": "thedailybeast",
+        "author_feed": {
+            "query": {
+                "authorSlug": "AUTHOR",
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10
+            },
+            "source": "story-feed-author"
+        },
+        "content": {
+            "query": {
+                "arc-site": "thedailybeast",
+                "uri": "PATH/",
+                "website_url": "PATH/",
+                "cs_content_alias":"cheatsheet",
+                "bs_content_alias":"business-cheatsheet"
+            },
+            "source": "content-api-tdb-v2"
+        },
+        "cheat-sheet": {
+            "query": {
+                "arc-site": "thedailybeast",
+                "cs_content_alias":"cheatsheet",
+                "bs_content_alias":"business-cheatsheet"
+            },
+            "source": "content-api-tdb-v2"
+        },
+        "deployment": 137,
+        "feeds": [
+            "https://www.thedailybeast.com/arc/outboundfeeds/rss/articles/"
+        ],
+        "module": "fusion",
+        "resizer_secret": "Fmkgru2rZ2uPZ5wXs7B2HbVDHS2SZuA7",
+        "resizer_url": "https://www.thedailybeast.com/resizer/",
+        "section_feed": {
+            "query": {
+                "excludeSections": "",
+                "feature": "results-list",
+                "feedOffset": 0,
+                "feedSize": 10,
+                "includeSections": "/SECTION"}
+,
+            "source": "story-feed-sections"
+        },
+        "tag_feed": {
+            "query": {
+                "feedOffset": 0,
+                "feedSize": 10,
+                "tagSlug": "TAG"
+            },
+            "source": "story-feed-tag"
+        }
     },
     "thedailymash": {
         "feeds": [
@@ -25994,6 +26069,35 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://thenewstack.io/wp-json"
+    },
+    "thenextweb": {
+        "content": {
+            "attrs": {
+                "id": "article-main-content"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "channel-cta"
+                },
+                "tag": "div"
+            }
+        ],
+        "lede_img": {
+            "selector": "article#articleOutput > div.c-article__media"
+        },
+        "module": "wp",
+        "subtitle": {
+            "attrs": {
+                "class": "c-header__intro"
+            },
+            "tag": "p"
+        },
+        "tags": {
+            "selector": "div.c-article__main > ul.c-tags > li.c-tags__tag > a.c-tags__link"
+        }
     },
     "thenib": {
         "feeds": [
@@ -30885,56 +30989,5 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ztgd.com/wp-json"
-    },
-    "rmondello": {
-        "feeds": [
-            "https://rmondello.com/feed"
-        ],
-        "module": "wp_posts",
-        "posts_path": "/wp/v2/posts",
-        "wpjson_path": "https://rmondello.com/wp-json"
-    },
-    "lewoniewski": {
-        "feeds": [
-            "https://en.lewoniewski.info/feed"
-        ],
-        "module": "wp_posts",
-        "posts_path": "/wp/v2/posts",
-        "wpjson_path": "https://en.lewoniewski.info/wp-json"
-    },
-    "thenextweb": {
-        "module": "wp",
-        "content": {
-            "attrs": {
-                "id": "article-main-content"
-            },
-            "tag": "div"
-        },
-        "subtitle": {
-            "attrs": {
-                "class": "c-header__intro"
-            },
-            "tag": "p"
-        },
-        "lede_img": {
-            "selector": "article#articleOutput > div.c-article__media"
-        },
-        "tags": {
-            "selector": "div.c-article__main > ul.c-tags > li.c-tags__tag > a.c-tags__link"
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "channel-cta"
-                },
-                "tag": "div"
-            }
-        ]
-    },
-    "mashable": {
-        "module": "mashable"
-    },
-    "lifehacker": {
-        "module": "mashable"
     }
 }
