@@ -1275,7 +1275,41 @@
         "wpjson_path": "https://armdevices.net/wp-json"
     },
     "arstechnica": {
-        "module": "arstech"
+        "feeds": [
+            "https://arstechnica.com/feed/"
+        ],
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "caption-icon"
+                }
+            },
+            {
+                "selector": "div:has(> figure:has(> iframe[src*=\"/count.gif\"]))"
+            }
+        ],
+        "module": "wp",
+        "content": {
+            "attrs": {
+                "class": "post-content"
+            },
+            "tag": "div"
+        },
+        "lede_img": {
+            "selector": "article > header div:has(> div[class*=\"caption\"])"
+        },
+        "rename": [
+            {
+                "name": "blockquote",
+                "attrs": {
+                    "class": [
+                        "ars-sidebar",
+                        "sidebar"
+                    ]
+                },
+                "tag": "aside"
+            }
+        ]
     },
     "art19": {
         "module": "art19"
@@ -1669,7 +1703,7 @@
         }
     },
     "axios": {
-        "buildId": "rSfTta3GpzCHuzu298Mha",
+        "buildId": "bwRdAAIpPgaBSgkeHqm3h",
         "feeds": [
             "https://api.axios.com/feed/",
             "https://api.axios.com/feed/technology/"
@@ -4151,14 +4185,6 @@
             },
             "source": "article-beta-content-api"
         },
-        "gallery": {
-            "query": {
-                "arc-site": "cleveland",
-                "id": "ID",
-                "uri": "PATH/"
-            },
-            "source": "gallery-api"
-        },
         "deployment": 1428,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
@@ -4167,6 +4193,14 @@
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/sports/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/cavs/?outputType=xml&size=10"
         ],
+        "gallery": {
+            "query": {
+                "arc-site": "cleveland",
+                "id": "ID",
+                "uri": "PATH/"
+            },
+            "source": "gallery-api"
+        },
         "homepage_feed": {
             "query": {
                 "arc-site": "cleveland"

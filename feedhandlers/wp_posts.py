@@ -294,7 +294,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                 if it and it.get_text().strip():
                     credit = it.get_text().strip()
                 else:
-                    it = elm.find(class_=re.compile(r'image-attribution|image-credit|hds-credits|photo-credit|credits-overlay|credits-text|image_source|article-grid-img-credit|__credits|caption-owner'))
+                    it = elm.find(class_=re.compile(r'image-attribution|image-credit|hds-credits|photo-credit|credits-overlay|credits-text|image_source|article-grid-img-credit|__credits|caption-owner|caption-credit'))
                     if it and it.get_text().strip():
                         credit = it.get_text().strip()
                     else:
@@ -306,22 +306,22 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                         it = it.find_parent(class_='author')
                     it.decompose()
 
-                it = elm.find(class_='caption')
+                it = elm.find(class_='caption-content')
                 if it and it.get_text().strip():
-                    if it.find(class_='description'):
-                        it = it.find(class_='description')
-                    captions.insert(0, it.decode_contents().strip())
+                    captions.append(it.decode_contents().strip())
 
                 if not captions:
-                    it = elm.find(class_=re.compile(r'wp-block-media-text__content'))
+                    it = elm.find(class_='caption')
                     if it and it.get_text().strip():
-                        captions.append(it.decode_contents().strip())
+                        if it.find(class_='description'):
+                            it = it.find(class_='description')
+                        captions.insert(0, it.decode_contents().strip())
 
                 if not captions:
-                    it = elm.find(class_=re.compile(r'br-image.*-description|caption-text|image-caption|img-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption|article-grid-img-caption|__caption|inline_caption|r-inner|ie-custom-caption|phtcptn'))
+                    it = elm.find(class_=re.compile(r'wp-block-media-text__content|br-image.*-description|caption-content|caption-text|image-caption|img-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption|article-grid-img-caption|__caption|inline_caption|r-inner|ie-custom-caption|phtcptn'))
                     if it and it.get_text().strip():
                         if it.find('p'):
-                            captions.append(it.decode_contents().strip())
+                            captions.append(it.p.decode_contents().strip())
                         else:
                             captions.append(it.decode_contents().strip())
 
@@ -4046,7 +4046,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.replace_with(new_el)
 
-    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'wp-block-coblocks-gallery-collage', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'list-gallery', 'carousel-basic', 'm-carousel', 'media-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout', 'rslides', 'banner-grid-wrapper', 'slider-wrapper', 'slideshow-wrapper', 'article-gallery', 'article__gallery', 'article__images', 'pictures', 'swiper-wrapper', 'whtGallery']):
+    for el in soup.find_all(class_=['gallery', 'tiled-gallery', 'wp-block-gallery', 'wp-block-jetpack-tiled-gallery', 'wp-block-coblocks-gallery-collage', 'article-slideshow', 'wp-block-jetpack-slideshow', 'ess-gallery-container', 'inline-slideshow', 'list-gallery', 'carousel-basic', 'm-carousel', 'media-carousel', 'multiple-images', 'image-pair', 'undark-image-caption', 'photo-layout', 'rslides', 'banner-grid-wrapper', 'slider-wrapper', 'slideshow-wrapper', 'article-gallery', 'article__gallery', 'article__images', 'pictures', 'swiper-wrapper', 'whtGallery']) + soup.select('div.ars-lightbox:has(img.ars-gallery-image)'):
         # print(el['class'])
         if el.name == None:
             continue
@@ -4166,6 +4166,9 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         elif 'whtGallery' in el['class']:
             # https://android.gadgethacks.com/how-to/see-passwords-for-wi-fi-networks-youve-connected-your-android-device-0160995/
             images = el.find_all('figure')
+            add_caption = True
+        elif 'ars-lightbox' in el['class']:
+            images = el.find_all(class_='ars-lightbox-item')
             add_caption = True
         gallery_parent = el.find_parent('div', id=re.compile(r'attachment_\d'))
         if not gallery_parent:

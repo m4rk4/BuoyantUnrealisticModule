@@ -53,6 +53,20 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if save_debug:
         utils.write_file(meta, './debug/meta.json')
 
+    parsley_page = None
+    if 'parsely-page' in meta:
+        try:
+            parsley_page = json.loads(meta['parsely-page'])
+        except:
+            pass
+
+    parsley_meta = None
+    if 'parsely-metadata' in meta:
+        try:
+            parsley_meta = json.loads(meta['parsely-metadata'])
+        except:
+            pass
+
     ld_json = []
     for el in soup.find_all('script', attrs={"type": "application/ld+json"}):
         try:
@@ -129,6 +143,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         article_json = ld_article
     elif ld_page:
         article_json = ld_page
+    if article_json and save_debug:
+        utils.write_file(article_json, './debug/article.json')
 
     el = soup.find('link', attrs={"type": "application/json+oembed"})
     if el:
@@ -217,7 +233,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 item['title'] = oembed_json['title']
             elif article_json and article_json.get('name'):
                 item['title'] = article_json['name']
-        if not item.get('title'):
+            elif parsley_page and parsley_page.get('title'):
+                item['title'] = parsley_page['title']
+            elif parsley_meta and parsley_meta.get('title'):
+                item['title'] = parsley_meta['title']
+        if not item.get('title') and soup.title:
             item['title'] = soup.title.get_text()
         item['title'] = item['title'].replace('&amp;', '&')
         if item.get('title') and re.search(r'#\d+|&\w+;', item['title']):
@@ -424,6 +444,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             item['tags'] = list(map(str.strip, meta['keywords'].split(',')))
         elif article_json and article_json.get('articleSection') and isinstance(article_json['articleSection'], list):
             item['tags'] = article_json['articleSection'].copy()
+        elif parsley_page:
+            if parsley_page.get('section'):
+                item['tags'].append(parsley_page['section'])
+            if parsley_page.get('tags'):
+                item['tags'] += parsley_page['tags'].copy()
         if not item.get('tags'):
             del item['tags']
         else:
@@ -475,9 +500,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             # print(el.get_text())
             subtitles.append(el.get_text())
         if subtitles:
-            item['content_html'] += '<p><em>{}</em></p>'.format('<br/>'.join(subtitles))
+            item['content_html'] += '<p><em>' + '<br/>'.join(subtitles) + '</em></p>'
+    elif parsley_meta and parsley_meta.get('lower_deck'):
+        item['content_html'] += '<p><em>' + parsley_meta['lower_deck'] + '</em></p>'
     elif 'add_subtitle' in args and item.get('summary'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
+        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
 
     if 'no_lede_caption' in args:
         add_caption = False
