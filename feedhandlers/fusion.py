@@ -897,16 +897,44 @@ def get_item(content, url, args, site_json, save_debug):
         item['summary'] = content['subheadlines']['basic']
 
     if 'embed' in args and content['type'] != 'video':
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
-    item['content_html'] = get_content_html(content, url, site_json, save_debug)
+    if content['type'] == 'gallery':
+        item['_gallery'] = []
+        item['content_html'] = '<h3><a href="{}/gallery?url={}" target="_blank">View photo gallery</a></h3>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        for element in content['content_elements']:
+            img_src = resize_image(element, site_json)
+            thumb = resize_image(element, site_json, 800)
+            desc = ''
+            if element.get('subtitle'):
+                desc = '<h4>' + element['subtitle'] + '</h4>'
+            caption = ''
+            credit = ''
+            if element.get('credits_caption_display'):
+                caption = element['credits_caption_display']
+            else:
+                if element.get('caption') and element['caption'] != '-':
+                    caption = re.sub(r'^<p>|</p>$', '', element['caption'])
+                if element.get('credits'):
+                    if element['credits'].get('by') and element['credits']['by'][0].get('byline'):
+                        if element['credits']['by'][0]['byline'] == 'Fanatics':
+                            # Skip ad
+                            img_src = ''
+                        else:
+                            credit = element['credits']['by'][0]['byline']
+                    elif element['credits'].get('affiliation'):
+                        credit = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation']]))
+            if caption:
+                desc += '<p>' + caption + '</p>'
+            if img_src:
+                item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, credit, link=img_src, desc=desc) + '</div>'
+                item['_gallery'].append({"src": img_src, "caption": credit, "desc": desc, "thumb": thumb})
+        item['content_html'] += '</div>'
+        return item
+    else:
+        item['content_html'] = get_content_html(content, url, site_json, save_debug)
 
     if content.get('label') and content['label'].get('read_it_at_url'):
         item['content_html'] += utils.add_embed(content['label']['read_it_at_url']['text'])
@@ -951,11 +979,17 @@ def get_content(url, args, site_json, save_debug=False):
             query = query.replace('"ALL_PATHS"', json.dumps({"all": paths}).replace(' ', ''))
             api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['story']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         else:
-            query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
+            if '/galleries/' in split_url.path and 'gallery' in site_json:
+                # https://www.cleveland.com/galleries/MWY2D3UWRRC6HMDMV6KQWI6ACM/
+                query = re.sub(r'\s', '', json.dumps(site_json['gallery']['query'])).replace('PATH', path)
+                api_url = '{}{}'.format(site_json['api_url'], site_json['gallery']['source'])
+            else:
+                query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
+                api_url = '{}{}'.format(site_json['api_url'], site_json['content']['source'])
             # if re.search(r'ajc\.com|daytondailynews\.com|springfieldnewssun\.com', split_url.netloc):
             if '"ID"' in query:
                 query = query.replace('ID', paths[-1])
-            api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['content']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
+            api_url += '?query={}&d={}&_website={}'.format(quote_plus(query), site_json['deployment'], site_json['arc_site'])
         if save_debug:
             logger.debug('getting content from ' + api_url)
         api_json = utils.get_url_json(api_url, site_json=site_json)

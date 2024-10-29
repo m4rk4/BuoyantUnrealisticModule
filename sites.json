@@ -4151,7 +4151,15 @@
             },
             "source": "article-beta-content-api"
         },
-        "deployment": 1401,
+        "gallery": {
+            "query": {
+                "arc-site": "cleveland",
+                "id": "ID",
+                "uri": "PATH/"
+            },
+            "source": "gallery-api"
+        },
+        "deployment": 1428,
         "feeds": [
             "https://www.cleveland.com/arc/outboundfeeds/rss/?outputType=xml&size=10",
             "https://www.cleveland.com/arc/outboundfeeds/rss/category/metro/?outputType=xml&size=10",
@@ -12687,6 +12695,9 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://katiecouric.com/wp-json"
+    },
+    "katu": {
+        "module": "sinclair"
     },
     "katv": {
         "module": "sinclair"
@@ -25121,21 +25132,21 @@
             },
             "source": "story-feed-author"
         },
-        "content": {
-            "query": {
-                "arc-site": "thedailybeast",
-                "uri": "PATH/",
-                "website_url": "PATH/",
-                "cs_content_alias":"cheatsheet",
-                "bs_content_alias":"business-cheatsheet"
-            },
-            "source": "content-api-tdb-v2"
-        },
         "cheat-sheet": {
             "query": {
                 "arc-site": "thedailybeast",
-                "cs_content_alias":"cheatsheet",
-                "bs_content_alias":"business-cheatsheet"
+                "bs_content_alias": "business-cheatsheet",
+                "cs_content_alias": "cheatsheet"
+            },
+            "source": "content-api-tdb-v2"
+        },
+        "content": {
+            "query": {
+                "arc-site": "thedailybeast",
+                "bs_content_alias": "business-cheatsheet",
+                "cs_content_alias": "cheatsheet",
+                "uri": "PATH/",
+                "website_url": "PATH/"
             },
             "source": "content-api-tdb-v2"
         },
@@ -25152,8 +25163,8 @@
                 "feature": "results-list",
                 "feedOffset": 0,
                 "feedSize": 10,
-                "includeSections": "/SECTION"}
-,
+                "includeSections": "/SECTION"
+            },
             "source": "story-feed-sections"
         },
         "tag_feed": {

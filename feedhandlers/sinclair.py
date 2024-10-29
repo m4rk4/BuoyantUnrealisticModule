@@ -33,14 +33,18 @@ def get_content(url, args, site_json, save_debug=False):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {"name": article_json['byLine']}
+    item['author'] = {
+        "name": article_json['byLine']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if article_json.get('tags'):
         item['tags'] = []
         for it in article_json['tags']:
             item['tags'].append(it['name'])
 
-    item['_image'] = '{}{}'.format(base_url, article_json['teaserImage']['image']['originalUrl'])
+    item['image'] = '{}{}'.format(base_url, article_json['teaserImage']['image']['originalUrl'])
 
     item['summary'] = article_json['summary']
 
@@ -148,10 +152,10 @@ def get_content(url, args, site_json, save_debug=False):
     if gallery_html:
         item['content_html'] += '<h2>Videos</h2>' + gallery_html
 
-    gallery_html = ''
-    gallery_images = []
     if len(article_json['images']) > 1:
-        gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+        item['_gallery'] = []
+        item['content_html'] += '<h2><a href="{}/gallery?url={}" target="_blank">View photo gallery</a></h2>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for image in article_json['images']:
             img_src = base_url + image['originalUrl']
             thumb = img_src.replace('/resources/media/', '/resources/media2/original/full/640/center/80/')
@@ -159,11 +163,9 @@ def get_content(url, args, site_json, save_debug=False):
                 caption = re.sub(r'\{/?(p|&nbsp;)\}', '', image['caption'])
             else:
                 caption = ''
-            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
-            gallery_html += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
-        gallery_html += '</div>'
-        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
-        item['content_html'] += '<h2><a href="{}" target="_blank">View photo gallery</a></h2>'.format(gallery_url) + gallery_html
+            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
+            item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
+        item['content_html'] += '</div>'
     return item
 
 
