@@ -15,10 +15,18 @@ def get_content(url, args, site_json, save_debug=False):
     # https://substack.com/api/v1/posts/by-id/96541363
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    api_url = '{}://{}/api/v1/posts/{}'.format(split_url.scheme, split_url.netloc, paths[1])
+    if 'post' in paths:
+        # https://substack.com/home/post/p-151067817
+        m = re.search(r'p-(\d+)', paths[-1])
+        if m:
+            api_url = '{}://{}/api/v1/posts/by-id/{}'.format(split_url.scheme, split_url.netloc, m.group(1))
+    else:
+        api_url = '{}://{}/api/v1/posts/{}'.format(split_url.scheme, split_url.netloc, paths[1])
     post_json = utils.get_url_json(api_url)
     if not post_json:
         return None
+    if post_json.get('post'):
+        return get_post(post_json['post'], args, site_json, save_debug)
     return get_post(post_json, args, site_json, save_debug)
 
 
@@ -57,8 +65,14 @@ def get_post(post_json, args, site_json, save_debug):
     if post_json.get('description'):
         item['summary'] = post_json['description']
 
+    content_soup = None
     item['content_html'] = ''
     if post_json['audience'] == 'only_paid':
+        page_html = utils.get_url_html(item['url'])
+        if page_html:
+            page_soup = BeautifulSoup(page_html, 'lxml')
+            if page_soup.find(class_='paywall-jump'):
+                content_soup = page_soup.find(class_='c-content')
         item['content_html'] += '<h2 style="text-align:center;"><a href="{}">This post is for paid subscribers</a></h2>'.format(item['url'])
 
     if post_json.get('subtitle'):
@@ -68,14 +82,14 @@ def get_post(post_json, args, site_json, save_debug):
         audio = next((it for it in post_json['audio_items'] if it['type'] == 'voiceover'), None)
         if not audio:
             audio = next((it for it in post_json['audio_items'] if it['type'] == 'tts'), None)
-        item['_audio'] = audio['audio_url']
-        attachment = {}
-        attachment['url'] = item['_audio']
-        attachment['mime_type'] = 'audio/mpeg'
-        item['attachments'] = []
-        item['attachments'].append(attachment)
-        #item['content_html'] += '<div><a href="{}"><img src="{}/static/play_button-48x48.png" style="float:left;" /><span>&nbsp;Listen to article</span></a></div><div style="clear:left;">&nbsp;</div>'.format(item['_audio'], config.server)
-        item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a></span></div>'.format(item['_audio'], config.server)
+        if audio and audio.get('audio_url'):
+            item['_audio'] = audio['audio_url']
+            attachment = {}
+            attachment['url'] = item['_audio']
+            attachment['mime_type'] = 'audio/mpeg'
+            item['attachments'] = []
+            item['attachments'].append(attachment)
+            item['content_html'] += utils.add_audio(item['_audio'], '', 'Listen to article', '', '', '', '', '', show_poster=False)
 
     if post_json['type'] == 'podcast':
         if post_json.get('videoUpload'):
@@ -100,17 +114,21 @@ def get_post(post_json, args, site_json, save_debug):
             attachment['mime_type'] = 'audio/mpeg'
             item['attachments'] = []
             item['attachments'].append(attachment)
-            link = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(item['_audio']), quote_plus('audio/mpeg'), quote_plus(post_json['cover_image']))
-            poster = '{}/image?url={}&height=540&overlay=audio'.format(config.server, quote_plus(post_json['podcast_episode_image_url']))
-            # item['content_html'] += '<div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}"/></a><span>&nbsp;<a href="{0}">Listen now ({2})</a></span></div>'.format(item['_audio'], poster, duration)
-            caption = '<a href="{}">Listen: {} ({})</a>'.format(link, item['title'], utils.calc_duration(post_json['podcast_duration']))
-            item['content_html'] += utils.add_image(poster, caption, link=link)
+            # TODO: podcast name & url
+            item['content_html'] += utils.add_audio(item['_audio'], post_json['cover_image'], item['title'], item['url'], '', '', utils.format_display_date(datetime.fromisoformat(post_json['podcastUpload']['uploaded_at']), False), post_json['podcastUpload']['duration'])
 
     if post_json.get('body_html'):
         # utils.write_file(post_json['body_html'], './debug/debug.html')
         soup = BeautifulSoup(post_json['body_html'], 'html.parser')
+        if content_soup:
+            paywall = False
+            for it in content_soup.find_all(recursive=False):
+                if paywall:
+                    soup.append(it)
+                if it.get('class') and 'paywall-jump' in it['class']:
+                    paywall = True
 
-        for el in soup.find_all(class_=['subscription-widget-wrap', 'subscription-widget-wrap-editor']):
+        for el in soup.find_all(class_=['subscription-widget-wrap', 'subscription-widget-wrap-editor', 'paywall-jump']):
             el.decompose()
 
         for el in soup.find_all(class_=re.compile('button-wrap')):
@@ -155,10 +173,11 @@ def get_post(post_json, args, site_json, save_debug):
                 # likely from above
                 continue
             elif not el.get('class'):
-                new_html = utils.add_blockquote(el.decode_contents())
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
+                el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
+                # new_html = utils.add_blockquote(el.decode_contents())
+                # new_el = BeautifulSoup(new_html, 'html.parser')
+                # el.insert_after(new_el)
+                # el.decompose()
             else:
                 logger.warning('unhandled blockquote in ' + item['url'])
 

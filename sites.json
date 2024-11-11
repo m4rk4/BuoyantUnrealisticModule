@@ -1275,9 +1275,12 @@
         "wpjson_path": "https://armdevices.net/wp-json"
     },
     "arstechnica": {
-        "feeds": [
-            "https://arstechnica.com/feed/"
-        ],
+        "content": {
+            "attrs": {
+                "class": "post-content"
+            },
+            "tag": "div"
+        },
         "decompose": [
             {
                 "attrs": {
@@ -1288,25 +1291,22 @@
                 "selector": "div:has(> figure:has(> iframe[src*=\"/count.gif\"]))"
             }
         ],
-        "module": "wp",
-        "content": {
-            "attrs": {
-                "class": "post-content"
-            },
-            "tag": "div"
-        },
+        "feeds": [
+            "https://arstechnica.com/feed/"
+        ],
         "lede_img": {
             "selector": "article > header div:has(> div[class*=\"caption\"])"
         },
+        "module": "wp",
         "rename": [
             {
-                "name": "blockquote",
                 "attrs": {
                     "class": [
                         "ars-sidebar",
                         "sidebar"
                     ]
                 },
+                "name": "blockquote",
                 "tag": "aside"
             }
         ]
@@ -2628,6 +2628,11 @@
     "bonappetit": {
         "module": "cne"
     },
+    "bookforum": {
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/articles",
+        "wpjson_path": "https://bhaskars2.sg-host.com/wp-json"
+    },
     "bookmarks": {
         "feeds": [
             "https://bookmarks.reviews/feed"
@@ -3615,6 +3620,19 @@
             "https://www.celebretainment.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
         ],
         "module": "tncms"
+    },
+    "centauri-dreams": {
+        "decompose": [
+            {
+                "selector": "p:has(> img[src*=\"tzf_img_post\"])"
+            }
+        ],
+        "feeds": [
+            "https://www.centauri-dreams.org/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.centauri-dreams.org/wp-json"
     },
     "centralmaine": {
         "decompose": [
@@ -8026,6 +8044,33 @@
             "https://www.eurogamer.net/feed"
         ],
         "module": "eurogamer"
+    },
+    "euronews": {
+        "content": {
+            "selector": "div.o-article-newsy__main > div.o-article-newsy__main__body > div.c-article-content"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "advertising",
+                        "c-article-content__first-element",
+                        "c-widget-related"
+                    ]
+                },
+                "tag": "div"
+            }
+        ],
+        "lede_img": {
+            "selector": "div.o-article-newsy__main > header.o-article-newsy__header > div.c-article-image-video"
+        },
+        "lede_video": {
+            "selector": "div.o-article-newsy__main > header.o-article-newsy__header > div.c-article-image-video"
+        },
+        "module": "wp",
+        "subtitle": {
+            "selector": "div.o-article-newsy__main > div.o-article-newsy__main__body > p.c-article-summary"
+        }
     },
     "european-rubber-journal": {
         "content": {
@@ -14357,6 +14402,12 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://blog.lon.tv/wp-json"
     },
+    "londoncentric": {
+        "feeds": [
+            "https://www.londoncentric.media/feed"
+        ],
+        "module": "substack"
+    },
     "lonestarlive": {
         "api_url": "https://www.lonestarlive.com/pf/api/v3/content/fetch/",
         "arc_site": "lonestarlive",
@@ -15097,40 +15148,57 @@
         "module": "healthline"
     },
     "medicalxpress": {
-        "author": {
-            "selector": "p.article-byline > a.article-byline__link"
-        },
+        "_comment": "same as phys, techxplore, medicalxpress",
         "content": {
             "attrs": {
                 "class": "article-main"
-            }
+            },
+            "tag": "div"
         },
         "decompose": [
-            {
-                "selector": "a.icon_open > svg"
-            },
             {
                 "attrs": {
                     "class": [
                         "ads",
-                        "d-print-block",
-                        "d-print-none"
+                        "d-print-block"
                     ]
                 },
                 "tag": "div"
+            },
+            {
+                "selector": "div[class*=\"ads-\"]"
+            },
+            {
+                "attrs": {
+                    "class": "icon_open"
+                },
+                "tag": "a"
             }
         ],
+        "feeds": [
+            "https://medicalxpress.com/rss-feed/"
+        ],
         "module": "wp",
-        "unwrap": [
+        "rename": [
             {
-                "tag": [
-                    "html",
-                    "body"
-                ]
+                "name": "p",
+                "selector": "div.mt-3:has(> strong)"
             },
             {
                 "attrs": {
                     "class": "article-main__more"
+                },
+                "name": "blockquote",
+                "tag": "div"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "mt-3",
+                        "d-inline-block "
+                    ]
                 },
                 "tag": "div"
             }
@@ -15230,6 +15298,12 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.mesonstars.com/wp-json"
+    },
+    "messageboxnews": {
+        "feeds": [
+            "https://www.messageboxnews.com/feed"
+        ],
+        "module": "substack"
     },
     "metalinjection": {
         "feeds": [
@@ -15857,7 +15931,8 @@
         }
     },
     "motortrend": {
-        "module": "motortrend"
+        "module": "motortrend",
+        "rsc": "esnzq"
     },
     "movieguide": {
         "feeds": [
@@ -15932,6 +16007,14 @@
         "graphql_url": "https://picon.graphql.aspire-ebm.com/",
         "module": "ebm",
         "x-tenant-key": "ebm_msw"
+    },
+    "musicaficionado": {
+        "feeds": [
+            "https://musicaficionado.blog/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://musicaficionado.blog/wp-json"
     },
     "musically": {
         "args": {
@@ -16197,6 +16280,12 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://natehoffelder.com/wp-json"
+    },
+    "natesilver": {
+        "feeds": [
+            "https://www.natesilver.net/feed"
+        ],
+        "module": "substack"
     },
     "nathandane": {
         "api_path": "https://write.as/api",
@@ -17969,6 +18058,30 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.onmsft.com/wp-json"
     },
+    "onwardstate": {
+        "decompose": [
+            {
+                "attrs": {
+                    "type": "hidden"
+                },
+                "tag": "input"
+            }
+        ],
+        "feeds": [
+            "https://onwardstate.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": "p402_premium"
+                },
+                "tag": "div"
+            }
+        ],
+        "wpjson_path": "https://onwardstate.com/wp-json"
+    },
     "oofhours": {
         "feeds": [
             "https://oofhours.com/feed"
@@ -19022,6 +19135,63 @@
             "https://www.phoenix.org/search/?f=rss&t=article&l=10&s=start_time&sd=desc"
         ],
         "module": "tncms"
+    },
+    "phys": {
+        "_comment": "same as phys, techxplore, medicalxpress",
+        "content": {
+            "attrs": {
+                "class": "article-main"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "ads",
+                        "d-print-block"
+                    ]
+                },
+                "tag": "div"
+            },
+            {
+                "selector": "div[class*=\"ads-\"]"
+            },
+            {
+                "attrs": {
+                    "class": "icon_open"
+                },
+                "tag": "a"
+            }
+        ],
+        "feeds": [
+            "https://phys.org/rss-feed/"
+        ],
+        "module": "wp",
+        "rename": [
+            {
+                "name": "p",
+                "selector": "div.mt-3:has(> strong)"
+            },
+            {
+                "attrs": {
+                    "class": "article-main__more"
+                },
+                "name": "blockquote",
+                "tag": "div"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "mt-3",
+                        "d-inline-block "
+                    ]
+                },
+                "tag": "div"
+            }
+        ]
     },
     "physiqonomics": {
         "feeds": [
@@ -21941,6 +22111,15 @@
     "seeker": {
         "module": "pinnacle"
     },
+    "seekhifi": {
+        "data-api": "https://seekhifi.ghost.io/ghost/api/content/",
+        "data-key": "8efd5736a0f996055fec6bc1ec",
+        "feeds": [
+            "https://www.seekhifi.com/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
     "seekingalpha": {
         "module": "seekingalpha"
     },
@@ -23419,8 +23598,9 @@
         "feeds": [
             "https://www.startribune.com/feed"
         ],
-        "module": "wp_posts",
+        "module": "startribune",
         "posts_path": "/wp/v2/posts",
+        "rsc": "1dfug",
         "wpjson_path": "https://www.startribune.com/wp-json"
     },
     "statecollege": {
@@ -23808,7 +23988,6 @@
             "https://mandystadtmiller.substack.com/feed",
             "https://mattstoller.substack.com/feed",
             "https://maxread.substack.com/feed",
-            "https://natesilver.substack.com/feed",
             "https://noahpinion.substack.com/feed",
             "https://www.piratewires.com/feed",
             "https://planetwavesfm.substack.com/feed",
@@ -23819,6 +23998,7 @@
             "https://robertreich.substack.com/feed",
             "https://robotic.substack.com/feed",
             "https://shityoushouldcareabout.substack.com/feed",
+            "https://socialwarming.substack.com/feed",
             "https://statuskuo.substack.com/feed",
             "https://stephaniesutton.substack.com/feed",
             "https://systemsapproach.substack.com/feed",
@@ -24351,6 +24531,63 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.techtoyreviews.com/wp-json"
+    },
+    "techxplore": {
+        "_comment": "same as phys, techxplore, medicalxpress",
+        "content": {
+            "attrs": {
+                "class": "article-main"
+            },
+            "tag": "div"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "ads",
+                        "d-print-block"
+                    ]
+                },
+                "tag": "div"
+            },
+            {
+                "selector": "div[class*=\"ads-\"]"
+            },
+            {
+                "attrs": {
+                    "class": "icon_open"
+                },
+                "tag": "a"
+            }
+        ],
+        "feeds": [
+            "https://techxplore.com/rss-feed/"
+        ],
+        "module": "wp",
+        "rename": [
+            {
+                "name": "p",
+                "selector": "div.mt-3:has(> strong)"
+            },
+            {
+                "attrs": {
+                    "class": "article-main__more"
+                },
+                "name": "blockquote",
+                "tag": "div"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "mt-3",
+                        "d-inline-block "
+                    ]
+                },
+                "tag": "div"
+            }
+        ]
     },
     "techzoneonline": {
         "feeds": [
@@ -30351,7 +30588,7 @@
     },
     "wsj": {
         "articles_api": "https://www.barrons.com/articles/api/articles/",
-        "datadome": "datadome=1tQ5qyqeX9CW2BY3Ar4Va7jF3LJaiaqCwNlri4hug6v0khIwWlxQGacvE2DN9y5N5nyBZrSJIQbIoDKWtQpQ7F2WcKN1sbO4azB6xOFzniUpG7YW46zt4d45_dsm4Ts6; Max-Age=31536000; Domain=.barrons.com; Path=/; Secure; SameSite=Lax",
+        "datadome": "datadome=BPLlUHablN77iJbNclD7h1CjVbjNsLl_LjHc~a1zI3RhfEt1WboaB_APtIqzeuOGCk3E4Dl9ESxBzfI88aRnMOUUgYIjFmRWUCWrMLARRTld2YNYeLZ~l~6a1se2qYRg; Max-Age=31536000; Domain=.barrons.com; Path=/; Secure; SameSite=Lax",
         "module": "wsj"
     },
     "wsjm": {
@@ -31034,5 +31271,16 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://ztgd.com/wp-json"
+    },
+    "chalkdustmagazine": {
+        "args": {
+            "add_subtitle": true
+        },
+        "feeds": [
+            "https://chalkdustmagazine.com/feed"
+        ],
+        "module": "wp_posts",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://chalkdustmagazine.com/wp-json"
     }
 }

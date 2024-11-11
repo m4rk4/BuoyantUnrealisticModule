@@ -581,7 +581,7 @@ def process_content_element(element, url, site_json, save_debug):
             if '<' in headline:
                 # Couple of cases of unclosed html tags in the headline, just use the text
                 headline = BeautifulSoup(headline, 'html.parser').get_text()
-            element_html += '<hr><h2>{}</h2>'.format(headline)
+            element_html += '<div>&nbsp;</div><hr><h2>{}</h2>'.format(headline)
             authors = []
             for author in element['credits']['by']:
                 if author.get('name'):
@@ -596,6 +596,7 @@ def process_content_element(element, url, site_json, save_debug):
             else:
                 element_html += '<p>updated {}</p>'.format(date)
             element_html += get_content_html(element, url, site_json, save_debug)
+            element_html += '<div>&nbsp;</div><hr><div>&nbsp;</div>'.format(headline)
 
     elif element['type'] == 'link_list':
         if element['subtype'] == 'key-moments':

@@ -21,7 +21,7 @@ def get_content(url, args, site_json, save_debug=False):
             item['_image'] = '{}/screenshot?url={}&locator=%23fl-layout-wrapper-outer&networkidle=true'.format(config.server, quote_plus(item['url']))
         else:
             item['_image'] = '{}/screenshot?url={}&locator=body%23story&networkidle=true'.format(config.server, quote_plus(item['url']))
-        caption = '<a href="{}">View on Flourish</a>'.format(item['url'])
+        caption = '<a href="{}" target="_blank">View on Flourish</a>'.format(item['url'])
         item['content_html'] = utils.add_image(item['_image'], caption, link=item['url'])
     else:
         logger.warning('unhandled url ' + url)

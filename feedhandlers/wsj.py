@@ -1,8 +1,9 @@
 import base64, certifi, json, math, pytz, random, re, requests, STPyV8, time
+import dateutil.parser
 from bs4 import BeautifulSoup, Comment
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from datetime import datetime
+from datetime import datetime, timezone
 from markdown2 import markdown
 from urllib.parse import parse_qs, quote, quote_plus, urlsplit
 
@@ -20,30 +21,114 @@ logger = logging.getLogger(__name__)
 
 def render_contents(contents, netloc, article_links, image_link=None):
     content_html = ''
-    for content in contents:
+    if isinstance(contents, dict):
+        contents_list = []
+        contents_list.append(contents)
+    else:
+        contents_list = contents
+    for content in contents_list:
         if not content.get('type'):
-            content_html += content['text']
-        elif content['type'] == 'paragraph':
-            if content.get('content'):
-                content_html += '<p>' + render_contents(content['content'], netloc, article_links) + '</p>'
-        elif content['type'] == 'headline':
-            if content.get('content'):
-                content_html += '<h2>' + render_contents(content['content'], netloc, article_links) + '</h2>'
-        elif content['type'] == 'hed':
-            if content.get('content'):
-                if content['hed_type'] == 'subhed':
-                    content_html += '<h2>' + render_contents(content['content'], netloc, article_links) + '</h2>'
-                elif content['hed_type'] == 'small-hed':
-                    content_html += '<h3>' + render_contents(content['content'], netloc, article_links) + '</h3>'
-        elif content['type'] == 'list':
-            if content.get('content'):
-                if content.get('ordered'):
-                    content_html += '<ol>' + render_contents(content['content'], netloc, article_links) + '</ol>'
+            if content.get('upstreamType'):
+                if content['upstreamType'] == 'link':
+                    content_html += '<a href="{}" target="_blank">'.format(content['decorationMetadata']['uri'])
+                    if content.get('text'):
+                        content_html += content['text']
+                    elif content.get('nestedTextAndDecorations'):
+                        content_html += render_contents(content['nestedTextAndDecorations'], netloc, article_links)
+                    content_html += '</a>'
+                elif content['upstreamType'] == 'emphasis':
+                    if content['decorationType'] == 'BOLD':
+                        content_html += '<strong>' + content['text'] + '</strong>'
+                    else:
+                        content_html += '<em>' + content['text'] + '</em>'
+                elif content['upstreamType'] == 'break':
+                    content_html += '<div>&nbsp;</div><hr><div>&nbsp;</div>'
+                elif content['upstreamType'] == 'company':
+                    if netloc == 'www.barrons.com':
+                        content_html += '<a href="https://www.barrons.com/market-data/stocks/{}">{}</a>'.format(content['decorationMetadata']['instrumentResult']['ticker'], content['text'])
+                    else:
+                        content_html += '<a href="https://www.wsj.com/market-data/quotes/{}">{}</a>'.format(content['decorationMetadata']['chartingSymbol'].replace('STOCK/', ''), content['text'])
+                    if content['decorationMetadata']['instrumentResult']['exchangeData']['countryCode'] == 'XE':
+                        stock_id = ''
+                    else:
+                        stock_id = content['decorationMetadata']['instrumentResult']['exchangeData']['countryCode'] + ":" + content['decorationMetadata']['instrumentResult']['ticker']
+                    stock_html = utils.get_stock_price(content['decorationMetadata']['instrumentResult']['ticker'], stock_id)
+                    if stock_html:
+                        content_html += ' (' + stock_html + ')'
+                elif content['upstreamType'] == 'instrument' and content['decorationMetadata']['instrumentType'] == 'index':
+                    if netloc == 'www.barrons.com':
+                        content_html += '<a href="https://www.barrons.com/market-data/indexes/{}">{}</a>'.format(content['decorationMetadata']['ticker'], content['text'])
+                    else:
+                        paths = content['decorationMetadata']['chartingSymbol'].split('/')
+                        content_html += '<a href="https://www.wsj.com/market-data/quotes/{}/{}/{}">{}</a>'.format(paths[0], paths[1], content['decorationMetadata']['ticker'], content['text'])
+                    if content['decorationMetadata']['id'] == 'index|djia':
+                        stock_id = 'US:I:DJI'
+                    elif content['decorationMetadata']['id'] == 'index|spx':
+                        stock_id = 'US:SP500'
+                    else:
+                        stock_id = ''
+                    stock_html = utils.get_stock_price(content['decorationMetadata']['ticker'], stock_id)
+                    if stock_html:
+                        content_html += ' (' + stock_html + ')'
+                elif content['upstreamType'] == 'person':
+                    # TODO: link
+                    content_html += content['text']
                 else:
-                    content_html += '<ul>' + render_contents(content['content'], netloc, article_links) + '</ul>'
+                    logger.warning('unhandled upstreamType ' + content['upstreamType'])
+            elif content.get('text'):
+                content_html += content['text']
+            else:
+                logger.warning('unhandled content ' + str(content))
+        elif content['type'] == 'paragraph':
+            content_html += '<p>'
+            if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            content_html += '</p>'
+        elif content['type'] == 'headline':
+            content_html += '<h2>'
+            if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            content_html += '</h2>'
+        elif content['type'] == 'hed':
+            if content.get('hed_type') == 'subhed' or content.get('hedType') == 'subhed':
+                tag = 'h2'
+            elif content.get('hed_type') == 'small-hed' or content.get('hedType') == 'small-hed':
+                tag = 'h3'
+            else:
+                logger.warning('unknown hed type')
+                tag = 'h3'
+            content_html += '<{}>'.format(tag)
+            if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            content_html += '</{}>'.format(tag)
+        elif content['type'] == 'list':
+            if content.get('ordered'):
+                tag = 'ol'
+            else:
+                tag = 'ul'
+            content_html += '<{}>'.format(tag)
+            if content.get('listContent'):
+                content_html += render_contents(content['listContent'], netloc, article_links)
+            elif content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            content_html += '</{}>'.format(tag)
         elif content['type'] == 'listitem':
-            if content.get('content'):
-                content_html += '<li>' + render_contents(content['content'], netloc, article_links) + '</li>'
+            content_html += '<li>'
+            if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                content_html += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            content_html += '</li>'
         elif content['type'] == 'phrase':
             if content.get('href'):
                 content_html += '<a href="https://{}{}">{}</a>'.format(netloc, content['href'], content['text'])
@@ -56,7 +141,7 @@ def render_contents(contents, netloc, article_links, image_link=None):
                 link_content = content['text']
             else:
                 link_content = ''
-                logger.warning('unknown link content')
+                logger.warning('unknown link content ' + str(content))
             link_uri = ''
             if not content.get('uri') and content.get('ref'):
                 link = next((it for it in article_links['related'] if (it['type'] == 'link' and it['id'] == content['ref'])), None)
@@ -71,9 +156,9 @@ def render_contents(contents, netloc, article_links, image_link=None):
                 content_html += link_content
         elif content['type'] == 'emphasis':
             if content['emphasis'] == 'BOLD':
-                tag = 'b'
+                tag = 'strong'
             elif content['emphasis'] == 'ITALIC':
-                tag = 'i'
+                tag = 'em'
             else:
                 tag = 'em'
             if content.get('content'):
@@ -94,20 +179,40 @@ def render_contents(contents, netloc, article_links, image_link=None):
             if content.get('content'):
                 content_html +=  '<h5>' + render_contents(content['content'], netloc, article_links) + '</h5>'
         elif content['type'] == 'image':
-            if content.get('src'):
-                img_src = content['src']['params']['href']
-            elif content.get('properties') and content['properties'].get('location'):
-                img_src = content['properties']['location']
-            elif content.get('alt_images'):
-                it = utils.closest_dict(content['alt_images'], 'width', 1200)
+            if content.get('ref') and (content['ref'].startswith('ai2html') or content['ref'].startswith('image_')):
+                image = next((it for it in article_links['related'] if (it['type'] == 'image' and it['id'] == content['ref'])), None)
+                if not image:
+                    logger.warning('unknown image ref ' + str(content))
+                    continue
+            else:
+                image = content
+                
+            if image.get('src') and image['src'].get('path'):
+                img_src = image['src']['baseUrl'] + image['src']['path'] + '?width=1200&size=' + image['src']['size']
+            elif image.get('src') and image['src'].get('params'):
+                img_src = image['src']['params']['href']
+            elif image.get('name') and image['name'].startswith('https'):
+                img_src = image['name']
+            elif image.get('properties') and image['properties'].get('location'):
+                img_src = image['properties']['location']
+            elif image.get('displayVariants'):
+                img_src = image['displayVariants'][image['displayVariants']['default']]['url']
+            elif image.get('alt_images'):
+                it = utils.closest_dict(image['alt_images'], 'width', 1200)
                 img_src = it['url']
-            elif content.get('url'):
-                img_src = content['url']
+            elif image.get('url'):
+                img_src = image['url']
+            else:
+                img_src = ''
+            if not img_src:
+                logger.warning('unknown image src for ' + image['id'])
+                continue
+
             captions = []
-            if content.get('caption'):
-                captions.append(content['caption'])
-            if content.get('credit'):
-                captions.append(content['credit'])
+            if image.get('caption'):
+                captions.append(image['caption'])
+            if image.get('credit'):
+                captions.append(image['credit'])
             content_html += utils.add_image(img_src, ' | '.join(captions), link=image_link)
         elif content['type'] == 'video' or (content['type'] == 'inset' and content.get('videoData')):
             video_json = None
@@ -142,7 +247,7 @@ def render_contents(contents, netloc, article_links, image_link=None):
                     content_html += video_item['content_html']
                 else:
                     logger.warning('unhandled video content')
-        elif content['type'] == 'media' and (content['media_type'] == 'audio' or content['media_type'] == 'AUDIO'):
+        elif content['type'] == 'media' and ((content.get('media_type') and content['media_type'].lower() == 'audio') or (content.get('mediaType')  and content['mediaType'].lower() == 'audio')):
             audio_item = get_content('https://www.wsj.com/podcasts/' + content['name'], {"embed": True}, {}, False)
             if audio_item:
                 content_html += audio_item['content_html']
@@ -155,28 +260,159 @@ def render_contents(contents, netloc, article_links, image_link=None):
         elif content['type'] == 'Break':
             content_html += '<br/>'
         elif content['type'] == 'inset':
-            if content['inset_type'] == 'bigtophero' and content['properties']['datatype'] == 'Image':
+            if content.get('insetType'):
+                inset_type = content['insetType']
+            elif content.get('inset_type'):
+                inset_type = content['inset_type']
+            else:
+                inset_type = ''
+            if content.get('__typename'):
+                if content['__typename'] == 'InsetArticleBody' and inset_type == 'bigtophero':
+                    if content['properties']['dataType'] == 'Image':
+                        captions = []
+                        if content['properties'].get('imageCaption'):
+                            captions.append(content['properties']['imageCaption'])
+                        if content['properties'].get('imageCredit'):
+                            captions.append(content['properties']['imageCredit'])
+                        content_html += utils.add_image(content['properties']['urlLarge'], ' | '.join(captions))
+                    elif content['properties']['dataType'] == 'AutoPlayVideoClip':
+                        captions = []
+                        if content['properties'].get('videoCaption'):
+                            captions.append(content['properties']['videoCaption'])
+                        if content['properties'].get('imageCaption'):
+                            captions.append(content['properties']['imageCaption'])
+                        if content['properties'].get('imageCredit'):
+                            captions.append(content['properties']['imageCredit'])
+                        content_html += utils.add_video(content['properties']['bigTopHeroVideoData']['videoContent']['jsonLD']['contentUrl'], 'video/mp4', content['properties']['bigTopHeroVideoData']['videoContent']['jsonLD']['thumbnailUrl'], ' | '.join(captions), use_videojs=True)
+                    else:
+                        logger.warning('unhandled InsetArticleBody bigtophero data type ' + content['properties']['dataType'])
+                elif content['__typename'] == 'InsetArticleBody' and inset_type == 'pagebreak':
+                    content_html += '<div>&nbsp;</div><hr><div>&nbsp;</div>'
+                elif content['__typename'] == 'InsetArticleBody' and inset_type == 'dynamic' and content['content']['subType'] == 'charts':
+                    content_html += utils.add_image(utils.clean_url(content['content']['alt']['picture']['img']['src']), content['content']['alt']['text'], link=content['content']['alt']['render']['src'])
+                elif content['__typename'] == 'SeriesNavigationInsetArticleBody':
+                    inset_json = utils.get_url_json(content['url'])
+                    if inset_json:
+                        content_html += render_contents(inset_json['alt']['capi']['data']['attributes']['body'], netloc, inset_json['alt']['capi']['links'])
+                elif content['__typename'] == 'OrigamiInsetArticleBody' and content['content'].get('strippedHTML'):
+                    inset_soup = BeautifulSoup(content['content']['strippedHTML'], 'html.parser')
+                    if inset_soup.find('video'):
+                        video = inset_soup.find('video')
+                        video_src = video.find('source', attrs={"type": "video/mp4"})
+                        if video_src:
+                            it = inset_soup.find(class_='origami-caption')
+                            if it:
+                                caption = it.decode_contents()
+                            else:
+                                caption = ''
+                            content_html += utils.add_video(video_src['src'], video_src['type'], video.get('poster'), caption)
+                        else:
+                            logger.warning('unhandled OrigamiInsetArticleBody video')
+                    elif len(inset_soup.select('div.origami-item > figure')) > 1:
+                        gallery_images = []
+                        gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        for i, el in enumerate(inset_soup.find_all(class_='origami-item')):
+                            img_src = utils.clean_url(el.figure.img['src'])
+                            thumb = el.img['src']
+                            it = el.find(class_='origami-caption')
+                            if it:
+                                caption = it.decode_contents()
+                            else:
+                                caption = ''
+                            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+                            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                        if i % 2 == 0:
+                            gallery_html += '<div style="flex:1; min-width:360px;"></div>'
+                        gallery_html += '</div>'
+                        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                        content_html += '<h3><a href="{}" target="_blank">View photo gallery</a>'.format(gallery_url)
+                        el = inset_soup.find(class_='origami-grouped-caption')
+                        if el:
+                            content_html += ': ' + el.decode_contents()
+                        content_html += '</h3>' + gallery_html
+                elif content['__typename'] == 'RichTextArticleBody':
+                    inset_html = render_contents(content['richTextContent'], netloc, article_links)
+                    if not re.search(r'SHARE YOUR THOUGHTS', inset_html):
+                        content_html += inset_html
+                elif content['__typename'] == 'TweetArticleBody':
+                    content_html += utils.add_embed(content['properties']['tweetUrl'])
+                elif content['__typename'] == 'DynamicInsetArticleBody':
+                    print(content['id'])
+                    if content['content'].get('subType') and (content['content']['subType'] == 'promo' or content['content']['subType'] == 'feedback-form'):
+                        continue
+                    elif content['content'].get('subType') and content['content']['subType'] == 'charts':
+                        content_html += utils.add_image(utils.clean_url(content['content']['alt']['picture']['img']['src']), content['content']['alt']['text'], link=content['content']['alt']['render']['src'])
+                    elif content['content'].get('subType') and content['content']['subType'] == 'tap-unmute':
+                        for it in content['content']['serverSide']['data']['data']['items']:
+                            if it['type'] == 'video':
+                                captions = []
+                                if it['data'].get('caption'):
+                                    captions.append(it['data']['caption'])
+                                if it['data'].get('credit'):
+                                    captions.append(it['data']['credit'])
+                                content_html += utils.add_video(it['data']['media'], 'video/mp4', it['data']['thumbnail'], ' | '.join(captions), use_videojs=True)
+                            else:
+                                logger.warning('unhandled DynamicInsetArticleBody tap-unmute id ' + content['id'])
+                    elif content['content'].get('subType') and content['content']['subType'] == 'parallax-gallery':
+                        inset_json = utils.get_url_json(content['url'])
+                        if inset_json:
+                            gallery_images = []
+                            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                            for i, it in enumerate(inset_json['serverside']['data']['data']['items']):
+                                if it['type'] == 'image':
+                                    img_src = it['data']['media']
+                                    thumb = img_src + '?width=640'
+                                elif it['type'] == 'video':
+                                    img_src = it['data']['media']
+                                    thumb = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(it['data']['thumbnailURL']))
+                                if it['data'].get('mediaCredit'):
+                                    caption = it['data']['mediaCredit']
+                                else:
+                                    caption = ''
+                                if it['data'].get('mediaBody'):
+                                    desc = it['data']['mediaBody']
+                                else:
+                                    desc = ''
+                                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, desc=desc) + '</div>'
+                                gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb, "desc": desc})
+                            if i % 2 == 0:
+                                gallery_html += '<div style="flex:1; min-width:360px;"></div>'
+                            gallery_html += '</div>'
+                            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                            content_html += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
+                    elif content['content'].get('strippedHTML') and '<iframe' in content['content']['strippedHTML']:
+                        m = re.search(r'src="([^"]+)"', content['content']['strippedHTML'])
+                        content_html += utils.add_embed(m.group(1))
+                    else:
+                        content_html += render_contents(content['content']['alt']['capi']['data']['attributes']['body'], netloc, content['content']['alt']['capi']['links'])
+                elif content['__typename'] == 'NewsletterInsetArticleBody':
+                    continue
+                else:
+                    logger.warning('unhandled inset __typename ' + content['__typename'])
+            elif inset_type == 'ai2html' and content.get('content'):
+                content_html += render_contents(content['content'], netloc, article_links)
+            elif inset_type == 'bigtophero' and content['properties']['datatype'] == 'Image':
                 captions = []
                 if content['properties'].get('imagecaption'):
                     captions.append(content['properties']['imagecaption'])
                 if content['properties'].get('imagecredit'):
                     captions.append(content['properties']['imagecredit'])
                 content_html += utils.add_image(content['properties']['urllarge'], ' | '.join(captions))
-            elif content['inset_type'] == 'slideshow':
+            elif inset_type == 'slideshow':
                 content_html += render_contents(content['content'], netloc, article_links)
-            elif content['inset_type'] == 'videobyguid':
+            elif inset_type == 'videobyguid':
                 video_item = get_content('https://www.wsj.com/video/' + content['properties']['videoguid'], {"embed": True}, {}, False)
                 if video_item:
                     content_html += video_item['content_html']
                 else:
                     logger.warning('unhandled videobyguid content')
-            elif content['inset_type'] == 'youtube':
+            elif inset_type == 'youtube':
                 content_html += utils.add_embed('https://www.youtube.com/' + content['properties']['url'])
-            elif content['inset_type'] == 'tweet':
+            elif inset_type == 'tweet':
                 content_html += utils.add_embed(content['properties']['url'])
-            elif content['inset_type'] == 'pagebreak':
+            elif inset_type == 'pagebreak':
                 content_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
-            elif content['inset_type'] == 'pullquote':
+            elif inset_type == 'pullquote':
                 author = ''
                 for i, it in enumerate(content['content']):
                     if it['type'] == 'tagline':
@@ -185,10 +421,10 @@ def render_contents(contents, netloc, article_links, image_link=None):
                         del content['content'][i]
                 text = render_contents(content['content'], netloc, article_links)
                 content_html += utils.add_pullquote(text, author)
-            elif content['inset_type'] == 'advisortake':
+            elif inset_type == 'advisortake':
                 if content.get('content'):
                     content_html +=  render_contents(content['content'], netloc, article_links)
-            elif content['inset_type'] == 'dynamic':
+            elif inset_type == 'dynamic':
                 inset_html = ''
                 link = 'https://pub-prod-djcs-dynamicinset-renderer.ohi.onservo.com/?url=' + content['properties']['url']
                 if content.get('chartData') and content['chartData'].get('src'):
@@ -274,16 +510,16 @@ def render_contents(contents, netloc, article_links, image_link=None):
                 else:
                     logger.warning('unhandled dynamic inset')
                     content_html += '<blockquote><b><a href="{}">View dynamic inset content</a></b></blockquote>'.format(link)
-            elif content['inset_type'] == 'richtext':
+            elif inset_type == 'richtext':
                 text = render_contents(content['content'], netloc, article_links)
                 if not re.search(r'>read more|>SHARE YOUR THOUGHTS|>Explore Buy Side|>new from', text, flags=re.I):
                     content_html += '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">' + text + '</blockquote>'
-            elif content['inset_type'] == 'newsletterinset' or content['inset_type'] == 'relatedbyarticletype':
+            elif inset_type == 'newsletterinset' or inset_type == 'relatedbyarticletype':
                 pass
-            elif content['type'] == 'inset' and content['inset_type'] == 'normal' and not content.get('content'):
+            elif content['type'] == 'inset' and inset_type == 'normal' and not content.get('content'):
                 pass
             else:
-                logger.warning('unhandled inset type ' + content['inset_type'])
+                logger.warning('unhandled inset type ' + inset_type)
         else:
             logger.warning('unhandled content type ' + content['type'])
     return content_html
@@ -723,29 +959,51 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if 'video' in paths or 'podcasts' in paths:
-        api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&fields=adCategory%2CadTagParams%2CadZone%2CadsAllowed%2CaspectRatio%2Cauthor%2CcaptionsVTT%2Ccatastrophic%2CchapterTimes%2Ccolumn%2Cdescription%2CdoctypeID%2Cduration%2Ceditor%2CemailURL%2CepisodeNumber%2CforceClosedCaptions%2Cformat%2CformattedCreationDate%2CgptCustParams%2Cguid%2Chls%2ChlsNoCaptions%2CisQAEvent%2Ciso8601CreationDate%2Ckeywords%2CkeywordsOmni%2ClinkRelativeURL%2ClinkShortURL%2ClinkURL%2CmediaLiveChannelId%2Cname%2ComniProgramName%2ComniPublishDate%2ComniVideoFormat%2Cprovider%2CrssURL%2CsecondsUntilStartTime%2CseriesName%2CshowName%2CsponsoredVideo%2Clang%2Cstate%2CsuppressAutoplay%2CthumbnailImageManager%2CthumbnailList%2CthumbstripURL%2CthumbstripVTTURL%2Ctitletag%2CtouchCastID%2Ctype%2Cvideo1264kMP4Url%2Cvideo174kMP4Url%2Cvideo1864kMP4Url%2Cvideo2564kMP4Url%2Cvideo320kMP4Url%2Cvideo664kMP4Url%2CvideoBestQualityWebmUrl%2CvideoMP4List%2CvideoStillURL%2Cwsj-section%2Cwsj-subsection%2Cfactiva-subjects%2Cfactiva-regions&count=1&query=' + paths[-1]
+        if 'podcasts' in paths:
+            api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&query={}&fields=adZone,audioURL,audioURLPanoply,author,body,column,description,doctypeID,duration,episodeNumber,formattedCreationDate,guid,keywords,linkURL,name,omniPublishDate,omniVideoFormat,playbackSite,podcastName,podcastSubscribeLinks,podcastUrl,rootId,thumbnailImageManager,thumbnailList,titletag,type,wsj-section,wsj-subsection&snippet=true'.format(paths[-1])
+        else:
+            api_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=guid&fields=adCategory%2CadTagParams%2CadZone%2CadsAllowed%2CaspectRatio%2Cauthor%2CcaptionsVTT%2Ccatastrophic%2CchapterTimes%2Ccolumn%2Cdescription%2CdoctypeID%2Cduration%2Ceditor%2CemailURL%2CepisodeNumber%2CforceClosedCaptions%2Cformat%2CformattedCreationDate%2CgptCustParams%2Cguid%2Chls%2ChlsNoCaptions%2CisQAEvent%2Ciso8601CreationDate%2Ckeywords%2CkeywordsOmni%2ClinkRelativeURL%2ClinkShortURL%2ClinkURL%2CmediaLiveChannelId%2Cname%2ComniProgramName%2ComniPublishDate%2ComniVideoFormat%2Cprovider%2CrssURL%2CsecondsUntilStartTime%2CseriesName%2CshowName%2CsponsoredVideo%2Clang%2Cstate%2CsuppressAutoplay%2CthumbnailImageManager%2CthumbnailList%2CthumbstripURL%2CthumbstripVTTURL%2Ctitletag%2CtouchCastID%2Ctype%2Cvideo1264kMP4Url%2Cvideo174kMP4Url%2Cvideo1864kMP4Url%2Cvideo2564kMP4Url%2Cvideo320kMP4Url%2Cvideo664kMP4Url%2CvideoBestQualityWebmUrl%2CvideoMP4List%2CvideoStillURL%2Cwsj-section%2Cwsj-subsection%2Cfactiva-subjects%2Cfactiva-regions&count=1&query=' + paths[-1]
         api_json = utils.get_url_json(api_url)
         if not api_json:
             return None
         video_json = api_json['items'][0]
         if save_debug:
-            utils.write_file(video_json, './debug/debug.json')
+            utils.write_file(video_json, './debug/video.json')
         item = {}
         item['id'] = video_json['guid']
         item['url'] = video_json['linkURL']
         item['title'] = video_json['name']
 
-        dt = datetime.fromisoformat(video_json['iso8601CreationDate'].replace('Z', '+00:00'))
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt)
+        if video_json.get('iso8601CreationDate'):
+            dt = datetime.fromisoformat(video_json['iso8601CreationDate'])
+        elif video_json.get('formattedCreationDate'):
+            tz_loc = pytz.timezone(config.local_tz)
+            dt_loc = dateutil.parser.parse(video_json['formattedCreationDate'])
+            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        else:
+            dt = None
+        if dt:
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt, False)
 
         if video_json.get('seriesName'):
-            item['author'] = {"name": video_json['seriesName']}
+            item['author'] = {
+                "name": video_json['seriesName']
+            }
         elif video_json.get('column'):
-            item['author'] = {"name": video_json['column']}
+            item['author'] = {
+                "name": video_json['column']
+            }
         elif video_json.get('author'):
-            item['author'] = {"name": video_json['author']}
+            item['author'] = {
+                "name": video_json['author']
+            }
+        if item.get('author'):
+            if video_json.get('podcastUrl'):
+                item['author']['url'] = video_json['podcastUrl']
+            item['authors'] = []
+            item['authors'].append(item['author'])
 
         if video_json.get('keywords'):
             item['tags'] = video_json['keywords'].copy()
@@ -755,37 +1013,33 @@ def get_content(url, args, site_json, save_debug=False):
 
         image = utils.closest_dict(video_json['thumbnailList'], 'width', 1200)
         if image:
-            item['_image'] = image['url']
+            item['image'] = image['url']
         else:
-            item['_image'] = video_json['thumbnailManager']
+            item['image'] = video_json['thumbnailManager']
 
         if video_json['type'] == 'video':
-            video = None
-            if video_json.get('videoMP4List'):
+            if video_json.get('hls'):
+                item['content_html'] = utils.add_video(video_json['hls'], 'application/x-mpegURL', item['image'], item['title'])
+            elif video_json.get('videoMP4List'):
                 video = utils.closest_dict(video_json['videoMP4List'], 'bitrate', 2000)
                 if video:
-                    item['content_html'] = utils.add_video(video['url'], 'video/mp4', item['_image'], item['title'])
-            if not video:
-                item['content_html'] = utils.add_video(video['hls'], 'application/x-mpegURL', item['_image'], item['title'])
+                    item['content_html'] = utils.add_video(video['url'], 'video/mp4', item['image'], item['title'])
+
         elif video_json['type'] == 'audio':
-            # TODO: transcript
-            item['_audio'] = video_json['video320kMP4Url']
+            item['_audio'] = video_json['audioURL']
             attachment = {}
             attachment['url'] = item['_audio']
             attachment['mime_type'] = 'audio/mpeg'
             item['attachments'] = []
             item['attachments'].append(attachment)
-            if item.get('_image'):
-                poster = '{}/image?height=128&url={}&overlay=audio'.format(config.server, quote_plus(item['_image']))
-            else:
-                poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
-            item['content_html'] = '<table><tr><td><a href="{}"><img src="{}"/></td>'.format(item['_audio'], poster)
-            item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>{}</div>'.format(item['url'], item['title'], item['author']['name'])
-            duration = utils.calc_duration(int(video_json['duration']))
-            item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div></td></tr></table>'.format(utils.format_display_date(dt, False), duration)
+            item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], video_json['duration'], audio_type='audio/mpeg', use_video_js=True)
 
         if item.get('summary') and 'embed' not in args:
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
+            if video_json.get('body'):
+                item['content_html'] += '<h2>Transcript:</h2>'
+                for it in video_json['body']:
+                    item['content_html'] += '<p>' + it + '</p>'
         return item
 
     if site_json['datadome'] == '':
@@ -819,41 +1073,115 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
 
-    article_json = api_json['articleData']['attributes']
-    # article_json = api_json['articleData']
+    if api_json.get('siteHubSlug') and api_json['siteHubSlug'] == 'buyside':
+        article_json = api_json['article']
+        item = {}
+        item['id'] = article_json['id']
+        item['url'] = article_json['seo']['canonicalURL']
+        item['title'] = article_json['title']
+        dt = datetime.fromisoformat(article_json['publishedAt']).astimezone(timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = datetime.fromisoformat(article_json['updatedAt']).astimezone(timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['authors'] = [{"name": x['fullName']} for x in article_json['authors']]
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+        item['tags'] = []
+        item['tags'].append(api_json['category'])
+        item['tags'].append(article_json['subcategory']['name'])
+        item['content_html'] = ''
+        if article_json.get('heroSection'):
+            if article_json['heroSection'].get('summary'):
+                item['summary'] = article_json['heroSection']['summary']['label']
+                item['content_html'] += '<p><em>' + article_json['heroSection']['summary']['label'] + '</em></p>'
+            if article_json['heroSection'].get('featuredImage'):
+                item['image'] = article_json['heroSection']['featuredImage']['url']
+                item['content_html'] += utils.add_image(item['image'], article_json['heroSection']['featuredImage'].get('credit'))
+        if 'summary' not in item and article_json['seo'].get('metaDescription'):
+            item['summary'] = article_json['seo']['metaDescription']['url']
+        if 'image' not in item and article_json['seo'].get('metaImage'):
+            item['image'] = article_json['seo']['metaImage']['url']
+        if 'embed' in args:
+            item['content_html'] = utils.format_embed_preview(item)
+            return item
+        for block in article_json['blocks']:
+            if block['__typename'] == 'strapiComponentSharedTextContent':
+                item['content_html'] += block['content']
+            elif block['__typename'] == 'strapiBuysideProductBlock':
+                item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                if block['product'].get('image'):
+                    item['content_html'] += '<div style="flex:1; min-width:256px;"><img src="{}" style="width:100%;"></div>'.format(block['product']['image']['url'])
+                item['content_html'] += '<div style="flex:1; min-width:256px;">'
+                item['content_html'] += '<div style="font-weight:bold; text-transform:uppercase;">' + block['product']['brandName'] + '</div>'
+                item['content_html'] += '<h3>' + block['product']['productHeadline'] + '</h3>'
+                for it in block['product']['affiliateLinks']['customEcommerceLink']:
+                    if it['price'] != it['originalPrice']:
+                        text = '<span style="color:#ccc; font-size:0.8em; text-decoration:line-through;">${}</span> '.format(it['originalPrice'])
+                    else:
+                        text = ''
+                    text = '${} at {}'.format(it['price'], it['merchant']['name'])
+                    item['content_html'] += utils.add_button(it['url'], text)
+                if block['product']['affiliateLinks']['amazonLink']:
+                    if block['product']['affiliateLinks']['amazonLink']['price'] != block['product']['affiliateLinks']['amazonLink']['originalPrice']:
+                        text = '<span style="color:#ccc; font-size:0.8em; text-decoration:line-through;">${}</span> '.format(block['product']['affiliateLinks']['amazonLink']['originalPrice'])
+                    else:
+                        text = ''
+                    text += '${} at Amazon'.format(block['product']['affiliateLinks']['amazonLink']['price'])
+                    item['content_html'] += utils.add_button(block['product']['affiliateLinks']['amazonLink']['url'], text)
+                if block['product'].get('description'):
+                    item['content_html'] += block['product']['description']
+                item['content_html'] += '</div></div>'
+            elif block['__typename'] == 'strapiComponentBlocksAuthorsBox':
+                continue
+            else:
+                logger.warning('unhandled article block type ' + block['__typename'])
+        return item
+
+    # article_json = api_json['articleData']['attributes']
+    article_json = api_json['articleData']
 
     item = {}
-    # item['id'] = api_json['id']
-    # item['url'] = api_json['articleUrl']
-    # item['title'] = api_json['headline']
-    item['id'] = article_json['upstream_origin_id']
-    item['url'] = article_json['source_url']
+    item['id'] = article_json['originId']
+    item['url'] = article_json['canonicalUrl']
     item['title'] = article_json['headline']['text']
 
-    dt = datetime.fromisoformat(article_json['published_datetime_utc'])
+    dt = datetime.fromisoformat(article_json['publishedDateTimeUtc'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['updated_datetime_utc'])
+    dt = datetime.fromisoformat(article_json['updatedDateTimeUtc'])
     item['date_published'] = dt.isoformat()
 
-    item['author'] = {}
-    authors = []
+    item['authors'] = []
     if article_json.get('authors'):
-        for it in article_json['authors']:
-            authors.append(it['text'])
+        item['authors'] = [{"name": x['text']} for x in article_json['authors']]
     elif article_json.get('byline'):
+        item['authors'] = []
         for it in article_json['byline']:
-            if it.get('type'):
-                authors.append(it['text'])
-    if authors:
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    else:
-        item['author']['name'] = article_json['publisher']
+            for x in it['text'].split('|'):
+                m = re.search(r'^(.*?)?by (.*?)?(for .*?)?$', x.strip(), flags=re.I)
+                if m:
+                    if m.group(1).strip():
+                        item['authors'].append({"name": "{} ({})".format(m.group(2).strip(), m.group(1).strip())})
+                    else:
+                        item['authors'].append({"name": m.group(2).strip()})
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+    elif article_json.get('publisher'):
+        item['author'] = {
+            "name": article_json['publisher']
+        }
+        item['authors'].append(item['author'])
 
     item['tags'] = []
-    item['tags'].append(article_json['section_name'])
-    item['tags'].append(article_json['section_type'])
+    item['tags'].append(article_json['sectionName'])
+    item['tags'].append(article_json['sectionType'])
     if article_json.get('keywords'):
         item['tags'] += article_json['keywords'].copy()
     if api_json.get('articleMeta') and api_json['articleMeta'].get('properties'):
@@ -887,19 +1215,11 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('standfirst') and article_json['standfirst'].get('content'):
         item['content_html'] += '<p><em>{}</em></p>'.format(render_contents(article_json['standfirst']['content'], split_url.netloc, article_links))
     elif api_json.get('dek'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(api_json['dek'])
+        item['content_html'] += '<p><em>' + api_json['dek'] + '</em></p>'
 
     if article_json.get('leadInset'):
-        item['content_html'] += render_contents([article_json['leadInset']], split_url.netloc, article_links)
-        if article_json['leadInset']['type'] == 'image':
-            if article_json['leadInset'].get('src'):
-                item['_image'] = article_json['leadInset']['src']['params']['href']
-            elif article_json['leadInset'].get('properties') and article_json['leadInset']['properties'].get('location'):
-                item['_image'] = article_json['leadInset']['properties']['location']
-            elif article_json['leadInset'].get('alt_images'):
-                it = utils.closest_dict(article_json['leadInset']['alt_images'], 'width', 1200)
-                item['_image'] = it['url']
-        elif article_json['leadInset']['type'] == 'video':
+        lead_html = render_contents(article_json['leadInset'], split_url.netloc, article_links)
+        if article_json['leadInset']['type'] == 'video':
             if article_json['leadInset'].get('video_service_props') and article_json['leadInset']['video_service_props'].get('jsonLD') and article_json['leadInset']['video_service_props']['jsonLD'].get('thumbnailUrl'):
                 item['_image'] = article_json['leadInset']['video_service_props']['jsonLD']['thumbnailUrl']
         elif article_json['leadInset']['type'] == 'inset':
@@ -908,141 +1228,147 @@ def get_content(url, args, site_json, save_debug=False):
             elif article_json['leadInset']['properties'].get('datatype') and article_json['leadInset']['properties']['datatype'] == 'AutoPlayVideoClip':
                 item['_image'] = article_json['leadInset']['videoData']['thumbnail']
         if not item.get('_image'):
-            m = re.search(r'src="([^"]+)"', item['content_html'])
+            m = re.search(r'src="([^"]+)"', lead_html)
             if m:
                 item['_image'] = m.group(1)
+    else:
+        lead_html = ''
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
-    body_json = utils.get_url_json('https://www.mansionglobal.com/articles/{}?jsondata=y&noredirect=true&count=1'.format(item['id']), headers=headers)
-    if body_json:
-        body_soup = BeautifulSoup(body_json['body'], 'html.parser')
-        if save_debug:
-            utils.write_file(str(body_soup), './debug/body.html')
-        el = body_soup.find('div', class_='paywall')
-        if el:
-            el.unwrap()
+    if article_json.get('articleBody'):
+        item['content_html'] += render_contents(article_json['articleBody'], split_url.netloc, article_links)
+    elif article_json.get('body'):
+        item['content_html'] += render_contents(article_json['body'], split_url.netloc, article_links)
+    else:
+        item['content_html'] += lead_html
+        body_json = utils.get_url_json('https://www.mansionglobal.com/articles/{}?jsondata=y&noredirect=true&count=1'.format(item['id']), headers=headers)
+        if body_json:
+            body_soup = BeautifulSoup(body_json['body'], 'html.parser')
+            if save_debug:
+                utils.write_file(str(body_soup), './debug/body.html')
 
-        # Remove comment sections
-        for el in body_soup.find_all(text=lambda text: isinstance(text, Comment)):
-            el.extract()
+            el = body_soup.find('div', class_='paywall')
+            if el:
+                el.unwrap()
 
-        for el in body_soup.find_all('a', href=re.compile(r'https://www\.mansionglobal\.com/quote/')):
-            m = re.search(r'/quote/([^/]+)', el['href'])
-            if m:
-                if 'wsj' in split_url.netloc:
-                    # https://www.wsj.com/market-data/quotes/AAPL
-                    el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.wsj.com/market-data/quotes/')
-                elif 'barrons' in split_url.netloc:
-                    # https://www.wsj.com/market-data/quotes/AAPL
-                    el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.barrons.com/market-data/stocks/')
-                else:
-                    logger.warning('unhandled stock quote link {} in {}'.format(el['href'], item['url']))
-                if el.get('class') and 'chiclet-wrapper' in el['class']:
-                    stock_json = utils.get_url_json('https://api.foxbusiness.com/factset/stock-search?stockType=quoteInfo&identifiers=US:{}&isIndex=true'.format(m.group(1)))
-                    if stock_json:
-                        new_html = ' ({} ${:,.2f}'.format(stock_json['data'][0]['symbol'], stock_json['data'][0]['last'])
-                        if stock_json['data'][0]['changePercent'] < 0:
-                            el['style'] = 'color:red; text-decoration:none;'
-                            new_html += ' ▼ '
-                        else:
-                            el['style'] = 'color:green; text-decoration:none;'
-                            new_html += ' ▲ '
-                        new_html += '{:,.2f}%)'.format(stock_json['data'][0]['changePercent'])
-                        el.string = new_html
-                        # new_el = BeautifulSoup(new_html, 'html.parser')
-                        # el.insert(0, new_el)
+            # Remove comment sections
+            for el in body_soup.find_all(text=lambda text: isinstance(text, Comment)):
+                el.extract()
 
-        for el in body_soup.find_all(class_='media-object'):
-            new_html = ''
-            if 'type-InsetMediaIllustration' in el['class']:
-                it = el.find('img')
-                if it:
-                    if it.get('srcset'):
-                        img_src = utils.image_from_srcset(it['srcset'], 1200)
+            for el in body_soup.find_all('a', href=re.compile(r'https://www\.mansionglobal\.com/quote/')):
+                m = re.search(r'/quote/([^/]+)', el['href'])
+                if m:
+                    if 'wsj' in split_url.netloc:
+                        # https://www.wsj.com/market-data/quotes/AAPL
+                        el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.wsj.com/market-data/quotes/')
+                    elif 'barrons' in split_url.netloc:
+                        # https://www.wsj.com/market-data/quotes/AAPL
+                        el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.barrons.com/market-data/stocks/')
                     else:
-                        img_src = it['src']
-                    captions = []
-                    it = el.find(class_='wsj-article-caption-content')
+                        logger.warning('unhandled stock quote link {} in {}'.format(el['href'], item['url']))
+                    if el.get('class') and 'chiclet-wrapper' in el['class']:
+                        stock_json = utils.get_url_json('https://api.foxbusiness.com/factset/stock-search?stockType=quoteInfo&identifiers=US:{}&isIndex=true'.format(m.group(1)))
+                        if stock_json:
+                            new_html = ' ({} ${:,.2f}'.format(stock_json['data'][0]['symbol'], stock_json['data'][0]['last'])
+                            if stock_json['data'][0]['changePercent'] < 0:
+                                el['style'] = 'color:red; text-decoration:none;'
+                                new_html += ' ▼ '
+                            else:
+                                el['style'] = 'color:green; text-decoration:none;'
+                                new_html += ' ▲ '
+                            new_html += '{:,.2f}%)'.format(stock_json['data'][0]['changePercent'])
+                            el.string = new_html
+                            # new_el = BeautifulSoup(new_html, 'html.parser')
+                            # el.insert(0, new_el)
+
+            for el in body_soup.find_all(class_='media-object'):
+                new_html = ''
+                if 'type-InsetMediaIllustration' in el['class']:
+                    it = el.find('img')
                     if it:
-                        captions.append(it.decode_contents())
-                    it = el.find(class_='wsj-article-credit')
-                    if it:
-                        captions.append(it.decode_contents())
-                    new_html = utils.add_image(img_src, ' | '.join(captions))
-            elif 'type-InsetMediaVideo' in el['class']:
-                it = el.find(class_='video-container')
-                if it:
-                    video_item = get_content('https://www.wsj.com/video/' + it['data-src'], {"embed": True}, {}, False)
-                    if video_item:
-                        new_html = video_item['content_html']
-            elif 'type-InsetDynamic' in el['class']:
-                group_captions = []
-                it = el.find(class_='origami-grouped-caption')
-                if it:
-                    group_captions.append(it.decode_contents())
-                it = el.find(class_='origami-grouped-credit')
-                if it:
-                    group_captions.append(it.decode_contents())
-                new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
-                for it in el.find_all(class_='origami-item'):
-                    if it.figure and it.figure.img:
+                        if it.get('srcset'):
+                            img_src = utils.image_from_srcset(it['srcset'], 1200)
+                        else:
+                            img_src = it['src']
                         captions = []
-                        if not group_captions:
-                            cap = it.find(class_='origami-caption')
-                            if cap:
-                                captions.append(cap.decode_contents())
-                            cap = it.find(class_='origami-credit')
-                            if cap:
-                                captions.append(cap.decode_contents())
-                        new_html += '<div style="flex:1; min-width:256px; margin:auto;">' + utils.add_image(it.figure.img['src'], ' | '.join(captions), link=it.figure.img['src']) + '</div>'
-                new_html += '</div>'
-                if group_captions:
-                    new_html += '<div><small>' + ' | '.join(group_captions) + '</div>'
-            elif 'type-InsetArticleReader' in el['class']:
-                it = el.find(class_='audioplayer')
-                if it:
-                    video_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=read-to-me&query={}&fields=adZone,audioURL,audioURLPanoply,author,body,column,description,doctypeID,duration,episodeNumber,formattedCreationDate,guid,keywords,linkURL,name,omniPublishDate,omniVideoFormat,playbackSite,podcastName,podcastSubscribeLinks,podcastUrl,rootId,thumbnailImageManager,thumbnailList,titletag,type,wsj-section,wsj-subsection'.format(it['data-sbid'])
-                    video_json = utils.get_url_json(video_url)
-                    if video_json:
-                        duration = utils.calc_duration(int(video_json['items'][0]['duration']))
-                        new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a> ({2})</span></div><div>&nbsp;</div>'.format(video_json['items'][0]['audioURL'], config.server, duration)
-            elif 'type-InsetPageRule' in el['class']:
-                new_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
-            elif 'type-InsetRichText' in el['class']:
-                it = el.find('h4')
-                if it and re.search(r'MORE IN|SHARE YOUR THOUGHTS', it.get_text().strip()):
+                        it = el.find(class_='wsj-article-caption-content')
+                        if it:
+                            captions.append(it.decode_contents())
+                        it = el.find(class_='wsj-article-credit')
+                        if it:
+                            captions.append(it.decode_contents())
+                        new_html = utils.add_image(img_src, ' | '.join(captions))
+                elif 'type-InsetMediaVideo' in el['class']:
+                    it = el.find(class_='video-container')
+                    if it:
+                        video_item = get_content('https://www.wsj.com/video/' + it['data-src'], {"embed": True}, {}, False)
+                        if video_item:
+                            new_html = video_item['content_html']
+                elif 'type-InsetDynamic' in el['class']:
+                    group_captions = []
+                    it = el.find(class_='origami-grouped-caption')
+                    if it:
+                        group_captions.append(it.decode_contents())
+                    it = el.find(class_='origami-grouped-credit')
+                    if it:
+                        group_captions.append(it.decode_contents())
+                    new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                    for it in el.find_all(class_='origami-item'):
+                        if it.figure and it.figure.img:
+                            captions = []
+                            if not group_captions:
+                                cap = it.find(class_='origami-caption')
+                                if cap:
+                                    captions.append(cap.decode_contents())
+                                cap = it.find(class_='origami-credit')
+                                if cap:
+                                    captions.append(cap.decode_contents())
+                            new_html += '<div style="flex:1; min-width:256px; margin:auto;">' + utils.add_image(it.figure.img['src'], ' | '.join(captions), link=it.figure.img['src']) + '</div>'
+                    new_html += '</div>'
+                    if group_captions:
+                        new_html += '<div><small>' + ' | '.join(group_captions) + '</div>'
+                elif 'type-InsetArticleReader' in el['class']:
+                    it = el.find(class_='audioplayer')
+                    if it:
+                        video_url = 'https://video-api.shdsvc.dowjones.io/api/legacy/find-all-videos?type=read-to-me&query={}&fields=adZone,audioURL,audioURLPanoply,author,body,column,description,doctypeID,duration,episodeNumber,formattedCreationDate,guid,keywords,linkURL,name,omniPublishDate,omniVideoFormat,playbackSite,podcastName,podcastSubscribeLinks,podcastUrl,rootId,thumbnailImageManager,thumbnailList,titletag,type,wsj-section,wsj-subsection'.format(it['data-sbid'])
+                        video_json = utils.get_url_json(video_url)
+                        if video_json:
+                            duration = utils.calc_duration(int(video_json['items'][0]['duration']))
+                            new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a> ({2})</span></div><div>&nbsp;</div>'.format(video_json['items'][0]['audioURL'], config.server, duration)
+                elif 'type-InsetPageRule' in el['class']:
+                    new_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+                elif 'type-InsetRichText' in el['class']:
+                    it = el.find('h4')
+                    if it and re.search(r'MORE IN|SHARE YOUR THOUGHTS', it.get_text().strip()):
+                        el.decompose()
+                        continue
+                elif 'type-InsetBigTopHero' in el['class'] or 'type-InsetNewsletterSignup' in el['class']:
+                    # Skip
                     el.decompose()
                     continue
-            elif 'type-InsetBigTopHero' in el['class'] or 'type-InsetNewsletterSignup' in el['class']:
-                # Skip
-                el.decompose()
-                continue
-            if new_html:
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.replace_with(new_el)
-            else:
-                logger.warning('unhandled media-object class {} in {}'.format(el['class'], item['url']))
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.replace_with(new_el)
+                else:
+                    logger.warning('unhandled media-object class {} in {}'.format(el['class'], item['url']))
 
-        item['content_html'] += body_soup.find(class_='article-wrap').decode_contents()
-    else:
-        if api_json.get('body'):
+            item['content_html'] += body_soup.find(class_='article-wrap').decode_contents()
+        elif api_json.get('body'):
             item['content_html'] += render_contents(api_json['body'], split_url.netloc, article_links)
-        if api_json.get('encryptedDocumentKey'):
-            content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
-            if content:
-                content_json = json.loads(content)
-                if save_debug:
-                    utils.write_file(content_json, './debug/content.json')
-                item['content_html'] += render_contents(content_json, split_url.netloc, article_links)
+            if api_json.get('encryptedDocumentKey'):
+                logger.debug('decrypting document...')
+                content = decrypt_content(item['url'], api_json['encryptedDocumentKey'], api_json['encryptedDataHash'])
+                if content:
+                    logger.debug('...success')
+                    content_json = json.loads(content)
+                    if save_debug:
+                        utils.write_file(content_json, './debug/content.json')
+                    item['content_html'] += render_contents(content_json, split_url.netloc, article_links)
+                else:
+                    logger.warning('...failed to decrypt document')
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item

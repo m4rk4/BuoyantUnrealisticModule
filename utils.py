@@ -802,7 +802,7 @@ def bs_get_inner_html(soup):
   # Also strips \n
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
-def add_blockquote(quote, pullquote_check=True, border_color='#ccc'):
+def add_blockquote(quote, pullquote_check=True, border_color='light-dark(#ccc, #333)'):
   quote = html.unescape(quote.strip())
   # print(quote)
   if quote.startswith('<p'):
@@ -1333,7 +1333,7 @@ def get_content(url, args, save_debug=False):
   return module.get_content(url, args_copy, site_json, save_debug)
 
 def format_embed_preview(item, content_link=True):
-  content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
+  content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
   if item.get('_image'):
     content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
   elif item.get('image'):
@@ -1342,7 +1342,7 @@ def format_embed_preview(item, content_link=True):
     style = 'margin:8px 8px 16px 8px;'
   else:
     style = 'margin:8px 8px 0 8px;'
-  content_html += '<div style="{}"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(style, item['url']).netloc, item['url'], item['title'])
+  content_html += '<div style="{}"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(style, urlsplit(item['url']).netloc, item['url'], item['title'])
   if item.get('summary'):
     content_html += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
   if content_link:
@@ -1549,3 +1549,29 @@ def search_for(search_query):
     if result:
       results.append(result)
   return results
+
+
+def get_stock_price(symbol, stock_id):
+  stock_html = ''
+  if not stock_id:
+    stock_search = get_url_json('https://api.foxbusiness.com/factset/stock-search?stockType=autocomplete&search=' + symbol)
+    if stock_search:
+      stock = next((it for it in stock_search['data'] if it['symbol'] == symbol), None)
+      if stock:
+        stock_id = stock['identifier']
+    if not stock_id:
+      stock_id = 'US:' + symbol
+  stock_url = 'https://api.foxbusiness.com/factset/stock-search?stockType=quoteInfo&identifiers={}&isIndex=true'.format(stock_id)
+  stock_json = get_url_json(stock_url)
+  if stock_json and stock_json.get('data'):
+      # write_file(stock_json, './debug/stock.json')
+      if stock_json['data'][0]['changePercent'] < 0:
+          color = 'red'
+          arrow = '▼'
+      else:
+          color = 'green'
+          arrow = '▲'
+      stock_html = '<span style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</span>'.format(color, stock_json['data'][0]['symbol'], stock_json['data'][0]['last'], arrow, stock_json['data'][0]['changePercent'])
+  else:
+    logger.warning('unable to get stock data ' + stock_url)
+  return stock_html

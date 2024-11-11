@@ -197,7 +197,7 @@ def render_content(content, skip_promos=True):
                 else:
                     logger.warning('unhandled Promo type ' + content['type'])
             else:
-                logger.debug('skipping Promo ' + content.get('url'))
+                logger.debug('skipping Promo ' + content['contentId'])
         elif '/image/ImageEnhancement.hbs' in content['_template']:
             for it in content['item']:
                 content_html += render_content(it, skip_promos)
@@ -677,6 +677,8 @@ def get_item(article_json, args, site_json, save_debug):
         if lead_items:
             if lead_items[0].get('items'):
                 lead_items = lead_items[0]['items']
+            if lead_items[0]['_template'] == '/core/promo/Promo.hbs' and lead_items[0].get('media'):
+                lead_items = lead_items[0]['media']
             content_html += render_content(lead_items[0])
             if lead_items[0].get('image'):
                 if isinstance(lead_items[0]['image'], dict):

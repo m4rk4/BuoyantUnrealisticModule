@@ -278,7 +278,7 @@ def make_card(card_json, tweet_json):
                     if object['data'].get('destination'):
                         destination = unified_card['destination_objects'][object['data']['destination']]
                         card_link = destination['data']['url_data']['url']
-            card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
+            card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
             for image in images[:-1]:
                 if image.get('link'):
                     card_html += '<a href="{}"><img src={} style="width:100%; border-radius:10px;" /></a><div>&nbsp;</div>'.format(image['link'], image['src'])
@@ -329,14 +329,14 @@ def make_card(card_json, tweet_json):
                         destinations.append(destination['data']['url_data'])
                         card_link = destination['data']['url_data']['url']
             for i, image in enumerate(images):
-                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
+                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
                 card_html += '<a href="{}"><img src={} style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(destinations[i]['url'], image)
                 card_html += '<div style="margin:8px;"><small><a href="{}">{}</a></small></div>'.format(destinations[i]['url'], destinations[i]['vanity'])
                 if title:
                     card_html += '<div style="margin:8px; font-weight:bold;"><a href="{}">{}</a></div>'.format(destinations[i]['url'], title)
                 card_html += '</figure>'
             for i, video in enumerate(videos):
-                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px;">'
+                card_html = '<figure style="width:100%; margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
                 card_html += '<a href="{}"><img src={} style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(video['src'], video['poster'])
                 card_html += '<div style="margin:8px;"><small><a href="{}">{}</a></small></div>'.format(destinations[i]['url'], destinations[i]['vanity'])
                 if title:
@@ -379,9 +379,9 @@ def make_card(card_json, tweet_json):
                 color = 'lightgrey'
             pct = float(count / total_count * 100)
             if pct >= 50:
-                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {:.0f}%, white {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(color, pct, 100 - pct, style, label, style, pct)
+                card_html += '<div style="border:1px solid light-dark(#ccc, #333); border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {:.0f}%, white {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(color, pct, 100 - pct, style, label, style, pct)
             else:
-                card_html += '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {:.0f}%, {} {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(100 - pct, color, pct, style, label, style, pct)
+                card_html += '<div style="border:1px solid light-dark(#ccc, #333); border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, white {:.0f}%, {} {:.0f}%);"><p{}>{}</p><p{}>{:.1f}%</p></div>'.format(100 - pct, color, pct, style, label, style, pct)
         card_html += '</div><div><small>'
         if binding_values['counts_are_final']['boolean_value'] == True:
             card_html += 'Final results'
@@ -420,14 +420,14 @@ def make_card(card_json, tweet_json):
         img_link = card_link
 
     if card_type == 1:
-        card_html += '<table style="width:100%; margin:0; padding:0; border:1px solid black; border-radius:10px; border-spacing:0;"><tr>'
+        card_html += '<table style="width:100%; margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px; border-spacing:0;"><tr>'
         card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}">{}</a></td>'.format(img_link, img)
         card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(link_text, card_link, title, card_desc)
         card_html += '</tr></table>'
 
     elif card_type == 2:
         desc = '<div style="margin:8px;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div>'.format(link_text, card_link, title, card_desc)
-        card_html += utils.add_image(img_src, '', link=card_link, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;", desc=desc)
+        card_html += utils.add_image(img_src, '', link=card_link, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;", desc=desc)
     return card_html
 
 
@@ -649,7 +649,7 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
         quoted_html += make_tweet(tweet_json['quoted_tweet'], ref_tweet_url, is_quoted=True)
 
     if tweet_json.get('birdwatch_pivot'):
-        media_html += '<div style="border:1px solid black; border-radius:10px; padding:0.5em;">'
+        media_html += '<div style="border:1px solid light-dark(#ccc, #333); border-radius:10px; padding:0.5em;">'
         if tweet_json['birdwatch_pivot'].get('title'):
             media_html += '<div style="margin-bottom:0.5em;"><strong>{}</strong></div>'.format(tweet_json['birdwatch_pivot']['title'])
         if tweet_json['birdwatch_pivot'].get('subtitle'):
@@ -687,7 +687,7 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
         tweet_html += '<tr><td>&nbsp;</td></tr></table></td></tr>'
     elif is_quoted:
         avatar = '{}/image?url={}&width=32&height=32&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
-        tweet_html = '<table style="font-size:0.95em; width:100%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="width:36px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td><td></td></tr>'.format(
+        tweet_html = '<table style="font-size:0.95em; width:100%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;"><tr><td style="width:36px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td><td></td></tr>'.format(
             avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date)
         tweet_html += '<tr><td colspan="3" style="padding:1em 0 0 0;">{}</td></tr>'.format(text_html)
         if media_html:
@@ -744,13 +744,13 @@ def get_content(url, args, site_json, save_debug=False):
         # https://twitter.com/gerald1064/status/1537123311041355776
         item = {}
         item['id'] = tweet_id
-        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;"><tr><td style="text-align:center;">{}</td></tr></table><div>&nbsp;</div>'.format(replace_tombstone_entities(tweet_json['tombstone']['text']))
+        item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;"><tr><td style="text-align:center;">{}</td></tr></table><div>&nbsp;</div>'.format(replace_tombstone_entities(tweet_json['tombstone']['text']))
         return item
 
     tweet_user = tweet_json['user']['screen_name']
 
     # content_html = '<table style="width:80%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
-    content_html = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+    content_html = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
 
     item = {}
     item['id'] = tweet_id

@@ -527,7 +527,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if site_json.get('lede_video'):
         elements = utils.get_soup_elements(site_json['lede_video'], soup)
         if elements:
-            print(elements)
+            # print(elements)
             el = elements[0]
             if el:
                 it = el.find(class_='jw-video-box')
@@ -563,15 +563,25 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                                 item['content_html'] += utils.add_embed(it['data-src'])
                                 lede = True
                             else:
-                                if el.name == 'iframe':
-                                    it = el
-                                else:
-                                    it = el.find('iframe')
-                                if it:
-                                    item['content_html'] += utils.add_embed(it['src'])
+                                it = el.find(class_='js-superdiv')
+                                if it and it.get('data-video'):
+                                    video_json = json.loads(it['data-video'])
+                                    if it.img:
+                                        poster = it.img['src']
+                                    else:
+                                        poster = ''
+                                    item['content_html'] += utils.add_video(video_json['url'], 'video/mp4', poster, video_json['title'], use_videojs=True)
                                     lede = True
                                 else:
-                                    logger.warning('unhandled lede video wrapper in ' + item['url'])
+                                    if el.name == 'iframe':
+                                        it = el
+                                    else:
+                                        it = el.find('iframe')
+                                    if it:
+                                        item['content_html'] += utils.add_embed(it['src'])
+                                        lede = True
+                                    else:
+                                        logger.warning('unhandled lede video wrapper in ' + item['url'])
 
     if not lede and 'add_lede_video' in args and 'video' in article_json:
         if isinstance(article_json['video'], list):

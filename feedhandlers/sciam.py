@@ -37,10 +37,11 @@ def get_content(url, args, site_json, save_debug=False):
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
 
-            authors = data_json[0]['content']['contentInfo']['author'].copy()
-            if authors:
-                item['author'] = {}
-                item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'] = [{"name": x} for x in data_json[0]['content']['contentInfo']['author']]
+            if len(item['authors']) > 0:
+                item['author'] = {
+                    "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(data_json[0]['content']['contentInfo']['author']))
+                }
 
             if data_json[0]['content']['contentInfo'].get('keywords'):
                 item['tags'] = [it.strip() for it in data_json[0]['content']['contentInfo']['keywords'].split(',')]
@@ -60,12 +61,13 @@ def get_content(url, args, site_json, save_debug=False):
                 item['_timestamp'] = dt.timestamp()
                 item['_display_date'] = utils.format_display_date(dt)
 
-            authors = []
+            item['authors'] = []
             for el in soup.find_all('meta', attrs={"name": "author"}):
-                authors.append(el['content'])
-            if authors:
-                item['author'] = {}
-                item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                item['authors'].append({"name": el['content']})
+            if len(item['authors']) > 0:
+                item['author'] = {
+                    "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+                }
 
             el = soup.find('meta', attrs={"name": "keywords"})
             if el and el['content']:
@@ -77,7 +79,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         el = soup.find('meta', attrs={"property": "og:image"})
         if el:
-            item['_image'] = el['content']
+            item['image'] = el['content']
 
         el = soup.find('meta', attrs={"property": "og:description"})
         if el:
@@ -103,7 +105,7 @@ def get_content(url, args, site_json, save_debug=False):
             if media_src:
                 if media_src.startswith('/'):
                     media_src = 'https://www.scientificamerican.com' + media_src
-                item['content_html'] = utils.add_image(item['_image'])
+                item['content_html'] = utils.add_image(item['image'])
                 item['content_html'] += '<div>&nbsp;</div><table><tr><td style="width:48px;"><a href="{}"><img src="{}/static/play_button-48x48.png" style="width:100%;"/></a></td>'.format(media_src, config.server)
                 item['content_html'] += '<td><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>By {}</div></td></tr></table>'.format(item['url'], item['title'], item['author']['name'])
                 if item.get('summary'):
@@ -139,12 +141,11 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['updated_at_date_time']).replace(tzinfo=dt_rel.tzinfo).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in article_json['authors']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in article_json['authors']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if article_json.get('categories'):
@@ -158,7 +159,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(BeautifulSoup(article_json['summary'], 'html.parser').get_text())
 
     if article_json.get('image_url'):
-        item['_image'] = article_json['image_url']
+        item['image'] = article_json['image_url']
         caption = ''
         if article_json.get('image_caption'):
             if article_json['image_caption'].startswith('<p'):
@@ -176,7 +177,11 @@ def get_content(url, args, site_json, save_debug=False):
                 caption += BeautifulSoup(article_json['image_credits'], 'html.parser').p.decode_contents()
             else:
                 caption += article_json['image_credits']
-        item['content_html'] += utils.add_image(item['_image'], caption)
+        item['content_html'] += utils.add_image(item['image'], caption)
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     for content in article_json['content']:
         if content['type'] == 'paragraph' or content['type'] == 'heading':

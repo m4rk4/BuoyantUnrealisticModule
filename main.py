@@ -1,4 +1,4 @@
-import asyncio, glob, importlib, io, json, os, re, sys
+import asyncio, base64, glob, importlib, io, json, os, re, sys
 # import certifi, primp
 # import requests
 from curl_cffi import requests
@@ -522,6 +522,43 @@ def screenshot():
     args = request.args
     if not args.get('url'):
         return 'No url specified'
+
+    if True:
+        # https://www.thum.io/documentation/api/url
+        # TODO: use https://image.thum.io/get/prefetch/{url} in get_content to prefetch images
+        return redirect('https://image.thum.io/get/maxAge/12/width/800/' + args['url'])
+
+    api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024'.format(quote_plus(args['url']))
+    headers = {
+        "accept": "text/plain, */*; q=0.01",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "origin": "https://urltoscreenshot.com/",
+        "priority": "u=1, i",
+        "referrer": "https://urltoscreenshot.com/",
+        "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
+    }
+    try:
+        r = requests.get(api_url, headers=headers, impersonate="chrome", timeout=30)
+        if r.status_code == 200:
+            return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
+    except Exception as e:
+        logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+
+    api_url = 'https://api.pikwy.com/?tkn=125&d=3000&u={}&fs=0&w=1280&h=1200&s=100&z=100&f=jpg&rt=jweb'.format(quote_plus(args['url']))
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "origin": "https://pikwy.com/",
+        "priority": "u=1, i",
+        "referrer": "https://pikwy.com/"
+    }
+    try:
+        r = requests.get(api_url, headers=headers, impersonate="chrome", timeout=30)
+        if r.status_code == 200 and r.json().get('iurl'):
+            return redirect(r.json()['iurl'])
+    except Exception as e:
+        logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+
     # https://github.com/microsoft/playwright-python/issues/723
     loop = asyncio.ProactorEventLoop()
     asyncio.set_event_loop(loop)

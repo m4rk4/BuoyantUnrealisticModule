@@ -89,7 +89,7 @@ def get_next_json(url, save_debug):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    next_json = get_next_json(url + '?_rsc=esnzq', save_debug)
+    next_json = get_next_json(url + '?_rsc=' + site_json['rsc'], save_debug)
     if not next_json:
         return None
     if save_debug:
@@ -286,7 +286,7 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
-    next_data = get_next_data(url + '?_rsc=esnzq', save_debug)
+    next_data = get_next_data(url + '?_rsc=' + site_json['rsc'], save_debug)
     if not next_data:
         return None
     if save_debug:

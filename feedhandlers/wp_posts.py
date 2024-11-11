@@ -214,7 +214,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                                     image['width'] = int(m.group(1))
                                 images.append(image)
                 if images:
-                    print(images)
+                    # print(images)
                     image = utils.closest_dict(images, 'width', 1000)
                     img_src = image['src']
     if not img_src:
@@ -264,6 +264,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
     elif re.search(r'www\.post-journal\.com.*?-\d+x\d+\.(jpe?g|png)', img_src):
         img_src = re.sub(r'^(.*?www\.post-journal\.com.*?)(-\d+x\d+)(\.jpe?g|png)', r'\1\3', img_src)
 
+    # print(el.name)
     desc = ''
     captions = []
     if not bg_img:
@@ -294,7 +295,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                 if it and it.get_text().strip():
                     credit = it.get_text().strip()
                 else:
-                    it = elm.find(class_=re.compile(r'image-attribution|image-credit|hds-credits|photo-credit|credits-overlay|credits-text|image_source|article-grid-img-credit|__credits|caption-owner|caption-credit'))
+                    it = elm.find(class_=re.compile(r'image-attribution|image-credit|hds-credits|photo-credit|credits-overlay|credits-text|image_source|article-grid-img-credit|__credits|caption-owner|caption-credit|captionCredit'))
                     if it and it.get_text().strip():
                         credit = it.get_text().strip()
                     else:
@@ -318,7 +319,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
                         captions.insert(0, it.decode_contents().strip())
 
                 if not captions:
-                    it = elm.find(class_=re.compile(r'wp-block-media-text__content|br-image.*-description|caption-content|caption-text|image-caption|img-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption|article-grid-img-caption|__caption|inline_caption|r-inner|ie-custom-caption|phtcptn'))
+                    it = elm.find(class_=re.compile(r'wp-block-media-text__content|br-image.*-description|caption-content|caption-text|image-caption|img-caption|photo-layout__caption|article-media__featured-caption|m-article__hero-caption|media-caption|rslides_caption|slide-caption|atr-caption|article-grid-img-caption|__caption|inline_caption|r-inner|ie-custom-caption|phtcptn|captionText'))
                     if it and it.get_text().strip():
                         if it.find('p'):
                             captions.append(it.p.decode_contents().strip())
@@ -327,7 +328,7 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
 
                 if not captions:
                     it = elm.find(class_=re.compile(r'text'))
-                    if it and it.get_text().strip():
+                    if it and it.name != 'figure' and it.get_text().strip():
                         captions.append(it.decode_contents().strip())
 
                 if not captions:
@@ -1865,6 +1866,12 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(['h5', 'h6']):
         # too small
         el.name = 'h4'
+
+    for el in soup.find_all('h2', class_='entry-title'):
+        if el.a:
+            new_html = utils.add_embed(el.a['href'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
 
     for el in soup.find_all('span', class_='neFMT_Subhead_WithinText'):
         el['style'] = 'font-size:1.2em; font-weight:bold;'
@@ -4412,6 +4419,25 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.select('figure:has( a[rel*="wp-att"])'):
         # https://japannews.yomiuri.co.jp/news-services/afp-jiji/20240818-205740/
         add_image(el, el, base_url, site_json)
+
+    for el in soup.find_all(class_='widget'):
+        if 'widget--type-image' in el['class']:
+            add_image(el.figure, el, base_url, site_json)
+        else:
+            new_html = ''
+            if 'widget--type-tweet' in el['class']:
+                it = soup.find(class_='widget__tweet')
+                new_html = utils.add_embed('https://twitter.com/__/status/' + it['data-tweet-id'])
+            elif 'widget--type-instagram' in el['class']:
+                new_html = utils.add_embed(el['data-oembed-url'])
+            elif 'widget--type-flourish' in el['class']:
+                it = el.find(class_='flourish-embed')
+                new_html = utils.add_embed('https://flo.uri.sh/{}/embed?auto=1'.format(it['data-src'].split('?')[0]))
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled widget in ' + item['url'])
 
     for el in soup.find_all(class_=re.compile(r'article[-_]+image|article-grid-width-image|bp-embedded-image|br-image|c-figure|c-image|cli-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|featured-image|img-responsive|r-img-caption|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-media|wp-block-ups-image|wp-caption|wp-post-image|wp-image-\d+|img-container|inline_image|sc-block-image|-insert-image|max-w-img-|image--shortcode|(?<!-)custom-caption')):
         # print(el.parent.name)

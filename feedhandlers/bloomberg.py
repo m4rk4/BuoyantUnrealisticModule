@@ -637,7 +637,7 @@ def get_item(story_json, args, site_json, save_debug):
         for el in body.find_all('div', class_='thirdparty-embed'):
             new_html = ''
             if el.blockquote and ('twitter-tweet' in el.blockquote['class']):
-                m = re.findall('https:\/\/twitter\.com\/[^\/]+\/statuse?s?\/\d+', str(el.blockquote))
+                m = re.findall(r'https:\/\/twitter\.com\/[^\/]+\/statuse?s?\/\d+', str(el.blockquote))
                 new_html += utils.add_embed(m[-1])
 
             if new_html:

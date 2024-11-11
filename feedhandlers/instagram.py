@@ -1,4 +1,5 @@
-import json, random, re, string
+import json, pytz, random, re, string
+import dateutil.parser
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
 from datetime import datetime, timezone
@@ -52,9 +53,9 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             logger.warning('unable to get get instagram embed page ' + embed_url)
             return None
         if save_debug:
-            utils.write_file(ig_embed, './debug/instagram.html')
+            utils.write_file(ig_embed, './debug/ig_embed.html')
 
-        soup = BeautifulSoup(ig_embed, 'html.parser')
+        soup = BeautifulSoup(ig_embed, 'lxml')
         el = soup.find(class_='EmbedIsBroken')
         if el:
             msg = el.find(class_='ebmMessage').get_text()
@@ -74,7 +75,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 ig_data = None
 
         if not ig_data:
-            soup = BeautifulSoup(ig_embed, 'lxml')
+            # soup = BeautifulSoup(ig_embed, 'lxml')
             el = soup.find('script', string=re.compile(r'gql_data'))
             if el:
                 m = re.search(r'handle\((.*?)\);requireLazy', el.string)
@@ -134,13 +135,25 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 user['verified'] = it.get('is_verified')
                 item['authors'].append(user)
     else:
+        ig_html = utils.get_url_html(ig_url, use_curl_cffi=True, use_proxy=True)
+        if ig_html:
+            if save_debug:
+                utils.write_file(ig_html, './debug/instagram.html')
+            ig_soup = BeautifulSoup(ig_html, 'lxml')
+        else:
+            ig_soup = None
+
         el = soup.find(class_='Avatar')
         if el:
             user = {}
             it = soup.select('div.HeaderText > a.Username')
             user['name'] = it[0].find(class_='UsernameText').get_text()
             user['avatar'] = el.img['src']
-            user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+            if ig_soup:
+                user['full_name'] = ig_soup.title.string.split('|')[0].strip()
+                print(user['full_name'])
+            else:
+                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
             user['verified'] = False
             for it in soup.select('span.Username:has(+ i.VerifiedSprite)'):
                 if it.get_text().strip() == user['name']:
@@ -206,6 +219,20 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
         item['tags'] = tags.copy()
 
     if soup and not post_caption:
+        if ig_soup:
+            el = ig_soup.find('meta', attrs={"name": "description"})
+            if el:
+                m = re.search(r'{} on ([^:]+)'.format(item['authors'][0]['name']), el['content'])
+                try:
+                    dt_loc = dateutil.parser.parse(m.group(1))
+                    tz_loc = pytz.timezone(config.local_tz)
+                    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                    item['date_published'] = dt.isoformat()
+                    item['_timestamp'] = dt.timestamp()
+                    item['_display_date'] = utils.format_display_date(dt, False)
+                except:
+                    pass
+
         caption = soup.find(class_='Caption')
         if caption:
             # Make paragragh instead of div to help with spacing
@@ -351,7 +378,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
 
     #item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><span style="line-height:48px; vertical-align:middle;"><a href="https://www.instagram.com/{1}"><b>{1}</b></a></span></div><br/><div style="clear:left;"></div>'.format(avatar, username)
     #item['content_html'] = '<table style="table-layout:fixed; width:90%; max-width:496px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;">'
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px black;">'
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px light-dark(#ccc, #333);">'
     for i, user in enumerate(item['authors']):
         avatar = '{}/image?url={}&height=48&mask=ellipse'.format(config.server, quote_plus(user['avatar']))
         if user['verified']:
