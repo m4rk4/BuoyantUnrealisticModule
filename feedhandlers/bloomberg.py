@@ -240,6 +240,22 @@ def format_content(content, images):
         for c in content['content']:
             quote += format_content(c, images)
         content_html += utils.add_blockquote(quote)
+    elif content['type'] == 'tabularData':
+        content_html += '<table style="width:100%; border-collapse:collapse;">'
+        for tr in content['content']:
+            content_html += '<tr>'
+            if tr['type'] == 'row':
+                for td in tr['content']:
+                    if td['type'] == 'cell':
+                        content_html += '<td>'
+                        for c in td['content']:
+                            content_html += format_content(c, images)
+                        content_html += '</td>'
+            elif tr['type'] == 'columns':
+                for td in tr['data']['definitions']:
+                    content_html += '<th style="text-align:left;">' + td['title'] + '</th>'
+            content_html += '</tr>'
+        content_html += '</table>'
     elif content['type'] == 'aside':
         if content['data'].get('class') and content['data']['class'] == 'pullquote':
             quote = ''

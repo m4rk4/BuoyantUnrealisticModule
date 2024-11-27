@@ -37,6 +37,7 @@ location = ["38.897957", "-77.036560"]
 # impersonate target for curl_cffi
 impersonate = "chrome110"
 
+# NOT USED
 # For Twitter api - doesn't work after Twitter changes https://github.com/zedeus/nitter/issues/983
 # generate with twitter_api.get_guest_account()
 twitter_oauth_token = ''
@@ -44,3 +45,11 @@ twitter_oauth_token_secret = ''
 
 # searXNG instance from https://searx.space/
 searxng_host = 'https://searx.tiekoetter.com'
+
+# Extracting Youtube PO Token and Cookies: https://github.com/yt-dlp/yt-dlp/wiki/Extractors
+youtube_po_token = ""
+youtube_cookies = {
+    "YSC": "",
+    "VISITOR_INFO1_LIVE": "",
+    "VISITOR_PRIVACY_METADATA": ""
+}

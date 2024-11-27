@@ -81,7 +81,7 @@ def format_body(body, url, page_layer):
     soup = BeautifulSoup(body['body'], 'html.parser')
     for el in soup.find_all('script'):
         if el.get('data-placement'):
-            if el['data-placement'] == 'betting-e2' or el['data-placement'] == 'mobile-advert':
+            if el['data-placement'] == 'betting-e2' or el['data-placement'] == 'mobile-advert' or el['data-placement'] == 'footballco-bet-betsense':
                 el.decompose()
             elif el['data-placement'] == 'poll':
                 data = body['embeds']['poll']
@@ -162,6 +162,9 @@ def format_body(body, url, page_layer):
             el.insert_after(new_el)
             el.decompose()
 
+    for el in soup.find_all('p', attrs={"style": re.compile(r'display:\s?none;')}):
+        el.decompose()
+
     return str(soup)
 
 
@@ -198,23 +201,27 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['author'] = {}
     if article_json.get('author'):
-        authors = []
-        for it in article_json['author']:
-            authors.append(it['name'])
-        if authors:
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in article_json['author']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = 'GOAL'
+        item['author'] = {
+            "name": "GOAL"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     if article_json.get('tagList') and article_json['tagList'].get('tags'):
         item['tags'] = []
         for it in article_json['tagList']['tags']:
             item['tags'].append(it['name'])
 
+    item['content_html'] = ''
     if article_json.get('teaser'):
         item['summary'] = article_json['teaser']
+        item['content_html'] += '<p><em>' + article_json['teaser'] + '</em></p>'
 
-    item['content_html'] = ''
     if article_json.get('match'):
         item['content_html'] += '<table style="width:100%"><tr>'
         item['content_html'] += '<td style="text-align:center; vertical-align:middle;"><img src="{}" style="width:60px;"/><br/><b>{}</b></td>'.format(article_json['match']['teamA']['crest']['url'], article_json['match']['teamA']['name'])
@@ -226,7 +233,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     if article_json.get('poster'):
         if article_json['poster'].get('image'):
-            item['_image'] = resize_image(article_json['poster']['image']['src'])
+            item['image'] = resize_image(article_json['poster']['image']['src'])
         if article_json['poster']['type'] == 'Image':
             if article_json['poster'].get('credit'):
                 caption = article_json['poster']['credit']
@@ -234,7 +241,7 @@ def get_content(url, args, site_json, save_debug=False):
                 caption = article_json['poster']['source']
             else:
                 caption = ''
-            item['content_html'] += utils.add_image(item['_image'], caption)
+            item['content_html'] += utils.add_image(item['image'], caption)
         elif article_json['poster']['type'] == 'YoutubeVideo':
             soup = BeautifulSoup(article_json['poster']['embed'], 'html.parser')
             item['content_html'] += utils.add_embed(soup.iframe['src'])
@@ -243,6 +250,10 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += add_fcplayer_video(soup.script['src'], urlsplit(url), page_layer)
         else:
             logger.warning('unhandled poster media type {} in {}'.format(article_json['poster']['type'], item['url']))
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json.get('body'):
         item['content_html'] += format_body(article_json['body'], item['url'], page_layer)
@@ -277,7 +288,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     if slides:
         for slide in slides:
-            item['content_html'] += '<hr/>'
+            item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
             if slide.get('media'):
                 if slide['media']['type'] == 'Image':
                     if slide['media'].get('credit'):
@@ -292,9 +303,11 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += utils.add_embed(soup.iframe['src'])
                 else:
                     logger.warning('unhandled slide media type {} in {}'.format(slide['media']['type'], item['url']))
-            slide_body = format_body(slide['body'], item['url'], page_layer)
-            item['content_html'] += '<h3>{}</h3>{}'.format(slide['headline'], slide_body)
+            item['content_html'] += '<h3>' + slide['headline'] + '</h3>'
+            if slide.get('body') and slide['body'].get('body'):
+                item['content_html'] += format_body(slide['body'], item['url'], page_layer)
 
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

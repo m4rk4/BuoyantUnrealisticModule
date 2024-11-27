@@ -250,6 +250,8 @@ def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, 
             img_src = img['data-src']
         elif img.get('nw18-data-src') and not img['nw18-data-src'].startswith('data:image/gif;base64'):
             img_src = img['nw18-data-src']
+        elif el_sources.find(attrs={"itemprop": "image"}) and el_sources.find('meta', attrs={"itemprop": "url"}):
+            img_src = el_sources.find('meta', attrs={"itemprop": "url"})['content']
         else:
             img_src = img['src']
 
@@ -621,7 +623,7 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
             authors.append(wp_post['meta']['extracredits'])
             return authors
 
-        if not authors and wp_post.get('metadata') and wp_post['metadata'].get('author'):
+        if not authors and wp_post.get('metadata') and wp_post['metadata'].get('author') and isinstance(wp_post['metadata']['author'], list):
             return wp_post['metadata']['author'].copy()
 
         if wp_post.get('yoast_head_json') and wp_post['yoast_head_json'].get('author'):
@@ -1237,6 +1239,8 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 subtitle = post['meta']['savage_platform_subheadline']
             elif post['meta'].get('dek'):
                 subtitle = post['meta']['dek']
+            elif post['meta'].get('mj_dek'):
+                subtitle = post['meta']['mj_dek']
             elif post['meta'].get('lux_article_dek_field'):
                 subtitle = post['meta']['lux_article_dek_field']
             elif post['meta'].get('long_summary'):
@@ -1412,14 +1416,25 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                 el = page_soup.find('video', attrs={"data-video-id-pending": post['meta']['featured_bc_video_id']['id']})
                 if el:
                     video_lede = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el['data-account'], el['data-player'], el['data-video-id-pending']))
+        elif post.get('acf') and post['acf'].get('video_code'):
+            m = re.search(r'account_id="([^"]+)"', post['acf']['video_code'])
+            if m:
+                video_src = 'https://players.brightcove.net/' + m.group(1)
+                m = re.search(r'player_id="([^"]+)"', post['acf']['video_code'])
+                if m:
+                    video_src += '/' + m.group(1)
+                    m = re.search(r'video_id="([^"]+)"', post['acf']['video_code'])
+                    if m:
+                        video_src += '_default/index.html?videoId=' + m.group(1)
+                        video_lede = utils.add_embed(video_src)
         elif post.get('you_tube_id'):
             video_lede = utils.add_embed('https://www.youtube.com/watch?v=' + post['you_tube_id'])
         elif site_json.get('lede_video'):
+            logger.debug('checking for lede_video...')
             if not page_soup:
                 page_soup = get_page_soup(item['url'], site_json, save_debug)
             if page_soup:
                 el = utils.get_soup_elements(site_json['lede_video'], page_soup)
-                print(el)
                 if el:
                     it = el[0].find(class_='c-videoPlay')
                     if it and it.get('data-displayinline'):
@@ -1431,6 +1446,10 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
                     elif 'video-js' in el[0]['class']:
                         video_url = 'https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(el[0]['data-account'], el[0]['data-player'], el[0]['data-video-id'])
                         video_lede = utils.add_embed(video_url)
+                    elif 'ami-video-placeholder' in el[0]['class']:
+                        it = el[0].find('script', attrs={"data-type": "s2nScript"})
+                        if it:
+                            video_lede = utils.add_embed(it['src'])
         if video_lede:
             lede += video_lede
         elif post.get('content') and re.search(r'^\s*<p><script[^>]+src="https://newsource-embed-prd\.ns\.cnn\.com/videos/embed', post['content']['rendered']):
@@ -2213,7 +2232,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         for post in el.find_all('div', id=re.compile(r'post-')):
             dt = datetime.fromisoformat(post.find('amp-timeago')['datetime'])
             new_html += '<div style="font-weight:bold;">&bull;&nbsp;' + utils.format_display_date(dt) + '</div>'
-            new_html += '<div style="border-left:3px solid #ccc; margin-left:0.3em; padding:0.5em 1em;">'
+            new_html += '<div style="border-left:3px solid light-dark(#ccc, #333); margin-left:0.3em; padding:0.5em 1em;">'
             post_body = post.find('div')
             if post_body:
                 for it in post_body.select('div:has(> div.image):has(> h3):has(> p)'):
@@ -2265,7 +2284,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             except:
                 pass
             new_html += '<span style="font-size:0.8em;">' + date + '</span>'
-        new_html += '</div><div style="margin-left:0.35em; padding-left:8px; border-left:;border-left:3px solid #ccc;">'
+        new_html += '</div><div style="margin-left:0.35em; padding-left:8px; border-left:;border-left:3px solid light-dark(#ccc, #333);">'
         it = el.find(class_='blg-ttl')
         if it:
             new_html += '<div style="font-size:1.05em; font-weight:bold;">' + it.get_text().strip() + '</div>'
@@ -2447,14 +2466,14 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         it = el.find(class_='cons')
         if it:
             new_html += it.decode_contents()
-        new_html += '<hr style="width:80%; margin:auto; border-top:1px solid #ccc;"><div>&nbsp;</div>'
+        new_html += '<hr style="width:80%; margin:auto; border-top:1px solid light-dark(#ccc, #333);"><div>&nbsp;</div>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.replace_with(new_el)
 
     for el in soup.find_all(class_='review-wrapper'):
         # https://the5krunner.com/2023/01/11/magene-l508-review-smart-radar-tail-light/
         # https://readysteadycut.com/2024/07/03/beverly-hills-cop-axel-f-review/
-        new_html = '<div>&nbsp;</div><div style="margin:8px; padding:8px; border:1px solid #ccc; border-radius:10px;">'
+        new_html = '<div>&nbsp;</div><div style="margin:8px; padding:8px; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
         # img = el.find('img')
         # if img:
         #     new_html += '<img src="{}" style="float:left; margin-right:8px; width:128px;"/>'.format(img['src'])
@@ -2507,7 +2526,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
                         n = 5 * float(m.group(1)) / 100
                 if n <= 5:
                     # Stars
-                    new_html += '<tr style="line-height:1.5em; border-bottom:1px solid #ccc;"><td>' + title + '</td><td>'
+                    new_html += '<tr style="line-height:1.5em; border-bottom:1px solid light-dark(#ccc, #333);"><td>' + title + '</td><td>'
                     if n > 0:
                         new_html += utils.add_stars(n, star_size='1em', label='<b>{:.1f}</b>&nbsp;'.format(n))
                     new_html += '</td></tr>'
@@ -2668,7 +2687,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
 
     for el in soup.find_all(class_='score-box'):
         # https://www.psu.com/reviews/star-wars-bounty-hunter-review-ps5/
-        new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; background-color:#ccc; border-radius:10px;">'
+        new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; background-color:light-dark(#ccc, #333); border-radius:10px;">'
         it = el.find(class_='score')
         if it:
             new_html += '<div style="flex:1; min-width:256px; padding:8px; text-align:center;"><h3>Score</h3><div style="font-size:3em; font-weight:bold;">' + it.get_text().strip() + '</div></div>'
@@ -2732,7 +2751,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         if el.find(class_='xer-review-footer'):
             new_html += '<table style="border-collapse:collapse;">'
             for row in el.select('section.xer-review-footer > div.xer-row > div.xer-col-50 > div.xer-row'):
-                new_html += '<tr style="border-bottom:1px solid #ccc;">'
+                new_html += '<tr style="border-bottom:1px solid light-dark(#ccc, #333);">'
                 for col in row.find_all(class_='xer-col-50'):
                     new_html += '<td>' + col.decode_contents() + '</td>'
                 new_html += '</tr>'
@@ -2842,7 +2861,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
 
     for el in soup.select('div:has(> div:-soup-contains("The Final Grade"))'):
         # https://www.nintendojo.com/reviews/review-animal-well-switch
-        new_html = '<h3>The Final Grade</h3><blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">'
+        new_html = '<h3>The Final Grade</h3><blockquote style="border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;">'
         it = el.find('img', attrs={"src": re.compile(r'editorsChoice_long\.png')})
         if it:
             new_html += '<div><span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span></div>'
@@ -3413,7 +3432,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(class_=['et-box', 'factfile', 'snrsInfobox']):
         el.attrs = {}
         el.name = 'blockquote'
-        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
         for it in el.find_all(class_=['snrsInfoboxContainer', 'snrsInfoboxSubContainer']):
             it.unwrap()
 
@@ -3933,7 +3952,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
                 it.decompose()
             el.name = 'blockquote'
             el.attrs = {}
-            el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+            el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
             continue
         elif 'elementor-widget-pp-info-box' in el['class']:
             new_html = '<table><tr>'
@@ -4416,6 +4435,17 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     #     # https://www.carscoops.com/2024/08/2025-chevrolet-traverse-gains-luxurious-high-country-trim/
     #     add_image(el, el, base_url, site_json)
 
+    for el in soup.select('figure.fixed-media:has(> span.caption-overlay)'):
+        # https://leadstories.com/hoax-alert/2024/11/fact-check-no-proof-taylor-swift-moved-to-canada-in-response-to-2024-presidential-election-results.html
+        it = el.find('img')
+        if it:
+            new_html = '<div style="position:relative; text-align:center;"><img src="{}" style="width:100%;" />'.format(it['src'])
+            it = el.find('span', class_='caption-overlay')
+            # TODO: color
+            new_html += '<div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:2em; font-weight:bold; background:red; color:white; padding:8px;">' + it.get_text().strip() + '</div></div>'
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+
     for el in soup.select('figure:has( a[rel*="wp-att"])'):
         # https://japannews.yomiuri.co.jp/news-services/afp-jiji/20240818-205740/
         add_image(el, el, base_url, site_json)
@@ -4439,7 +4469,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             else:
                 logger.warning('unhandled widget in ' + item['url'])
 
-    for el in soup.find_all(class_=re.compile(r'article[-_]+image|article-grid-width-image|bp-embedded-image|br-image|c-figure|c-image|cli-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|featured-image|img-responsive|r-img-caption|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-media|wp-block-ups-image|wp-caption|wp-post-image|wp-image-\d+|img-container|inline_image|sc-block-image|-insert-image|max-w-img-|image--shortcode|(?<!-)custom-caption')):
+    for el in soup.find_all(class_=re.compile(r'article[-_]+image|article-picture|article-grid-width-image|bp-embedded-image|br-image|c-figure|c-image|cli-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|featured-image|img-responsive|r-img-caption|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-media|wp-block-ups-image|wp-caption|wp-post-image|wp-image-\d+|img-container|inline_image|sc-block-image|-insert-image|max-w-img-|image--shortcode|(?<!-)custom-caption')):
         # print(el.parent.name)
         if el.name != None:
             if not (el.name == 'p' and 'wp-caption-text' in el['class']):
@@ -5271,6 +5301,8 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
         if el.get('class'):
             if 'instagram-media' in el['class']:
                 new_html = utils.add_embed(el['data-instgrm-permalink'])
+            elif 'bluesky-embed' in el['class']:
+                new_html = utils.add_embed(el['data-bluesky-uri'])
             elif 'text-post-media' in el['class']:
                 new_html = utils.add_embed(el['data-text-post-permalink'])
             elif 'reddit-embed-bq' in el['class'] or 'reddit-card' in el['class']:
@@ -5314,7 +5346,10 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
                 else:
                     new_html = '<div>&nbsp;</div>'
         if not new_html and el.get_text().strip():
-            if el.get('id') and re.search(r'blockquote\d', el['id']):
+            if 'nakedcapitalism.com' in split_url.netloc:
+                el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
+                continue
+            elif el.get('id') and re.search(r'blockquote\d', el['id']):
                 it = el.find_previous_sibling()
                 new_html = utils.add_blockquote(el.decode_contents())
             else:
@@ -5346,17 +5381,17 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
     for el in soup.find_all(class_=re.compile(r'textbox\d')):
         el.name = 'blockquote'
         el.attrs = {}
-        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in soup.find_all(class_='aside-wide'):
         el.name = 'blockquote'
         el.attrs = {}
-        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in soup.select('p:has(> cite)'):
         el.name = 'blockquote'
         el.attrs = {}
-        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in soup.find_all(class_='info-box'):
         new_html = '<table style="margin:1.5em 10px;"><tr><td style="font-size:3em; font-weight:bold;">ⓘ</td><td style="font-style:italic; padding:8px;">{}</td></tr></table>'.format(el.decode_contents())
@@ -5469,7 +5504,7 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             it.attrs = {}
         el.name = 'blockquote'
         el.attrs = {}
-        el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
 
     for el in soup.find_all(class_='is-content-justification-center'):
         el.attrs = {}

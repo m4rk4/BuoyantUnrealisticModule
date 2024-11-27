@@ -135,7 +135,7 @@ def get_content(url, args, site_json, save_debug=False):
             paragraph_text = ''
 
         elif paragraph_type == 'pre':
-            start_tag += '<pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">'
+            start_tag += '<pre style="padding:0.5em; white-space:pre-wrap; background:light-dark(#ccc, #333);">'
             end_tag = '</pre>'
             if not paragraph.get('markups'):
                 # Escape HTML characters so they are not rendered
@@ -176,7 +176,7 @@ def get_content(url, args, site_json, save_debug=False):
                     if m:
                         gist = utils.get_url_html('https://gist.githubusercontent.com/{}/{}/raw'.format(m.group(1), m.group(2)))
                         if gist:
-                            start_tag += '<pre style="margin-left:2em; padding:0.5em; white-space:pre-wrap; background:#F2F2F2;">{}</pre>'.format(gist)
+                            start_tag += '<pre style="padding:0.5em; white-space:pre-wrap; background:light-dark(#ccc, #333);">{}</pre>'.format(gist)
                             end_tag = ''
                             paragraph_text = ''
                 if not start_tag:

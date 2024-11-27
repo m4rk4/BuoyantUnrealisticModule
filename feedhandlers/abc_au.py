@@ -228,7 +228,7 @@ def get_content(url, args, site_json, save_debug):
     if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
         item['_audio'] = article_json['renditions'][0]['url']
         attachment = {
-            "url": article_json['renditions'][0]['url']
+            "url": article_json['renditions'][0]['url'],
             "mime_type": article_json['renditions'][0]['MIMEType']
         }
         item['attachments'] = []

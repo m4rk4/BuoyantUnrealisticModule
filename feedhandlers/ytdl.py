@@ -1,8 +1,8 @@
 import pytz, re
-from datetime import datetime
-from urllib.parse import parse_qs, quote_plus, urlsplit
-
 from bs4 import BeautifulSoup
+from datetime import datetime
+from http.cookiejar import Cookie
+from urllib.parse import parse_qs, quote_plus, urlsplit
 from yt_dlp import YoutubeDL, DownloadError
 
 import config, utils
@@ -44,7 +44,10 @@ def get_content(url, args, site_json, save_debug=False):
         "extractor_args": {
             "youtube": {
                 "player_client": [
-                    "mediaconnect"
+                    "web_safari"
+                ],
+                "po_token": [
+                    "web_safari+" + config.youtube_po_token
                 ]
             }
         }
@@ -57,7 +60,15 @@ def get_content(url, args, site_json, save_debug=False):
         # TODO: capture warning info like "WARNING: [youtube] Video unavailable. The uploader has not made this video available in your country"
         # These are printed to stdout
         try:
-            video_info = YoutubeDL(ydl_opts).extract_info('https://www.youtube.com/watch?v=' + video_id, download=False)
+            ydl = YoutubeDL(ydl_opts)
+            for key, val in config.youtube_cookies.items():
+                ydl.cookiejar.set_cookie(Cookie(
+                    name=key, value=val, domain='.youtube.com', 
+                    version=0, port=None, path='/', secure=True, expires=None, discard=False,
+                    comment=None, comment_url=None, rest={'HttpOnly': None},
+                    domain_initial_dot=True, port_specified=False, domain_specified=True, path_specified=False
+                ))
+            video_info = ydl.extract_info('https://www.youtube.com/watch?v=' + video_id, download=False)
         except DownloadError as e:
             logger.warning(str(e))
             item = {}

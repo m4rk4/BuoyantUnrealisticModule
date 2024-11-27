@@ -1,6 +1,6 @@
 import av, math, re
 from io import BytesIO
-from PIL import Image, ImageDraw, ImageFilter, ImageColor
+from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
 
 import utils
 
@@ -27,6 +27,16 @@ def resize(im, width, height, scale):
     return im.resize((w, h), resample=Image.LANCZOS)
 
 
+def crop_bbox(im, invert):
+    # Removes surrounding black borders
+    if isinstance(invert, str) and invert == '1':
+        # invert to remove white borders
+        bbox = ImageOps.invert(im.convert("RGB")).getbbox()
+    else:
+        bbox = im.getbbox()
+    return im.crop(bbox)
+
+
 def crop(im, crop_args):
     if len(crop_args) == 4:
         # Rectangle
@@ -41,8 +51,8 @@ def crop(im, crop_args):
         x = (im.width - w) // 2
         y = (im.height - h) // 2
     elif len(crop_args) == 1:
-        # Centered square
         v = int(crop_args[0])
+        # Centered square
         if v == 0:
             w = min(im.width, im.height)
         elif v <= im.width and v <= im.height:
@@ -52,6 +62,9 @@ def crop(im, crop_args):
         h = w
         x = (im.width - w) // 2
         y = (im.height - h) // 2
+    elif len(crop_args) == 0:
+        im_box = im.getbox()
+        return im.crop(im_box)
     else:
         return im
     return im.crop((x, y, x + w, y + h))
@@ -305,6 +318,10 @@ def get_image(args):
 
         elif arg == 'crop':
             im = crop(im, args['crop'].split(','))
+            save = True
+
+        elif arg == 'cropbbox':
+            im = crop_bbox(im, args['cropbbox'])
             save = True
 
         elif arg == 'overlay':

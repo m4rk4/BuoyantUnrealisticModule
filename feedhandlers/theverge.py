@@ -188,8 +188,12 @@ def render_body_component(component):
                 content_html += utils.add_embed(links[-1]['href'])
             elif provider == 'instagram':
                 content_html += utils.add_embed(soup.blockquote['data-instgrm-permalink'])
+            elif provider == 'threads' and soup.find('a', href=re.compile(r'threads\.net')):
+                content_html += utils.add_embed(soup.a['href'])
             elif provider == 'tiktok':
                 content_html += utils.add_embed(soup.blockquote['cite'])
+            elif provider == 'bluesky social':
+                content_html += utils.add_embed(soup.blockquote['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('/app.bsky.feed.post/', '/post/'))
             elif provider == 'spotify' or provider == 'youtube':
                 content_html += utils.add_embed(soup.iframe['src'])
             else:
@@ -425,13 +429,16 @@ def get_item(entry_json, args, site_json, save_debug):
         item['date_modified'] = dt.isoformat()
 
     if entry_json.get('author'):
-        item['author'] = {"name": entry_json['author']['fullName']}
+        item['author'] = {
+            "name": entry_json['author']['fullName']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     elif entry_json.get('authors'):
-        authors = []
-        for it in entry_json['authors']:
-            authors.append(it['name'])
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in entry_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if entry_json.get('communityGroups'):
@@ -445,15 +452,15 @@ def get_item(entry_json, args, site_json, save_debug):
         del item['tags']
 
     if entry_json.get('leadImage') and entry_json['leadImage'].get('variantUrl'):
-        item['_image'] = entry_json['leadImage']['variantUrl']
+        item['image'] = entry_json['leadImage']['variantUrl']
     elif entry_json.get('leadImage') and entry_json['leadImage'].get('defaultImageUrl'):
-        item['_image'] = entry_json['leadImage']['defaultImageUrl']
+        item['image'] = entry_json['leadImage']['defaultImageUrl']
     elif entry_json.get('leadMedia') and entry_json['leadMedia'].get('image'):
-        item['_image'] = entry_json['leadMedia']['image']['thumbnails']['horizontal']['url']
+        item['image'] = entry_json['leadMedia']['image']['thumbnails']['horizontal']['url']
     elif entry_json.get('promoImage'):
-        item['_image'] = entry_json['promoImage']['variantUrl']
+        item['image'] = entry_json['promoImage']['variantUrl']
     elif entry_json.get('socialImage'):
-        item['_image'] = entry_json['socialImage']['variantUrl']
+        item['image'] = entry_json['socialImage']['variantUrl']
 
     if entry_json.get('seoDescription'):
         item['summary'] = entry_json['seoDescription']['plaintext']
@@ -461,6 +468,10 @@ def get_item(entry_json, args, site_json, save_debug):
         item['summary'] = entry_json['promoDescription']['plaintext']
     elif entry_json.get('socialDescription'):
         item['summary'] = entry_json['socialDescription']['plaintext']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if entry_json.get('dek'):

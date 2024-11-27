@@ -553,18 +553,20 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(article_json['lastModDate'].replace('Z', '+00:00'))
         item['date_modified'] = dt.isoformat()
 
-    authors = []
-    item['author'] = {}
     if article_json.get('authors'):
-        for it in article_json['authors']:
-            authors.append(it['fullName'])
+        item['authors'] = [{"name": x['fullName']} for x in article_json['authors']]
     elif article_json.get('publishedByUsers'):
-        for it in article_json['publishedByUsers']:
-            authors.append(it['fullName'])
+        item['authors'] = [{"name": x['fullName']} for x in article_json['publishedByUsers']]
     else:
-        item['author']['name'] = 'E! Online'
-    if authors:
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['author'] = {
+            "name": "E! Online"
+		}
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    if 'author' not in item and 'authors' in item and len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+		}   
 
     if article_json.get('categories'):
         item['tags'] = []
@@ -572,12 +574,16 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append(it['name'])
 
     if article_json.get('thumbnail'):
-        item['_image'] = article_json['thumbnail']['uri']
+        item['image'] = article_json['thumbnail']['uri']
 
     item['content_html'] = ''
     if article_json.get('subhead'):
         item['summary'] = article_json['subhead']
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['subhead'])
+        
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json.get('videoUri'):
         video_src = utils.get_redirect_url(article_json['videoUri'])

@@ -125,12 +125,11 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromtimestamp(content_json['updatedDate']/1000 + 4*3600).replace(tzinfo=timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in content_json['authors']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in content_json['authors']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if content_json.get('keywords'):
@@ -165,9 +164,9 @@ def get_content(url, args, site_json, save_debug=False):
             if it['type']:
                 if it['type'] == 'default':
                     if it.get('size_1200x800'):
-                        item['_image'] = it['size_1200x800']['url']
+                        item['image'] = it['size_1200x800']['url']
                     else:
-                        item['_image'] = it['url']
+                        item['image'] = it['url']
                 elif it['type'] == 'leading':
                     caption = it.get('title')
                     if it.get('size_1200x800'):
@@ -176,16 +175,13 @@ def get_content(url, args, site_json, save_debug=False):
                         img_src = it['url']
                     if not lede:
                         item['content_html'] += utils.add_image(img_src, caption)
-                    if not item.get('_image'):
-                        item['_image'] = img_src
+                    if not item.get('image'):
+                        item['image'] = img_src
     else:
         images = None
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], split_url.netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     for block in content_json['body']:

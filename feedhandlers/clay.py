@@ -185,6 +185,9 @@ def get_content_html(content_uri):
             content_html += '<li><a href="{}">{}</a></li>'.format(it['canonicalUrl'], it['primaryHeadline'])
         content_html += '</ul>'
 
+    elif '/recirc-line/' in content_uri:
+        pass
+
     else:
         logger.warning('unhandled content in https://' + content_uri)
     return content_html
@@ -243,11 +246,11 @@ def get_content(url, args, site_json, save_debug=False, page_uri=''):
         if not utils.check_age(item, args):
             return None
 
-    authors = []
-    for author in article_json['authors']:
-        authors.append(author['text'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if article_json.get('authors'):
+        item['authors'] = [{"name": x['text']} for x in article_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if article_json.get('tags'):
         tags_json = utils.get_url_json('https://' + article_json['tags']['_ref'])
@@ -265,16 +268,20 @@ def get_content(url, args, site_json, save_debug=False, page_uri=''):
 
     if article_json.get('pageDescription'):
         item['summary'] = article_json['pageDescription']
+    elif article_json.get('seoDescription'):
+        item['summary'] = article_json['seoDescription']
     elif article_json.get('dek'):
         item['summary'] = article_json['dek']
 
     item['content_html'] = ''
 
     if article_json.get('displayTeaser') and article_json['hideTeaser'] == False:
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['displayTeaser'])
+        item['content_html'] += '<p><em>' + article_json['displayTeaser'] + '</em></p>'
+    elif article_json.get('dek'):
+        item['content_html'] += '<p><em>' + article_json['dek'] + '</em></p>'
 
     if article_json.get('ledeUrl'):
-        item['_image'] = article_json['ledeUrl']
+        item['image'] = article_json['ledeUrl']
         caption = []
         if article_json.get('ledeCaption'):
             caption.append(article_json['ledeCaption'].strip())
@@ -286,6 +293,19 @@ def get_content(url, args, site_json, save_debug=False, page_uri=''):
     elif article_json.get('topImage'):
         for content in article_json['topImage']:
             item['content_html'] += get_content_html(content['_ref'])
+        m = re.search(r'src="([^"]+)"', item['content_html'])
+        if m:
+            item['image'] = m.group(1)
+    elif article_json.get('articleImage'):
+        item['image'] = article_json['articleImage']['url']
+        item['content_html'] += utils.add_image(item['image'])
+    elif article_json.get('preloadImage'):
+        item['image'] = article_json['preloadImage']['url']
+        item['content_html'] += utils.add_image(item['image'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     for content in article_json['content']:
         item['content_html'] += get_content_html(content['_ref'])

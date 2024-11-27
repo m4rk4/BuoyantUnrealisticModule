@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import unquote_plus, urlsplit
+from urllib.parse import quote_plus, unquote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -157,11 +157,18 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html = utils.add_image(el['data-img-src'], caption)
             elif el['data-embed-type'] == 'gallery':
                 if el.get('data-img-src'):
+                    gallery_images = []
+                    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                    for it in  el['data-img-src'].split(','):
+                        gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(it) + '</div>'
+                        gallery_images.append({"src": it, "caption": '', "thumb": it})
+                    gallery_html += '</div>'
+                    gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                    new_html = '<h3><a href="{}" target="_blank">View slideshow'.format(gallery_url)
                     it = el.find(class_='image-gallery__label')
                     if it:
-                        new_html += '<h2>' + it.decode_contents() + '</h2>'
-                    for it in  el['data-img-src'].split(','):
-                        new_html += utils.add_image(it)
+                        new_html += ': ' + it.decode_contents()
+                    new_html += '</a></h3>' + gallery_html
             elif el['data-embed-type'] == 'imageGallery':
                 # Seems to be related gallery
                 el.decompose()
@@ -177,79 +184,100 @@ def get_content(url, args, site_json, save_debug=False):
                 new_html = utils.add_embed(el['data-src'])
             elif el['data-embed-type'] == 'buylink':
                 if el['data-size'] == 'buylink__large':
-                    for it in el.find_all('input', class_='buylink__extra'):
-                        it.decompose()
-                    for it in el.find_all('a'):
-                        if it.get('data-vars-buy-link'):
-                            link = it['data-vars-buy-link']
-                        else:
-                            link = it['href']
-                        if it.get('class') and 'buylink__link--not-button' not in it['class']:
-                            it.attrs = {}
-                            it['style'] = 'display:inline-block; padding:0 8px 0 8px; background-color:red; color:white; text-decoration:none;'
-                        else:
-                            it.attrs = {}
-                        it['href'] = link
-                    for i, it in enumerate(el.find_all(class_='buylink__item')):
-                        if i > 0:
-                            new_html += '<hr style="width:80%;" />'
-                        new_html += '<table><tr>'
-                        elm = it.find('img', class_='buylink__image')
+                    new_html = ''
+                    for it in el.find_all(class_='buylink__item'):
+                        new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; border:1px solid light-dark(#ccc, #333); border-radius:10px; padding:8px; margin:1em 0 1em 0;">'
+                        elm = it.find(class_='buylink__image-container')
                         if elm:
-                            new_html += '<td style="width:128px;"><img src="{}" style="width:100%;" /></td>'.format(elm['src'])
-                        new_html += '<td style="vertical-align:top;">'
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                                new_html += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><a href="{}"><img style="width:100%;" src="{}"/></a></div>'.format(link, elm.img['src'])
+                            else:
+                                new_html += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><img style="width:100%;" src="{}"/></div>'.format(elm.img['src'])
+                        new_html += '<div style="flex:2; min-width:256px;">'
                         elm = it.find(class_='buylink__title')
                         if elm:
-                            new_html += '<div style="font-size:1.1em; font-weight:bold;">' + elm.decode_contents() + '</div>'
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                                new_html += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link, elm.a.get_text().strip())
+                            else:
+                                new_html += '<div style="font-size:1.1em; font-weight:bold;">{}</div>'.format(elm.get_text().strip())
                         elm = it.find(class_='buylink__deck')
                         if elm:
-                            elm.attrs = {}
-                            new_html += str(elm)
-                        elm = el.find(class_='buylink__links')
-                        if elm:
-                            for link in it.find_all('a'):
-                                new_el = soup.new_tag('div')
-                                new_el['style'] = 'line-height:2em; margin:8px 0 8px 0;'
-                                link.wrap(new_el)
-                            # it.attrs = {}
-                            # it['style'] = 'line-height:2em;'
-                            # new_html += str(it)
-                            new_html += elm.decode_contents()
-                        new_html += '</td></tr></table>'
-                    new_html += '<hr/>'
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                                new_html += '<p><a href="{}" style="text-decoration:none;">{}</a></p>'.format(link, elm.a.get_text().strip())
+                            else:
+                                new_html += '<p>{}</p>'.format(elm.get_text().strip())
+                        for elm in it.select('div.buylink__links > a'):
+                            if elm.get('data-vars-buy-link'):
+                                link = elm['data-vars-buy-link']
+                            else:
+                                link = elm['href']
+                            if 'buylink__link--not-button' in it['class']:
+                                new_html += '<div><a href="{}">{}</a></div>'.format(link, elm.get_text().strip())
+                            else:
+                                new_html += utils.add_button(link, elm.get_text().strip())
+                        new_html += '</div></div>'
                 elif el['data-size'] == 'buylink__listicle':
-                    for it in el.find_all('a'):
-                        if it.get('data-vars-buy-link'):
-                            link = it['data-vars-buy-link']
-                        else:
-                            link = it['href']
-                        if it.get('class') and 'buylink__link--not-button' not in it['class']:
-                            it.attrs = {}
-                            it['style'] = 'display:inline-block; padding:0 8px 0 8px; background-color:red; color:white; text-decoration:none;'
-                        else:
-                            it.attrs = {}
-                        it['href'] = link
+                    new_html = ''
                     for it in el.find_all(class_='buylink-item-container'):
+                        elm = it.find(class_='item-title')
+                        if elm:                        
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                                new_html += '<h2><a href="{}">{}</a></h2>'.format(link, elm.get_text().strip())
+                            else:
+                                new_html += '<h2>' + elm.get_text().strip() + '</h2>'
+                        elm = it.find(class_='item-deck')
+                        if elm:                        
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                                new_html += '<p style="font-weight:bold;"><a href="{}" style="text-decoration:none;">{}</a></p>'.format(link, elm.get_text().strip())
+                            else:
+                                new_html += '<p style="font-weight:bold;">' + elm.get_text().strip() + '</p>'
                         elm = it.find(class_='image-container')
-                        if elm and elm.img:
-                            new_el = BeautifulSoup(utils.add_image(elm.img['src'], link=it.a['href']), 'html.parser')
-                            elm.replace_with(new_el)
+                        if elm:                        
+                            if elm.a:
+                                if elm.a.get('data-vars-buy-link'):
+                                    link = elm.a['data-vars-buy-link']
+                                else:
+                                    link = elm.a['href']
+                            else:
+                                link = ''
+                            new_html += utils.add_image(elm.img['src'], link=link)
                         elm = it.find(class_='item-description')
-                        if elm:
-                            elm.unwrap()
-                        elm = it.find(class_='item-buttons')
-                        if elm:
-                            for link in elm.find_all('div', recursive=False):
-                                link['style'] = 'line-height:2em; margin:8px 0 8px 0; text-align:center;'
-                            elm.unwrap()
-                        it.attrs = {}
-                        it['style'] = 'width:90%; margin:auto;'
-                        new_html += '<hr style="width:80%; margin:auto;"/>' + str(it)
-                    new_html += '<hr style="width:80%; margin:auto;"/>'
+                        if elm:                        
+                            new_html += elm.decode_contents()
+                        for elm in it.select('div.item-buttons a'):
+                            if elm.get('data-vars-buy-link'):
+                                link = elm['data-vars-buy-link']
+                            else:
+                                link = elm['href']
+                            if 'buylink__link--not-button' in elm['class']:
+                                new_html += '<div><a href="{}">{}</a></div>'.format(link, elm.get_text().strip())
+                            else:
+                                new_html += utils.add_button(link, elm.get_text().strip())
+                        new_html += '<div>&nbsp;</div><hr/>'
                 elif el['data-size'] == 'buylink__small':
                     if el.get('data-collection'):
                         data_json = json.loads(unquote_plus(el['data-collection']))
-                        new_html = '<div style="line-height:2em;"><span style="display:inline-block; padding:0 8px 0 8px; background-color:red;"><a href="{}" style="text-decoration:none; color:white;">{}</a></span></div>'.format(data_json['rawUrl'], data_json['text'])
+                        new_html = utils.add_button(data_json['rawUrl'], data_json['text'])
                 elif el['data-size'] == 'buylink__embed':
                     if el.get('data-collection'):
                         data_json = json.loads(unquote_plus(el['data-collection']))

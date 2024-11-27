@@ -1,8 +1,8 @@
 import re
 from datetime import datetime, timezone
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -28,7 +28,11 @@ def get_content(url, args, site_json, save_debug=False):
         logger.warning('unable to parse video id from ' + url)
         return None
 
-    video_json = utils.get_url_json('https://www.dailymotion.com/player/metadata/video/' + video_id)
+    dm_url = 'https://www.dailymotion.com/player/metadata/video/' + video_id
+    if 'embedder' in args:
+        dm_url += '?embedder=' + quote_plus(args['embedder'])
+    print(dm_url)
+    video_json = utils.get_url_json(dm_url)
     if not video_json:
         return None
     if save_debug:
@@ -39,10 +43,11 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = video_json['url']
     item['title'] = video_json['title']
 
-    dt = datetime.fromtimestamp(video_json['created_time']).replace(tzinfo=timezone.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
+    if video_json.get('create_time'):
+        dt = datetime.fromtimestamp(video_json['created_time']).replace(tzinfo=timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
 
     if video_json.get('owner'):
         item['author'] = {"name": video_json['owner']['screenname']}
@@ -50,9 +55,20 @@ def get_content(url, args, site_json, save_debug=False):
     if video_json.get('tags'):
         item['tags'] = video_json['tags'].copy()
 
-    item['_image'] = video_json['posters']['720']
+    if video_json.get('posters'):
+        item['image'] = video_json['posters']['720']
+    elif video_json.get('thumbnails'):
+        item['image'] = video_json['thumbnails']['720']
+    elif video_json.get('first_frames'):
+        item['image'] = video_json['first_frames']['720']
+    else:
+        item['image'] = config.server + '/image?width=1280&height=720'
+    
+    if video_json.get('qualities'):
+        video = video_json['qualities']['auto'][0]
 
-    video = video_json['qualities']['auto'][0]
-
-    item['content_html'] = utils.add_video(video['url'], video['type'], item['_image'], item['title'], use_proxy=True)
+    if video_json.get('error'):
+        item['content_html'] = utils.add_image(item['image'], video_json['error']['message'], link=item['url'])
+    else:
+        item['content_html'] = utils.add_video(video['url'], video['type'], item['image'], item['title'], use_proxy=True)
     return item

@@ -248,6 +248,10 @@ def get_item(content_json, args, site_json, save_debug):
     elif content_json.get('social_image'):
         item['image'] = content_json['social_image']['base_image_url']
 
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     if content_json.get('intro'):
         item['content_html'] += format_blocks(content_json['intro']) + '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
     elif content_json.get('introHtml'):

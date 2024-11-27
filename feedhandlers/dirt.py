@@ -1,8 +1,8 @@
-import re
+import json, re
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 
 import logging
 
@@ -47,7 +47,11 @@ def resize_image(img_src, width=1000):
 
 def render_content(node, links):
     content_html = ''
-    if node['nodeType'] == 'paragraph':
+    if node['nodeType'] == 'document':
+        for content in node['content']:
+            content_html += render_content(content, links)
+
+    elif node['nodeType'] == 'paragraph':
         content_html += '<p>'
         for content in node['content']:
             content_html += render_content(content, links)
@@ -158,7 +162,78 @@ def render_content(node, links):
                     content_html += ' <span style="font-size:0.8em; line-height:inherit; padding:3px 5px 1px; border:1px solid rgb(6,187,0); color:green;">{} ${:.2f} ({:.2f}%)</span>'.format(data_json['quote']['symbol'], float(data_json['quote']['last_trade_price']), diff)
 
     elif node['nodeType'] == 'embedded-entry-block':
-        if not (node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I)):
+        block_html = ''
+        if node['data']['target'].get('sys') and links and links.get('entries') and links['entries'].get('block'):
+            block = next((it for it in links['entries']['block'] if it['sys']['__ref'] == 'Sys:' + node['data']['target']['sys']['id']), None)
+            logger.debug('embedded-entry-block __typename ' + block['__typename'])
+            if block and block['__typename'] == 'Image':
+                if block.get('imageV2'):
+                    m = re.search(r'https?://res.cloudinary.com/.*?/upload/', block['imageV2'][0]['original_secure_url'])
+                    if m:
+                        img_src = m.group(0) + 'w_1200/f_auto/q_auto/' + block['imageV2'][0]['public_id']
+                    else:
+                        img_src = block['imageV2'][0]['original_secure_url']
+                    if block['imageV2'][0]['metadata'].get('photo_creds'):
+                        caption = block['imageV2'][0]['metadata']['photo_creds']
+                    else:
+                        caption = ''
+                    block_html += utils.add_image(img_src, caption)
+            elif block and block['__typename'] == 'RichTextMultipleImage':
+                for key, val in block.items():
+                    if key.startswith('imagesCollection'):
+                        gallery_images = []
+                        block_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        n = len(val['items'])
+                        for i, it in enumerate(val['items']):
+                            if it.get('imageV2'):
+                                m = re.search(r'https?://res.cloudinary.com/.*?/upload/', it['imageV2'][0]['original_secure_url'])
+                                if m:
+                                    img_src = m.group(0) + 'w_1200/f_auto/q_auto/' + it['imageV2'][0]['public_id']
+                                    thumb = m.group(0) + 'w_800/f_auto/q_auto/' + it['imageV2'][0]['public_id']
+                                else:
+                                    img_src = it['imageV2'][0]['original_secure_url']
+                                    thumb = img_src
+                                if it['imageV2'][0]['metadata'].get('photo_creds'):
+                                    caption = it['imageV2'][0]['metadata']['photo_creds']
+                                else:
+                                    caption = ''
+                                gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                                if i == 0 and n > 2:
+                                    block_html += utils.add_image(thumb, caption, link=img_src)
+                                else:
+                                    block_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+                        if n > 2 and i % 2 != 0:
+                            block_html += '<div style="flex:1; min-width:360px;"></div>'
+                        block_html += '</div>'
+                        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                        block_html += '<div><small><a href="{}" target="_blank">View photo gallery</a></small></div>'.format(gallery_url)
+                        break
+            elif block and block['__typename'] == 'FoodRundown':
+                for key, val in block.items():
+                    if key.startswith('foodRundownItemCollection'):
+                        block_html += '<h2>Food Rundown</h2>'
+                        for it in val['items']:
+                            if it.get('imageV2'):
+                                m = re.search(r'https?://res.cloudinary.com/.*?/upload/', it['imageV2'][0]['original_secure_url'])
+                                if m:
+                                    img_src = m.group(0) + 'w_1200/f_auto/q_auto/' + it['imageV2'][0]['public_id']
+                                else:
+                                    img_src = it['imageV2'][0]['original_secure_url']
+                                if it['imageV2'][0]['metadata'].get('photo_creds'):
+                                    caption = it['imageV2'][0]['metadata']['photo_creds']
+                                else:
+                                    caption = ''
+                                block_html += utils.add_image(img_src, caption)
+                            block_html += '<h3>' + it['name'] + '</h3>'
+                            if it.get('description'):
+                                block_html += '<p>' + it['description'] + '</p><div>&nbsp;</div>'
+            elif block and block['__typename'] == 'SocialMediaEmbed':
+                block_html += utils.add_embed(block['socialMediaUrl'])
+        if node['data']['target'].get('fields') and node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I):
+            pass
+        elif block_html:
+            content_html += block_html
+        else:
             logger.warning('unhandled embedded-entry-block')
 
     else:

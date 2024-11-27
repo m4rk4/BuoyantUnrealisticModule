@@ -84,9 +84,9 @@ def make_post(post, profile, is_parent, is_quoted=False):
             card_desc += '<br/><a href="{}"><b>{}</b></a></div>'.format(card_link, post['text_post_app_info']['link_preview_attachment']['title'])
         card_desc += '</div>'
         if post['text_post_app_info']['link_preview_attachment'].get('image_url'):
-            card_html += utils.add_image(post['text_post_app_info']['link_preview_attachment']['image_url'], '', link=card_link, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid black; border-radius:10px;", desc=card_desc)
+            card_html += utils.add_image(post['text_post_app_info']['link_preview_attachment']['image_url'], '', link=card_link, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;", desc=card_desc)
         else:
-            card_html = '<div style="margin:0; padding:0; border:1px solid black; border-radius:10px;">' + card_desc + '</div>'
+            card_html = '<div style="margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">' + card_desc + '</div>'
 
     quoted_html = ''
     if post.get('text_post_app_info') and post['text_post_app_info'].get('share_info'):
@@ -112,7 +112,7 @@ def make_post(post, profile, is_parent, is_quoted=False):
             quoted_html = make_post(quoted_post, quoted_profile, False, True)
 
     if is_quoted:
-        post_html = '<table style="font-size:0.95em; width:100%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+        post_html = '<table style="font-size:0.95em; width:100%; min-width:260px; max-width:550px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
         # post_html += '<tr><td style="width:36px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b></a>{} <a style="text-decoration:none;" href="{}">{}</a></td><td></td></tr>'.format(user_url, avatar, user_url, post['user']['username'], verified_icon, post_url, post_date)
         if profile and profile['pk'] == post['user']['pk']:
             user_html = '<a style="text-decoration:none;" href="{}"><b>@{}</b>{} <small>{}</small></a>'.format(user_url, post['user']['username'], verified_icon, profile['full_name'])
@@ -207,7 +207,7 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             item['title'] += ' : ' + post_json['caption']['text']
 
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid black; border-radius:10px;">'
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
 
     done = False
     for i, edge in enumerate(post_data['data']['data']['edges']):

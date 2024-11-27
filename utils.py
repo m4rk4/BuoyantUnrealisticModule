@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from duckduckgo_search import DDGS
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
@@ -21,7 +21,9 @@ def get_site_json(url):
   split_url = urlsplit(url)
   netloc = split_url.netloc
   tld = tldextract.extract(url.strip())
-  if tld.domain == 'youtu' and tld.suffix == 'be':
+  if split_url.scheme == 'at':
+    domain = 'bsky'
+  elif tld.domain == 'youtu' and tld.suffix == 'be':
     domain = 'youtu.be'
   elif tld.domain == 'megaphone' and tld.suffix == 'fm':
     domain = 'megaphone.fm'
@@ -62,9 +64,8 @@ def get_site_json(url):
         if not site_json and default_site:
           site_json = default_site
 
-
-
-  if not site_json:
+  # if not site_json:
+  if False:
     if url_exists('{}://{}/wp-json/wp/v2/posts'.format(split_url.scheme, split_url.netloc)):
       site_json = {
           "module": "wp_posts",
@@ -1027,7 +1028,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     if use_videojs:
       video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
-  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
+  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'application/dash+xml' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':
@@ -1230,11 +1231,7 @@ def add_embed(url, args={}, save_debug=False):
   if 'go.redirectingat.com' in embed_url:
     embed_url = get_redirect_url(embed_url)
 
-  if '/t.co/' in embed_url:
-    embed_url = get_redirect_url(embed_url)
-  elif 'cloudfront.net' in embed_url:
-    embed_url = get_redirect_url(embed_url)
-  elif 'dts.podtrac.com/redirect' in embed_url:
+  if '/t.co/' in embed_url or '/wapo.st/' in embed_url or '/buff.ly/' in embed_url or '/dlvr.it/' in embed_url or 'cloudfront.net' in embed_url or 'dts.podtrac.com/redirect' in embed_url:
     embed_url = get_redirect_url(embed_url)
 
   if 'twitter.com' in embed_url or '/x.com' in embed_url:
@@ -1332,7 +1329,7 @@ def get_content(url, args, save_debug=False):
       args_copy.update(site_json['args'])
   return module.get_content(url, args_copy, site_json, save_debug)
 
-def format_embed_preview(item, content_link=True):
+def format_embed_preview(item, content_link=True, add_space=True):
   content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
   if item.get('_image'):
     content_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
@@ -1347,7 +1344,9 @@ def format_embed_preview(item, content_link=True):
     content_html += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
   if content_link:
     content_html += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p>'.format(config.server, quote_plus(item['url']))
-  content_html += '</div></div><div>&nbsp;</div>'
+  content_html += '</div></div>'
+  if add_space:
+    content_html += '<div>&nbsp;</div>'
   return content_html
 
 def get_ld_json(url):
@@ -1551,7 +1550,7 @@ def search_for(search_query):
   return results
 
 
-def get_stock_price(symbol, stock_id):
+def __get_stock_price(symbol, stock_id):
   stock_html = ''
   if not stock_id:
     stock_search = get_url_json('https://api.foxbusiness.com/factset/stock-search?stockType=autocomplete&search=' + symbol)
@@ -1575,3 +1574,60 @@ def get_stock_price(symbol, stock_id):
   else:
     logger.warning('unable to get stock data ' + stock_url)
   return stock_html
+
+
+def get_stock_price(stock_sym, stock_name):
+  symbols = []
+  if stock_sym:
+    symbols.append(stock_sym)
+  if stock_name:
+    api_url = 'https://query2.finance.yahoo.com/v1/finance/search?q={}&lang=en-US&region=US&quotesCount=7&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=false&enableResearchReports=false&listsCount=2&recommendCount=6'.format(quote_plus(stock_name))
+    # print(api_url)
+    r = curl_cffi_requests.get(api_url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code == 200:
+      api_json = r.json()
+      # write_file(api_json, './debug/stock.json')
+      if api_json.get('quotes'):
+        if stock_sym:
+          # Try to find matching symbol. Remove non-letters when comparing.
+          for it in api_json['quotes']:
+            if re.sub(r'\W', '', it['symbol'].upper()) == re.sub(r'\W', '', stock_sym.upper()):
+              if it['symbol'] not in symbols:
+                symbols.append(it['symbol'])
+              break
+        if api_json['quotes'][0]['symbol'] not in symbols:
+          symbols.append(api_json['quotes'][0]['symbol'])
+  if len(symbols) == 0:
+    return ''
+  # period1 = close last market day (19:59 EST)
+  # period2 = close today (18:00 EST)
+  dt = datetime.now()
+  if dt.weekday() == 0:
+    # Monday
+    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=19, minute=59) - timedelta(days=3)
+  elif dt.weekday() == 6:
+    # Sunday
+    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=19, minute=59) - timedelta(days=2)
+  else:
+    # Tues - Sat
+    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=19, minute=59) - timedelta(days=1)
+  dt2 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=18, minute=00)
+  for sym in symbols:
+    api_url = 'https://query1.finance.yahoo.com/v8/finance/chart/{}?period1={}&period2={}&interval=1m&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US'.format(sym, int(dt1.timestamp()), int(dt2.timestamp()))
+    # print(api_url)
+    r = curl_cffi_requests.get(api_url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code == 200:
+      api_json = r.json()
+      # write_file(api_json, './debug/stock.json')
+      stock_json = api_json['chart']['result'][0]['meta']
+      pct = (stock_json['regularMarketPrice'] - stock_json['previousClose']) / stock_json['previousClose'] * 100
+      if pct < 0:
+          color = 'red'
+          arrow = '▼'
+          pct = (stock_json['regularMarketPrice'] - stock_json['previousClose']) / stock_json['previousClose'] * 100
+      else:
+          color = 'green'
+          arrow = '▲'
+      stock_html = '<span style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</span>'.format(color, stock_json['symbol'], stock_json['regularMarketPrice'], arrow, pct)
+      return stock_html
+  return ''

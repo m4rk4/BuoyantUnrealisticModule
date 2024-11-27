@@ -176,18 +176,28 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['author'] = {}
     if article_json.get('authors'):
-        authors = []
+        item['authors'] = []
         for it in article_json['authors']:
             if it.get('person'):
-                authors.append(it['person']['name'])
+                item['authors'].append({"name": it['person']['name']})
             elif it.get('name'):
-                authors.append(it['name'])
-        if authors:
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                item['authors'].append({"name": it['name']})
+        if len(item['authors']) > 0:
+            item['author']= {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
     elif article_json.get('source'):
-        item['author']['name'] = article_json['source']['name'].title()
+        item['author'] = {
+            "name": article_json['source']['name'].title()
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     elif article_json.get('publisher'):
-        item['author']['name'] = article_json['publisher']['name'].title()
+        item['author'] = {
+            "name": article_json['publisher']['name'].title()
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if article_json['taxonomy'].get('primarySection'):
@@ -206,12 +216,16 @@ def get_content(url, args, site_json, save_debug=False):
         del item['tags']
 
     if article_json.get('teaseImage'):
-        item['_image'] = article_json['teaseImage']['url']['primary']
+        item['image'] = article_json['teaseImage']['url']['primary']
     elif article_json.get('socialImage'):
-        item['_image'] = article_json['socialImage']['url']['primary']
+        item['image'] = article_json['socialImage']['url']['primary']
 
     if article_json.get('description'):
         item['summary'] = article_json['description']['primary']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if article_json.get('dek'):

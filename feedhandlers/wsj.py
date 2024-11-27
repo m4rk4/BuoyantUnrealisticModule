@@ -19,6 +19,42 @@ logger = logging.getLogger(__name__)
 # Fix - 2 leads: https://www.wsj.com/tech/personal-tech/chatgpt-can-now-chat-aloud-with-you-and-yes-it-sounds-pretty-much-human-3be39840
 
 
+def get_stock_price(symbol):
+    logger.debug('getting stock price for ' + symbol)
+    # token = api_json['endpoints']['michelangeloToken']
+    token = 'c1b7ca756343461b86565b61bbd2ac6f'
+    headers = {
+        "accept": "application/json, text/plain, */*",
+        "accept-encoding": "gzip, deflate, br, zstd",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "dylan2010.entitlementtoken": token,
+        "priority": "u=1, i",
+        "referrer": "https://www.barrons.com/",
+        "sec-ch-ua": "\"Chromium\";v=\"130\", \"Microsoft Edge\";v=\"130\", \"Not?A_Brand\";v=\"99\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site"
+    }
+    api_url = 'https://api.barrons.com/api/dylan/quotes/v2/comp/quoteByDialect?ckey={}&MaxInstrumentMatches=1&needed=CompositeTrading%7CBluegrassChannels%7CCurrencySpecific&dialect=charting&id={}'.format(token[:10], quote_plus(symbol))
+    api_json = utils.get_url_json(api_url, headers=headers)
+    if not api_json:
+        return None
+    utils.write_file(api_json, './debug/stock.json')
+    instrument = api_json['InstrumentResponses'][0]['Matches'][0]['Instrument']
+    trading = api_json['InstrumentResponses'][0]['Matches'][0]['CompositeTrading']
+    pct = (trading['Last']['Price']['Value'] - trading['Open']['Value']) / trading['Open']['Value'] * 100
+    if pct < 0:
+        color = 'red'
+        arrow = '▼'
+    else:
+        color = 'green'
+        arrow = '▲'
+    stock_html = '<span style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</span>'.format(color, instrument['Ticker'], trading['Last']['Price']['Value'], arrow, pct)
+    return stock_html
+
+
 def render_contents(contents, netloc, article_links, image_link=None):
     content_html = ''
     if isinstance(contents, dict):
@@ -38,36 +74,72 @@ def render_contents(contents, netloc, article_links, image_link=None):
                     content_html += '</a>'
                 elif content['upstreamType'] == 'emphasis':
                     if content['decorationType'] == 'BOLD':
-                        content_html += '<strong>' + content['text'] + '</strong>'
+                        tag = 'strong'
                     else:
-                        content_html += '<em>' + content['text'] + '</em>'
+                        tag = 'em'
+                    content_html += '<{}>'.format(tag)
+                    if content.get('text'):
+                        content_html += content['text']
+                    elif content.get('nestedTextAndDecorations'):
+                        content_html += render_contents(content['nestedTextAndDecorations'], netloc, article_links)
+                    content_html += '</{}>'.format(tag)
                 elif content['upstreamType'] == 'break':
+                    # TODO: ignore content['upstreamType'] == 'Break'
                     content_html += '<div>&nbsp;</div><hr><div>&nbsp;</div>'
                 elif content['upstreamType'] == 'company':
+                    link = ''
                     if netloc == 'www.barrons.com':
-                        content_html += '<a href="https://www.barrons.com/market-data/stocks/{}">{}</a>'.format(content['decorationMetadata']['instrumentResult']['ticker'], content['text'])
-                    else:
-                        content_html += '<a href="https://www.wsj.com/market-data/quotes/{}">{}</a>'.format(content['decorationMetadata']['chartingSymbol'].replace('STOCK/', ''), content['text'])
-                    if content['decorationMetadata']['instrumentResult']['exchangeData']['countryCode'] == 'XE':
-                        stock_id = ''
-                    else:
-                        stock_id = content['decorationMetadata']['instrumentResult']['exchangeData']['countryCode'] + ":" + content['decorationMetadata']['instrumentResult']['ticker']
-                    stock_html = utils.get_stock_price(content['decorationMetadata']['instrumentResult']['ticker'], stock_id)
+                        link = 'https://www.barrons.com/market-data/'
+                        if content['decorationMetadata']['chartingSymbol'].startswith('STOCK'):
+                            link += 'stocks/'
+                        elif content['decorationMetadata']['chartingSymbol'].startswith('FUTURE'):
+                            link += 'futures/'
+                        link += content['decorationMetadata']['instrumentResult']['ticker']
+                    elif netloc == 'www.marketwatch.com':
+                        link = 'https://www.barrons.com/investing/'
+                        if content['decorationMetadata']['chartingSymbol'].startswith('STOCK'):
+                            link += 'stock/'
+                        elif content['decorationMetadata']['chartingSymbol'].startswith('FUTURE'):
+                            link += 'future/'
+                        link += content['decorationMetadata']['instrumentResult']['ticker']
+                    elif netloc == 'www.wsj.com':
+                        if '/US/' in content['decorationMetadata']['chartingSymbol']:
+                            link = 'https://www.wsj.com/market-data/quotes/' + content['decorationMetadata']['instrumentResult']['ticker']
+                        else:
+                            link = 'https://www.wsj.com/market-data/quotes/' + content['decorationMetadata']['chartingSymbol'].replace('STOCK/', '')
+                    if not link:
+                        logger.warning('unknown company link ' + content['decorationMetadata']['chartingSymbol'])
+                    content_html += '<a href="{}" target="_blank">{}</a>'.format(link, content['text'])
+                    stock_html = get_stock_price(content['decorationMetadata']['chartingSymbol'])
                     if stock_html:
                         content_html += ' (' + stock_html + ')'
-                elif content['upstreamType'] == 'instrument' and content['decorationMetadata']['instrumentType'] == 'index':
+                elif content['upstreamType'] == 'instrument':
+                    link = ''
                     if netloc == 'www.barrons.com':
-                        content_html += '<a href="https://www.barrons.com/market-data/indexes/{}">{}</a>'.format(content['decorationMetadata']['ticker'], content['text'])
-                    else:
+                        link = 'https://www.barrons.com/market-data/'
+                        if content['decorationMetadata']['chartingSymbol'].startswith('INDEX'):
+                            link += 'indexes/'
+                        elif content['decorationMetadata']['instrumentType'] == 'exchangetradedfund':
+                            link += 'funds/'
+                        else:
+                            link += 'stocks/'
+                        link += content['decorationMetadata']['ticker']
+                    elif netloc == 'www.marketwatch.com':
+                        link = 'https://www.marketwatch.com/investing/'
+                        if content['decorationMetadata']['chartingSymbol'].startswith('INDEX'):
+                            link += 'indexes/'
+                        elif content['decorationMetadata']['instrumentType'] == 'exchangetradedfund':
+                            link += 'funds/'
+                        else:
+                            link += 'stocks/'
+                        link += content['decorationMetadata']['ticker']
+                    elif netloc == 'www.wsj.com':
                         paths = content['decorationMetadata']['chartingSymbol'].split('/')
-                        content_html += '<a href="https://www.wsj.com/market-data/quotes/{}/{}/{}">{}</a>'.format(paths[0], paths[1], content['decorationMetadata']['ticker'], content['text'])
-                    if content['decorationMetadata']['id'] == 'index|djia':
-                        stock_id = 'US:I:DJI'
-                    elif content['decorationMetadata']['id'] == 'index|spx':
-                        stock_id = 'US:SP500'
-                    else:
-                        stock_id = ''
-                    stock_html = utils.get_stock_price(content['decorationMetadata']['ticker'], stock_id)
+                        link = 'https://www.wsj.com/market-data/quotes/{}/{}/{}'.format(paths[0], paths[1], content['decorationMetadata']['ticker'])
+                    if not link:
+                        logger.warning('unknown instrument link ' + content['decorationMetadata']['chartingSymbol'])
+                    content_html += '<a href="{}" target="_blank">{}</a>'.format(link, content['text'])
+                    stock_html = get_stock_price(content['decorationMetadata']['chartingSymbol'])
                     if stock_html:
                         content_html += ' (' + stock_html + ')'
                 elif content['upstreamType'] == 'person':
@@ -86,6 +158,13 @@ def render_contents(contents, netloc, article_links, image_link=None):
             elif content.get('content'):
                 content_html += render_contents(content['content'], netloc, article_links)
             content_html += '</p>'
+        elif content['type'] == 'blockquote':
+            quote = ''
+            if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
+                quote += render_contents(content['textAndDecorations']['nested'], netloc, article_links)
+            elif content.get('content'):
+                quote += render_contents(content['content'], netloc, article_links)
+            content_html += utils.add_blockquote(quote)
         elif content['type'] == 'headline':
             content_html += '<h2>'
             if content.get('textAndDecorations') and content['textAndDecorations'].get('nested'):
@@ -342,6 +421,14 @@ def render_contents(contents, netloc, article_links, image_link=None):
                         continue
                     elif content['content'].get('subType') and content['content']['subType'] == 'charts':
                         content_html += utils.add_image(utils.clean_url(content['content']['alt']['picture']['img']['src']), content['content']['alt']['text'], link=content['content']['alt']['render']['src'])
+                    elif content['content'].get('subType') and content['content']['subType'] == 'ai2html':
+                        img_src = utils.clean_url(content['content']['alt']['picture']['img']['src']).replace('fallback_classic', 'fallback_wide')
+                        if content['content']['alt']['capi']['data']['attributes'].get('headline'):
+                            caption = content['content']['alt']['capi']['data']['attributes']['headline']['text']
+                        else:
+                            caption = ''
+                        link = 'https://pub-prod-djcs-dynamicinset-renderer.ohi.onservo.com/?url=' + content['properties']['url']
+                        content_html += utils.add_image(img_src, caption, link=link)
                     elif content['content'].get('subType') and content['content']['subType'] == 'tap-unmute':
                         for it in content['content']['serverSide']['data']['data']['items']:
                             if it['type'] == 'video':
@@ -383,6 +470,9 @@ def render_contents(contents, netloc, article_links, image_link=None):
                     elif content['content'].get('strippedHTML') and '<iframe' in content['content']['strippedHTML']:
                         m = re.search(r'src="([^"]+)"', content['content']['strippedHTML'])
                         content_html += utils.add_embed(m.group(1))
+                    elif content['content'].get('subType') == None and content['content'].get('alt') == None:
+                        link = 'https://pub-prod-djcs-dynamicinset-renderer.ohi.onservo.com/?url=' + content['properties']['url']
+                        content_html += utils.add_image(config.server + '/screenshot?cropbbox=1&url=' + quote_plus(link), link=link)
                     else:
                         content_html += render_contents(content['content']['alt']['capi']['data']['attributes']['body'], netloc, content['content']['alt']['capi']['links'])
                 elif content['__typename'] == 'NewsletterInsetArticleBody':
@@ -1146,7 +1236,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = article_json['originId']
-    item['url'] = article_json['canonicalUrl']
+    if article_json.get('canonicalUrl'):
+        item['url'] = article_json['canonicalUrl']
+    elif article_json.get('sourceUrl'):
+        item['url'] = article_json['sourceUrl']
+    elif api_json.get('articleUrl'):
+        item['url'] = api_json['articleUrl']
     item['title'] = article_json['headline']['text']
 
     dt = datetime.fromisoformat(article_json['publishedDateTimeUtc'])
@@ -1158,7 +1253,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['authors'] = []
     if article_json.get('authors'):
-        item['authors'] = [{"name": x['text']} for x in article_json['authors']]
+        authors = []
+        for it in article_json['authors']:
+            if it['text'] not in authors:
+                authors.append(it['text'])
+        item['authors'] = [{"name": x} for x in authors]
     elif article_json.get('byline'):
         item['authors'] = []
         for it in article_json['byline']:

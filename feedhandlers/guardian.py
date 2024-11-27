@@ -1,4 +1,4 @@
-import re
+import pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -28,7 +28,9 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = clean_url
     item['title'] = page['headline']
 
-    dt = datetime.fromtimestamp(int(page['webPublicationDate']) / 1000).replace(tzinfo=timezone.utc)
+    tz_loc = pytz.timezone(config.local_tz)
+    dt_loc = datetime.fromtimestamp(int(page['webPublicationDate']) / 1000)
+    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
@@ -40,10 +42,12 @@ def get_content(url, args, site_json, save_debug=False):
         item['author']['name'] = page['byline']
     else:
         item['author']['name'] = 'The Guardian'
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = page['keywords'].split(',')
 
-    item['_image'] = page['thumbnail']
+    item['image'] = page['thumbnail']
 
     if page.get('lightboxImages') and page['lightboxImages'].get('standfirst'):
         if page['lightboxImages']['standfirst'].startswith('<p'):
@@ -54,10 +58,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     if 'embed' in args:
         # TODO: check audio/video embeds
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;"><a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a><div style="margin-left:8px; margin-right:8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['_image'], urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     content_html = ''

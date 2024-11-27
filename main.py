@@ -526,7 +526,34 @@ def screenshot():
     if True:
         # https://www.thum.io/documentation/api/url
         # TODO: use https://image.thum.io/get/prefetch/{url} in get_content to prefetch images
-        return redirect('https://image.thum.io/get/maxAge/12/width/800/' + args['url'])
+        thumb_url = 'https://image.thum.io/get'
+        if args.get('maxAge'):
+            thumb_url += '/maxAge/' + args['maxAge']
+        else:
+            thumb_url += '/maxAge/12'
+        if args.get('width'):
+            thumb_url += '/width/' + args['width']
+        else:
+            thumb_url += '/width/800'
+        if args.get('crop'):
+            # Default is 1200
+            thumb_url += '/crop/' + args['crop']
+        if args.get('allowJPG'):
+            thumb_url += '/allowJPG'
+        if args.get('png'):
+            thumb_url += '/png'
+        if args.get('noanimate'):
+            thumb_url += '/noanimate'
+        thumb_url += '/' + args['url']
+        if 'cropbbox' in args:
+            im_args = {
+                'url': thumb_url,
+                'cropbbox': args['cropbbox']
+            }
+            im_io, mimetype = image_utils.get_image(im_args)
+            if im_io:
+                return send_file(im_io, mimetype=mimetype)
+        return redirect(thumb_url)
 
     api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024'.format(quote_plus(args['url']))
     headers = {
@@ -605,12 +632,17 @@ def proxy(url):
                 headers = content['_video_headers']
 
     if 'manifest.googlevideo.com/api' in proxy_url:
+        cookies = []
+        for key, val in config.youtube_cookies.items():
+            cookies.append('{}={}'.format(key, val))
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-us,en;q=0.5",
+            "Cookie": "; ".join(cookies),
             "Sec-Fetch-Mode": "navigate",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
         }
+        #print(headers)
 
     if 'tt_chain_token' in proxy_url:
         # For TikTok videos, need to add a cookie

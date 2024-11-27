@@ -162,37 +162,45 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['title'] = article_json['headline']
 
-    dt = datetime.fromisoformat(article_json['datePublished'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['datePublished'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['dateModified'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['dateModified'])
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    item['author']['name'] = article_json['author']['name']
+    item['author'] = {
+        "name": article_json['author']['name']
+    }
     if data_json.get('providerBrand') and data_json['providerBrand'].get('displayName') and data_json['providerBrand']['displayName'] not in item['author']['name'] and data_json['providerBrand']['brandId'] not in item['url']:
         item['author']['name'] += ' ({})'.format(data_json['providerBrand']['displayName'])
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = article_json['keywords'].copy()
 
-    item['_image'] = article_json['image']['url']
+    item['image'] = article_json['image']['url']
 
     item['summary'] = article_json['description']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     caas_soup = BeautifulSoup(caas_json['items'][0]['markup'], 'html.parser')
     caas_body = caas_soup.find(class_='caas-body')
     # utils.write_file(str(caas_body), './debug/debug.html')
+
+    for el in caas_body.find_all(class_='caas-curated-links'):
+        el.decompose()
+
+    for el in caas_body.select('p:has(> span.sailthru-signup-widget-close)'):
+        for it in el.find_next_siblings():
+            if (it.name == 'p' or it.name == 'h1') and re.search(r'thanks for signing up|watch for us in your inbox|subscribe now|daily digest', it.get_text(), flags=re.I):
+                it.decompose()
+            else:
+                break
+        el.decompose()
 
     for el in caas_body.find_all('figure'):
         new_html = get_image(el)

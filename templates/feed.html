@@ -3,6 +3,17 @@
 	<head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                max-width: 800px;
+                margin: auto;
+                font-size: 18px;
+                font-family: Verdana, Geneva, sans-serif;
+                background-color: color-mix(in srgb, Canvas, CanvasText 2.5%);
+                color: color-mix(in srgb, CanvasText, Canvas 15%);
+                color-scheme: light dark;
+            }
+        </style>
 		<title>{{ title }}</title>
 	</head>
 	<body style="max-width:800px; font-size:18px;">
@@ -10,10 +21,12 @@
         {% for item in items %}
             {% if item._image %}
                 <img src="{{ item._image | make_thumbnail }}" style="float:right;" />
+            {% elif item.image %}
+                <img src="{{ item.image | make_thumbnail }}" style="float:right;" />
             {% endif %}
             <details>
                 <summary style="height:108px;">
-                    <a href="{{ item.url }}" style="font-size:1.2em; font-weight:bold; color:black;">{{ item.title }}</a>
+                    <a href="{{ item.url }}" style="text-decoration:none; font-size:1.2em; font-weight:bold; color:color-mix(in srgb, CanvasText, Canvas 15%);">{{ item.title }}</a>
                 </summary>
                 <div style="clear:right;"></div>
                 <div class="content">
@@ -24,7 +37,7 @@
                     </p>
                     {{ item.content_html | safe }}
                     {% if item.tags %}
-                        <div style="width:100%; text-align:center; border-bottom:1px solid #000; border-top:1px solid #000; line-height:0.1em; margin:10px 0 20px;">&nbsp;</div>
+                        <div style="width:100%; text-align:center; border-bottom:1px solid light-dark(black, white); border-top:1px solid light-dark(black, white); line-height:0.1em; margin:10px 0 20px;">&nbsp;</div>
                         <p>Tags: {{ ', '.join(item.tags) | safe }}</p>
                         {% endif %}
                 </div>

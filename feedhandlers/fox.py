@@ -132,6 +132,9 @@ def get_content(url, args, site_json, save_debug=False):
     elif 'foxnews' in split_url.netloc:
         canonical_url = 'foxnews.com' + split_url.path
         api_url = 'https://api.foxnews.com/spark/articles?searchBy=urls&type=&values=' + quote_plus(canonical_url)
+    elif 'foxweather' in split_url.netloc:
+        canonical_url = 'foxweather.com' + split_url.path
+        api_url = 'https://api.foxweather.com/spark/articles?searchBy=urls&type=&values=' + quote_plus(canonical_url)
     elif 'foxsports' in split_url.netloc:
         canonical_url = 'foxsports.com' + split_url.path
         if '/watch/' in split_url.path:
@@ -265,6 +268,13 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += utils.add_embed(component['content']['url'])
         elif re.search(r'brightcove|delta_video', component['content_type']):
             item['content_html'] += add_video(component['content'])
+        elif component['content_type'] == 'mississippi_video':
+            # TODO: only foxweather?
+            video_url = 'https://api.foxweather.com/spark/videos?external_id={}&_={}'.format(component['content']['external_id'], int(datetime.timestamp(datetime.now())))
+            video_json = utils.get_url_json(video_url)
+            if video_json:
+                video = video_json['data']['results'][0]
+                item['content_html'] += utils.add_video(video['mississippi']['m3u8_url'], 'application/x-mpegURL', video['thumbnail']['url'], video['title'])
         elif component['content_type'] == 'list':
             if component['content']['ordered'] == True:
                 tag = 'ol'

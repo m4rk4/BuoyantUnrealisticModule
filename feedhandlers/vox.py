@@ -77,22 +77,25 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['dateModified']).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in article_json['author']:
-        authors.append(it['name'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in article_json['author']]
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
     if article_json.get('keywords'):
         item['tags'] = article_json['keywords'].copy()
 
     if article_json.get('thumbnailUrl'):
-        item['_image'] = article_json['thumbnailUrl']
+        item['image'] = article_json['thumbnailUrl']
 
-    item['content_html'] = ''
     if article_json.get('description'):
         item['summary'] = article_json['description']
 
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
+    item['content_html'] = ''
     el = soup.find('p', class_='p-dek')
     if el:
         item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())

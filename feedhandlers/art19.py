@@ -62,7 +62,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         item['_audio'] = ep_json['content']['media']['mp3']['url']
         attachment = {
-            "url": item['_audio']
+            "url": item['_audio'],
             "mime_type": "audio/mpeg"
         }
         item['attachments'] = []

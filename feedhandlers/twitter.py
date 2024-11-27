@@ -405,6 +405,28 @@ def make_card(card_json, tweet_json):
         title = binding_values['title']['string_value']
         img_src = binding_values['player_image']['image_value']['url']
 
+    elif ':broadcast' in card_json['name']:
+        # TODO: handle broadcast video src: https://twitter.com/i/broadcasts/1mnGeAXPyWNGX
+        api_json = utils.get_url_json('https://api.x.com/1.1/broadcasts/show.json?ids=' + binding_values['broadcast_id']['string_value'])
+        if api_json:
+            card_type = 2
+            broadcast = api_json['broadcasts'][binding_values['broadcast_id']['string_value']]
+            live_stream = utils.get_url_json('https://api.x.com/1.1/live_video_stream/status/{}.json?client=web&use_syndication_guest_id=false&cookie_set_host=x.com'.format(broadcast['media_key']))
+            if live_stream:
+                # TODO: CORS proxy???
+                video_src = config.server + '/proxy/' + live_stream['source']['noRedirectPlaybackUrl']
+                card_link = '{}/videojs?src={}&type=application%2Fx-mpegURL&poster={}'.format(config.server, quote_plus(video_src), quote_plus(binding_values['broadcast_thumbnail']['image_value']['url']))
+            else:
+                card_link = binding_values['broadcast_url']['string_value']
+            link_text = '<div style="font-size:0.9em;"><a href="https://x.com/{}" style="text-decoration:none;"><img style="float:left; width:1em; height:1em; border-radius:50%;" src="{}" />&nbsp;<b>{}</b>&nbsp;@{}</a></div>'.format(broadcast['twitter_username'], broadcast['profile_image_url'], broadcast['user_display_name'], broadcast['twitter_username'])
+            title = broadcast['status']
+            #img_src = broadcast['image_url']
+            img_src = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(binding_values['broadcast_thumbnail']['image_value']['url']))
+        else:
+            card_type = 2
+            card_link = binding_values['broadcast_url']['string_value']
+            title = binding_values['broadcast_title']['string_value']
+            img_src = binding_values['broadcast_thumbnail']['image_value']['url']
     else:
         logger.warning('unknown twitter card name ' + card_json['name'])
         return ''
@@ -424,9 +446,16 @@ def make_card(card_json, tweet_json):
         card_html += '<td style="line-height:0; width:128px; height:128px; padding:0 8px 0 0; border-collapse:collapse;"><a href="{}">{}</a></td>'.format(img_link, img)
         card_html += '<td style="padding:0; border-collapse:collapse; vertical-align:top;"><div style="max-height:128px; overflow:hidden;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div></td>'.format(link_text, card_link, title, card_desc)
         card_html += '</tr></table>'
-
     elif card_type == 2:
-        desc = '<div style="margin:8px;"><small>{}</small><br/><a href="{}"><b>{}</b></a><br/>{}</div>'.format(link_text, card_link, title, card_desc)
+        desc = '<div style="margin:8px;">'
+        if link_text.startswith('<div'):
+            desc += link_text
+        else:
+            desc += '<small>' + link_text + '</small><br/>'
+        desc += '<a href="{}"><b>{}</b></a>'.format(card_link, title)
+        if card_desc:
+            desc += '<br/>' + card_desc
+        desc += '</div>'
         card_html += utils.add_image(img_src, '', link=card_link, img_style="border-top-left-radius:10px; border-top-right-radius:10px;", fig_style="margin:0; padding:0; border:1px solid light-dark(#ccc, #333); border-radius:10px;", desc=desc)
     return card_html
 
@@ -671,10 +700,11 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
 
     if is_parent or is_reply:
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))
-        border = ' border-left:2px solid rgb(196, 207, 214);'
         if is_reply == 1:
             border = ''
-        tweet_html = '<tr style="font-size:0.95em;"><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1} · <a style="text-decoration:none;" href="{4}">{5}</a></small></a></td><td style="width:32px;">{6}</td></tr>'.format(
+        else:
+            border = ' border-left:2px solid rgb(196, 207, 214);'
+        tweet_html = '<tr style="font-size:0.95em;"><td style="width:56px;"><img src="{0}" /></td><td><a style="text-decoration:none;" href="https://twitter.com/{1}"><b>{2}</b>{3} <small>@{1}</small></a> · <a style="text-decoration:none;" href="{4}"><small>{5}</small></a></td><td style="width:32px;">{6}</td></tr>'.format(
             avatar, tweet_json['user']['screen_name'], tweet_json['user']['name'], verified_icon, tweet_url, tweet_date, logo)
         tweet_html += '<tr><td colspan="3" style="padding:0 0 0 24px;">'
         # tweet_html += '<table style="font-size:0.95em; padding:0 0 0 24px;{}"><tr><td rowspan="3">&nbsp;</td><td>{}</td></tr>'.format(border, text_html)

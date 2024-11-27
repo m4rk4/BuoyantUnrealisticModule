@@ -1,5 +1,6 @@
 import feedparser, json, re
 from bs4 import BeautifulSoup
+from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
 
 import config, utils
@@ -27,13 +28,75 @@ def get_content(url, args, site_json, save_debug=False):
         content_id = split_url.fragment[1:]
     else:
         logger.warning('unhandled link fragment {} in {}'.format(split_url.fragment, url))
+
     content = soup.find('div', id=content_id)
-    if content:
-        el = content.find(class_=['L1', 'sharebox'])
-        if el and el.a:
-            return utils.get_content(el.a['href'], args, save_debug)
-    logger.warning('unhandled content in ' + url)
-    return None
+    if not content:
+        logger.warning('unhandled content in ' + url)
+        return None
+
+    item = {}
+    item['id'] = content_id
+    item['url'] = url
+
+    el = soup.find('meta', attrs={"property": "og:title"})
+    if el:
+        item['title'] = el['content']
+
+    item['author'] = {"name": "Techmeme"}
+    item['authors'] = []
+    item['authors'].append(item['author'])
+
+    # Use date from Mastodon link - seems to be created shortly after the article is posted
+    el = content.find(attrs={"mdurl": True})
+    if el:
+        split_url = urlsplit(el['mdurl'])
+        paths = list(filter(None, split_url.path.split('/')))
+        api_url = 'https://{}/api/v1/statuses/{}'.format(split_url.netloc, paths[-1])
+        api_json = utils.get_url_json(api_url)
+        if api_json:
+            dt = datetime.fromisoformat(api_json['created_at'])
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+
+    el = soup.find('META', attrs={"PROPERTY": "og:image"})
+    if el:
+        item['image'] = el['CONTENT']
+
+    content_link = ''
+    el = content.find('a', class_='ourh')
+    if el and el.get('href'):
+        content_link = el['href']
+    else:
+        el = content.find(class_='sharebox', attrs={"pml": content_id})
+        if el:
+            content_link = el['url']
+
+    item['content_html'] = ''
+    if content_link:
+        content_item = utils.get_content(content_link, {"embed": True}, save_debug=False)
+        if content_item:
+            item['content_html'] += content_item['content_html']
+        if 'date_published' not in item:
+            item['date_published'] = content_item['date_published']
+            item['_timestamp'] = content_item['_timestamp']
+            item['_display_date'] = content_item['_display_date']
+    else:
+        logger.warning('unable to find main article link in ' + url)
+
+    el = content.select('div:has(> div:is(.dbpt, .mlk))')
+    if el:
+        for it in el[-1].find_all(class_=['dxd', 'show', 'exm', 'shr']):
+            it.decompose()
+        for it in el[-1].find_all(class_=['drhed', 'moreat']):
+            it['style'] = 'font-size:1.1em; font-weight:bold;'
+        for it in el[-1].find_all(class_=['di', 'lnkr']):
+            it['style'] = 'margin:8px 0 8px 12px;'
+        for it in el[-1].find_all('span', attrs={"style": re.compile(r'background:')}):
+            it.unwrap()
+        item['content_html'] += el[-1].decode_contents()
+
+    return item
 
 
 def get_feed(url, args, site_json, save_debug=False):

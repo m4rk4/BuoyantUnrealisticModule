@@ -78,12 +78,19 @@ def get_content(url, args, site_json, save_debug=False):
     if content_json['ad']['customTargeting'].get('tag'):
         item['tags'] = [x.strip() for x in content_json['ad']['customTargeting']['tag'].split(',')]
 
-    item['_image'] = content_json['global']['rrss']['imgUrl']
+    item['image'] = content_json['global']['rrss']['imgUrl']
 
     soup = BeautifulSoup(content_json['content'], 'html.parser')
+    if save_debug:
+        utils.write_file(str(soup), './debug/debug.html')
+
     el = soup.find(class_='ue-c-article__byline-name')
     if el:
-        item['author'] = {"name": el.get_text()}
+        item['author'] = {
+            "name": el.get_text()
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['content_html'] = ''
     if content_json['global']['rrss'].get('summary'):
@@ -107,8 +114,13 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
 
         for el in body.find_all(class_='ue-c-article__media--video'):
+            new_html = ''
             if re.search(r'kalturaPlayer', str(el)):
                 new_html = add_video(el)
+            elif re.search(r'dailymotion', str(el)):
+                m = re.search(r'id="video-([^"]+)"', str(el))
+                if m:
+                    new_html = utils.add_embed('https://www.dailymotion.com/video/' + m.group(1), args={"embedder": item['url']})
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)

@@ -16,7 +16,6 @@ def resize_image(img_src, width=1200):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    # print(url)
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     m = re.search(r'([^_]+)_([0-91-f\-]+)\.html?', paths[-1])
@@ -83,24 +82,28 @@ def get_content(url, args, site_json, save_debug=False):
             item['_timestamp'] = dt.timestamp()
             item['_display_date'] = utils.format_display_date(dt)
             if tn_json['tncms']['asset'].get('author'):
-                item['author'] = {"name": tn_json['tncms']['asset']['author']}
+                item['author'] = {
+                    "name": tn_json['tncms']['asset']['author']
+                }
+                item['authors'] = []
+                item['authors'].append(item['author'])
             el = soup.find(id='asset-content')
             if el:
                 if tn_json['tncms']['asset'].get('type') and tn_json['tncms']['asset']['type'] == 'image':
                     it = el.find('img')
                     if it:
                         if it.get('data-srcset'):
-                            item['_image'] = utils.image_from_srcset(it['data-srcset'], 1200)
+                            item['image'] = utils.image_from_srcset(it['data-srcset'], 1200)
                         else:
-                            item['_image'] = it['src']
+                            item['image'] = it['src']
                         captions = []
                         it = el.find(class_='caption-text')
                         if it:
-                            captions.append(re.sub('\s*<p>(.*)</p>\s*$', r'\1', it.decode_contents()))
+                            captions.append(re.sub(r'\s*<p>(.*)</p>\s*$', r'\1', it.decode_contents()))
                         it = el.find(class_='tnt-byline')
                         if it:
                             captions.append(it.decode_contents())
-                        item['content_html'] = utils.add_image(item['_image'], ' | '.join(captions))
+                        item['content_html'] = utils.add_image(item['image'], ' | '.join(captions))
                     else:
                         logger.warning('unhandled image asset-content in ' + item['url'])
                 elif tn_json['tncms']['asset'].get('type') and tn_json['tncms']['asset']['type'] == 'video' and tn_json['tncms']['asset']['subtype'] == 'youtube':
@@ -138,27 +141,40 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(article_json['lastupdated']['iso8601']).astimezone(timezone.utc)
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
     if article_json.get('authors'):
-        authors = []
+        item['authors'] = []
         for it in article_json['authors']:
             if it.get('full_name'):
-                authors.append(it['full_name'])
+                item['authors'].append({"name": it['full_name']})
             else:
-                authors.append(it['screen_name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+                item['authors'].append({"name": it['screen_name']})
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
     elif article_json.get('byline'):
         if re.search(r'<|>', article_json['byline']):
             it = BeautifulSoup(article_json['byline'], 'html.parser').get_text().strip()
         else:
             it = article_json['byline']
-        item['author']['name'] = re.sub(r'^By ', '', it, flags=re.I)
+        item['author'] = {
+            "name": re.sub(r'^By ', '', it, flags=re.I)
+        }
     elif tn_json and tn_json.get('asset_byline'):
-        item['author']['name'] = tn_json['asset_byline']
+        item['author'] = {
+            "name": tn_json['asset_byline']
+        }
     elif ld_json and ld_json.get('creator'):
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(ld_json['creator']))
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(ld_json['creator']))
+        }
     else:
-        item['author']['name'] = split_url.netloc
+        item['author'] = {
+            "name": split_url.netloc
+        }
+    if 'author' in item and 'authors' not in item:
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     if article_json.get('keywords'):
         item['tags'] = article_json['keywords'].copy()
@@ -262,14 +278,18 @@ def get_content(url, args, site_json, save_debug=False):
                         lede_img = embed_item['content_html']
 
     if article_json.get('preview') and article_json['preview'].get('url'):
-        item['_image'] = resize_image(article_json['preview']['url'])
+        item['image'] = resize_image(article_json['preview']['url'])
         if not lede_img and article_json['type'] != 'image' and article_json['type'] != 'collection':
             if article_json['preview']['uuid'] != item['id']:
                 embed_item = get_content('{}://{}/image_{}.html'.format(split_url.scheme, split_url.netloc, article_json['preview']['uuid']), {"embed": True}, site_json, False)
                 if embed_item and embed_item.get('content_html'):
                     lede_img += embed_item['content_html']
                 else:
-                    lede_img += utils.add_image(item['_image'])
+                    lede_img += utils.add_image(item['image'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     content_html = ''
     for content in article_json['content']:
@@ -289,7 +309,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if m:
                     embed_item = get_content(m.group(1), {"embed": True}, site_json, False)
                     link = '{}/content?read&url={}'.format(config.server, quote_plus(embed_item['url']))
-                    content_html += utils.add_image(embed_item['_image'], 'Photo gallery: <a href="{}">{}</a>'.format(embed_item['url'], embed_item['title']), link=link)
+                    content_html += utils.add_image(embed_item['image'], 'Photo gallery: <a href="{}">{}</a>'.format(embed_item['url'], embed_item['title']), link=link)
                     continue
             elif re.search(r'inline-editorial-article', content):
                 # Generally related articles

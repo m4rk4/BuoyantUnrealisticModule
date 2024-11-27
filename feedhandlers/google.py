@@ -428,83 +428,98 @@ def get_trends(url, args, site_json, save_debug=False):
         "sec-fetch-site": "same-origin",
         "x-same-domain": "1"
     }
-    # https://www.gstatic.com/_/mss/boq-trends/_/js/k=boq-trends.TrendsUi.en_US.gDt5arkdnmg.es5.O/ck=boq-trends.TrendsUi.S_W8qdbhHDA.L.W.O/am=IMGAtQ/d=1/exm=PIVayb,_b,_tp/excm=_b,_tp,trendingnowview/ed=1/wt=2/ujg=1/rs=APgalu4ZiufHJKC7aqz_TFDaDcr20_YDqQ/ee=EVNhjf:pw70Gc;EmZ2Bf:zr1jrb;JsbNhc:Xd8iUd;K5nYTd:ZDZcre;LBgRLc:SdcwHb;Me32dd:MEeYgc;NPKaK:SdcwHb;NSEoX:lazG7b;Pjplud:EEDORb;QGR0gd:Mlhmy;SNUn3:ZwDk9d;ScI3Yc:e7Hzgb;Uvc8o:VDovNc;YIZmRd:A1yn5d;a56pNe:JEfCwb;cEt90b:ws9Tlc;dIoSBb:SpsfSb;dowIGb:ebZ3mb;eBAeSb:zbML3c;iFQyKf:QIhFr;lOO0Vd:OTA3Ae;nAFL3:s39S4;oGtAuc:sOXFj;pXdRYb:MdUzUe;qafBPd:yDVVkb;qddgKe:xQtZb;wR5FRb:O1Gjze;xqZiqf:BBI74;yxTchf:KUM7Z;zxnPse:duFQFc/m=ws9Tlc,n73qwf,UUJqVe,IZT63,e5qFLc,O1Gjze,byfTOb,lsjVmc,xUdipf,OTA3Ae,A1yn5d,fKUV3e,aurFic,Ug7Xab,ZwDk9d,V3dDOb,U4Hp0d,sd0Qyf,Wvm6ze,TMHc6,V8fbed,XTf4dd,TNy4y,Fr52Od,qIjbeb,ehD6Ec,suD16d,PyXkxd,SFt34c,x6qQoe,O6y8ed,MpJwZc,PrPYRd,LEikZe,NwH0H,OmgaI,XVMNvd,L1AAkb,KUM7Z,Mlhmy,s39S4,duFQFc,lwddkf,gychg,w9hDv,EEDORb,RMhBfe,SdcwHb,aW3pY,pw70Gc,EFQ78c,Ulmmrd,ZfAoz,xQtZb,JNoxi,kWgXee,BVgquf,QIhFr,ovKuLd,yDVVkb,hc6Ubd,SpsfSb,ebZ3mb,Z5uLle,BBI74,ZDZcre,MdUzUe,A7fCU,zbML3c,zr1jrb,thbVbd,Uas9Hd,pjICDe
     # i0OFE = /FeTrendingService.ListTrends
     reqid = random.randint(10000, 99999)
     data_url = 'https://trends.google.com/{}/data/batchexecute?rpcids=i0OFE&source-path=%2Ftrending&f.sid={}8&bl={}&hl={}&_reqid=2{}&rt=c'.format(global_data['Im6cmf'], global_data['FdrFJe'], global_data['cfb2h'], lang, reqid)
-    # data = "f.req=%5B%5B%5B%22i0OFE%22%2C%22%5Bnull%2Cnull%2C%5C%22US%5C%22%2C0%2C%5C%22{}%5C%22%2C24%2C1%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&".format(lang)
     data = 'f.req=%5B%5B%5B%22i0OFE%22%2C%22%5Bnull%2Cnull%2C%5C%22{}%5C%22%2C0%2C%5C%22{}%5C%22%2C{}%2C1%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&'.format(geo, lang, hours)
     list_trends = utils.post_url(data_url, data=data, headers=headers, r_text=True)
     if not list_trends:
         logger.warning('unable to get ListTrends data from ' + data_url)
         return None
+    if save_debug:
+        utils.write_file(list_trends, './debug/trends.txt')
 
-    list_trends = re.sub(r'[\\]{2,}"', r'&quot;', list_trends).replace('\\', '')
-    m = re.findall(r'\["([^"]+)"', list_trends)
-    # remove dups
-    trends = []
-    [trends.append(x) for x in m if x not in trends]
+    trends_json = None
+    for line in list_trends.splitlines():
+        if line.startswith('[["wrb.fr"'):
+            line_json = json.loads(line)
+            trends_json = json.loads(line_json[0][2])
+            break
+    if trends_json:
+        if save_debug:
+            utils.write_file(trends_json, './debug/trends.json')
+        feed_items = []
+        for trend in trends_json[1]:
+            item = {}
+            # timestamp:title
+            item['id'] = str(trend[3][0]) + ':' + quote_plus(trend[0])
+            item['url'] = 'https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}'.format(quote_plus(trend[0]), geo, lang)
+            item['title'] = trend[0]
+            tz_loc = pytz.timezone(config.local_tz)
+            dt_loc = datetime.fromtimestamp(trend[3][0])
+            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt, False)
 
-    feed_items = []
-    n_max = len(trends) - 3
-    for n in range(1, 10):
-        logger.debug('adding trend: ' + trends[n])
-        item = {}
-        i = list_trends.find(trends[n])
-        j = list_trends.find(trends[n + 1])
-        trend = list_trends[i - 2 : j - 4]
-
-        # timestamp
-        m = re.search(r'\[(\d+)\]', trend)
-
-        item['id'] = m.group(1) + ':' + quote_plus(trends[n])
-        item['url'] = 'https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}'.format(quote_plus(trends[n]), geo, lang)
-        item['title'] = trends[n]
-
-        tz_loc = pytz.timezone(config.local_tz)
-        dt_loc = datetime.fromtimestamp(int(m.group(1)))
-        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
-
-        item['author'] = {
-            "name": "Google Trends"
-        }
-        item['authors'] = []
-        item['authors'].append(item['author'])
-
-        item['tags'] = []
-        item['content_html'] = '<h3>Trend breakdown</h3>'
-        i = trend.find(',["')
-        j = trend.find('],[')
-        for x in trend[i + 2 : j].split(','):
-            tag = x.strip('"')
-            if tag not in item['tags']:
-                item['tags'].append(tag)
-                item['content_html'] += '<a href="https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}">{}</a>  '.format(quote_plus(tag), geo, lang, tag)
-
-        i = trend[j + 2:].find('],[')
-        n_articles = 3
-        data = 'f.req=%5B%5B%5B%22w4opAf%22%2C%22%5B' + quote_plus(trend[j + 2 + i :][2:].replace('"', '\\"')) + '%2C{}%5D%22%2Cnull%2C%22generic%22%5D%5D%5D'.format(n_articles)
-        # w4opAf = /FeTrendingService.ListNews
-        data_url = 'https://trends.google.com/{}/data/batchexecute?rpcids=w4opAf&source-path=%2Ftrending&f.sid={}8&bl={}&hl={}&_reqid=3{}&rt=c'.format(global_data['Im6cmf'], global_data['FdrFJe'], global_data['cfb2h'], lang, reqid)
-        list_news = utils.post_url(data_url, data=data, headers=headers, r_text=True)
-        if list_news:
-            item['content_html'] += '<h3>In the news</h3>'
-            list_news = re.sub(r'\\u003d', '=', list_news).replace('\\', '')
-            for m in re.findall(r'"(http[^"]+)"', list_news):
-                if 'gstatic.com/images' in m:
-                    if 'image' not in item:
-                        item['image'] = m
-                else:
-                    item['content_html'] += utils.add_embed(m)
-        feed_items.append(item)
+            item['author'] = {
+                "name": "Google Trends"
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
+            item['tags'] = trend[9].copy()
+            item['content_html'] = ''
+            breakdown_html = '<h3>Trend breakdown</h3><ul>'
+            for it in trend[9]:
+                breakdown_html += '<li><a href="https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}">{}</a></li>'.format(quote_plus(it), geo, lang, it)
+            breakdown_html += '</ul>'
+            n_articles = 3
+            f_req_list = [[], n_articles]
+            for it in trend[11]:
+                if isinstance(it, list):
+                    f_req_list[0].append(it.copy())
+            f_req = [[[
+                "w4opAf",
+                json.dumps(f_req_list, separators=(',', ':')),
+                None,
+                "generic"
+            ]]]
+            data = 'f.req=' + quote_plus(json.dumps(f_req, separators=(',', ':')))
+            data_url = 'https://trends.google.com{}/data/batchexecute?rpcids=w4opAf&source-path=%2Ftrending&f.sid={}8&bl={}&hl={}&_reqid=3{}&rt=c'.format(global_data['Im6cmf'], global_data['FdrFJe'], global_data['cfb2h'], lang, reqid)
+            list_news = utils.post_url(data_url, data=data, headers=headers, r_text=True)
+            if list_news:
+                if save_debug:
+                    utils.write_file(list_news, './debug/news.txt')
+                news_json = None
+                for line in list_news.splitlines():
+                    if line.startswith('[["wrb.fr"'):
+                        line_json = json.loads(line)
+                        news_json = json.loads(line_json[0][2])
+                        break
+                if news_json:
+                    if save_debug:
+                        utils.write_file(news_json, './debug/news.json')
+                    item['content_html'] += '<h3>In the news</h3>'
+                    for news in news_json[0]:
+                        if 'image' not in item:
+                            item['image'] = news[4]
+                        embed_html = utils.add_embed(news[1])
+                        if embed_html.startswith('<blockquote'):
+                            embed_item = {
+                                "url": news[1],
+                                "title": news[0],
+                                "image": news[4]
+                            }
+                            embed_item = utils.format_embed_preview(embed_item, False)
+                        item['content_html'] += embed_html
+            item['content_html'] += breakdown_html
+            feed_items.append(item)
 
     feed = utils.init_jsonfeed(args)
     feed['title'] = 'Google Trends'
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
+
 
 def get_news(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)

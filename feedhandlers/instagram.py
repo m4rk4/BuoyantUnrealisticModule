@@ -151,7 +151,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             user['avatar'] = el.img['src']
             if ig_soup:
                 user['full_name'] = ig_soup.title.string.split('|')[0].strip()
-                print(user['full_name'])
+                # print(user['full_name'])
             else:
                 user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
             user['verified'] = False
@@ -674,7 +674,7 @@ def get_ig_post_data(url, get_profile_posts=False, save_debug=False, load_from_f
     post_doc_id = ''
     profile_doc_id = ''
     for el in page_soup.find_all('link', href=re.compile(r'https://static\.cdninstagram\.com/rsrc\.php/.*\.js')):
-        print(el['href'])
+        # print(el['href'])
         r = s.get(el['href'], proxies=config.proxies)
         if r.status_code == 200:
             if 'instagram.com' in url:

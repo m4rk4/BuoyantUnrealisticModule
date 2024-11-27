@@ -15,6 +15,12 @@ def get_content(url, args, site_json, save_debug=False):
     # https://substack.com/api/v1/posts/by-id/96541363
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
+
+    if split_url.netloc == 'open.substack.com':
+        redirect_url = utils.get_redirect_url(url)
+        split_url = urlsplit(redirect_url)
+        paths = list(filter(None, split_url.path[1:].split('/')))
+
     if 'post' in paths:
         # https://substack.com/home/post/p-151067817
         m = re.search(r'p-(\d+)', paths[-1])
@@ -47,12 +53,11 @@ def get_post(post_json, args, site_json, save_debug):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    authors = []
-    for it in post_json['publishedBylines']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in post_json['publishedBylines']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if post_json.get('postTags'):
         item['tags'] = []
@@ -60,10 +65,14 @@ def get_post(post_json, args, site_json, save_debug):
             item['tags'].append(it['name'])
 
     if post_json.get('cover_image'):
-        item['_image'] = post_json['cover_image']
+        item['image'] = post_json['cover_image']
 
     if post_json.get('description'):
         item['summary'] = post_json['description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     content_soup = None
     item['content_html'] = ''
@@ -264,6 +273,8 @@ def get_post(post_json, args, site_json, save_debug):
             el.decompose()
 
         for el in soup.find_all(class_='tiktok-wrap'):
+            if el.name == None:
+                continue
             new_html = ''
             if el.get('data-attrs'):
                 data_json = json.loads(el['data-attrs'])

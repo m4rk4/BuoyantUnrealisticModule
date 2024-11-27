@@ -111,9 +111,16 @@ def get_content(url, args, site_json, save_debug=False):
     item['_display_date'] = utils.format_display_date(dt)
 
     if api_json['root'].get('source'):
-        item['author'] = {"name": api_json['root']['source']['name']}
+        item['author'] = {
+            "name": api_json['root']['source']['name']
+        }
     elif api_json['root'].get('audio') and api_json['root']['audio'].get('podcast'):
-        item['author'] = {"name": api_json['root']['audio']['podcast']['author']}
+        item['author'] = {
+            "name": api_json['root']['audio']['podcast']['author']
+        }
+    if 'author' in item:
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if api_json['root'].get('tag'):
@@ -131,9 +138,9 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(api_json['root']['second_title'])
 
     if api_json['root']['og'].get('image'):
-        item['_image'] = api_json['root']['og']['image']
+        item['image'] = api_json['root']['og']['image']
         if api_json['root']['layout'] == 'card':
-            item['content_html'] += utils.add_image(item['_image'])
+            item['content_html'] += utils.add_image(item['image'])
 
     if api_json['root']['content'].get('lead'):
         lead_html = ''
@@ -152,6 +159,10 @@ def get_content(url, args, site_json, save_debug=False):
             elif content['type'] == 'tag':
                 pass
         item['content_html'] += lead_html
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if api_json['root']['content'].get('blocks'):
         item['content_html'] += render_content(api_json['root']['content']['blocks'])

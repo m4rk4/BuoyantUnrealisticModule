@@ -60,6 +60,9 @@ def get_content(url, args, site_json, save_debug=False):
         for el in content.find_all(['script', 'style']):
             el.decompose()
 
+        for el in content.select('div:has( a[href*="/subscribe"]:has(> button))', recursive=False):
+            el.decompose()
+
         for el in content.find_all(recursive=False):
             it = el.find(class_='button')
             if not it:

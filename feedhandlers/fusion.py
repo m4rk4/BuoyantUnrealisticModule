@@ -358,6 +358,29 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(m.group(1))
             else:
                 logger.warning('unhandled custom_embed iframe')
+        elif element['subtype'] == 'Axis Video' and element['embed']['config']['brand'] == 'BNN':
+            # https://www.bnnbloomberg.ca/business/company-news/2024/11/12/bang-up-quarter-across-the-board-experts-react-to-shopifys-q3-earnings-beat/
+            # TODO: bnnbloomberg.ca specific?
+            video_url = 'https://capi.9c9media.com/destinations/bnn_web/platforms/desktop/contents/{}?%24lang=en&%24include=%5BDesc%2CType%2CMedia%2CImages%2CContentPackages%2CAuthentication%2CSeason%2CChannelAffiliate%2COwner%2CRevShare%2CAdTarget%2CKeywords%2CAdRights%2CTags%5D'.format(element['embed']['config']['id'])
+            video_json = utils.get_url_json(video_url)
+            if video_json:
+                video_url = 'https://capi.9c9media.com/destinations/bnn_web/platforms/desktop/bond/contents/{}/contentPackages/{}/manifest.pmpd?action=reference&ssl=true&filter=13'.format(video_json['Id'], video_json['ContentPackages'][0]['Id'])
+                video = utils.get_url_html(video_url)
+                if video:
+                    element_html += utils.add_video(video, 'application/dash+xml', element['embed']['config']['thumbnailUrl'], element['embed']['config']['title'])
+        elif element['subtype'] == 'Stock Widgets':
+            # TODO: bnnbloomberg.ca specific?
+            # https://www.bnnbloomberg.ca/business/company-news/2024/11/12/bang-up-quarter-across-the-board-experts-react-to-shopifys-q3-earnings-beat/
+            stock_id = next((it for it in element['embed']['config']['selectedWidget']['props'] if it['name'] == 'custom-id'), None)
+            if stock_id:
+                stock_url = 'https://bnn.stats.bellmedia.ca/bnn/api/stock/infos?brand=bnn&lang=en&symbol=' + stock_id['value']
+                stock_json = utils.get_url_json(stock_url)
+                if stock_json:
+                    if stock_json[0]['percentChange'].startswith('-'):
+                        color = 'red'
+                    else:
+                        color = 'green'
+                    element_html += '<h3 style="text-align:center;">{} (<a href="https://www.bnnbloomberg.ca/stock/{}/">{}</a>): ${} <span style="color:{};">{} ({}%)</span></h3>'.format(stock_json[0]['name'], stock_json[0]['symbol'], stock_json[0]['symbol'], stock_json[0]['price'], color, stock_json[0]['netChange'], stock_json[0]['percentChange'])
         elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag' or element['subtype'] == 'Alternate Headlines':
             pass
         else:
@@ -421,14 +444,14 @@ def process_content_element(element, url, site_json, save_debug):
             element_html += '</ol>'
 
     elif element['type'] == 'table':
-        element_html += '<table>'
+        element_html += '<table style="width:100%; border-collapse:collapse;">'
         if element.get('header'):
             element_html += '<tr>'
             for it in element['header']:
                 if isinstance(it, str):
-                    element_html += '<th>{}</th>'.format(it)
+                    element_html += '<th style="text-align:left;">{}</th>'.format(it)
                 elif isinstance(it, dict) and it.get('type') and it['type'] == 'text':
-                    element_html += '<th>{}</th>'.format(it['content'])
+                    element_html += '<th style="text-align:left;">{}</th>'.format(it['content'])
                 else:
                     logger.warning('unhandled table header item type {}'.format(element['type']))
             element_html += '</tr>'
