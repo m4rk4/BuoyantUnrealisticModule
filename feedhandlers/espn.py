@@ -105,13 +105,7 @@ def get_story(story_json, args, site_json, save_debug=False):
         return item
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     story_html = story_json['story']
@@ -283,6 +277,17 @@ def get_content(url, args, site_json, save_debug=False):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 story_json = api_json['headlines'][0]
+    elif '/nota/_/id/' in url:
+        split_url = urlsplit(url)
+        if split_url.netloc == 'espndeportes.espn.com':
+            lang = 'es'
+        else:
+            lang = 'en'
+        api_url = 'https://secure.espn.com/core{}?render=true&partial=article&xhr=1&device=tablet&country=us&lang={}&region=us&site=espn&edition-host={}&site-type=full'.format(split_url.path, lang, split_url.netloc)
+        print(api_url)
+        api_json = utils.get_url_json(api_url)
+        if api_json:
+            story_json = api_json['content']
     elif re.search(r'(preview|recap)\?gameId=\d+', url):
         m = re.search(r'gameId=(\d+)', url)
         if m:

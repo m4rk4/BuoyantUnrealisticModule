@@ -32,19 +32,22 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     item['id'] = post_json['uri']
     item['url'] = post_json['uri'].replace('at://', 'https://bsky.app/profile/').replace('/app.bsky.feed.post/', '/post/')
-    item['title'] = '{}: "{}"'.format(post_json['author']['displayName'], post_json['record']['text'])
 
     dt = datetime.fromisoformat(post_json['record']['createdAt'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {
-        "name": post_json['author']['displayName'],
-        "url": "https://bsky.app/profile/" + post_json['author']['handle']
-    }
+    item['author'] = {}
+    if post_json['author'].get('displayName'):
+        item['author']['name'] = post_json['author']['displayName']
+    else:
+        item['author']['name'] = post_json['author']['handle']
+    item['author']['url'] = "https://bsky.app/profile/" + post_json['author']['handle']
     item['authors'] = []
     item['authors'].append(item['author'])
+
+    item['title'] = '{}: "{}"'.format(item['author']['name'], post_json['record']['text'])
 
     item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
 
@@ -120,22 +123,27 @@ def make_post(post_json, is_parent=False, is_reply=False, is_quoted=False):
         post_text = ''
     post_text = post_text.replace('\n\n', '<br><br>')
 
+    if post_json['author'].get('displayName'):
+        author_name = post_json['author']['displayName']
+    else:
+        author_name = post_json['author']['handle']
+
     if is_parent or is_reply:
         colspan = 3
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(post_json['author']['avatar']))
         post_date = '{}/{}/{}'.format(dt_loc.month, dt_loc.day, dt_loc.year)
-        post_html = '<tr style="font-size:0.95em;"><td style="width:56px;"><a href="{0}"><img src="{1}" /></td><td colspan="2"><a style="text-decoration:none;" href="{0}"><b>{2}</b> <small>@{3}</small></a> · <a style="text-decoration:none;" href="{4}"><small>{5}</small></a></td></tr>'.format(author_url, avatar, post_json['author']['displayName'], post_json['author']['handle'], post_url, post_date)
+        post_html = '<tr style="font-size:0.95em;"><td style="width:56px;"><a href="{0}"><img src="{1}" /></td><td colspan="2"><a style="text-decoration:none;" href="{0}"><b>{2}</b> <small>@{3}</small></a> · <a style="text-decoration:none;" href="{4}"><small>{5}</small></a></td></tr>'.format(author_url, avatar, author_name, post_json['author']['handle'], post_url, post_date)
         post_html += '<tr><td colspan="3" style="padding:0 0 0 24px;"><table style="font-size:0.95em; padding:0 0 0 24px; border-left:2px solid rgb(196, 207, 214);">'
     elif is_quoted:
         colspan = 2
         post_html = '<table style="font-size:0.95em; width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
         avatar = '{}/image?url={}&width=32&height=32&mask=ellipse'.format(config.server, quote_plus(post_json['author']['avatar']))
         post_date = '{}/{}/{}'.format(dt_loc.month, dt_loc.day, dt_loc.year)
-        post_html += '<tr><td style="width:36px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b> <small>@{}</small></a> · <a style="text-decoration:none;" href="{}"><small>{}</small></a></td></tr>'.format(author_url, avatar, author_url, post_json['author']['displayName'], post_json['author']['handle'], post_url, post_date)
+        post_html += '<tr><td style="width:36px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b> <small>@{}</small></a> · <a style="text-decoration:none;" href="{}"><small>{}</small></a></td></tr>'.format(author_url, avatar, author_url, author_name, post_json['author']['handle'], post_url, post_date)
     else:
         colspan = 3
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(post_json['author']['avatar']))
-        post_html = '<tr><td style="width:56px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b><br/><small>@{}</small></a></td><td style="width:32px;"><a href="{}"><img src="https://bsky.social/about/images/favicon-32x32.png" style="width:100%;"/></a></td></tr>'.format(author_url, avatar, author_url, post_json['author']['displayName'], post_json['author']['handle'], post_url)
+        post_html = '<tr><td style="width:56px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b><br/><small>@{}</small></a></td><td style="width:32px;"><a href="{}"><img src="https://bsky.social/about/images/favicon-32x32.png" style="width:100%;"/></a></td></tr>'.format(author_url, avatar, author_url, author_name, post_json['author']['handle'], post_url)
 
     if post_text:
         post_html += '<tr><td colspan="{}" style="padding:1em 0 1em 0;">'.format(colspan) + post_text + '</td></tr>'
@@ -214,5 +222,5 @@ def make_post(post_json, is_parent=False, is_reply=False, is_quoted=False):
     else:
         post_time = '{}:{:02d} {}'.format(dt_loc.strftime('%I').lstrip('0'), dt_loc.minute, dt_loc.strftime('%p'))
         post_date = '{}. {}, {}'.format(dt_loc.strftime('%b'), dt_loc.day, dt_loc.year)
-        post_html += '<tr><td colspan="3" style="padding:1em 0 0 0;"><a style="text-decoration:none;" href="{}"><small>{} at {}</small></a></td></tr>'.format(post_url, post_date, post_time)
+        post_html += '<tr><td colspan="3" style="padding-bottom:8px;"><a style="text-decoration:none;" href="{}"><small>{} at {}</small></a></td></tr>'.format(post_url, post_date, post_time)
     return post_html

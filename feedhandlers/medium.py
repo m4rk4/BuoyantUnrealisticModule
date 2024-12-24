@@ -194,8 +194,10 @@ def get_content(url, args, site_json, save_debug=False):
             src = urlsplit(paragraph['mixtapeMetadata']['href']).netloc
             paragraph_text = re.sub(r'…{}'.format(src), '', paragraph['text'])
             if paragraph['mixtapeMetadata'].get('thumbnailImageId'):
-                start_tag += '<div><img src="https://miro.medium.com/max/128/{}" style="float:left; margin-right:8px; width:128px;" /><div style="overflow:hidden;">'.format(paragraph['mixtapeMetadata']['thumbnailImageId'])
-                end_tag = '<br/><small>{}</small></div></div><div style="clear:left;">&nbsp;</div>'.format(src)
+                start_tag += '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+                start_tag += '<div style="flex:1; min-width:256px; max-width:360px;"><a href="{}" target="_blank"><img src="https://miro.medium.com/max/640/{}" style="width:100%;" /></a></div>'.format(paragraph['mixtapeMetadata']['href'], paragraph['mixtapeMetadata']['thumbnailImageId'])
+                start_tag += '<div style="flex:2; min-width:256px;">'
+                end_tag = '<div><small>{}</small></div></div></div>'.format(src)
             else:
                 start_tag += '<blockquote>'
                 end_tag = '<br/><small>{}</small></blockquote>'.format(src)

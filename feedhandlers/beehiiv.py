@@ -57,11 +57,37 @@ def get_content(url, args, site_json, save_debug=False):
     if content:
         if save_debug:
             utils.write_file(content.decode_contents(), './debug/debug.html')
+
+        if site_json:
+            if site_json.get('rename'):
+                for it in site_json['rename']:
+                    for el in utils.get_soup_elements(it, content):
+                        el.name = it['name']
+
+            if site_json.get('replace'):
+                for it in site_json['replace']:
+                    for el in utils.get_soup_elements(it, content):
+                        el.replace_with(BeautifulSoup(it['new_html'], 'html.parser'))
+
+            if site_json.get('decompose'):
+                for it in site_json['decompose']:
+                    for el in utils.get_soup_elements(it, content):
+                        el.decompose()
+
+            if site_json.get('unwrap'):
+                for it in site_json['unwrap']:
+                    for el in utils.get_soup_elements(it, content):
+                        el.unwrap()
+
         for el in content.find_all(['script', 'style']):
             el.decompose()
 
         for el in content.select('div:has( a[href*="/subscribe"]:has(> button))', recursive=False):
             el.decompose()
+
+        # Remove different fonts and colors
+        for el in content.find_all('span', attrs={"style": re.compile(r'(color|font-family):')}):
+            el['style'] = re.sub(r'(color|font-family):[^;]+(;|$)', '', el['style'])
 
         for el in content.find_all(recursive=False):
             it = el.find(class_='button')
@@ -108,13 +134,44 @@ def get_content(url, args, site_json, save_debug=False):
                     el.decompose()
                     continue
 
-            if el.name == 'div':
-                if el.get('style'):
-                    m = re.search(r'background-color:\s?([^;]+)', el['style'])
-                    if m:
-                        if m.group(1) != 'transparent':
-                            continue
-                el.unwrap()
+            it = el.select('a:has(> button)')
+            if it:
+                m = re.search(r'background-color:([^;]+)', it[0].button['style'])
+                if m:
+                    btn_color = m.group(1)
+                else:
+                    btn_color = 'light-dark(#ccc, #333)'
+                m = re.search(r';color:([^;]+)', it[0].button['style'])
+                if m:
+                    color = m.group(1)
+                else:
+                    color = 'white'
+                new_html = utils.add_button(it[0]['href'], it[0].button.decode_contents(), btn_color, color)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+                continue
+
+            if el.name == 'div' and el.get('style'):
+                it = el.find('div', attrs={"style": re.compile(r'-user-select:')})
+                if it and it.get_text().strip() == '❝':
+                    it = el.find('small')
+                    if it:
+                        author = it.decode_contents()
+                    else:
+                        author = ''
+                    quote = ''
+                    for it in el.find_all('p'):
+                        it.attrs = {}
+                        quote += str(it)
+                    new_html = utils.add_pullquote(quote, author)
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.replace_with(new_el)
+                elif 'background-color:#' in el['style']:
+                    el['style'] = re.sub(r'background-color:[^;]+;', '', el['style'])
+                    el['style'] += 'border:1px solid light-dark(#ccc, #333);border-radius:10px;'
+                else:
+                    el.unwrap()
+                continue
 
         for el in content.find_all(['p', 'h1', 'h2', 'h3', 'ol', 'ul', 'li']):
             el.attrs = {}

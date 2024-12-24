@@ -48,14 +48,16 @@ def get_content(url, args, site_json, save_debug):
     dt = datetime.fromtimestamp(post_json['last_updated']).replace(tzinfo=timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    authors = []
-    for author in post_json['authors']:
-        authors.append(author['title'])
-    if authors:
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['title']} for x in post_json['authors']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = 'Time Magazine'
+        item['author'] = {
+            "name": 'Time Magazine'
+        }
+        item['authors'].append(item['author'])
 
     if post_json['taxonomy'].get('tags'):
         item['tags'] = post_json['taxonomy']['tags'].copy()
@@ -70,7 +72,7 @@ def get_content(url, args, site_json, save_debug):
     else:
         del item['tags']
 
-    item['_image'] = post_json['meta']['og:image']
+    item['image'] = post_json['meta']['og:image']
 
     item['summary'] = post_json['meta']['description']
 
@@ -83,7 +85,7 @@ def get_content(url, args, site_json, save_debug):
         elif post_json['primary_media']['type'] == 'video-jw':
             item['content_html'] += utils.add_video(post_json['primary_media']['data']['url'], post_json['primary_media']['data']['video_type'], post_json['primary_media']['data']['poster_url'], post_json['primary_media']['data']['name'])
         else:
-            logger.warning('unhandled primary media type {} in {}'.format(post_json['primary_media']['type'], url))
+            logger.warning('unhandled primary media type {} in {}'.format(post_json['primary_media']['type'], item['url']))
     elif post_json.get('primary_image'):
         item['content_html'] += add_image(post_json['primary_image'])
 
@@ -101,13 +103,18 @@ def get_content(url, args, site_json, save_debug):
                 else:
                     item['content_html'] += block['content']
             else:
-                logger.warning('unhandled paragraph format {} in {}'.format(block['format'], url))
+                logger.warning('unhandled paragraph format {} in {}'.format(block['format'], item['url']))
 
         elif block['type'] == 'image':
             item['content_html'] += add_image(block)
 
         elif block['type'] == 'video-jw':
-            item['content_html'] += utils.add_video(block['data']['url'], block['data']['video_type'], block['data']['poster_url'], block['data']['name'])
+            if block['data'].get('media_id'):
+                item['content_html'] += utils.add_embed('https://content.jwplatform.com/players/{}.html'.format(block['data']['media_id']))
+            elif block['data'].get('url'):
+                item['content_html'] += utils.add_video(block['data']['url'], block['data']['video_type'], block['data']['poster_url'], block['data']['name'], use_videojs=True)
+            else:
+                logger.warning('unhandled video-jw block in ' + item['url'])
 
         elif block['type'] == 'embed-twitter' or block['type'] == 'video-youtube':
             item['content_html'] += utils.add_embed(block['original_oembed_url'])
@@ -116,7 +123,9 @@ def get_content(url, args, site_json, save_debug):
             pass
 
         else:
-            logger.warning('unhandled body block type {} in {}'.format(block['type'], url))
+            logger.warning('unhandled body block type {} in {}'.format(block['type'], item['url']))
+    
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
     return item
 
 

@@ -14,9 +14,13 @@ logger = logging.getLogger(__name__)
 def get_deployment_value(url):
     page_html = utils.get_url_html(url)
     if page_html:
-        m = re.search(r'Fusion\.deployment="([^"]+)"', page_html)
+        m = re.search(r'Fusion\.deployment="(\d+)"', page_html)
         if m:
             return int(m.group(1))
+        else:
+            m = re.search(r'"arcVersion":"(\d+)"', page_html)
+            if m:
+                return int(m.group(1))
     return -1
 
 

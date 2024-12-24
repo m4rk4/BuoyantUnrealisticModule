@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, tldextract
+import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, time, tldextract
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime, timedelta
@@ -8,7 +8,7 @@ from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from urllib.parse import parse_qs, quote, quote_plus, urlsplit
 
 import config
 from feedhandlers import twitter, vimeo, youtube
@@ -363,8 +363,9 @@ def find_redirect_url(url):
       return m.group(1)
   elif 'play.podtrac.com' in split_url.netloc:
     return 'https://' + '/'.join(paths[1:])
-  elif split_url.netloc == 'dts.podtrac.com' and 'redirect.mp3' in paths:
-    return 'https://' + '/'.join(paths[1:])
+  elif 'podtrac.com' in split_url.netloc and 'redirect.mp3' in paths:
+    n = paths.index('redirect.mp3')
+    return 'https://' + '/'.join(paths[n + 1:])
   elif 'injector.simplecastaudio.com' in split_url.path:
     m = re.search(r'injector\.simplecastaudio\.com/.*', split_url.path)
     return 'https://' + m.group(0)
@@ -945,7 +946,9 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     audio_html += '<div style="flex:1; min-width:48px; max-width:64px;">'
 
   if audio_src:
-    if use_video_js and audio_type != 'audio_redirect':
+    if audio_type == 'audio_link':
+      audio_html += '<a href="{}" target="_blank">'.format(audio_src)
+    elif use_video_js and audio_type != 'audio_redirect':
       if poster:
         audio_html += '<a href="{}/videojs?src={}&type={}&poster={}" target="_blank">'.format(config.server, quote_plus(audio_src), quote_plus(audio_type), quote_plus(poster))
       else:
@@ -1062,7 +1065,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
       poster += '&height={}'.format(height)
     poster += '&overlay=video'
   elif video_type == 'video/mp4':
-    poster = '{}/image?url={}&width={}&overlay=video'.format(config.server, quote_plus(video_src), width)
+    poster = '{}/image?url={}&width={}&overlay=video'.format(config.server, quote_plus(video_url), width)
   else:
     poster = '{}/image?width={}'.format(config.server, width)
     if height:
@@ -1191,7 +1194,7 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
   graph_html += '</div>'
   return graph_html
 
-def add_button(link, text, button_color='gray', text_color='white', center=True, border=True, border_color="black", font_size='1em'):
+def add_button(link, text, button_color='light-dark(#ccc, #333)', text_color='white', center=True, border=True, border_color="black", font_size='1em'):
   style = 'display:inline-block; min-width:180px; text-align:center; padding:0.5em; background-color:{}; color:{}; font-size:{}; border-radius:10px;'.format(button_color, text_color, font_size)
   if border:
     style += ' border:1px solid {};'.format(border_color)
@@ -1630,4 +1633,164 @@ def get_stock_price(stock_sym, stock_name):
           arrow = '▲'
       stock_html = '<span style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</span>'.format(color, stock_json['symbol'], stock_json['regularMarketPrice'], arrow, pct)
       return stock_html
+  return ''
+
+
+def get_datadome_cookie(website, dd_key):
+  # https://github.com/gravilk/datadome-documented/blob/main/main.py
+  data = {
+    "opts": "ajaxListenerPath",
+    "ttst": random.randint(200, 300) + random.uniform(0, 1),
+    "ifov": False,
+    "tagpu": 12.464481108548958,
+    "glvd": "",
+    "glrd": "",
+    "hc": 12,
+    "br_oh": 1002,
+    "br_ow": 1784,
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+    "wbd": False,
+    "wdif": False,
+    "wdifrm": False,
+    "npmtm": False,
+    "br_h": 811,
+    "br_w": 1706,
+    "nddc": 0,
+    "rs_h": 1440,
+    "rs_w": 2560,
+    "rs_cd": 24,
+    "phe": False,
+    "nm": False,
+    "jsf": False,
+    "lg": "en-US",
+    "pr": 1,
+    "ars_h": 1386,
+    "ars_w": 2560,
+    "tz": -120,
+    "str_ss": True,
+    "str_ls": True,
+    "str_idb": True,
+    "str_odb": True,
+    "plgod": False,
+    "plg": 5,
+    "plgne": True,
+    "plgre": True,
+    "plgof": False,
+    "plggt": False,
+    "pltod": False,
+    "hcovdr": False,
+    "hcovdr2": False,
+    "plovdr": False,
+    "plovdr2": False,
+    "ftsovdr": False,
+    "ftsovdr2": False,
+    "lb": False,
+    "eva": 33,
+    "lo": False,
+    "ts_mtp": 0,
+    "ts_tec": False,
+    "ts_tsa": False,
+    "vnd": "Google Inc.",
+    "bid": "NA",
+    "mmt": "application/pdf,text/pdf",
+    "plu": "PDF Viewer,Chrome PDF Viewer,Chromium PDF Viewer,Microsoft Edge PDF Viewer,WebKit built-in PDF",
+    "hdn": False,
+    "awe": False,
+    "geb": False,
+    "dat": False,
+    "med": "defined",
+    "aco": "probably",
+    "acots": False,
+    "acmp": "probably",
+    "acmpts": True,
+    "acw": "probably",
+    "acwts": False,
+    "acma": "maybe",
+    "acmats": False,
+    "acaa": "probably",
+    "acaats": True,
+    "ac3": "",
+    "ac3ts": False,
+    "acf": "probably",
+    "acfts": False,
+    "acmp4": "maybe",
+    "acmp4ts": False,
+    "acmp3": "probably",
+    "acmp3ts": False,
+    "acwm": "maybe",
+    "acwmts": False,
+    "ocpt": False,
+    "vco": "NA",
+    "vch": "NA",
+    "vcw": "NA",
+    "vc3": "NA",
+    "vcmp": "NA",
+    "vcq": "NA",
+    "vc1": "NA",
+    "vcots": "NA",
+    "vchts": "NA",
+    "vcwts": "NA",
+    "vc3ts": "NA",
+    "vcmpts": "NA",
+    "vcqts": "NA",
+    "vc1ts": "NA",
+    "dvm": 8,
+    "sqt": False,
+    "so": "landscape-primary",
+    "wdw": True,
+    "cokys": "bG9hZFRpbWVzY3NpYXBwL=",
+    "ecpc": False,
+    "lgs": True,
+    "lgsod": False,
+    "psn": True,
+    "edp": True,
+    "addt": True,
+    "wsdc": True,
+    "ccsr": True,
+    "nuad": True,
+    "bcda": False,
+    "idn": True,
+    "capi": False,
+    "svde": False,
+    "vpbq": True,
+    "ucdv": False,
+    "spwn": False,
+    "emt": False,
+    "bfr": False,
+    "dbov": False,
+    "prm": True,
+    "tzp": "US/Eastern",
+    "cvs": True,
+    "usb": "defined",
+    "jset": math.floor(time.time())
+  }
+  #  "tzp": "Europe/Berlin",
+
+  final_data = {
+    "jsData": json.dumps(data),
+    "eventCounters": [],
+    "cid": "null",
+    "ddk": dd_key,
+    "Referer": quote(f"{website}/", safe=''),
+    "request": "%2F",
+    "responsePage": "origin",
+    "ddv": "4.10.2"
+  }
+
+  headers = {
+    "origin": website,
+    "referer": f"{website}/",
+    "sec-ch-ua": '"Chromium";v="111", "Not(A:Brand";v="8"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Linux"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "cross-site",
+    "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
+  }
+
+  r = requests.post("https://api-js.datadome.co/js/", data=final_data, headers=headers, verify=certifi.where())
+  if r and r.status_code == 200:
+    dd = r.json()
+    return dd['cookie']
   return ''

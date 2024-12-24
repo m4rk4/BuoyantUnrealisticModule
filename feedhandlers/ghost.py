@@ -38,15 +38,15 @@ def get_item(post_json, args, site_json, save_debug):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(post_json['updated_at']).astimezone(timezone.utc)
-    item['date_modified'] = dt.isoformat()
+    if post_json.get('updated_at'):
+        dt = datetime.fromisoformat(post_json['updated_at']).astimezone(timezone.utc)
+        item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in post_json['authors']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in post_json['authors']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     for it in post_json['tags']:
@@ -68,18 +68,22 @@ def get_item(post_json, args, site_json, save_debug):
         item['summary'] = post_json['excerpt']
 
     if post_json.get('custom_excerpt'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(post_json['custom_excerpt'])
+        item['content_html'] += '<p><em>' + post_json['custom_excerpt'] + '</em></p>'
 
     if post_json.get('feature_image'):
-        item['_image'] = post_json['feature_image']
+        item['image'] = post_json['feature_image']
         if not soup:
-            item['content_html'] += utils.add_image(item['_image'], post_json.get('feature_image_caption'))
+            item['content_html'] += utils.add_image(item['image'], post_json.get('feature_image_caption'))
         else:
             el = soup.find()
             if el.name == 'figure' or (el.name == 'div' and el.find('iframe')):
                 pass
             else:
-                item['content_html'] += utils.add_image(item['_image'], post_json.get('feature_image_caption'))
+                item['content_html'] += utils.add_image(item['image'], post_json.get('feature_image_caption'))
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if soup:
         for el in soup.find_all('blockquote'):
@@ -316,7 +320,7 @@ def get_item(post_json, args, site_json, save_debug):
                             gist = utils.get_url_html(m.group(0))
                             if gist:
                                 new_html = '<h4>Gist: <a href="https://gist.github.com/{0}/{1}">https://gist.github.com/{0}/{1}</a></h4><pre style="margin-left:2em; padding:0.5em; white-space:pre; overflow-x:auto; background:#F2F2F2;">{2}</pre>'.format(gist_user, gist_id, html.escape(gist))
-            elif el.find(id='remixd-audio-player-script'):
+            elif el.find(id=['remixd-audio-player-script', 'elevenlabs-audionative-widget']):
                 el.decompose()
                 continue
             elif el.find('div', class_=['outpost-pub-container', 'subscribe']):
@@ -375,7 +379,7 @@ def get_item(post_json, args, site_json, save_debug):
                 el.decompose()
             else:
                 logger.warning('unhandled kg-card in ' + item['url'])
-                # print(str(el))
+                logger.warning(str(el))
 
         item['content_html'] += str(soup)
         item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])

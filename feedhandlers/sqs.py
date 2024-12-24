@@ -1,10 +1,10 @@
 import json, pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-from urllib.parse import urlsplit
+from datetime import datetime
+from urllib.parse import quote_plus, urlsplit
 
-import utils
-from feedhandlers import rss, wp_posts
+import config, utils
+from feedhandlers import rss
 
 import logging
 
@@ -151,10 +151,19 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-image in ' + item['url'])
 
         elif 'sqs-block-gallery' in block['class']:
+            # https://www.tokyocowboy.co/articles/uy1r8j003qdvb4ozr4qgplhd3yujyn
             # TODO: captions. Need and example.
+            gallery_images = []
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
             el = block.find(class_='sqs-gallery')
             for it in el.find_all('noscript'):
-                item['content_html'] += utils.add_image(resize_image(it.img['src']))
+                img_src = resize_image(it.img['src'], 1200)
+                thumb = resize_image(it.img['src'], 640)
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src) + '</div>'
+                gallery_images.append({"src": img_src, "caption": '', "thumb": thumb})
+            gallery_html += '</div>'
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
         elif 'sqs-block-video' in block['class']:
             if block.get('data-block-json'):

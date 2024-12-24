@@ -1628,6 +1628,47 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
     #                 if it:
     #                     it.decompose()
     #                 item['content_html'] += '<h2>Specs</h2>' + str(el)
+
+    def sub_cpt_item_desc(matchobj):
+        if 'youtu.be' in matchobj.group(1):
+            return utils.add_embed(matchobj.group(1))
+        else:
+            logger.warning('unhandled cpt_item_description substitution ' + matchobj.group(1))
+            return matchobj.group(1)
+    if post.get('type'):
+        if post['type'] == 'listicle_cpt' and post.get('cpt_item_name'):
+            for i in range(len(post['cpt_item_name'])):
+                if i > 0:
+                    item['content_html'] += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+                item['content_html'] += '<h3>' + post['cpt_item_name'][i] + '</h3>'
+                item['content_html'] += re.sub(r'<p>(http[^<]+)</p>', sub_cpt_item_desc, post['cpt_item_description'][i])
+        elif post['type'] == 'gmr_gallery':
+            if not page_soup:
+                item['_gallery'] = []
+                item['content_html'] += '<h3><a href="{}/gallery?url={}">View as slideshow</a></h3>'.format(config.server, quote_plus(item['url']))
+                item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                page_soup = get_page_soup(item['url'], site_json, save_debug)
+                for el in page_soup.select(r'ul.gallery-listicle > li.gallery-listicle-item'):
+                    it = el.find(class_='lazy-image', attrs={"data-src": True})
+                    if it:
+                        img_src = it['data-src']
+                        if it.get('data-attribution'):
+                            caption = it['data-attribution']
+                        else:
+                            caption = ''
+                        desc = ''
+                        it = el.find(class_='share-wrap')
+                        if it:
+                            it.decompose()
+                        it = el.find(class_='caption')
+                        if it:
+                            desc += it.decode_contents()
+                        it = el.find(class_='excerpt')
+                        if it:
+                            desc += str(it)
+                        item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(img_src, caption, desc=desc) + '</div>'
+                        item['_gallery'].append({"src": img_src, "caption": caption, "thumb": img_src, "desc": desc})
+                item['content_html'] += '</div>'
     return item
 
 
@@ -1723,6 +1764,12 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             it.unwrap()
         el.decompose()
 
+    for el in soup.find_all('p', attrs={"style": re.compile(r'text-align:\s?justify;?')}):
+        el['style'] = re.sub(r'text-align:\s?justify;?', '', el['style'])
+
+    for el in soup.find_all('div', class_='itemdb_embed'):
+        el['style'] = "border:1px solid light-dark(#ccc, #333); border-radius:10px; margin:8px; padding:8px;"
+
     for el in soup.find_all('svg', attrs={"data-icon": True}):
         new_html = ''
         if el['data-icon'] == 'clock':
@@ -1734,6 +1781,21 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             el.replace_with(new_el)
         else:
             logger.warning('unhandled svg data-icon {} in {}'.format(el['data-icon'], item['url']))
+
+    for el in soup.find_all('img', src=re.compile(r'gamingonlinux\.com'), attrs={"alt": re.compile(r'steam')}):
+        new_el = None
+        if 'verified' in el['alt']:
+            new_el = BeautifulSoup(' <span style="color:green;">☑</span> ', 'html.parser')
+        elif 'playable' in el['alt']:
+            new_el = BeautifulSoup(' <span style="color:yellow;">🛈</span> ', 'html.parser')
+        elif 'unsupported' in el['alt']:
+            new_el = BeautifulSoup(' <span style="color:red;">☒</span> ', 'html.parser')
+        elif 'not' in el['alt']:
+            new_el = BeautifulSoup(' ❔ ', 'html.parser')
+        else:
+            logger.warning('unhandled steam img in ' + item['url'])
+        if new_el:        
+            el.replace_with(new_el)
 
     for el in soup.find_all('img', class_='emoji'):
         new_html = ''
@@ -4469,6 +4531,39 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             else:
                 logger.warning('unhandled widget in ' + item['url'])
 
+    for el in soup.select('p:has(> a[data-fancybox="images"])'):
+        # https://www.gamingonlinux.com/2024/11/steam-deck-hits-17000-games-playable-and-verified/
+        it = el.find('em')
+        if it:
+            caption = it.decode_contents()
+        else:
+            caption = ''
+        images = el.find_all('a', attrs={"data-fancybox": "images"})
+        new_html = ''
+        if len(images) == 1:
+            new_html = utils.add_image(images[0]['href'], caption)
+        elif len(images) > 1:
+            gallery_images = []
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+            for it in images:
+                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(it['href'], link=it['href']) + '</div>'
+                gallery_images.append({"src": it['href'], "caption": "", "thumb": it['href']})
+            gallery_html += '</div>'
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            new_html = '<h3><a href="{}" target="_blank">View photo gallery'.format(gallery_url)
+            if caption:
+                new_html += ' - ' + caption
+            new_html += '</a></h3>' + gallery_html
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        else:
+            logger.warning('unhandled data-fancybox images in ' + item['url'])
+
+    for el in soup.select('p[style*="text-align:center"]:has(> img)'):
+        # https://www.gamingonlinux.com/2024/11/new-steam-controller-2-and-vr-controller-designs-got-leaked/
+        add_image(el, el, base_url, site_json)
+
     for el in soup.find_all(class_=re.compile(r'article[-_]+image|article-picture|article-grid-width-image|bp-embedded-image|br-image|c-figure|c-image|cli-image|captioned-image-container|custom-image-block|embed--image|entry-image|featured-media-img|featured-image|img-responsive|r-img-caption|gb-block-image|img-wrap|pom-image-wrap|post-content-image|block-coreImage|wp-block-image|wp-block-media|wp-block-ups-image|wp-caption|wp-post-image|wp-image-\d+|img-container|inline_image|sc-block-image|-insert-image|max-w-img-|image--shortcode|(?<!-)custom-caption')):
         # print(el.parent.name)
         if el.name != None:
@@ -4677,6 +4772,18 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             el.decompose()
         else:
             logger.warning('unhandled wp-block-video in ' + item['url'])
+
+    for el in soup.find_all(class_='hidden_video', attrs={"data-video-id": True}):
+        # https://www.gamingonlinux.com/2024/11/stalker-2-heart-of-chornobyl-review-works-on-linux-desktop-with-proton-but-poorly-on-steam-deck/
+        new_html = utils.add_embed('https://www.youtube.com/watch?v=' + el['data-video-id'])
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all(class_='ckeditor-html5-video'):
+        # https://www.gamingonlinux.com/2024/11/stalker-2-heart-of-chornobyl-review-works-on-linux-desktop-with-proton-but-poorly-on-steam-deck/
+        new_html = utils.add_video(el.video['src'], 'video/mp4', '', '', use_videojs=True)
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
 
     for el in soup.find_all(class_='jw-adthrive-wrap'):
         # https://www.mediaite.com/politics/maga-clad-woman-tries-to-convince-interviewer-the-us-government-controlled-the-hurricanes-to-hurt-trump/
@@ -5640,10 +5747,17 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                 if not posts_path:
                     posts_path = site_json['posts_path']['default']
 
-        if site_json['wpjson_path'].startswith('/'):
-            wpjson_path = '{}://{}{}'.format(split_url.scheme, split_url.netloc, site_json['wpjson_path'])
-        else:
-            wpjson_path = site_json['wpjson_path']
+        if isinstance(site_json['wpjson_path'], str):
+            if site_json['wpjson_path'].startswith('/'):
+                wpjson_path = '{}://{}{}'.format(split_url.scheme, split_url.netloc, site_json['wpjson_path'])
+            else:
+                wpjson_path = site_json['wpjson_path']
+        elif isinstance(site_json['wpjson_path'], dict):
+            key = set(paths).intersection(site_json['wpjson_path'].keys())
+            if key:
+                wpjson_path = site_json['wpjson_path'][list(key)[0]]
+            elif 'default' in wpjson_path:
+                wpjson_path = site_json['wpjson_path']['default']
 
         if page_soup:
             # print(wpjson_path)

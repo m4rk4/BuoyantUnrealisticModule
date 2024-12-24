@@ -779,168 +779,6 @@ def decrypt_content(url, encryptedDocumentKey, encryptedDataHash):
     return decoded
 
 
-def get_datadome_cookie():
-    # https://github.com/gravilk/datadome-documented/blob/main/main.py
-    website = 'https://www.barrons.com'
-    datadome_id = 'D428D51E28968797BC27FB9153435D'
-
-    data = {
-        "opts": "ajaxListenerPath",
-        "ttst": random.randint(200, 300) + random.uniform(0, 1),
-        "ifov": False,
-        "tagpu": 12.464481108548958,
-        "glvd": "",
-        "glrd": "",
-        "hc": 12,
-        "br_oh": 1002,
-        "br_ow": 1784,
-        "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
-        "wbd": False,
-        "wdif": False,
-        "wdifrm": False,
-        "npmtm": False,
-        "br_h": 811,
-        "br_w": 1706,
-        "nddc": 0,
-        "rs_h": 1440,
-        "rs_w": 2560,
-        "rs_cd": 24,
-        "phe": False,
-        "nm": False,
-        "jsf": False,
-        "lg": "en-US",
-        "pr": 1,
-        "ars_h": 1386,
-        "ars_w": 2560,
-        "tz": -120,
-        "str_ss": True,
-        "str_ls": True,
-        "str_idb": True,
-        "str_odb": True,
-        "plgod": False,
-        "plg": 5,
-        "plgne": True,
-        "plgre": True,
-        "plgof": False,
-        "plggt": False,
-        "pltod": False,
-        "hcovdr": False,
-        "hcovdr2": False,
-        "plovdr": False,
-        "plovdr2": False,
-        "ftsovdr": False,
-        "ftsovdr2": False,
-        "lb": False,
-        "eva": 33,
-        "lo": False,
-        "ts_mtp": 0,
-        "ts_tec": False,
-        "ts_tsa": False,
-        "vnd": "Google Inc.",
-        "bid": "NA",
-        "mmt": "application/pdf,text/pdf",
-        "plu": "PDF Viewer,Chrome PDF Viewer,Chromium PDF Viewer,Microsoft Edge PDF Viewer,WebKit built-in PDF",
-        "hdn": False,
-        "awe": False,
-        "geb": False,
-        "dat": False,
-        "med": "defined",
-        "aco": "probably",
-        "acots": False,
-        "acmp": "probably",
-        "acmpts": True,
-        "acw": "probably",
-        "acwts": False,
-        "acma": "maybe",
-        "acmats": False,
-        "acaa": "probably",
-        "acaats": True,
-        "ac3": "",
-        "ac3ts": False,
-        "acf": "probably",
-        "acfts": False,
-        "acmp4": "maybe",
-        "acmp4ts": False,
-        "acmp3": "probably",
-        "acmp3ts": False,
-        "acwm": "maybe",
-        "acwmts": False,
-        "ocpt": False,
-        "vco": "NA",
-        "vch": "NA",
-        "vcw": "NA",
-        "vc3": "NA",
-        "vcmp": "NA",
-        "vcq": "NA",
-        "vc1": "NA",
-        "vcots": "NA",
-        "vchts": "NA",
-        "vcwts": "NA",
-        "vc3ts": "NA",
-        "vcmpts": "NA",
-        "vcqts": "NA",
-        "vc1ts": "NA",
-        "dvm": 8,
-        "sqt": False,
-        "so": "landscape-primary",
-        "wdw": True,
-        "cokys": "bG9hZFRpbWVzY3NpYXBwL=",
-        "ecpc": False,
-        "lgs": True,
-        "lgsod": False,
-        "psn": True,
-        "edp": True,
-        "addt": True,
-        "wsdc": True,
-        "ccsr": True,
-        "nuad": True,
-        "bcda": False,
-        "idn": True,
-        "capi": False,
-        "svde": False,
-        "vpbq": True,
-        "ucdv": False,
-        "spwn": False,
-        "emt": False,
-        "bfr": False,
-        "dbov": False,
-        "prm": True,
-        "tzp": "US/Eastern",
-        "cvs": True,
-        "usb": "defined",
-        "jset": math.floor(time.time())
-    }
-
-    final_data = {
-        "jsData": json.dumps(data),
-        "eventCounters": [],
-        "cid": "null",
-        "ddk": datadome_id,
-        "Referer": quote(f"{website}/", safe=''),
-        "request": "%2F",
-        "responsePage": "origin",
-        "ddv": "4.10.2"
-    }
-
-    headers = {
-        "origin": website,
-        "referer": f"{website}/",
-        "sec-ch-ua": '"Chromium";v="111", "Not(A:Brand";v="8"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Linux"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "cross-site",
-        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"
-    }
-
-    r = requests.post("https://api-js.datadome.co/js/", data=final_data, headers=headers, verify=certifi.where())
-    if r and r.status_code == 200:
-        dd = r.json()
-        return dd['cookie']
-    return ''
-
-
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     path = re.sub(r'\.html', '', split_url.path, flags=re.I)
@@ -1133,7 +971,7 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if site_json['datadome'] == '':
-        site_json['datadome'] = get_datadome_cookie()
+        site_json['datadome'] = utils.get_datadome_cookie('https://www.barrons.com', 'D428D51E28968797BC27FB9153435D')
         utils.update_sites(url, site_json)
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -1146,7 +984,7 @@ def get_content(url, args, site_json, save_debug=False):
     api_url = site_json['articles_api'] + paths[-1]
     api_json = utils.get_url_json(api_url, headers=headers)
     if not api_json:
-        site_json['datadome'] = get_datadome_cookie()
+        site_json['datadome'] = utils.get_datadome_cookie('https://www.barrons.com', 'D428D51E28968797BC27FB9153435D')
         utils.update_sites(url, site_json)
         headers['cookie'] = site_json['datadome']
         api_json = utils.get_url_json(api_url, headers=headers)

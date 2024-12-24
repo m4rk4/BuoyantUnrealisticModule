@@ -396,6 +396,8 @@ def get_content(url, args, site_json, save_debug=False):
         return athletic.get_content(url, args, sites_json['theathletic'], save_debug)
     elif 'wirecutter' in paths:
         return wirecutter.get_content(url, args, site_json, save_debug)
+    elif split_url.netloc == 'cooking.nytimes.com':
+        return get_cooking_content(url, args, site_json, save_debug)
 
     article_html = utils.get_url_html(url, user_agent='googlebot')
     if not article_html:
@@ -533,6 +535,147 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += render_block(article_json['sprinkledBody'])
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+    return item
+
+
+def get_cooking_content(url, args, site_json, save_debug=False):
+    article_html = utils.get_url_html(url, user_agent='googlebot')
+    if not article_html:
+        return None
+    if save_debug:
+        utils.write_file(article_html, './debug/debug.html')
+
+    soup = BeautifulSoup(article_html, 'html.parser')
+    el = soup.find('script', id='__NEXT_DATA__')
+    if not el:
+        logger.warning('unable to find __NEXT_DATA__ in ' + url)
+        return None
+
+    next_data = json.loads(el.string)
+    if save_debug:
+        utils.write_file(next_data, './debug/debug.json')
+
+    meta = next_data['props']['pageProps']['meta']
+    if meta['pageType'] != 'recipe':
+        logger.warning('unhandled pageType {} for {}'.format(meta['pageType'], url))
+        return None
+
+    recipe = next_data['props']['pageProps']['recipe']
+    ld_json = meta['jsonLD'][0]
+
+    item = {}
+    item['id'] = recipe['uuid']
+    item['url'] = recipe['fullUrl']
+    item['title'] = recipe['title']
+
+    if ld_json.get('datePublished'):
+        dt = datetime.fromisoformat(ld_json['datePublished'])
+    elif recipe.get('publishedAt'):
+        tz_loc = pytz.timezone('US/Eastern')
+        dt_loc = datetime.fromtimestamp(recipe['publishedAt'])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+    else:
+        dt = None
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+
+    if ld_json.get('dateModified'):
+        dt = datetime.fromisoformat(ld_json['dateModified'])
+    elif recipe.get('modifiedAt'):
+        tz_loc = pytz.timezone('US/Eastern')
+        dt_loc = datetime.fromtimestamp(recipe['modifiedAt'])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+    else:
+        dt = None
+    if dt:
+        item['date_modified'] = dt.isoformat()
+
+    if recipe.get('contentAttribution') and recipe['contentAttribution'].get('primaryByline'):
+        item['authors'] = [{"name": x['name']} for x in recipe['contentAttribution']['primaryByline']['authors']]
+        if recipe.get('contentAttribution') and recipe['contentAttribution'].get('secondaryByline'):
+            item['authors'] += [{"name": x['name']} for x in recipe['contentAttribution']['secondaryByline']['authors']]
+    elif ld_json.get('author'):
+        item['authors'] = [{"name": ld_json['author']['name']}]
+    if 'authors' in item:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+
+    item['tags'] = []
+    if recipe.get('tags'):
+        item['tags'] = [x['name'].lower() for x in recipe['tags']]
+    if ld_json.get('keywords'):
+        item['tags'] = [x.strip() for x in ld_json['keywords'].split(',') if x.strip().lower() not in item['tags']]
+    if ld_json.get('recipeCategory'):
+        item['tags'] = [x.strip() for x in ld_json['recipeCategory'].split(',') if x.strip().lower() not in item['tags']]
+    
+    if recipe.get('image'):
+        item['image'] = recipe['image']['src']['article']
+    elif meta.get('imageUrl'):
+        item['image'] = meta['imageUrl']
+    elif ld_json.get('image'):
+        item['image'] = ld_json['image'][0]['url']
+
+    item['summary'] = meta['description']
+
+    item['content_html'] = ''
+    if recipe.get('image'):
+        captions = []
+        if recipe['image'].get('caption'):
+            captions.append(recipe['image']['caption'])
+        if recipe['image'].get('credit'):
+            captions.append(recipe['image']['credit'])
+        if recipe.get('videoSrc'):
+            item['_video'] = recipe['videoSrc']
+            item['content_html'] += utils.add_video(recipe['videoSrc'], 'application/x-mpegURL', recipe['image']['src']['article'], ' | '.join(captions))
+        else:
+            item['content_html'] += utils.add_image(recipe['image']['src']['article'], ' | '.join(captions))
+
+    item['content_html'] += '<div>&nbsp;</div><table style="margin:auto;">'
+    if recipe.get('totalTime'):
+        item['content_html'] += '<tr><td style="padding-right:1em;"><b>Total Time</b></td><td>' + recipe['totalTime'] + '</td></tr>'
+    if recipe.get('prepTime'):
+        item['content_html'] += '<tr><td>Prep Time</td><td>' + recipe['prepTime'] + '</td></tr>'
+    if recipe.get('cookTime'):
+        item['content_html'] += '<tr><td>Prep Time</td><td>' + recipe['cookTime'] + '</td></tr>'
+    if recipe.get('ratings'):
+        item['content_html'] += '<tr><td><b>Rating</b></td><td>{} ({})</td></tr>'.format(recipe['ratings']['avgRating'], recipe['ratings']['numRatings'])
+        item['content_html'] += '<tr><td colspan="2">' + utils.add_stars(recipe['ratings']['avgRating']) + '</td></tr>'
+    item['content_html'] += '</table>'
+
+    if recipe.get('topnote'):
+        item['content_html'] += '<hr style="margin:2em 0 2em 0; height:3px; border-width:0; color:light-dark(#ccc, #333); background-color:light-dark(#ccc, #333);">'
+        item['content_html'] += '<p>' + recipe['topnote'] + '</p>'
+
+    item['content_html'] += '<hr style="margin:2em 0 2em 0; height:3px; border-width:0; color:light-dark(#ccc, #333); background-color:light-dark(#ccc, #333);"><h3 style="margin-top:0;">INGREDIENTS</h3>'
+    if recipe.get('recipeYield'):
+        item['content_html'] += '<p><b>Yield:</b> ' + recipe['recipeYield'] + '</p>'
+
+    for it in recipe['ingredients']:
+        if it.get('name'):
+            item['content_html'] += '<div style="margin-top:2em; font-weight:bold;">' + it['name'].upper() + '</div>'
+        for i in it['ingredients']:
+            item['content_html'] += '<p>{} {}</p>'.format(i['quantity'], i['text'])
+
+    item['content_html'] += '<hr style="margin:2em 0 2em 0; height:3px; border-width:0; color:light-dark(#ccc, #333); background-color:light-dark(#ccc, #333);"><h3 style="margin-top:0;">PREPERATION</h3>'
+    for it in recipe['steps']:
+        if it.get('name'):
+            item['content_html'] += '<div style="font-weight:bold;">' + it['name'].upper() + '</div>'
+        for i in it['steps']:
+            item['content_html'] += '<div style="font-weight:bold;">Step {}</div>'.format(i['number'])
+            item['content_html'] += '<p>' + i['description'] + '</p>'
+            if i.get('media'):
+                logger.warning('unhandled media in step {}'.format(i['number']))
+
+    if recipe.get('nutritionalInformation'):
+        item['content_html'] += '<hr style="margin:2em 0 2em 0; height:3px; border-width:0; color:light-dark(#ccc, #333); background-color:light-dark(#ccc, #333);"><h3 style="margin-top:0;">NUTRITIONAL INFORMATION</h3>'
+        for it in recipe['nutritionalInformation']:
+            if it.get('header'):
+                item['content_html'] += '<div style="font-weight:bold;">' + it['header'] + '</div>'
+            item['content_html'] += '<p>' + it['description'] + '</p>'
+
     return item
 
 

@@ -114,7 +114,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item = {}
     item['id'] = content_json['entityId']
-    item['url'] = '{}:{}{}'.format(split_url.scheme, split_url.netloc, content_json['urlAlias'])
+    item['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, content_json['urlAlias'])
     item['title'] = content_json['headline']
 
     # Offset to match date/time in ld+json info

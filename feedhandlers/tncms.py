@@ -182,8 +182,11 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = ''
 
     if article_json.get('subheadline'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['subheadline'])
+        item['content_html'] += '<p><em>' + article_json['subheadline'] + '</em></p>'
         item['summary'] = article_json['subheadline']
+    elif article_json.get('prologue'):
+        item['content_html'] += '<p><em>' + re.sub(r'^<p>|</p>$', '', article_json['prologue'].strip()) + '</em></p>'
+        item['summary'] = article_json['prologue']
 
     lede_img = ''
     gallery = ''
@@ -287,7 +290,7 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     lede_img += utils.add_image(item['image'])
 
-    if 'embed' in args:
+    if article_json['type'] == 'article' and 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
         return item
 

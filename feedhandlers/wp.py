@@ -350,11 +350,28 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 date = meta['updated_at'][0]
             else:
                 date = meta['updated_at']
+        elif meta and meta.get('last-modified'):
+            if isinstance(meta['last-modified'], list):
+                date = meta['last-modified'][0]
+            else:
+                date = meta['last-modified']
         elif article_json and article_json.get('dateModified'):
             date = article_json['dateModified']
         if date:
-            dt = datetime.fromisoformat(date).astimezone(timezone.utc)
-            item['date_modified'] = dt.isoformat()
+            try:
+                dt = datetime.fromisoformat(date).astimezone(timezone.utc)
+            except:
+                try:
+                    dt = dateutil.parser.parse(date).astimezone(timezone.utc)
+                except:
+                    dt = None
+            if dt:
+                if 'date_published' not in item:
+                    item['date_published'] = dt.isoformat()
+                    item['_timestamp'] = dt.timestamp()
+                    item['_display_date'] = utils.format_display_date(dt)
+                else:
+                    item['date_modified'] = dt.isoformat()
 
     if not item.get('author'):
         authors = []
@@ -487,6 +504,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['summary'] = meta['og:description']
     elif meta and meta.get('twitter:description'):
         item['summary'] = meta['twitter:description']
+    elif 'summary' in site_json:
+        for el in utils.get_soup_elements(site_json['summary'], soup):
+            item['summary'] = el.get_text()
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
@@ -636,6 +656,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 contents = utils.get_soup_elements(it, soup)
                 for el in contents:
                     # print(el)
+                    if 'title' in it:
+                        item['content_html'] += it['title']
                     if 'unwrap' in it and it['unwrap'] == False:
                         item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
                     else:
@@ -660,6 +682,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 contents = utils.get_soup_elements(it, soup)
                 if contents and it.get('separator'):
                     item['content_html'] += '<div>&nbsp;</div><hr style="width:80%; margin:auto;"/><div>&nbsp;</div>'
+                if 'title' in it:
+                        item['content_html'] += it['title']
                 for el in contents:
                     if 'unwrap' in it and it['unwrap'] == False:
                         item['content_html'] += wp_posts.format_content(str(el), item, site_json, module_format_content, soup)

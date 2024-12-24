@@ -38,6 +38,19 @@ def get_content(url, args, site_json, save_debug=False):
             j = el.string.rfind('}') + 1
             preloaded_state = json.loads(el.string[i:j])
             article_json = preloaded_state['template']
+        else:
+            # Seems to be specific to mentalfloss.com
+            el = soup.find('script', attrs={"type": "qwik/json"})
+            if el:
+                qwik_json = json.loads(el.string)
+                # TODO: how to determine valid ids?
+                ids = [x for x in qwik_json['objs'] if isinstance(x, str) and x.startswith('01')]
+                if ids:
+                    post_id = ','.join(ids)
+                    api_url = 'https://{}/api/properties/{}/posts?ids={}&limit=1&withBody=true'.format(split_url.netloc, site_json['site_property'], post_id)
+                    api_json = utils.get_url_json(api_url)
+                    if api_json and api_json.get('data') and api_json['data'].get('articles'):
+                        article_json = api_json['data']['articles'][0]
     if not article_json:
         return None
     if save_debug:
@@ -97,7 +110,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['content_html'] = ''
     if article_json.get('intro'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['intro'].encode('iso-8859-1').decode('utf-8'))
+        try:
+            item['content_html'] += '<p><em>' + article_json['intro'].encode('iso-8859-1').decode('utf-8') + '</em></p>'
+        except:
+            item['content_html'] += '<p><em>' + article_json['intro'] + '</em></p>'
 
     if article_json.get('cover')  and article_json['cover'].get('image'):
         captions = []
@@ -134,16 +150,20 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += content['html']
         elif content['type'] == 'image':
             captions = []
-            if content['image'].get('caption'):
-                captions.append(content['image']['caption'])
-            if content['image'].get('credit'):
-                captions.append(content['image']['credit'])
+            if content.get('image'):
+                image = content['image']
+            elif content.get('value'):
+                image = content['value']
+            if image.get('caption'):
+                captions.append(image['caption'])
+            if image.get('credit'):
+                captions.append(image['credit'])
             for i, it in enumerate(captions):
                 try:
                     captions[i] = it.encode('iso-8859-1').decode('utf-8')
                 except:
                     pass
-            item['content_html'] += utils.add_image(resize_image(content['image']['path']), ' | '.join(captions))
+            item['content_html'] += utils.add_image(resize_image(image['path']), ' | '.join(captions))
         elif content['type'] == 'twitter':
             if content.get('value'):
                 item['content_html'] += utils.add_embed(content['value']['originalEmbedUrl'])

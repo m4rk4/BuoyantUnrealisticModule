@@ -341,17 +341,29 @@ def get_content(url, args, site_json, save_debug=False):
         item['authors'].append(item['author'])
         item['summary'] = episode_json['html_description']
         item['image'] = episode_json['images'][0]['url']
+        audio_type = 'audio/mpeg'
         if episode_json.get('external_playback_url'):
             playback_url = utils.get_redirect_url(episode_json['external_playback_url'])
         elif episode_json.get('audio_preview_url'):
-            playback_url = utils.get_redirect_url(episode_json['audio_preview_url'])
-        item['_audio'] = playback_url
-        attachment = {}
-        attachment['url'] = item['_audio']
-        attachment['mime_type'] = 'audio/mpeg'
-        item['attachments'] = []
-        item['attachments'].append(attachment)
-        item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(episode_json['duration_ms']) / 1000)
+            # Playback of the widevine url fails after a few seconds presumably from DRM
+            # TODO: implement decryption?
+            # widevine = utils.get_url_json('https://spclient.wg.spotify.com/soundfinder/v1/unauth/episode/{}/com.widevine.alpha'.format(content_id), headers=headers)
+            # if widevine and widevine.get('url'):
+            #     utils.write_file(widevine, './debug/widevine.json')
+            #     playback_url = widevine['url'][0]
+            #     audio_type = 'audio/mp4'
+            # else:
+            #     playback_url = utils.get_redirect_url(episode_json['audio_preview_url'])
+            playback_url = 'https://embed-standalone.spotify.com/embed/episode/' + content_id
+            audio_type = 'audio_link'
+        if audio_type != 'audio_link':
+            item['_audio'] = playback_url
+            attachment = {}
+            attachment['url'] = item['_audio']
+            attachment['mime_type'] = audio_type
+            item['attachments'] = []
+            item['attachments'].append(attachment)
+        item['content_html'] = utils.add_audio(playback_url, item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(episode_json['duration_ms']) / 1000, audio_type)
         if 'embed' in args or '/embed/' in url:
             return item
         item['content_html'] += item['summary']

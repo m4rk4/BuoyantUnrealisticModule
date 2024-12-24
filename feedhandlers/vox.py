@@ -131,7 +131,7 @@ def get_content(url, args, site_json, save_debug=False):
                     it = el.find(class_='c-entry-sidebar')
                     img = el.find('figure', class_='e-image')
                     if img:
-                        new_html = '<div style="display:flex; flex-wrap:wrap; gap:0.5em;">'
+                        new_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5em; width:90%; margin:auto;">'
                         new_html += '<div style="flex:1; min-width:256px;">{}</div>'.format(add_image(img))
                         img.decompose()
                         new_html += '<div style="flex:2; min-width:256px;">{}</div>'.format(it.decode_contents())

@@ -27,7 +27,7 @@ def render_content(content):
     if content['type'] == 'text':
         def rebelmouse_proxy_image(matchobj):
             return utils.add_image(matchobj.group(1))
-        text = re.sub('\[rebelmouse-proxy-image (https://[^\s]+) [^\]]+]', rebelmouse_proxy_image, content['text'])
+        text = re.sub(r'\[rebelmouse-proxy-image (https://[^\s]+) [^\]]+]', rebelmouse_proxy_image, content['text'])
         content_html += text
 
     elif content['type'] == 'tag':
@@ -285,32 +285,63 @@ def render_content(content):
                                 credit = m.group(1)
 
                     elif child['name'] == 'assembler':
-                        if child['attributes']['use_pagination']:
+                        if child['attributes'].get('layout') == 'slideshow':
+                            content_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        elif child['attributes'].get('use_pagination') == True:
                             content_html += '<hr/>'
                         if child.get('children'):
                             for nino in child['children']:
                                 content_html += render_content(nino)
-                                if child['attributes']['use_pagination']:
+                                if child['attributes'].get('use_pagination'):
                                     content_html += '<hr/>'
+                        if child['attributes'].get('layout') == 'slideshow':
+                            content_html += '</div>'
+                            gallery_images = []
+                            for el in BeautifulSoup(content_html, 'html.parser').select('div:has(> figure)'):
+                                if el.figure.img:
+                                    img_src = resize_image(el.figure.img['src'], 1200)
+                                    thumb = resize_image(el.figure.img['src'], 640)
+                                    if el.figure.figcaption:
+                                        caption = el.figure.figcaption.small.decode_contents()
+                                    else:
+                                        caption = ''
+                                    # TODO: extract desc
+                                    gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                                    img_src = ''
+                            if len(gallery_images) > 0:
+                                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                                content_html = '<h3><a href="{}" target="_blank">View slideshow</a></h3>'.format(gallery_url) + content_html
 
                     else:
                         logger.warning('unhandled particle child ' + child['name'])
 
                 particle_html = ''
+                desc = ''
+                if is_slideshow:
+                    particle_html += '<div style="flex:1; min-width:360px;">'
                 if headline:
-                    particle_html += '<h3>{}</h3>'.format(headline)
-                if img_src:
-                    if caption and credit:
-                        caption += ' | ' + credit
-                    elif credit and not caption:
-                        caption = credit
-                    particle_html += utils.add_image(img_src, caption, link=img_link)
                     if is_slideshow:
-                        particle_html += '<br/>'
+                        desc += '<h3>' + headline + '</h3>'
+                    else:
+                        particle_html += '<h3>' + headline + '</h3>'
+                if img_src:
+                    captions = []
+                    if caption:
+                        captions.append(caption)
+                    if credit:
+                        captions.append(credit)
+                    if is_slideshow:
+                        if body:
+                            desc += body
+                        particle_html += utils.add_image(img_src, ' | '.join(captions), link=img_link, desc=desc)
+                    else:
+                        particle_html += utils.add_image(img_src, ' | '.join(captions), link=img_link)
                 if embed_src:
                     particle_html += utils.add_embed(embed_src)
-                if body:
+                if body and not is_slideshow:
                     particle_html += body
+                if is_slideshow:
+                    particle_html += '</div>'
                 if content.get('attributes') and content['attributes'].get('class_name') and re.search(r'ieee-(factbox|sidebar)-', content['attributes']['class_name']):
                     content_html += utils.add_blockquote(particle_html)
                 elif content.get('attributes') and content['attributes'].get('class_name') and re.search(r'ieee-pullquote-', content['attributes']['class_name']):
@@ -318,7 +349,7 @@ def render_content(content):
                 else:
                     content_html += particle_html
                 return content_html
-
+                
         elif content['name'] == 'assembler':
             if content['attributes']['use_pagination']:
                 content_html += '<hr/>'
@@ -476,15 +507,8 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
-
 
     for child in content_json['children']:
         item['content_html'] += render_content(child)

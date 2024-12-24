@@ -1,5 +1,6 @@
 import json, re
 from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime
 from urllib.parse import quote_plus
 
@@ -117,180 +118,160 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(next_json, './debug/debug.json')
 
-    bing_html = ''
-    if next_json['props']['pageProps'].get('walled') and next_json['props']['pageProps']['walled'] == True:
-        logger.debug('article is paywalled')
-        # TODO: Bing no longer caches economist articles
-        # logger.debug('article is paywalled, trying to find bing cached version')
-        # bing_html = utils.get_bing_cache(url, '', save_debug)
-        # if bing_html:
-        #     if save_debug:
-        #         utils.write_file(bing_html, './debug/bing.html')
-        #     soup = BeautifulSoup(bing_html, 'html.parser')
-        #     next_data = soup.find('script', id='__NEXT_DATA__')
-        #     if next_data:
-        #         next_json = json.loads(next_data.string)
-        #         if save_debug:
-        #             utils.write_file(next_json, './debug/debug.json')
-
     item = {}
-
-    if isinstance(next_json['props']['pageProps']['content'], list):
-        content_parts = None
-        content_json = next_json['props']['pageProps']['content'][0]
+    if next_json['props']['pageProps'].get('cp2Content'):
+        content_json = next_json['props']['pageProps']['cp2Content']
         item['id'] = content_json['id']
-        item['url'] = content_json['url']['canonical']
-    else:
-        if 'CollectionPage' in next_json['props']['pageProps']['content']['type']:
-            content_parts = next_json['props']['pageProps']['content']['hasPart']['parts'][0]['hasPart']['parts']
-            content_json = content_parts[0]
-            item['id'] = next_json['props']['pageProps']['content']['id']
-            item['url'] = next_json['props']['pageProps']['pageUrl']
-        elif 'Article' in next_json['props']['pageProps']['content']['type']:
-            content_parts = None
-            content_json = next_json['props']['pageProps']['content']
-            item['id'] = next_json['props']['pageProps']['content']['id']
-            item['url'] = next_json['props']['pageProps']['pageUrl']
+        item['url'] = next_json['props']['pageProps']['pageUrl']
+
+        if '/the-world-this-week/' in item['url']:
+            item['title'] = 'The World this Week: {} ({})'.format(content_json['headline'], utils.format_display_date(datetime.fromisoformat(content_json['datePublished']), False))
         else:
-            logger.warning('unhandled content type {} in {}'.format(next_json['props']['pageProps']['content']['type'], url))
+            item['title'] = content_json['headline']
 
-    item['title'] = content_json['headline']
+        dt = datetime.fromisoformat(content_json['datePublished'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = datetime.fromisoformat(content_json['dateModified'])
+        item['date_modified'] = dt.isoformat()
 
-    dt = datetime.fromisoformat(content_json['datePublished'].replace('Z', '+00:00'))
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
-
-    if '/the-world-this-week/' in item['url']:
-        item['title'] = 'The World this Week: {} ({})'.format(content_json['headline'], utils.format_display_date(dt, False))
-
-    dt = datetime.fromisoformat(content_json['dateModified'].replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
-
-    item['tags'] = []
-    item['author'] = {}
-    if content_json.get('_metadata'):
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(content_json['_metadata']['author']))
-        item['tags'] += content_json['_metadata']['keywords'].copy()
-        if content_json['_metadata'].get('imageUrl'):
-            item['_image'] = content_json['_metadata']['imageUrl']
-    elif content_json.get('byline'):
-        item['author']['name'] = content_json['byline']
-    else:
-        item['author']['name'] = 'The Economist'
-
-    if content_json.get('articleSection') and content_json['articleSection']['__typename'] == 'Taxonomies' and content_json['articleSection'].get('internal'):
-        for it in content_json['articleSection']['internal']:
-            if it['headline'] not in item['tags']:
-                item['tags'].append(it['headline'])
-    if not item.get('tags'):
-        del item['tags']
-
-    caption = ''
-    if content_json.get('leadComponent') and content_json['leadComponent']['type'] == 'IMAGE':
-        item['_image'] = content_json['leadComponent']['url']
-        captions = []
-        if content_json['leadComponent'].get('caption') and content_json['leadComponent']['caption'].get('textHtml'):
-            caption.append(content_json['leadComponent']['caption']['textHtml'])
-        if content_json['leadComponent'].get('credit'):
-            caption.append(content_json['leadComponent']['credit'])
-        caption = ' | '.join(captions)
-    elif content_json.get('image'):
-        if content_json['image'].get('main'):
-            item['_image'] = content_json['image']['main']['url']['canonical']
-            if content_json['image']['main'].get('description'):
-                caption = content_json['image']['main']['description']
-        elif content_json['image'].get('promo'):
-            item['_image'] = content_json['image']['promo']['url']['canonical']
-            if content_json['image']['promo'].get('description'):
-                caption = content_json['image']['promo']['description']
-
-    if content_json.get('description'):
-        item['summary'] = content_json['description']
-
-    item['content_html'] = ''
-    if content_json.get('description'):
-        item['content_html'] += '<p><em>{}</em></p>'.format(content_json['description'])
-
-    if not content_json.get('text') or (item.get('_image') and content_json['text'][0].get('name') and content_json['text'][0]['name'] != 'figure'):
-        if item['_image'].startswith('/'):
-            item['_image'] = 'https://www.economist.com' + item['_image']
-        item['content_html'] += utils.add_image(item['_image'], caption)
-
-    if content_parts:
-        for i, content_json in enumerate(content_parts):
-            if 'Article' in content_json['type']:
-                if i > 0:
-                    item['content_html'] += '<hr/><h2>{}</h2>'.format(content_json['headline'])
-                    if content_json.get('image') and content_json['image'].get('main'):
-                        if content_json['image']['main'].get('description'):
-                            caption = content_json['image']['main']['description']
-                        else:
-                            caption = ''
-                        item['content_html'] += utils.add_image(content_json['image']['main']['url']['canonical'], caption)
-                item['content_html'] += format_blocks(content_json['text'])
-                if content_json.get('image') and content_json['image'].get('inline'):
-                    for image in content_json['image']['inline']:
-                        if image.get('description'):
-                            caption = image['description']
-                        else:
-                            caption = ''
-                        item['content_html'] += utils.add_image(image['url']['canonical'], caption)
-            elif 'Quotation' in content_json['type']:
-                item['content_html'] += '<hr/>' + utils.add_pullquote(content_json['headline'], content_json['byline'])
-            else:
-                logger.warning('unhandled content type {} in {}'.format(content_json['type'], item['url']))
-    elif content_json.get('text'):
-        if next_json['props']['pageProps'].get('walled') and next_json['props']['pageProps']['walled'] == True and bing_html:
-            item['content_html'] += content_from_html(bing_html)
+        if content_json.get('byline'):
+            item['author'] = {
+                "name": content_json['byline']
+            }
+        elif content_json.get('brand'):
+            item['author'] = {
+                "name": content_json['brand']
+            }
         else:
-            item['content_html'] += format_blocks(content_json['text'])
+            item['author'] = {
+                "name": "The Economist"
+            }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
+        item['tags'] = []
+        if content_json.get('section'):
+            item['tags'].append(content_json['section']['name'])
+        if content_json.get('tags'):
+            logger.warning('unhandled tags in ' + item['url'])
+        if not item.get('tags'):
+            del item['tags']
+
+        if content_json['seo'].get('description'):
+            item['summary'] = content_json['seo']['description']
+        elif content_json.get('rubric'):
+            item['summary'] = content_json['rubric']
+        elif content_json.get('printRubric'):
+            item['summary'] = content_json['printRubric']
+
+        item['content_html'] = ''
+        if content_json.get('rubric'):
+            item['content_html'] += '<p><em>' + content_json['rubric'] + '</em></p>'
+        elif content_json.get('printRubric'):
+            item['content_html'] += '<p><em>' + content_json['printRubric'] + '</em></p>'
+
+        if content_json.get('leadComponent') and content_json['leadComponent']['type'] == 'IMAGE':
+            item['image'] = content_json['leadComponent']['url']
+            captions = []
+            if content_json['leadComponent'].get('caption') and content_json['leadComponent']['caption'].get('textHtml'):
+                captions.append(content_json['leadComponent']['caption']['textHtml'])
+            if content_json['leadComponent'].get('credit'):
+                captions.append(content_json['leadComponent']['credit'])
+            item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
+
+        if 'embed' in args:
+            item['content_html'] = utils.format_embed_preview(item)
+            return item
+
+        if content_json.get('body'):
+            for block in content_json['body']:
+                if block['type'] == 'PARAGRAPH':
+                    if block['textHtml'].startswith('<span data-caps'):
+                        item['content_html'] += '<p>' + re.sub(r'^<span[^>]+>([^<]+)</span>', r'<span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', block['textHtml']) + '</p><span style="clear:left;"></span>'
+                    else:
+                        item['content_html'] += '<p>' + block['textHtml'] + '</p>'
+                else:
+                    logger.warning('unhandled body content block type {} in {}'.format(block['type'], item['url']))
+
+    elif next_json['props']['pageProps'].get('metadata'):
+        metadata = next_json['props']['pageProps']['metadata']
+        item['id'] = metadata['tegID']
+        item['url'] = metadata['url']
+        item['title'] = metadata['headline']
+
+        dt = datetime.fromisoformat(metadata['datePublished'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = datetime.fromisoformat(metadata['dateModified'])
+        item['date_modified'] = dt.isoformat()
+
+        item['author'] = {
+            "name": "The Economist"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
+        item['content_html'] = ''
+        if metadata.get('description'):
+            item['summary'] = metadata['description']
+            item['content_html'] += '<p><em>' + metadata['description'] + '</em></p>'
+
+        if metadata.get('imageUrl'):
+            item['image'] = metadata['imageUrl']
+            item['content_html'] += utils.add_image(metadata['imageUrl'])
+
+        if 'embed' in args:
+            item['content_html'] = utils.format_embed_preview(item)
+            return item
+
+        if next_json['props']['pageProps'].get('content') and next_json['props']['pageProps']['content'].get('gobbets'):
+            for block in next_json['props']['pageProps']['content']['gobbets']:
+                item['content_html'] += '<p>' + block + '</p><div>&nbsp;</div><hr/><div>&nbsp;</div>'
+
+    if ('walled' in next_json['props']['pageProps'] and next_json['props']['pageProps']['walled'] == True) or ('isUnwalled' in next_json['props']['pageProps'] and next_json['props']['pageProps']['isUnwalled'] == False):
+        item['content_html'] += '<h3 style="text-align:center;"><a href="{}">Article is paywalled</a></h3>'.format(item['url'])
+        get_archive_content(item['url'], save_debug)
     return item
 
 
-def content_from_html(content_html):
-    soup = BeautifulSoup(content_html, 'lxml')
-    body = soup.find('section', attrs={"data-body-id": True})
-    if not body :
+def get_archive_content(url, save_debug):
+    # TODO: utils.get_url_html often times out
+    # page_html = utils.get_url_html('https://archive.is/' + url, use_proxy=True, use_curl_cffi=True)
+    # if not page_html:
+    #     return None
+    r = curl_cffi_requests.get('https://archive.is/' + url, impersonate=config.impersonate, proxies=config.proxies)
+    if r.status_code != 200:
         return None
+    page_html = r.text
+    if save_debug:
+        utils.write_file(page_html, './debug/archive.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+    archive_links = []
+    for el in soup.find_all('div', class_='TEXT-BLOCK'):
+        if el.a['href'] not in archive_links:
+            archive_links.append(el.a['href'])
+    if len(archive_links) == 0:
+        logger.warning(url + ' is not archived')
+        return None
+    archive_link = archive_links[-1]
+    logger.debug('getting content from ' + archive_link)
 
-    for el in body.find_all('div', class_=re.compile(r'css-'), recursive=False):
-        el.unwrap()
-
-    for el in body.find_all('style'):
-        el.decompose()
-
-    for el in body.find_all(class_=re.compile(r'adComponent')):
-        el.decompose()
-
-    for el in body.find_all('p', attrs={"data-component": "paragraph"}):
-        el.attrs = {}
-
-    for el in body.find_all('figure'):
-        new_html = ''
-        if el.find('audio'):
-            if el.figcaption:
-                caption = el.figcaption.get_text()
-            else:
-                caption = 'Listen to this story.'
-            new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">{2}</a></span></div><div>&nbsp;</div>'.format(el.audio['src'], config.server, caption)
-        elif el.find('img'):
-            if el.img.get('srcset'):
-                img_src = utils.image_from_srcset(el.img['srcset'], 1000)
-            else:
-                img_src = el.img['src']
-            if el.figcaption:
-                caption = el.figcaption.get_text()
-            else:
-                caption = ''
-            new_html = utils.add_image(img_src, caption)
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            if el.parent and el.parent.name == 'div':
-                el.parent.replace_with(new_el)
-            else:
-                el.replace_with(new_el)
-    return body.decode_contents()
+    # TODO: utils.get_url_html often times out
+    # page_html = utils.get_url_html(archive_link, use_proxy=True, use_curl_cffi=True)
+    # if not page_html:
+    #     return None
+    r = curl_cffi_requests.get(archive_link, impersonate=config.impersonate, proxies=config.proxies)
+    if r.status_code != 200:
+        return None
+    page_html = r.text
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+    body = soup.select('main#content > article section')
+    return None
 
 
 def get_feed(url, args, site_json, save_debug=False):

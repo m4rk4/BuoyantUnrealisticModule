@@ -237,11 +237,20 @@ def render_contents(content_blocks, body_intro=False, heading=0):
                 content_html += utils.add_embed(block['model']['href'])
             else:
                 logger.warning('unhandled social content source ' + block['model']['source'])
+        elif block['type'] == 'callout':
+            quote = ''
+            if block['model'].get('title'):
+                quote += '<h3>' + block['model']['title'] + '</h3>'
+            quote += '<div>' + render_contents(block['model']['blocks']) + '</div>'
+            content_html += utils.add_blockquote(quote)
         elif block['type'] == 'include':
             if block['model']['type'] == 'idt2':
                 content_html += utils.add_image(block['model']['idt2Image']['src'])
             elif block['model'].get('html'):
-                if re.search(r'hearken-curiosity', block['model']['html']) or block['model']['html'].startswith('</'):
+                if block['model']['type'] == 'customEmbedded' and block['model']['html'].startswith('<iframe'):
+                    m = re.search(r'src="([^"]+)"', block['model']['html'])
+                    content_html += utils.add_embed(m.group(1))
+                elif re.search(r'hearken-curiosity', block['model']['html']) or block['model']['html'].startswith('</'):
                     continue
                 else:
                     logger.warning('unhandled content block type include')

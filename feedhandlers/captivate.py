@@ -19,9 +19,12 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(page_html, './debug/debug.html')
 
-    soup = BeautifulSoup(page_html, 'html.parser')
-
     item = {}
+    soup = BeautifulSoup(page_html, 'html.parser')
+    if soup.find('body', class_='not-found'):
+        item['content_html'] = '<blockquote><b><a href="{}">{}</a></b></blockquote>'.format(url, soup.title.get_text())
+        return item
+
     item['id'] = m.group(1)
 
     el = soup.find('meta', attrs={"property": "og:url"})

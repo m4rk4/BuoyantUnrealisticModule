@@ -58,7 +58,12 @@ def add_video(el_video):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    content_url = 'https://www.marca.com/ue-nydus/nydus.php?content={}'.format(split_url.path.replace('.html', ''))
+    if split_url.path.startswith('/en') or split_url.netloc == 'us.marca.com':
+        content_url = 'https://{}/ue-nydus/nydus.php?content={}'.format(split_url.netloc, split_url.path[1:].replace('.html', ''))
+    elif split_url.path.startswith('/mx'):
+        content_url = 'https://{}/mx/ue-nydus/nydus.php?content={}'.format(split_url.netloc, split_url.path[1:].replace('.html', ''))
+    else:
+        content_url = 'https://{}/nydus/nydus/http?content={}'.format(split_url.netloc, split_url.path[1:].replace('.html', ''))
     content_json = utils.get_url_json(content_url)
     if not content_json:
         return None
@@ -75,7 +80,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    if content_json['ad']['customTargeting'].get('tag'):
+    if content_json['ad'].get('customTargeting') and content_json['ad']['customTargeting'].get('tag'):
         item['tags'] = [x.strip() for x in content_json['ad']['customTargeting']['tag'].split(',')]
 
     item['image'] = content_json['global']['rrss']['imgUrl']

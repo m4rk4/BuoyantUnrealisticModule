@@ -108,6 +108,7 @@ def add_product(props):
 
 
 def format_body(body_json):
+    #print(body_json[0])
     if body_json[0] == 'ad' or body_json[0] == 'native-ad' or body_json[0] == 'cm-unit' or body_json[0] == 'inline-newsletter':
         return ''
 
@@ -151,6 +152,15 @@ def format_body(body_json):
                     return ''
             if video_src:
                 return utils.add_video(video_src, video_type, video_json['video']['poster_frame'], video_json['video']['title'])
+        elif body_json[1]['type'] == 'cneaudio':
+            script = utils.get_url_html(body_json[1]['props']['scriptUrl'])
+            if script:
+                m = re.search(r'var varInit[^\{]+(\{.*?\});', script)
+                if m:
+                    # print(m.group(1).replace('\\"', '"'))
+                    audio_json = json.loads(m.group(1).replace('\\"', '"'))
+                    audio = audio_json['audios'][0]
+                    return utils.add_audio(utils.find_redirect_url(audio['files'][0]), audio['image']['patternUrl'].replace('h_HEIGHT', 'h_512').replace('w_WIDTH', 'w_512'), audio['title'], '', audio_json['title'], '', utils.format_display_date(datetime.fromisoformat(audio['pubDate']), False), audio['duration'])
         elif body_json[1]['type'] == 'firework':
             firework_api = 'https://fireworkapi1.com/embed/v2/playlists/{}/feeds?page_size=10'.format(body_json[1]['ref'])
             firework_json = utils.post_url(firework_api)
@@ -191,6 +201,9 @@ def format_body(body_json):
             end_tag = '</div>'
         elif re.search(r'callout:(dropcap|feature-default|feature-large|feature-medium|group-\d+|lead-in-text|pullquote)', body_json[1]['type']) or body_json[1]['type'] == 'callout:':
             # skip these but process the children
+            start_tag = ''
+            end_tag = ''
+        elif body_json[1]['type'] == 'callout:anchor' and len(body_json) > 2:
             start_tag = ''
             end_tag = ''
         elif re.search(r'callout:(anchor|inset-left|inset-right|sidebar)', body_json[1]['type']) or body_json[1]['type'] == 'cneinterlude':

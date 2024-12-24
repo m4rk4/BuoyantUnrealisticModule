@@ -363,7 +363,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                     else:
                         video_src = ig_url
                         video_link = ig_url
-                        caption = '<div style="padding:0 8px 0 8px;"><small><a href="">{}>Watch on Instagram</a></small></div>'.format(ig_url)
+                        caption = '<div style="padding:0 8px 0 8px;"><small><a href="{}">Watch on Instagram</a></small></div>'.format(ig_url)
                     gallery_html += '<div style="flex:1; min-width:200px;"><a href="{}" target="_blank"><img src="{}" style="display:block; width:100%;" /></a>{}</div>'.format(video_link, thumb, caption)
                     item['_gallery'].append({"src": video_src, "caption": caption, "thumb": thumb})
 

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_content(url, args, site_json, save_debug=False):
-    page_html = utils.get_url_html(url)
+    page_html = utils.get_url_html(url, use_proxy=True, use_curl_cffi=True)
     if not page_html:
         return None
     if save_debug:
