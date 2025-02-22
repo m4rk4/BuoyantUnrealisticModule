@@ -1,5 +1,6 @@
-import json, re
+import certifi, json, re
 from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
@@ -23,9 +24,14 @@ def get_content(url, args, site_json, save_debug):
         return None
 
     player_url = 'https://player.vimeo.com/video/{}'.format(vimeo_id)
-    vimeo_html = utils.get_url_html(player_url, 'desktop')
-    if not vimeo_html:
+    # vimeo_html = utils.get_url_html(player_url, 'desktop')
+    # if not vimeo_html:
+    #     return None
+    r = curl_cffi_requests.get(player_url, impersonate="chrome")
+    if r.status_code != 200:
+        logger.warning('curl_cffi requests error {} getting {}'.format(r.status_code, player_url))
         return None
+    vimeo_html = r.text
 
     soup = BeautifulSoup(vimeo_html, 'lxml')
     el = soup.find('script', string=re.compile(r'window\.playerConfig'))
@@ -66,7 +72,9 @@ def get_content(url, args, site_json, save_debug):
     item['authors'] = []
     item['authors'].append(item['author'])
 
-    if vimeo_json['video']['thumbs'].get('base'):
+    if vimeo_json['video'].get('thumbnail_url'):
+        item['image'] = vimeo_json['video']['thumbnail_url']
+    elif vimeo_json['video'].get('thumbs') and vimeo_json['video']['thumbs'].get('base'):
         item['image'] = vimeo_json['video']['thumbs']['base'] + '_1000'
 
     if not vimeo_json['video'].get('live_event'):

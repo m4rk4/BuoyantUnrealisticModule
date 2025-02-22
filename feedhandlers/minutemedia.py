@@ -93,14 +93,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['date_modified'] = dt.isoformat()
 
     if article_json.get('authors'):
-        item['author'] = {}
         if isinstance(article_json['authors'], list):
-            authors = []
-            for it in article_json['authors']:
-                authors.append(it['name'])
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'] = [{"name": x['name']} for x in article_json['authors']]
+            if len(item['authors']) > 0:
+                item['author'] = {
+                    "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+                }
         else:
-            item['author']['name'] = article_json['authors']['owner']['name']
+            item['author'] = {
+                "name": article_json['authors']['owner']['name']
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
             # TODO: co-authors?
 
     item['tags'] = article_json['tags'].copy()
@@ -118,13 +122,13 @@ def get_content(url, args, site_json, save_debug=False):
     if article_json.get('cover')  and article_json['cover'].get('image'):
         captions = []
         if article_json['cover']['image'].get('path'):
-            item['_image'] = resize_image(article_json['cover']['image']['path'])
+            item['image'] = resize_image(article_json['cover']['image']['path'])
             if article_json['cover']['image'].get('caption'):
                 captions.append(article_json['cover']['image']['caption'])
             if article_json['cover']['image'].get('credit'):
                 captions.append(article_json['cover']['image']['credit'])
         elif article_json['cover']['image'].get('value'):
-            item['_image'] = resize_image(article_json['cover']['image']['value']['path'])
+            item['image'] = resize_image(article_json['cover']['image']['value']['path'])
             if article_json['cover']['image']['value'].get('caption'):
                 captions.append(article_json['cover']['image']['value']['caption'])
             if article_json['cover']['image']['value'].get('credit'):
@@ -134,7 +138,11 @@ def get_content(url, args, site_json, save_debug=False):
                 captions[i] = it.encode('iso-8859-1').decode('utf-8')
             except:
                 pass
-        item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     for content in article_json['body']:
         if content['type'] == 'inline-text':

@@ -33,7 +33,7 @@ def get_content(url, args, site_json, save_debug=False):
     if not post:
         logger.warning('failed to get post data from ' + post_url)
         return None
-    item = wp_posts.get_post_content(post[0], args_copy, save_debug)
+    item = wp_posts.get_post_content(post[0], args_copy, site_json, save_debug)
     if item and lede:
         item['content_html'] = lede + item['content_html']
     return item

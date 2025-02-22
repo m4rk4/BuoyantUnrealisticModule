@@ -75,6 +75,9 @@ def add_video(video):
 
 
 def add_image(image):
+    # TODO: resize images
+    # Seems to use apache mod_dims with DIMS_SECRET=brightspot. What's the signature algorithm?
+    # https://registry.hub.docker.com/layers/brightspot/apache/2.4-dims3.3.25-amd64/images/sha256-fe05fceddcdceac805520b002f5f3809ce15665defedefd510fbdcd4a205dfb2?context=explore
     captions = []
     if image.get('caption'):
         if isinstance(image['caption'], str):

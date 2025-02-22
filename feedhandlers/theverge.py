@@ -55,6 +55,8 @@ def add_image(image):
         img_src = image['main']
     elif image.get('thumbnail'):
         img_src = image['thumbnail']['url']
+    elif image.get('image') and image['image'].get('originalUrl'):
+        img_src = image['image']['originalUrl']
     elif image.get('image') and image['image'].get('thumbnails'):
         img_src = image['image']['thumbnails']['horizontal']['url']
     else:

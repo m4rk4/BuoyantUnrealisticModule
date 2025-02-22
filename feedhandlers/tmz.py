@@ -25,43 +25,53 @@ def get_image_src(image_ref, image_netloc, aspect='o', size='lg'):
 
 def add_gallery(gallery_ref, image_netloc, link_preview=True):
     ref_split = gallery_ref.split(':')
-    gallery_url = 'https://www.{}.com/_/gallery/{}/images'.format(ref_split[0], ref_split[-1])
-    if ref_split[0] == 'toofab':
-        gallery_url += '/1'
+    gallery_url = 'https://www.{}.com/_/gallery/{}/images/1'.format(ref_split[0], ref_split[-1])
+    # print(gallery_url)
+    # if ref_split[0] == 'toofab':
+    #     gallery_url += '/1'
     gallery_json = utils.get_url_json(gallery_url)
     if not gallery_json:
         return ''
+    # utils.write_file(gallery_json, './debug/gallery.json')
     if link_preview:
         for key, val in gallery_json['derefs'].items():
             key_split = key.split(':')
             if 'gallery' in key_split:
                 gallery_link = 'https://www.{}.com/photos/{}'.format(key_split[0], val['slug'])
-                heading = '<div style="font-size:1.2em; font-weight:bold;">Photos: <a href="{}">{}</a></div>'.format(gallery_link, val['title'])
-                link = '{}/content?read&url={}'.format(config.server, quote_plus(gallery_link))
-                return utils.add_image(get_image_src(val['image_ref'], image_netloc), '', link=link, heading=heading)
+                heading = '<div style="font-size:1.2em; font-weight:bold;">Photos: <a href="{}" target="_blank">{}</a></div>'.format(gallery_link, val['title'])
+                link = '{}/gallery?url={}'.format(config.server, quote_plus(gallery_link))
+                return utils.add_image(get_image_src(val['image_ref'], image_netloc), '', link=link, heading=heading), None
         logger.warning('unhandled gallery preview')
 
-    gallery_html = ''
-    for image in gallery_json['message']['nodes']:
+    gallery_images = []
+    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+    for i, image in enumerate(gallery_json['message']['nodes']):
+        img_src = get_image_src(image['_id'], image_netloc, size='xl')
+        thumb = get_image_src(image['_id'], image_netloc, size='md')
         captions = []
         if image.get('description'):
             captions.append(image['description'])
         if image.get('credit'):
-            captions.append(image['credit'])
-        gallery_html += utils.add_image(get_image_src(image['_id'], image_netloc), ' | '.join(captions))
-    return gallery_html
+            captions.append('Photo: ' + image['credit'])
+        caption = ' | '.join(captions)
+        gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+        gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+    if i % 2 == 0:
+        gallery_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+    gallery_html += '</div>'
+    return gallery_html, gallery_images
 
 
 def add_video(block, image_netloc, page_soup):
     ref_split = block['node_ref'].split(':')
     video_json = utils.get_url_json('https://www.{}.com/_/video/{}/'.format(ref_split[0], ref_split[-1]))
     if video_json:
-        if video_json['message'].get('kaltura_mp4_url'):
-            return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
-        elif video_json['message'].get('mezzanine_url'):
+        if video_json['message'].get('mezzanine_url'):
             return utils.add_video(video_json['message']['mezzanine_url'], 'application/x-mpegURL', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'])
+        elif video_json['message'].get('kaltura_mp4_url'):
+            return utils.add_video(video_json['message']['kaltura_mp4_url'], 'video/mp4', get_image_src(video_json['message']['image_ref'], image_netloc, '16by9'), video_json['message']['title'], use_videojs=True)
         else:
-            logger.warning('unsupported video ' + video_ref)
+            logger.warning('unsupported video ' + block['node_ref'])
             return ''
     # Look for Youtube video
     el = page_soup.find('section', id=re.compile(block['etag']))
@@ -111,9 +121,15 @@ def get_content(url, args, site_json, save_debug):
 
     el = soup.find('span', class_='article__author')
     if el:
-        item['author'] = {"name": re.sub(r'^By ', '', el.get_text(), flags=re.I)}
+        item['author'] = {
+            "name": re.sub(r'^By ', '', el.get_text(), flags=re.I)
+        }
     else:
-        item['author'] = {"name": site_json['author']}
+        item['author'] = {
+            "name": site_json['author']
+        }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     item['tags'] = []
     m = re.search(r'derefs: ({.+?}),\n', page_html)
@@ -124,22 +140,39 @@ def get_content(url, args, site_json, save_debug):
                 item['tags'].append(val['title'])
     else:
         logger.warning('unable to find derefs content in ' + url)
+    if node.get('meta_keywords'):
+        item['tags'] += node['meta_keywords'].copy()
     if node.get('hashtags'):
-        for val in node['hashtags']:
-            item['tags'].append(val)
-    if not item.get('tags'):
+        item['tags'] += node['hashtags']
+    if len(item['tags']) == 0:
         del item['tags']
 
-    item['_image'] = get_image_src(node['image_ref'], site_json['image_netloc'])
+    item['image'] = get_image_src(node['image_ref'], site_json['image_netloc'])
 
     if node.get('meta_description'):
         item['summary'] = node['meta_description']
+    elif node.get('description'):
+        item['summary'] = node['description']
 
-    item['content_html'] = ''
     if ':gallery:' in node['_schema']:
         schema_split = node['_schema'].split(':')
-        item['content_html'] = add_gallery('{}:gallery:{}'.format(schema_split[1], node['_id']), site_json['image_netloc'], False)
+        gallery_html, item['_gallery'] = add_gallery('{}:gallery:{}'.format(schema_split[1], node['_id']), site_json['image_netloc'], False)
+        item['content_html'] = '<h3><a href="{}/gallery?url={}" target="_blank">View photo gallery</a></h3>'.format(config.server, quote_plus(item['url'])) + gallery_html
+        return item
+    elif ':video:' in node['_schema']:
+        if node.get('mezzanine_url'):
+            item['content_html'] = utils.add_video(node['mezzanine_url'], 'application/x-mpegURL', get_image_src(node['image_ref'], site_json['image_netloc'], '16by9'), node['title'])
+        elif node.get('kaltura_mp4_url'):
+            item['content_html'] = utils.add_video(node['kaltura_mp4_url'], 'video/mp4', get_image_src(node['image_ref'], site_json['image_netloc'], '16by9'), node['title'], use_videojs=True)
+        if 'embed' not in args and 'summary' in item:
+            item['content_html'] += '<p>' + item['summary'] + '</p>'
+        return item
 
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
+    item['content_html'] = ''
     if node.get('hf'):
         for i, hf in enumerate(node['hf']):
             if node['hf_styles'][i] == 'uppercase':
@@ -164,7 +197,8 @@ def get_content(url, args, site_json, save_debug):
             elif 'block:image-block' in block['_schema']:
                 item['content_html'] += utils.add_image(get_image_src(block['node_ref'], site_json['image_netloc'], block['aspect_ratio']))
             elif 'block:gallery-block' in block['_schema']:
-                item['content_html'] += add_gallery(block['node_ref'], site_json['image_netloc'])
+                gallery_html, gallery_images = add_gallery(block['node_ref'], site_json['image_netloc'])
+                item['content_html'] += gallery_html
             elif 'block:video-block' in block['_schema']:
                 item['content_html'] += add_video(block, site_json['image_netloc'], soup)
             elif 'block:youtube-video-block' in block['_schema']:

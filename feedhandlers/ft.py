@@ -40,34 +40,29 @@ def get_archive_content(url, title, args, site_json, save_debug):
     # page_html = utils.get_url_html('https://archive.is/' + url, use_proxy=True, use_curl_cffi=True)
     # if not page_html:
     #     return None
+    soup = None
     r = curl_cffi_requests.get('https://archive.is/' + url, impersonate=config.impersonate, proxies=config.proxies)
-    if r.status_code != 200:
+    if r.status_code == 200:
+        # utils.write_file(r.text, './debug/archive.html')
+        page_soup = BeautifulSoup(r.text, 'lxml')
+        archive_links = []
+        for el in page_soup.find_all('div', class_='TEXT-BLOCK'):
+            if el.a['href'] not in archive_links:
+                archive_links.append(el.a['href'])
+        if len(archive_links) == 0:
+            logger.warning(url + ' is not archived')
+            return None
+        archive_link = archive_links[-1]
+        logger.debug('getting content from ' + archive_link)
+        r = curl_cffi_requests.get(archive_link, impersonate=config.impersonate, proxies=config.proxies)
+        if r.status_code == 200:
+            soup = BeautifulSoup(r.text, 'lxml')
+    if not soup:
         return None
-    page_html = r.text
-    if save_debug:
-        utils.write_file(page_html, './debug/archive.html')
-    soup = BeautifulSoup(page_html, 'lxml')
-    archive_links = []
-    for el in soup.find_all('div', class_='TEXT-BLOCK'):
-        if el.a['href'] not in archive_links:
-            archive_links.append(el.a['href'])
-    if len(archive_links) == 0:
-        logger.warning(url + ' is not archived')
-        return None
-    archive_link = archive_links[-1]
-    logger.debug('getting content from ' + archive_link)
 
-    # TODO: utils.get_url_html often times out
-    # page_html = utils.get_url_html(archive_link, use_proxy=True, use_curl_cffi=True)
-    # if not page_html:
-    #     return None
-    r = curl_cffi_requests.get(archive_link, impersonate=config.impersonate, proxies=config.proxies)
-    if r.status_code != 200:
-        return None
-    page_html = r.text
     if save_debug:
-        utils.write_file(page_html, './debug/debug.html')
-    soup = BeautifulSoup(page_html, 'lxml')
+        utils.write_file(str(soup), './debug/debug.html')
+
     el = soup.find('script', attrs={"type": "application/ld+json"})
     if el:
         i = el.string.find('{')

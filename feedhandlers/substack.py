@@ -1,4 +1,4 @@
-import json, re
+import base64, json, jwt, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -9,6 +9,10 @@ from feedhandlers import rss
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def resize_image(img_src, width=1272):
+    return 'https://substackcdn.com/image/fetch/w_{},c_limit,f_auto,q_auto:good,fl_progressive:steep/'.format(width) + quote_plus(img_src)
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -53,11 +57,18 @@ def get_post(post_json, args, site_json, save_debug):
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    item['authors'] = [{"name": x['name']} for x in post_json['publishedBylines']]
-    if len(item['authors']) > 0:
+    if post_json.get('publishedBylines'):
+        item['authors'] = [{"name": x['name']} for x in post_json['publishedBylines']]
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+    else:
         item['author'] = {
-            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            "name": split_url.netloc
         }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     if post_json.get('postTags'):
         item['tags'] = []
@@ -228,6 +239,33 @@ def get_post(post_json, args, site_json, save_debug):
             else:
                 logger.warning('unhandled captioned-image-container in ' + item['url'])
 
+        for el in soup.find_all(class_='image-gallery-embed'):
+            new_html = ''
+            if el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                if data_json['gallery'].get('caption'):
+                    caption = data_json['gallery']['caption']
+                else:
+                    caption = ''
+                gallery_images = []
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                for i, it in enumerate(data_json['gallery']['images']):
+                    img_src = it['src']
+                    thumb = resize_image(it['src'], 848)
+                    gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                    new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, '', link=img_src) + '</div>'
+                if i % 2 == 0:
+                    new_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+                new_html += '</div>'
+                if caption:
+                    new_html += '<div><small>' + caption + '</small></div><div>&nbsp;</div>'
+                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                new_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled image-gallery-embed in ' + item['url'])
+
         for el in soup.find_all(class_='youtube-wrap'):
             new_html = ''
             if el.get('data-attrs'):
@@ -243,6 +281,23 @@ def get_post(post_json, args, site_json, save_debug):
                 el.decompose()
             else:
                 logger.warning('unhandled youtube-wrap in ' + item['url'])
+
+        for el in soup.find_all(class_='native-video-embed'):
+            # https://www.newsguardrealitycheck.com/p/wild-claims-about-la-wildfires-get
+            # https://www.mux.com/docs/guides/secure-video-playback
+            new_html = ''
+            if el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                video_json = utils.get_url_json('https://' + split_url.netloc + '/api/v1/video/upload/' + data_json['mediaUploadId'])
+                if video_json:
+                    video_src = 'https://' + split_url.netloc + '/api/v1/video/upload/' + data_json['mediaUploadId'] + '/src'
+                    new_html = utils.add_video(video_src, 'video/mp4', video_json['thumbnail_url'], use_videojs=True)
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled native-video-embed in ' + item['url'])
 
         for el in soup.find_all(class_='tweet'):
             new_html = ''

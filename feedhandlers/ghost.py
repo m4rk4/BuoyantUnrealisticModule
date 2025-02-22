@@ -269,6 +269,9 @@ def get_item(post_json, args, site_json, save_debug):
                     if it:
                         new_html += '<div>{}</div>'.format(it.get_text())
                     new_html += '</td></tr></table>'
+            elif 'kg-signup-card' in el['class']:
+                el.decompose()
+                continue
             elif el.find(class_='twitter-tweet'):
                 links = el.find_all('a')
                 new_html = utils.add_embed(links[-1]['href'])

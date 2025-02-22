@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    if '/article/' not in split_url.path:
+    if 'article' not in paths:
         logger.warning('unhandled url ' + url)
         return None
     api_json = utils.get_url_json('https://web-api-cdn.ground.news/api/public/event/' + paths[-1])
@@ -36,8 +36,14 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(event_json['lastModified'])
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {"name": "Ground News AI"}
+    item['author'] = {
+        "name": "Ground News AI"
+    }
 
+    item['tags'] = []
+    if event_json.get('interests'):
+        item['tags'] += [x['name'] for x in event_json['interests']]
+    
     item['content_html'] = ''
 
     if event_json.get('latestMedia'):
@@ -79,7 +85,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<div>&nbsp;</div><div style="font-size:1.1em; font-weight:bold;">Bias Insights:</div><ul>'
         for li in event_json['chatGptSummaries']['analysis'].split('\n'):
             if li.strip():
-                item['content_html'] += '<li>' + re.sub(r'^\d\.\s*', '', li.strip()).capitalize() + '</li>'
+                item['content_html'] += '<li>' + re.sub(r'^\d\.\s*', '', li.strip()) + '</li>'
         item['content_html'] += '</ul>'
 
     if event_json.get('chatGptSummaries'):
@@ -89,7 +95,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '<div style="flex:1; min-width:256px; max-width:800px; padding:8px; border:1px solid black; border-radius:10px;"><div style="font-size:1.1em; font-weight:bold; text-align:center;">{}</div><ul>'.format(it.title())
                 for li in event_json['chatGptSummaries'][it].split('\n'):
                     if li.strip():
-                        item['content_html'] += '<li>' + re.sub(r'^\d\.\s*', '', li.strip()).capitalize() + '</li>'
+                        item['content_html'] += '<li>' + re.sub(r'^\d\.\s*', '', li.strip()) + '</li>'
                 item['content_html'] += '</ul></div>'
         item['content_html'] += '</div>'
 
@@ -119,7 +125,7 @@ def get_content(url, args, site_json, save_debug=False):
 def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
-    if '/interest/' not in split_url.path:
+    if 'interest' not in paths:
         logger.warning('unhandled url ' + url)
         return None
 

@@ -167,25 +167,22 @@ def get_content(url, args, site_json, save_debug=False):
     item['_display_date'] = utils.format_display_date(dt)
 
     date = re.sub(r'\.(\d+)Z', format_date, article_json['dates']['modified'])
-    dt = datetime.fromisoformat(date.replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(date)
     item['date_modified'] = dt.isoformat()
 
+    item['authors'] = []
     if article_json.get('participants') and article_json['participants'].get('authors'):
-        authors = []
-        for it in article_json['participants']['authors']:
-            authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in article_json['participants']['authors']]
     elif article_json['asset'].get('byline'):
-        item['author'] = {"name": article_json['asset']['byline']}
+        item['authors'] = [{
+            "name": article_json['asset']['byline']
+        }]
     elif article_json.get('sources'):
-        authors = []
-        for it in article_json['sources']:
-            authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in article_json['sources']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = article_json['categories'].copy()
     if article_json.get('tags'):
@@ -202,11 +199,15 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['asset']['intro'])
 
     if article_json.get('featuredImages'):
-        item['_image'] = resize_image(article_json['featuredImages']['landscape16x9']['data'])
+        item['image'] = resize_image(article_json['featuredImages']['landscape16x9']['data'])
         if article_json['asset'].get('bodyPlaceholders'):
             if article_json['assetType'] == 'article':
                 if not next((it for it in article_json['asset']['bodyPlaceholders'].values() if (it['type'] == 'image' and it['data']['id'] == article_json['featuredImages']['landscape16x9']['data']['id'])), None):
                     item['content_html'] += add_image(article_json['featuredImages']['landscape16x9']['data'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if article_json['assetType'] == 'video':
         item['content_html'] += add_video(item['url'], '')

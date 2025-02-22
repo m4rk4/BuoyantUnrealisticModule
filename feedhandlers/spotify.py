@@ -1,4 +1,5 @@
-import pytz, re
+import json, re, requests
+from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
@@ -9,20 +10,60 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_authorization_header():
-    # https://open.spotify.com/get_access_token?reason=transport&productType=embed_podcast
-    # Top Songs - USA
-    url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
-    spotify_html = utils.get_url_html(url)
-    if not spotify_html:
-        return None
-    # utils.write_file(spotify_html, './debug/debug.html')
-    m = re.search(r'"accessToken":"([^"]+)', spotify_html)
-    if not m:
-        return None
-    header = {}
-    header['authorization'] = 'Bearer ' + m.group(1)
-    return header
+def get_key(file_id, save_debug=False):
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "origin": "https://embed-standalone.spotify.com",
+        "referer": "https://embed-standalone.spotify.com/",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+    }
+    url = 'https://seektables.scdn.co/seektable/{}.json'.format(file_id)
+    r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        return 'Error {} getting {}'.format(r.status_code, url)
+    seektables = r.json()
+    if save_debug:
+        utils.write_file(seektables, './debug/seektables.json')
+
+    license_headers = \
+'''{
+    'accept': '*/*',
+    'accept-language': 'en-US,en;q=0.9,en-GB;q=0.8',
+    'origin': 'https://embed-standalone.spotify.com',
+    'priority': 'u=1, i',
+    'referrer': 'https://embed-standalone.spotify.com/',
+    'sec-ch-ua': '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
+}'''
+    cdrm_data = {
+        'PSSH': seektables['pssh'],
+        'License URL': 'https://spclient.wg.spotify.com/widevine-license/v1/unauth/audio/license',
+        'Headers': license_headers,
+        'JSON': "{}",
+        'Cookies': "{}",
+        'Data': "{}",
+        'Proxy': "",
+    }
+    r = requests.post('https://cdrm-project.com/', json=cdrm_data)
+    if r.status_code != 200:
+        return 'Error {} getting keys from https://cdrm-project.com/'.format(r.status_code)
+    cdrm_result = r.json()
+    if save_debug:
+        utils.write_file(cdrm_result, './debug/cdrm.json')
+    key = cdrm_result['Message'].split(':')[1].strip()
+    return key
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -139,231 +180,386 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unable to parse Spotify url ' + url)
             return None
 
-    api_url = 'https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id)
-    if content_type == 'album' or content_type == 'playlist':
-        api_url += '/tracks'
-    if content_type == 'show':
-        api_url += '/episodes'
-    if 'max' in args:
-        api_url += '?limit={}'.format(args['max'])
-
-    headers = get_authorization_header()
-    if not headers:
+    # can get accessToken and clientId from https://open.spotify.com/get_access_token but would still need correlationId from the web page
+    # Top Songs - USA
+    page_html = utils.get_url_html('https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI', use_proxy=True, use_curl_cffi=True)
+    if not page_html:
+        page_html = utils.get_url_html(url, use_proxy=True, use_curl_cffi=True)
+        if not page_html:
+            return None
+    # utils.write_file(page_html, './debug/spotify-token.html')
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', id='session')
+    if not el:
         logger.warning('unable to get Spotify authorization token')
         return None
+    session_json = json.loads(el.string)
+    if save_debug:
+        logger.debug('Spotify accessToken ' + session_json['accessToken'])
+    access_token = session_json['accessToken']
+
+    client_token = None
+    el = soup.find('script', id='config')
+    if el:
+        config_json = json.loads(el.string)
+        client_data = {
+            "client_data": {
+                "client_version": "1.2.55.220.g964de25f",
+                "client_id": session_json['clientId'],
+                "js_sdk_data": {
+                    "device_brand": "unknown",
+                    "device_model": "unknown",
+                    "os": "windows",
+                    "os_version": "NT 10.0",
+                    "device_id": config_json['correlationId'],
+                    "device_type": "computer"
+                }
+            }
+        }
+        headers = {
+            "accept": "application/json",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "content-type": "application/json",
+            "priority": "u=1, i",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site"
+        }
+        clienttoken = utils.post_url('https://clienttoken.spotify.com/v1/clienttoken', json_data=client_data, headers=headers)
+        if clienttoken and clienttoken['response_type'] == 'RESPONSE_GRANTED_TOKEN_RESPONSE':
+            if save_debug:
+                logger.debug('Spotify client-token ' + clienttoken['granted_token']['token'])
+            client_token = clienttoken['granted_token']['token']
+
+    headers = {
+        "accept": "application/json",
+        "accept-language": "en",
+        "app-platform": "WebPlayer",
+        "authorization": "Bearer " + access_token,
+        "client-token": client_token,
+        "content-type": "application/json;charset=UTF-8",
+        "priority": "u=1, i",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "spotify-app-version": "1.2.55.197.g9b096077"
+    }
 
     item = {}
     if content_type == 'track':
-        # https://open.spotify.com/track/4nRyBgsqXEP2oPfzaMeZr7?si=c09ed9bb1b69462b
-        track_json = utils.get_url_json('https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id), headers=headers)
-        if not track_json:
+        variables = {
+            "uri": "spotify:track:" + content_id
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"5c5ec8c973a0ac2d5b38d7064056c45103c5a062ee12b62ce683ab397b5fbe7d"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getTrack&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
             return None
+        track = api_json['data']['trackUnion']
+        album = track['albumOfTrack']
         if save_debug:
-            utils.write_file(track_json, './debug/spotify.json')
+            utils.write_file(track, './debug/spotify.json')
 
-        item['id'] = track_json['id']
-        item['url'] = track_json['external_urls']['spotify']
-        item['title'] = track_json['name']
+        item['id'] = track['uri']
+        item['url'] = utils.clean_url(track['sharingInfo']['shareUrl'])
+        item['title'] = track['name']
 
-        dt = datetime.fromisoformat(track_json['album']['release_date'])
+        dt = datetime.fromisoformat(album['date']['isoString'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+        item['_display_date'] = utils.format_display_date(dt, False)
 
         artists = []
-        bylines = []
-        for artist in track_json['artists']:
-            artists.append(artist['name'])
-            bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
-        byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(bylines))
-        item['_image'] = track_json['album']['images'][0]['url']
+        item['authors'] = []
+        for artist in track['firstArtist']['items'] + track['otherArtists']['items']:
+            artist_url = 'https://open.spotify.com/artist/' + artist['uri'].split(':')[-1]
+            item['authors'].append({"name": artist['profile']['name'], "url": artist_url})
+            artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
+        artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
-        if track_json.get('preview_url'):
-            poster = '<a href="{}"><img src="{}/image?url={}&width=128&overlay=audio"/></a>'.format(track_json['preview_url'], config.server, quote_plus(item['_image']))
-        else:
-            poster = '<a href="{}"><img src="{}/image?url={}&width=128"/></a>'.format(track_json['external_urls']['spotify'], config.server, quote_plus(item['_image']))
+        item['image'] = album['coverArt']['sources'][0]['url']
 
-        item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;"><tr><td style="width:128px;">{}</td><td style="vertical-align:top;"><b><a href="{}">{}</a></b><br/>by {}<br/><small>from <a href="{}">{}</a></small></td></tr></table>'.format(poster, track_json['external_urls']['spotify'], track_json['name'], byline, track_json['album']['external_urls']['spotify'], track_json['album']['name'])
+        album_url = 'https://open.spotify.com/album/' + album['uri'].split(':')[-1]
+        artist += '<br/><a href="{}">{}</a>'.format(album_url, album['name'])
 
-    elif content_type == 'album' or content_type == 'playlist':
-        # https://open.spotify.com/album/5B4PYA7wNN4WdEXdIJu58a
-        playlist_json = utils.get_url_json('https://api.spotify.com/v1/{}s/{}'.format(content_type, content_id), headers=headers)
-        if not playlist_json:
+        playback_url = 'https://embed-standalone.spotify.com/embed/track/' + track['uri'].split(':')[-1]
+        audio_type = 'audio_link'
+        item['content_html'] = utils.add_audio(playback_url, item['image'], item['title'], item['url'], artist, '', 'Released: ' + item['_display_date'], -1, audio_type)
+
+    elif content_type == 'album':
+        variables = {
+            "uri": "spotify:album:" + content_id,
+            "locale": "",
+            "offset": 0,
+            "limit": 50
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"8f4cd5650f9d80349dbe68684057476d8bf27a5c51687b2b1686099ab5631589"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getAlbum&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
             return None
+        album = api_json['data']['albumUnion']
         if save_debug:
-            utils.write_file(playlist_json, './debug/spotify.json')
+            utils.write_file(album, './debug/spotify.json')
 
-        item['id'] = playlist_json['id']
-        item['url'] = playlist_json['external_urls']['spotify']
-        item['title'] = playlist_json['name']
+        item['id'] = album['uri']
+        item['url'] = utils.clean_url(album['sharingInfo']['shareUrl'])
+        item['title'] = album['name']
 
-        dt = None
-        byline = ''
-        item['author'] = {}
-        if content_type == 'playlist':
-            item['author']['name'] = playlist_json['owner']['display_name']
-            byline = '<a href="{}">{}</a>'.format(playlist_json['owner']['external_urls']['spotify'], playlist_json['owner']['display_name'])
-            # Assume first track is the most recent addition
-            dt = datetime.fromisoformat(playlist_json['tracks']['items'][0]['added_at'].replace('Z', '+00:00'))
-        elif content_type == 'album':
+        dt = datetime.fromisoformat(album['date']['isoString'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, False)
+
+        artists = []
+        item['authors'] = []
+        for artist in album['artists']['items']:
+            artist_url = utils.clean_url(artist['sharingInfo']['shareUrl'])
+            item['authors'].append({"name": artist['profile']['name'], "url": artist_url})
+            artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
+        artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+
+        item['image'] = album['coverArt']['sources'][0]['url']
+
+        item['content_html'] = utils.add_audio('', item['image'], item['title'], item['url'], artist, '', 'Released: ' + item['_display_date'], -1)
+        item['content_html'] += '<div style="margin-left:12px;">'
+        for it in album['tracksV2']['items']:
+            track = it['track']
+            track_id = track['uri'].split(':')[-1]
             artists = []
-            bylines = []
-            for artist in playlist_json['artists']:
-                artists.append(artist['name'])
-                bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
-            byline = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(bylines))
-            dt = datetime.fromisoformat(playlist_json['release_date'])
-        if dt:
+            for artist in track['artists']['items']:
+                artist_url = 'https://open.spotify.com/artist/' + artist['uri'].split(':')[-1]
+                artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
+            artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+            playback_url = 'https://embed-standalone.spotify.com/embed/track/' + track['uri'].split(':')[-1]
+            audio_type = 'audio_link'
+            item['content_html'] += utils.add_audio(playback_url, '', track['name'], 'https://open.spotify.com/track/' + track_id, artist, '', '', -1, audio_type, show_poster=False)
+        item['content_html'] += '</div>'
+
+    elif content_type == 'playlist':
+        variables = {
+            "uri": "spotify:playlist:" + content_id,
+            "offset": 0,
+            "limit": 25
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"19ff1327c29e99c208c86d7a9d8f1929cfdf3d3202a0ff4253c821f1901aa94d"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=fetchPlaylist&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
+            return None
+        playlist = api_json['data']['playlistV2']
+        if save_debug:
+            utils.write_file(playlist, './debug/spotify.json')
+
+        item['id'] = playlist['uri']
+        item['url'] = utils.clean_url(playlist['sharingInfo']['shareUrl'])
+        item['title'] = playlist['name']
+    
+        date = next((it for it in playlist['attributes'] if it['key'] == 'last_updated'), None)
+        if date:
+            dt = datetime.fromisoformat(date['value'])
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+            item['_display_date'] = utils.format_display_date(dt, False)
 
-        item['_image'] = playlist_json['images'][0]['url']
+        item['author'] = {
+            "name": playlist['ownerV2']['data']['name'],
+            "url": 'https://open.spotify.com/user/' + playlist['ownerV2']['data']['username']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
-        if playlist_json.get('description'):
-            item['summary'] = playlist_json['description']
+        item['image'] = playlist['images']['items'][0]['sources'][0]['url']
 
-        poster = '{}/image?url={}&width=128'.format(config.server, quote_plus(item['_image']))
-        item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;"><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:128px;"/></a></td><td style="vertical-align:top;"><b><a href="{}">{}</a></b><br/>by {}</td></tr><tr><td colspan="2">Tracks:<ol style="margin-top:0;">'.format(item['url'], poster, item['url'], item['title'], byline)
-        if 'max' in args and content_type == 'playlist':
-            i_max = int(args['max'])
-        elif 'embed' in args and content_type == 'playlist':
-            i_max = 10
-        else:
-            i_max = -100
-        for i, track_item in enumerate(playlist_json['tracks']['items']):
-            if content_type == 'playlist':
-                track = track_item['track']
-            else:
-                track = track_item
-            if not track:
-                i_max = i_max + 1
-                continue
-            if i == i_max:
-                item['content_html'] += '</ol></td></tr><tr><td colspan="2" style="text-align:center;"><a href="{}/content?url={}">View full playlist</a></td></tr>'.format(config.server, quote_plus(url))
-                break
+        item['summary'] = playlist['description']
+
+        item['content_html'] = utils.add_audio('', item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], 'Updated: ' + item['_display_date'], -1)
+
+        item['content_html'] += '<div style="margin-left:12px;">'
+        for it in playlist['content']['items']:
+            track = it['itemV2']['data']
+            track_id = track['uri'].split(':')[-1]
             artists = []
-            bylines = []
-            for artist in track['artists']:
-                artists.append(artist['name'])
-                bylines.append('<a href="{}">{}</a>'.format(artist['external_urls']['spotify'], artist['name']))
-            if content_type == 'playlist':
-                item['content_html'] += '<li><a href="{}">{}</a><br/><small>by {}</small></li>'.format(track['external_urls']['spotify'], track['name'], ', '.join(bylines))
-            else:
-                item['content_html'] += '<li><a href="{}">{}</a>'.format(track['external_urls']['spotify'], track['name'])
-        if i != i_max:
-            item['content_html'] += '</ol></td></tr>'
-        item['content_html'] += '</table>'
+            for artist in track['artists']['items']:
+                artist_url = 'https://open.spotify.com/artist/' + artist['uri'].split(':')[-1]
+                artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
+            artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+            playback_url = 'https://embed-standalone.spotify.com/embed/track/' + track['uri'].split(':')[-1]
+            audio_type = 'audio_link'
+            item['content_html'] += utils.add_audio(playback_url, track['albumOfTrack']['coverArt']['sources'][0]['url'], track['name'], 'https://open.spotify.com/track/' + track_id, artist, '', '', -1, audio_type, small_poster=True)
+        item['content_html'] += '</div>'
 
     elif content_type == 'show':
-        show_json = utils.get_url_json('https://api.spotify.com/v1/shows/{}?market=US'.format(content_id), headers=headers)
-        if not show_json:
+        variables = {
+            "uri": "spotify:show:" + content_id
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"8ecbb8477e896c28ef9fd1afa521b253b2ab817387fd13f2be6cc8874bf2aa06"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryShowMetadataV2&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
             return None
+        show = api_json['data']['podcastUnionV2']
         if save_debug:
-            utils.write_file(show_json, './debug/spotify.json')
-        item['id'] = show_json['id']
-        item['url'] = show_json['external_urls']['spotify']
-        item['title'] = show_json['name']
-        dt = datetime.fromisoformat(show_json['episodes']['items'][0]['release_date'])
-        item['date_published'] = dt.isoformat()
-        item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
+            utils.write_file(show, './debug/spotify.json')
+
+        item['id'] = show['uri']
+        item['url'] = utils.clean_url(show['sharingInfo']['shareUrl'])
+        item['title'] = show['name']
+
         item['author'] = {
-            "name": item['title'],
-            "url": item['url']
+            "name": show['publisher']['name']
         }
         item['authors'] = []
         item['authors'].append(item['author'])
-        item['image'] = show_json['images'][0]['url']
-        poster = '{}/image?url={}&overlay=audio'.format(config.server, quote_plus(item['image']))
-        if show_json.get('html_description'):
-            item['summary'] = show_json['html_description']
-        else:
-            item['summary'] = '<p>' + show_json['description'] + '</p>'
-        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-        item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}/playlist?url={}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), poster)
-        item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<div style="margin:4px 0 4px 0; font-size:0.8em;">{}</div>'.format(item['summary'])
-        item['content_html'] += '</div></div>'
-        item['content_html'] += '<h3>Episodes:</h3>'
-        item['_playlist'] = []
-        if 'max' in args:
-            n = int(args['max'])
-        elif 'embed' in args:
-            n = 3
-        else:
-            n = 10
-        n = min(n, show_json['episodes']['total'])
-        for episode in show_json['episodes']['items'][:n]:
-            tz_loc = pytz.timezone(config.local_tz)
-            dt_loc = datetime.fromisoformat(episode['release_date'])
-            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-            if episode.get('external_playback_url'):
-                playback_url = utils.get_redirect_url(episode['external_playback_url'])
-            elif episode.get('audio_preview_url'):
-                playback_url = utils.get_redirect_url(episode['audio_preview_url'])
-            else:
-                playback_url = ''
-            if playback_url:
-                item['_playlist'].append({
-                    "src": playback_url,
-                    "name": episode['name'],
-                    "artist": utils.format_display_date(dt, False),
-                    "image": item['image']
-                })
-            item['content_html'] += utils.add_audio(playback_url, item['image'], episode['name'], episode['external_urls']['spotify'], '', '', utils.format_display_date(dt, False), float(episode['duration_ms']) / 1000, show_poster=False)
-        if n < show_json['episodes']['total']:
-            item['content_html'] += '<div><a href="{}">View more episodes</a></div>'.format(item['url'])
+
+        item['tags'] = [x['title'] for x in show['topics']['items']]
+
+        item['image'] = show['coverArt']['sources'][-1]['url']
+
+        item['summary'] = show['htmlDescription']
+
+        item['content_html'] = utils.add_audio('', item['image'], item['title'], item['url'], item['author']['name'], '', '', -1)
+
+        variables = {
+            "uri": "spotify:show:" + content_id,
+            "offset": 0,
+            "limit": 10
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"5989878c374a6c5d0fec1860968490efda78be6c4128cfedb0595be15785c68e"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryPodcastEpisodes&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if api_json:
+            item['content_html'] += '<div style="margin-left:12px;">'
+            episodes = api_json['data']['podcastUnionV2']['episodesV2']['items']
+            for it in episodes:
+                episode = it['entity']['data']
+                dt = datetime.fromisoformat(episode['releaseDate']['isoString'])
+                playback_url = 'https://embed-standalone.spotify.com/embed/episode/' + episode['id']
+                audio_type = 'audio_link'
+                item['content_html'] += utils.add_audio(playback_url, '', episode['name'], utils.clean_url(episode['sharingInfo']['shareUrl']), '', '', utils.format_display_date(dt, False), episode['duration']['totalMilliseconds'] / 1000, audio_type, show_poster=False)
 
     elif content_type == 'episode':
-        episode_json = utils.get_url_json('https://api.spotify.com/v1/episodes/{}?market=US'.format(content_id), headers=headers)
-        if not episode_json:
+        variables = {
+            "uri": "spotify:episode:" + content_id
+        }
+        extensions = {
+            "persistedQuery": {
+                "version":1,
+                "sha256Hash":"64da4fea3a7c4f6bef79aa85b96ba995397b8866dfef5d9e455d1a161437c1c0"
+            }
+        }
+        api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getEpisodeOrChapter&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
+        api_json = utils.get_url_json(api_url, headers=headers)
+        if not api_json:
             return None
+        episode = api_json['data']['episodeUnionV2']
         if save_debug:
-            utils.write_file(episode_json, './debug/spotify.json')
+            utils.write_file(episode, './debug/spotify.json')
 
-        item['id'] = episode_json['id']
-        item['url'] = episode_json['external_urls']['spotify']
-        item['title'] = episode_json['name']
-        dt = datetime.fromisoformat(episode_json['release_date'])
+        item['id'] = episode['uri']
+        item['url'] = utils.clean_url(episode['sharingInfo']['shareUrl'])
+        item['title'] = episode['name']
+
+        dt = datetime.fromisoformat(episode['releaseDate']['isoString'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt)
+        item['_display_date'] = utils.format_display_date(dt, False)
+
         item['author'] = {
-            "name": episode_json['show']['name'],
-            "url": episode_json['show']['external_urls']['spotify']
+            "name": episode['podcastV2']['data']['name'],
+            "url": 'https://open.spotify.com/show/' + episode['podcastV2']['data']['uri'].split(':')[-1]
         }
         item['authors'] = []
         item['authors'].append(item['author'])
-        item['summary'] = episode_json['html_description']
-        item['image'] = episode_json['images'][0]['url']
-        audio_type = 'audio/mpeg'
-        if episode_json.get('external_playback_url'):
-            playback_url = utils.get_redirect_url(episode_json['external_playback_url'])
-        elif episode_json.get('audio_preview_url'):
-            # Playback of the widevine url fails after a few seconds presumably from DRM
-            # TODO: implement decryption?
-            # widevine = utils.get_url_json('https://spclient.wg.spotify.com/soundfinder/v1/unauth/episode/{}/com.widevine.alpha'.format(content_id), headers=headers)
-            # if widevine and widevine.get('url'):
-            #     utils.write_file(widevine, './debug/widevine.json')
-            #     playback_url = widevine['url'][0]
-            #     audio_type = 'audio/mp4'
-            # else:
-            #     playback_url = utils.get_redirect_url(episode_json['audio_preview_url'])
-            playback_url = 'https://embed-standalone.spotify.com/embed/episode/' + content_id
-            audio_type = 'audio_link'
-        if audio_type != 'audio_link':
-            item['_audio'] = playback_url
-            attachment = {}
-            attachment['url'] = item['_audio']
-            attachment['mime_type'] = audio_type
-            item['attachments'] = []
-            item['attachments'].append(attachment)
-        item['content_html'] = utils.add_audio(playback_url, item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(episode_json['duration_ms']) / 1000, audio_type)
+
+        item['image'] = episode['coverArt']['sources'][-1]['url']
+
+        item['summary'] = episode['htmlDescription']
+
+        playback_url = 'https://embed-standalone.spotify.com/embed/episode/' + content_id
+        audio_type = 'audio_link'
+
+        widevine = utils.get_url_json('https://spclient.wg.spotify.com/soundfinder/v1/unauth/episode/{}/com.widevine.alpha?market=US'.format(content_id), headers=headers)
+        if widevine:
+            item['_audio_file_id'] = widevine['fileId']
+            if save_debug:
+                utils.write_file(widevine, './debug/widevine.json')
+            if widevine.get('passthroughUrl'):
+                playback_url = widevine['passthroughUrl']
+                audio_type = 'audio/mpeg'
+                item['_audio'] = playback_url
+                item['_audio_type'] = audio_type
+                attachment = {}
+                attachment['url'] = item['_audio']
+                attachment['mime_type'] = audio_type
+                item['attachments'] = []
+                item['attachments'].append(attachment)
+            elif widevine.get('url'):
+                playback_url = item['url']
+                audio_type = 'audio_redirect'
+                item['_audio'] = widevine['url'][0]
+                item['_audio_type'] = 'audio/mp4'
+                item['_audio_key'] = 'deadbeefdeadbeefdeadbeefdeadbeef'
+            elif widevine.get('fileId'):
+                params = {
+                    'version': 10000000,
+                    'product': 9,
+                    'platform': 39,
+                    'alt': 'json'
+                }
+                headers['TE'] = 'Trailers'
+                files_url = 'https://gew1-spclient.spotify.com/storage-resolve/v2/files/audio/interactive/11/' + widevine['fileId']
+                r = requests.get(files_url, params=params, headers=headers)
+                if r.status_code != 200:
+                    logger.warning('requests error {} getting {}'.format(r.status_code, files_url))
+                else:
+                    files = r.json()
+                    if save_debug:
+                        utils.write_file(files, './debug/spotify_files.json')
+                    playback_url = item['url']
+                    audio_type = 'audio_redirect'
+                    item['_audio'] = files['cdnurl'][0]
+                    item['_audio_type'] = 'audio/mp4'
+                    item['_audio_key'] = 'deadbeefdeadbeefdeadbeefdeadbeef'
+
+        item['content_html'] = utils.add_audio(playback_url, item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(episode['duration']['totalMilliseconds']) / 1000, audio_type)
         if 'embed' in args or '/embed/' in url:
             return item
         item['content_html'] += item['summary']

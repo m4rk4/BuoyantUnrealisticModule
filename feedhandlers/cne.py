@@ -42,6 +42,7 @@ def get_caption(props, credit_only=False):
 
 
 def get_image_src(image, width=1200):
+    print(image)
     sources = []
     if image.get('sources'):
         for key, val in image['sources'].items():
@@ -52,8 +53,15 @@ def get_image_src(image, width=1200):
         for key, val in image['segmentedSources'].items():
             for src in val:
                 sources.append(src)
-    src = utils.closest_dict(sources, 'width', width)
-    return src['url']
+    if len(sources) > 0:
+        src = utils.closest_dict(sources, 'width', width)
+        return src['url']
+    else:
+        if image.get('sources'):
+            return image['sources']['lg']['url']
+        else:
+            logger.warning('unhandled image src ' + str(image))
+            return ''
 
 
 def add_image(props, width=1000, caption='', credit_only=False):
@@ -160,7 +168,17 @@ def format_body(body_json):
                     # print(m.group(1).replace('\\"', '"'))
                     audio_json = json.loads(m.group(1).replace('\\"', '"'))
                     audio = audio_json['audios'][0]
-                    return utils.add_audio(utils.find_redirect_url(audio['files'][0]), audio['image']['patternUrl'].replace('h_HEIGHT', 'h_512').replace('w_WIDTH', 'w_512'), audio['title'], '', audio_json['title'], '', utils.format_display_date(datetime.fromisoformat(audio['pubDate']), False), audio['duration'])
+                    if audio['image'].get('patternUrl'):
+                        poster = audio['image']['patternUrl'].replace('h_HEIGHT', 'h_512').replace('w_WIDTH', 'w_512')
+                    elif audio['image'].get('assets'):
+                        poster = audio['image']['assets']['mediaSession512']['url']
+                    else:
+                        poster = ''
+                    if audio.get('pubDate'):
+                        date = utils.format_display_date(datetime.fromisoformat(audio['pubDate']), False)
+                    else:
+                        date = ''
+                    return utils.add_audio(audio['files'][0], poster, audio['title'], '', audio_json['title'], '', date, audio['duration'])
         elif body_json[1]['type'] == 'firework':
             firework_api = 'https://fireworkapi1.com/embed/v2/playlists/{}/feeds?page_size=10'.format(body_json[1]['ref'])
             firework_json = utils.post_url(firework_api)
@@ -343,6 +361,11 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['image'] = article_json['head.og.image']
     item['summary'] = article_json['head.description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     item['content_html'] = ''
 
     if article_json.get(article_json['head.pageType']):

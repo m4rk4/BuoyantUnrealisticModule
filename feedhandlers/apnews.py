@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
+from feedhandlers import jwplayer
 import config, utils
 
 import logging
@@ -235,7 +236,7 @@ def get_item(content_data, args, site_json, save_debug=False):
     return item
 
 
-def get_content(url, args, site_json, save_debug=False):
+def get_content_api(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     m = re.search(r'([0-9a-f]+)\/?$', split_url.path)
     if not m:
@@ -249,6 +250,189 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(article_json, './debug/debug.json')
 
     return get_item(article_json, args, site_json, save_debug)
+
+
+def get_content(url, args, site_json, save_debug=False):
+    page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
+    if save_debug:
+        utils.write_file(page_html, './debug/debug.html')
+
+    page_soup = BeautifulSoup(page_html, 'lxml')
+    ld_json = []
+    for el in page_soup.find_all('script', attrs={"type": "application/ld+json"}):
+        ld = json.loads(el.string)
+        if isinstance(ld, list):
+            ld_json += ld
+        elif isinstance(ld, dict):
+            ld_json.append(ld)
+
+    if len(ld_json) == 0:
+        logger.warning('unable to find ld+json in ' + url)
+        return None
+    if save_debug:
+        utils.write_file(ld_json, './debug/debug.json')
+
+    ld_article = next((it for it in ld_json if it.get('@type') == 'NewsArticle'), None)
+    if not ld_article:
+        logger.warning('unable to find ld+json NewsArticle in ' + url)
+        return None
+
+    item = {}
+    item['id'] = ld_article['url'].split('-')[-1]
+    item['url'] = ld_article['url']
+    item['title'] = ld_article['headline']
+
+    dt = datetime.fromisoformat(ld_article['datePublished'])
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
+    if ld_article.get('dateModified'):
+        dt = datetime.fromisoformat(ld_article['dateModified'])
+        item['date_modified'] = dt.isoformat()
+
+    if ld_article.get('author'):
+        item['authors'] = [{"name": x["name"]} for x in ld_article['author']]
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+    elif ld_article.get('publisher'):
+        item['author'] = {
+            "name": ld_article['publisher']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
+    item['tags'] = ld_article['articleSection'].copy()
+    if ld_article.get('keywords'):
+        item['tags'] += ld_article['keywords'].copy()
+
+    item['image'] = ld_article['thumbnailUrl']
+
+    item['summary'] = ld_article['description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
+    item['content_html'] = ''
+    gallery_html = ''
+    page_lead = page_soup.find('div', class_='Page-lead')
+    if page_lead:
+        if page_lead.find('bsp-carousel'):
+            item['_gallery'] = []
+            gallery_html += '<h3><a href="{}/gallery?url={}" target="_blank">View gallery</a></h3>'.format(config.server, quote_plus(item['url']))
+            gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+            for i, slide in enumerate(page_lead.select('bsp-carousel div.Carousel-slide')):
+                media = slide.find(class_='CarouselSlide-media')
+                if 'imageSlide' in media['class']:
+                    if media.img.get('data-flickity-lazyload-srcset'):
+                        srcset = re.split(r'\s\dx,?', media.img['data-flickity-lazyload-srcset'])
+                    else:
+                        srcset = re.split(r'\s\dx,?', media.img['srcset'])
+                    thumb = srcset[0]
+                    src = srcset[1]
+                    el = slide.find(class_='CarouselSlide-infoDescription')
+                    if el and el.p:
+                        caption = el.p.decode_contents().strip()
+                    else:
+                        caption = ''
+                    if i == 0:
+                        item['content_html'] += utils.add_image(src, caption)
+                elif 'videoSlide' in media['class']:
+                    player = media.find(['bsp-jw-player'])
+                    video = jwplayer.get_content('https://cdn.jwplayer.com/v2/media/' + player['data-media-id'], {"embed": True}, {}, False)
+                    if video:
+                        src = video['_video_mp4']
+                        thumb = '{}/image?url={}&width=800&overlay=video'.format(config.server, quote_plus(video['image']))
+                        caption = video['summary']
+                        if i == 0:
+                            item['content_html'] += video['content_html']
+                else:
+                    logger.warning('unhandled CarouselSlide-media class ' + media['class'])
+                    src = ''
+                if src:
+                    gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=src) + '</div>'
+                    item['_gallery'].append({"src": src, "caption": caption, "thumb": thumb})
+            if i % 2 == 0:
+                gallery_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+            gallery_html += '</div>'
+
+    ld_review = next((it for it in ld_json if it.get('review')), None)
+    if ld_review and ld_review['review'].get('reviewRating'):
+        item['content_html'] += utils.add_stars(float(ld_review['review']['reviewRating']['ratingValue']), int(ld_review['review']['reviewRating']['bestRating']))
+
+    story_body = page_soup.select('main.Page-main > bsp-story-page > div.Page-storyBody > div.RichTextStoryBody')
+    if story_body:
+        body = story_body[0]
+        for el in body.find_all(class_=['SovrnAd', 'optimizelyHubpeekClass']):
+            el.decompose()
+
+        for el in body.find_all(class_='Enhancement'):
+            new_html = ''
+            if el.find('bsp-list-loadmore'):
+                el.decompose()
+                continue
+            elif el.find(class_='ImageEnhancement'):
+                media = el.find('bsp-figure')
+                if media:
+                    srcset = re.split(r'\s\dx,?', media.img['srcset'])
+                    src = srcset[1]
+                    it = el.find('figcaption', class_='Figure-caption')
+                    if it:
+                        if it.p:
+                            caption = it.p.decode_contents().strip()
+                        else:
+                            caption = it.decode_contents().strip()
+                    else:
+                        caption = ''
+                    new_html = utils.add_image(src, caption, link=src)
+            elif el.find(class_='ImageTwoUpEnhancement'):
+                new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                for media in el.find_all('bsp-figure'):
+                    srcset = re.split(r'\s\dx,?', media.img['srcset'])
+                    src = srcset[1]
+                    it = el.find('figcaption', class_='Figure-caption')
+                    if it:
+                        if it.p:
+                            caption = it.p.decode_contents().strip()
+                        else:
+                            caption = it.decode_contents().strip()
+                    else:
+                        caption = ''
+                    new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(src, caption) + '</div>'
+                new_html += '</div>'
+            elif el.find(class_='VideoEnhancement'):
+                player = el.find('bsp-jw-player')
+                new_html = utils.add_embed('https://cdn.jwplayer.com/v2/media/' + player['data-media-id'])
+            elif el.find(class_='PullQuote'):
+                it = el.find(class_='PullQuote-content-attribution')
+                if it:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                new_html = utils.add_pullquote(el.blockquote.decode_contents(), caption)
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled Enhancement in ' + item['url'])
+
+        for el in body.find_all(class_='HTMLModuleEnhancement'):
+            if el.find(class_='taboola_readmore'):
+                el.decompose()
+            else:
+                logger.warning('unhandled HTMLModuleEnhancement in ' + item['url'])
+
+        item['content_html'] += body.decode_contents()
+        item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
+
+    if gallery_html:
+        item['content_html'] += gallery_html
+
+    return item
 
 
 def get_feed(url, args, site_json, save_debug=False):

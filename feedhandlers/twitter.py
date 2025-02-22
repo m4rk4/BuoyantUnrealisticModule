@@ -760,7 +760,7 @@ def get_content(url, args, site_json, save_debug=False):
     if 'threadreaderapp' in split_url.netloc:
         tweet_id = paths[-1].replace('.html', '')
     else:
-        tweet_id = paths[-1]
+        tweet_id = paths[2]
     if not tweet_id.isnumeric():
         logger.warning('error determining tweet id in ' + url)
 

@@ -1,7 +1,7 @@
 import pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import config, utils
 from feedhandlers import rss
@@ -20,7 +20,7 @@ def add_video(media_id):
         if video:
             return utils.add_video(video['key'], 'video/mp4', media_json['thumbnail'],caption)
         else:
-            caption = '<b>Video unavailable:<b> ' + caption
+            caption = '<b>Video unavailable:</b> ' + caption
             return utils.add_image(media_json['thumbnail'], caption)
 
     caption = '<b>Video unavailable:<b> '
@@ -109,7 +109,8 @@ def format_block(block):
         block_html += add_image(block['content'])
 
     elif block['type'] == 'polopoly_media':
-        block_html += add_video(block['content']['mediaId'])
+        content = get_player_content(block['content']['url'], {"embed": True}, None, False)
+        block_html += content['content_html']
 
     elif block['type'] == 'polopoly_embed':
         if block['content']['type'] == 'youtube':
@@ -158,40 +159,45 @@ def format_block(block):
 
 
 def get_player_content(url, args, site_json, save_debug):
-    m = re.search(r'https://www\.cbc\.ca/player/play/(\d+)$', url)
-    if not m:
-        logger.warning('unable to determine mediaId from ' + url)
-        return None
-    bistro_json = utils.get_url_json('https://www.cbc.ca/bistro/order?mediaId={}'.format(m.group(1)))
-    if not bistro_json:
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    gql_data = {
+        "query": "query videoDetailPage($sourceId: String) {\n        contentItem(sourceId: $sourceId) {\n            \n    sourceId\n    mediaId\n    source\n    title\n    image {\n        url\n        derivative(aspectRatio: \"16x9\", preferredWidth: 1180) {\n            fileurl\n        }\n    }\n    publishedAt\n    type\n    showData {\n        name\n    }\n    showName\n    tags {\n        type\n        name\n    }\n    concepts {\n        type\n        path\n    }\n    media {\n        id\n        callSign\n        assets {\n            key\n            type\n            options {\n                token\n            }\n        }\n        adOrder\n        adCategoryExclusion\n        streamType\n        contentArea\n        contentTierId\n        duration\n        genre\n        clipType\n        brandedSponsorName\n        season\n        episode\n        region\n        sports {\n            name\n        }\n        hasCaptions\n        aspectRatio\n        textTracks {\n            kind\n            label\n            src\n            language\n        }\n        chapters {\n            name\n            startTime\n        }\n    }\n\n            updatedAt\n            description\n            image {\n                _16x9_460: derivative(preferredWidth:460, aspectRatio:\"16x9\") {\n                    w\n                    fileurl\n                }\n                _16x9_620: derivative(preferredWidth:620, aspectRatio:\"16x9\") {\n                    w\n                    fileurl\n                }\n                _16x9_940: derivative(preferredWidth:940, aspectRatio:\"16x9\") {\n                    w\n                    fileurl\n                }\n                square_220: derivative(preferredWidth:220, aspectRatio:\"square\") {\n                    w\n                    fileurl\n                }\n            }\n            categories {\n                name\n                slug\n            }\n            section {\n                attributionLevels\n                tracking{\n                    contentArea\n                    subSection1\n                    subSection2\n                    subSection3\n                    subSection4\n                }\n            }\n            tags {\n                name\n                type\n            }\n            concepts {\n                path\n                type\n            }\n        }\n    }",
+        "variables": {
+            "sourceId": paths[-1]
+        }
+    }
+    gql_json = utils.post_url('https://www.cbc.ca/graphql', json_data=gql_data, use_proxy=True, use_curl_cffi=True)
+    if not gql_json:
         return None
     if save_debug:
-        utils.write_file(bistro_json, './debug/debug.json')
+        utils.write_file(gql_json, './debug/debug.json')
 
-    if bistro_json.get('errors'):
-        logger.warning('Video unavailable: ' + bistro_json['errors'][0]['message'])
-        return None
-
-    media_json = bistro_json['items'][0]
+    content_json = gql_json['data']['contentItem']
 
     item = {}
-    item['id'] = media_json['id']
-    item['url'] = media_json['pageUrl']
-    item['title'] = media_json['title']
+    item['id'] = content_json['sourceId']
+    item['url'] = 'https://www.cbc.ca/player/play/video/' + content_json['sourceId']
+    item['title'] = content_json['title']
 
     tz_loc = pytz.timezone('US/Eastern')
-    dt_loc = datetime.fromtimestamp(int(media_json['airDate']) / 1000)
+    dt_loc = datetime.fromtimestamp(int(content_json['publishedAt']) / 1000)
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt_loc = datetime.fromtimestamp(int(media_json['addedDate']) / 1000)
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-    item['date_modified'] = dt.isoformat()
+    if content_json.get('updatedAt'):
+        dt_loc = datetime.fromtimestamp(int(content_json['updatedAt']) / 1000)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_modified'] = dt.isoformat()
 
-    if media_json.get('showName'):
+    if content_json.get('showName'):
         item['author'] = {
-            "name": media_json['showName']
+            "name": content_json['showName']
+        }
+    elif content_json.get('showData') and content_json['showData'].get('name'):
+        item['author'] = {
+            "name": content_json['showData']['name']
         }
     else:
         item['author'] = {
@@ -200,36 +206,45 @@ def get_player_content(url, args, site_json, save_debug):
     item['authors'] = []
     item['authors'].append(item['author'])
 
-    if media_json.get('keywords'):
-        item['tags'] = media_json['keywords'].split(', ')
+    if content_json.get('tags'):
+        item['tags'] = [x['name'] for x in content_json['tags']]
 
-    if media_json.get('thumbnail'):
-        item['image'] = media_json['thumbnail']
-        poster = item['image']
+    if content_json.get('image'):
+        item['image'] = content_json['image']['url']
+        poster = '{}/image?url={}&width=1280&overlay=video'.format(config.server, quote_plus(item['image']))
     else:
-        poster = ''
+        poster = '{}/image?width=1280&height=720&overlay=video'.format(config.server, quote_plus(item['image']))
 
-    item['content_html'] = ''
-    caption = '<a href="{}">{}</a>'.format(item['url'], item['title'])
-    video = next((it for it in media_json['assetDescriptors'] if (it.get('mimeType') and it['mimeType'] == 'video/mp4')), None)
-    if video:
-        item['_video'] = video['key']
-        item['content_html'] += utils.add_video(item['_video'], 'video/mp4', poster, '<b>Watch:</b> ' + caption)
+    if content_json.get('description'):
+        item['summary'] = content_json['description']
+
+    if content_json['media'].get('assets'):
+        media_json = utils.get_url_json(content_json['media']['assets'][0]['key'])
+        if media_json:
+            item['_video'] = media_json['url']
+            param = next((it for it in media_json['params'] if it['name'] == 'contentType'), None)
+            if param:
+                item['_video_type'] = 'application/' + param['value']
+            else:
+                item['_video_type'] = 'application/x-mpegURL'
+    
+    if '_video' in item:
+        video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.add_image(poster, item['title'], link=video_src)
     else:
-        item['content_html'] += utils.add_image(poster, '<b>Video unavailable:</b> ' + caption)
+        caption = '<b>Video is unavailable:</b> ' + item['title']
+        item['content_html'] = utils.add_image(poster, caption, link=item['url'])
 
-    if media_json.get('description'):
-        item['summary'] = media_json['description']
-        if 'embed' not in args:
-            item['content_html'] += '<p>{}</p>'.format(item['summary'])
-
+    if 'embed' not in args and 'summary' in item:
+        item['content_html'] += '<p>' + item['summary'] + '</p>'
     return item
 
 
 def get_content(url, args, site_json, save_debug=False):
     if url.startswith('https://www.cbc.ca/player/play/'):
         return get_player_content(url, args, site_json, save_debug)
-    elif url.startswith('https://www.cbc.ca/listencards/listencard/'):
+
+    if url.startswith('https://www.cbc.ca/listencards/listencard/'):
         page_html = utils.get_url_html(url)
         if page_html:
             soup = BeautifulSoup(page_html, 'lxml')
@@ -245,16 +260,16 @@ def get_content(url, args, site_json, save_debug=False):
     if not m:
         logger.warning('unable to determine sourceId from ' + url)
         return None
-    post_data = {
-        "query":"\n    query {{\n        contentItem(sourceId: \"{}\", contentStatus:\"\") {{\n            deck\n            byline\n            type\n            wordcount: wordCount\n            id\n            corrections {{\n              correction\n              date\n            }}\n            clarifications {{\n              clarification\n              date\n            }}\n            mediaid: mediaId\n            flag\n            publishedAt\n            updatedAt\n            url\n            externalLinks {{\n              type\n              title\n              url\n            }}\n            shareHeadline\n            highlights {{\n              highlight\n              label\n            }}\n            intlinks {{\n              url\n              flag\n              shareHeadline\n              title\n              type\n            }}\n            authorDisplay\n            authors {{\n              name\n              smallImageUrl\n              title\n              biography\n              url\n              photoDerivatives {{\n                square_140 {{\n                  ...derivative\n                }}\n                square_300 {{\n                  ...derivative\n                }}\n                square_620 {{\n                  ...derivative\n                }}\n              }}\n              links {{\n                title\n                type\n                url\n              }}\n            }}\n            departments {{\n              name\n              label\n            }}\n            body {{\n              containsAudio\n              containsVideo\n              containsPhotogallery\n              parsed\n            }}\n            tracking {{\n              contentarea\n              contenttype\n              subsection1\n              subsection2\n              subsection3\n              subsection4\n            }}\n            advertising {{\n              site\n              zone\n              contentcategory\n              categorization\n              section\n              exclusions\n              category\n            }}\n            sponsor {{\n              external\n              name\n              image {{\n                derivative(preferredWidth:620) {{\n                  fileurl\n                }}\n              }}\n              label\n              link: url\n            }}\n            imageLarge\n            leadmedia {{\n              ...leadMedia\n            }}\n            headlineimage {{\n              ...leadMedia\n            }}\n            media: poloMedia {{\n              ...media\n            }}\n            segmentmedia {{\n              ...media\n            }}\n            episodemedia {{\n              ...media\n            }}\n            headlineData {{\n              type\n              publishedAt\n              mediaDuration\n              mediaId\n            }}\n            socialNetworks {{\n              facebook\n            }}\n            jsonLD\n            commentsEnabled\n            section {{\n              social {{\n                commentsSection\n              }}\n            }}\n            tags {{\n              name\n              type\n            }}\n            concepts {{\n              type\n              path\n            }}\n            newsletter\n            language\n            categories {{\n              attributionLevels {{\n                level1\n                level2\n                level3\n              }}\n            }}\n            attribution {{\n              level1\n              level2\n              level3\n            }}\n            title\n            description\n            editorialSource\n            poloEpisode {{\n              id\n              flag\n              url\n              title\n              headline\n              segments {{\n                ...segment\n              }}\n            }}\n            segments {{\n              ...segment\n            }}\n            photoGallery {{\n                aspectRatio\n                images {{\n                sourceId\n                localDescription\n                image {{\n                  credit\n                  derivatives\n                  altText\n                }}\n              }}\n            }}\n          }}\n        }}\n        \nfragment leadMedia on LeadMedia {{\n    id\n    deck\n    description\n    title\n    type\n    url\n    altText\n    showcaption\n    derivatives {{\n      ...derivatives\n    }}\n    credit\n    headline\n    size\n    useoriginalimage\n    originalimageurl\n    guid\n    runtime\n  }}\n        \nfragment derivatives on ImageDerivatives {{\n    _16x9_940 {{\n      ...derivative\n    }}\n    _16x9_300 {{\n      ...derivative\n    }}\n    _16x9_620 {{\n      ...derivative\n    }}\n    original_620 {{\n      ...derivative\n    }}\n    original_300 {{\n      ...derivative\n    }}\n    _16x9tight_140 {{\n      ...derivative\n    }}\n    _16x9_460 {{\n      ...derivative\n    }}\n  }}\n\n        \nfragment derivative on ImageDerivative {{\n    w\n    h\n    fileurl\n  }}\n\n        \nfragment media on Media {{\n    description\n    epoch {{\n      pubdate\n    }}\n    extattrib {{\n      captionUrl\n      guid\n      liveondemand\n      mediatype\n      runtime\n    }}\n    headlineimage {{\n      url\n    }}\n    show\n    showcaption\n    title\n}}\n\n        \nfragment segment on PolopolySegment {{\n  id\n\tflag\n\turl\n\ttitle\n\theadline\n}}\n\n    ".format(m.group(1))
+    gql_data = {
+        "query": "\n    query {{\n        contentItem(sourceId: \"{}\", contentStatus:\"\") {{\n            deck\n            byline\n            type\n            wordcount: wordCount\n            id\n            corrections {{\n              correction\n              date\n            }}\n            clarifications {{\n              clarification\n              date\n            }}\n            mediaid: mediaId\n            flag\n            publishedAt\n            updatedAt\n            url\n            externalLinks {{\n              type\n              title\n              url\n            }}\n            shareHeadline\n            highlights {{\n              highlight\n              label\n            }}\n            intlinks {{\n              url\n              flag\n              shareHeadline\n              title\n              type\n            }}\n            authorDisplay\n            authors {{\n              name\n              smallImageUrl\n              title\n              biography\n              url\n              photoDerivatives {{\n                square_140 {{\n                  ...derivative\n                }}\n                square_300 {{\n                  ...derivative\n                }}\n                square_620 {{\n                  ...derivative\n                }}\n              }}\n              links {{\n                title\n                type\n                url\n              }}\n            }}\n            departments {{\n              name\n              label\n            }}\n            body {{\n              containsAudio\n              containsVideo\n              containsPhotogallery\n              parsed\n            }}\n            tracking {{\n              contentarea\n              contenttype\n              subsection1\n              subsection2\n              subsection3\n              subsection4\n            }}\n            advertising {{\n              site\n              zone\n              contentcategory\n              categorization\n              section\n              exclusions\n              category\n            }}\n            sponsor {{\n              external\n              name\n              image {{\n                derivative(preferredWidth:620) {{\n                  fileurl\n                }}\n              }}\n              label\n              link: url\n            }}\n            imageLarge\n            leadmedia {{\n              ...leadMedia\n            }}\n            headlineimage {{\n              ...leadMedia\n            }}\n            media: poloMedia {{\n              ...media\n            }}\n            segmentmedia {{\n              ...media\n            }}\n            episodemedia {{\n              ...media\n            }}\n            headlineData {{\n              type\n              publishedAt\n              mediaDuration\n              mediaId\n            }}\n            socialNetworks {{\n              facebook\n            }}\n            jsonLD\n            commentsEnabled\n            section {{\n              social {{\n                commentsSection\n              }}\n            }}\n            tags {{\n              name\n              type\n            }}\n            concepts {{\n              type\n              path\n            }}\n            newsletter\n            language\n            categories {{\n              attributionLevels {{\n                level1\n                level2\n                level3\n              }}\n            }}\n            attribution {{\n              level1\n              level2\n              level3\n            }}\n            title\n            description\n            editorialSource\n            poloEpisode {{\n              id\n              flag\n              url\n              title\n              headline\n              segments {{\n                ...segment\n              }}\n            }}\n            segments {{\n              ...segment\n            }}\n            photoGallery {{\n                aspectRatio\n                images {{\n                sourceId\n                localDescription\n                image {{\n                  credit\n                  derivatives\n                  altText\n                }}\n              }}\n            }}\n          }}\n        }}\n        \nfragment leadMedia on LeadMedia {{\n    id\n    deck\n    description\n    title\n    type\n    url\n    altText\n    showcaption\n    derivatives {{\n      ...derivatives\n    }}\n    credit\n    headline\n    size\n    useoriginalimage\n    originalimageurl\n    guid\n    runtime\n  }}\n        \nfragment derivatives on ImageDerivatives {{\n    _16x9_940 {{\n      ...derivative\n    }}\n    _16x9_300 {{\n      ...derivative\n    }}\n    _16x9_620 {{\n      ...derivative\n    }}\n    original_620 {{\n      ...derivative\n    }}\n    original_300 {{\n      ...derivative\n    }}\n    _16x9tight_140 {{\n      ...derivative\n    }}\n    _16x9_460 {{\n      ...derivative\n    }}\n  }}\n\n        \nfragment derivative on ImageDerivative {{\n    w\n    h\n    fileurl\n  }}\n\n        \nfragment media on Media {{\n    description\n    epoch {{\n      pubdate\n    }}\n    extattrib {{\n      captionUrl\n      guid\n      liveondemand\n      mediatype\n      runtime\n    }}\n    headlineimage {{\n      url\n    }}\n    show\n    showcaption\n    title\n}}\n\n        \nfragment segment on PolopolySegment {{\n  id\n\tflag\n\turl\n\ttitle\n\theadline\n}}\n\n    ".format(m.group(1))
     }
-    graphql_json = utils.post_url('https://www.cbc.ca/graphql', json_data=post_data, use_proxy=True, use_curl_cffi=True)
-    if not graphql_json:
+    gql_json = utils.post_url('https://www.cbc.ca/graphql', json_data=gql_data, use_proxy=True, use_curl_cffi=True)
+    if not gql_json:
         return None
     if save_debug:
-        utils.write_file(graphql_json, './debug/debug.json')
+        utils.write_file(gql_json, './debug/debug.json')
 
-    content_json = graphql_json['data']['contentItem']
+    content_json = gql_json['data']['contentItem']
     item = {}
     item['id'] = content_json['id']
     item['url'] = content_json['url']
@@ -266,9 +281,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt_loc = datetime.fromtimestamp(int(content_json['updatedAt']) / 1000)
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-    item['date_modified'] = dt.isoformat()
+    if content_json.get('updatedAt'):
+        dt_loc = datetime.fromtimestamp(int(content_json['updatedAt']) / 1000)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_modified'] = dt.isoformat()
 
     if content_json.get('authors'):
         item['authors'] = []
@@ -296,6 +312,10 @@ def get_content(url, args, site_json, save_debug=False):
         item['image'] = content_json['storyimages'][0]['originalimageurl']
 
     item['summary'] = content_json['description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if content_json.get('deck'):

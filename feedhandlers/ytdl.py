@@ -74,7 +74,7 @@ def get_content(url, args, site_json, save_debug=False):
             item = {}
             item['content_html'] = '<blockquote><strong><a href="https://www.youtube.com/watch?v={}" target="_blank">{}</a></strong></blockquote>'.format(video_id, str(e))
             return item
-    if playlist_id:
+    if playlist_id and 'skip_playlist' not in args:
         ydl_opts['playlist_items'] = '0-3'
         playlist_info = YoutubeDL(ydl_opts).extract_info('https://www.youtube.com/playlist?list=' + playlist_id, download=False)
         if playlist_info:
@@ -212,28 +212,38 @@ def get_content(url, args, site_json, save_debug=False):
         item['_playlist'] = []
         item['content_html'] += '<h3>Playlist: <a href="{}/playlist?url={}">{}</a></h3>'.format(config.server, quote_plus(playlist_info['webpage_url']), playlist_info['title'])
         for video_info in playlist_info['entries']:
-            item['_playlist'].append({
-                "src": config.server + '/video?url=' + quote_plus(video_info['webpage_url']) + '&novideojs',
-                "name": video_info['title'],
-                "artist": video_info['uploader'],
-                "image": video_info['thumbnail']
-            })
-            item['content_html'] += '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-            video_url = config.server + '/video?url=' + quote_plus(video_info['webpage_url'])
-            poster = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(video_info['thumbnail']))
-            item['content_html'] += '<div style="flex:1; min-width:128px; max-width:200px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(video_url, poster)
-            item['content_html'] += '<div style="flex:2; min-width:256px;">'
-            item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(video_info['webpage_url'], video_info['title'])
-            if video_info.get('uploader_url'):
-                item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(video_info['uploader_url'], video_info['uploader'])
-            elif video_info.get('channel_url'):
-                item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(video_info['channel_url'], video_info['uploader'])
+            if video_info['availability'] == 'public':
+                item['_playlist'].append({
+                    "src": config.server + '/video?url=' + quote_plus(video_info['webpage_url']) + '&novideojs',
+                    "name": video_info['title'],
+                    "artist": video_info['uploader'],
+                    "image": video_info['thumbnail']
+                })
+                item['content_html'] += '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+                video_url = config.server + '/video?url=' + quote_plus(video_info['webpage_url'])
+                poster = '{}/image?url={}&width=640&overlay=video'.format(config.server, quote_plus(video_info['thumbnail']))
+                item['content_html'] += '<div style="flex:1; min-width:128px; max-width:200px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(video_url, poster)
+                item['content_html'] += '<div style="flex:2; min-width:256px;">'
+                item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(video_info['webpage_url'], video_info['title'])
+                if video_info.get('uploader_url'):
+                    item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(video_info['uploader_url'], video_info['uploader'])
+                elif video_info.get('channel_url'):
+                    item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(video_info['channel_url'], video_info['uploader'])
+                else:
+                    item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(video_info['uploader'])
+                dt_loc = datetime.fromtimestamp(video_info['timestamp'])
+                dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+                item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), utils.calc_duration(video_info['duration']))
+                item['content_html'] += '</div></div>'
             else:
-                item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(video_info['uploader'])
-            dt_loc = datetime.fromtimestamp(video_info['timestamp'])
-            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-            item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), utils.calc_duration(video_info['duration']))
-            item['content_html'] += '</div></div>'
+                item['content_html'] += '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+                video_url = video_info['webpage_url']
+                poster = '{}/image?width=640&height=360&overlay=video'.format(config.server, quote_plus(video_info['thumbnail']))
+                item['content_html'] += '<div style="flex:1; min-width:128px; max-width:200px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(video_url, poster)
+                item['content_html'] += '<div style="flex:2; min-width:256px;">'
+                item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">Video is unavailable</a></div>'.format(video_info['webpage_url'])
+                item['content_html'] += '</div></div>'
+
         if playlist_info['playlist_count'] > len(playlist_info['entries']):
             item['content_html'] += '<p><a href="{}">View more on YouTube</a></p>'.format(playlist_info['webpage_url'])
 

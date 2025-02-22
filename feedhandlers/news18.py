@@ -43,17 +43,30 @@ def get_content(url, args, site_json, save_debug=False):
             dt = dateutil.parser.parse(ld_json['dateModified']).astimezone(timezone.utc)
             item['date_modified'] = dt.isoformat()
         if ld_json.get('author'):
-            item['author'] = {"name": ld_json['author']['name']}
+            item['author'] = {
+                "name": ld_json['author']['name']
+            }
         elif ld_json.get('publisher'):
-            item['author'] = {"name": ld_json['publisher']['name']}
+            item['author'] = {
+                "name": ld_json['publisher']['name']
+            }
+        else:
+            item['author'] = {
+                "name": "News18.com"
+            }
+        item['authors'] = []
+        item['authors'].append(item['author'])
         if ld_json.get('keywords'):
             item['tags'] = [it.strip() for it in ld_json['keywords'].split(',')]
         if ld_json.get('image'):
-            item['_image'] = ld_json['image']
+            item['image'] = ld_json['image']
         elif ld_json.get('associatedMedia') and ld_json['associatedMedia']['@type'] == 'ImageObject':
-            item['_image'] = ld_json['associatedMedia']['url']
+            item['image'] = ld_json['associatedMedia']['url']
         if ld_json.get('description'):
             item['summary'] = ld_json['description']
+        if 'embed' in args:
+            item['content_html'] = utils.format_embed_preview(item)
+            return item
         item['content_html'] = ''
         for el in page_soup.find_all('amp-story-page'):
             it = el.find('amp-img')
@@ -98,20 +111,34 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(data_json['updated_at']).replace(tzinfo=timezone.utc)
         item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in data_json['author_byline']:
-        if it.get('english_name'):
-            authors.append(it['english_name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    elif data_json.get('author') and data_json['author'].get('name'):
-        item['author'] = {"name": data_json['author']['name']}
-    elif data_json.get('byline'):
-        item['author'] = {"name": data_json['byline']}
-    elif data_json.get('publish_by') and data_json['publish_by'].get('name'):
-        item['author'] = {"name": data_json['publish_by']['name']}
+    if data_json.get('author_byline'):
+        item['authors'] = []
+        item['authors'] = [{"name": x['english_name']} for x in data_json['author_byline'] if x.get('english_name')]
+        if len(item['authors']):
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+    else:
+        if data_json.get('author') and data_json['author'].get('name'):
+            item['author'] = {
+                "name": data_json['author']['name']
+            }
+        elif data_json.get('byline'):
+            item['author'] = {
+                "name": data_json['byline']
+            }
+        elif data_json.get('publish_by') and data_json['publish_by'].get('name'):
+            item['author'] = {
+                "name": data_json['publish_by']['name']
+            }
+        else:
+            item['author'] = {
+                "name": "News18.com"
+            }
+        item['authors'] = []
+        item['authors'].append(item['author'])
     if data_json.get('edited_by') and data_json['edited_by'].get('name'):
+        item['authors'].append(data_json['edited_by']['name'] + ' (editor)')
         item['author']['name'] += ' (Edited by ' + data_json['edited_by']['name'] + ')'
 
     item['tags'] = []
@@ -133,17 +160,25 @@ def get_content(url, args, site_json, save_debug=False):
 
     if data_json.get('youtubeid'):
         item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v=' + data_json['youtubeid'])
-        if not item.get('author') and data_json.get('auto_youtube_import') and data_json['auto_youtube_import'].get('nw_auto_yt_feed_channel_name'):
-            item['author'] = {"name": data_json['auto_youtube_import']['nw_auto_yt_feed_channel_name']}
+        if item['author']['name'] == 'News18.com' and data_json.get('auto_youtube_import') and data_json['auto_youtube_import'].get('nw_auto_yt_feed_channel_name'):
+            item['author'] = {
+                "name": data_json['auto_youtube_import']['nw_auto_yt_feed_channel_name']
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
 
     if data_json.get('images_all_sizes'):
-        item['_image'] = data_json['images_all_sizes']['sizes']['16x9']['url']
+        item['image'] = data_json['images_all_sizes']['sizes']['16x9']['url']
         if not data_json.get('youtubeid'):
-            item['content_html'] += utils.add_image(item['_image'], data_json['images_all_sizes'].get('caption'))
+            item['content_html'] += utils.add_image(item['image'], data_json['images_all_sizes'].get('caption'))
     elif data_json.get('images'):
-        item['_image'] = data_json['images']['url']
+        item['image'] = data_json['images']['url']
         if not data_json.get('youtubeid'):
-            item['content_html'] += utils.add_image(item['_image'], data_json['images'].get('caption'))
+            item['content_html'] += utils.add_image(item['image'], data_json['images'].get('caption'))
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     if data_json.get('movie_review') and data_json['movie_review'].get('movie_name'):
         item['content_html'] += '<div>&nbsp;</div><div style="text-align:center; font-size:1.5em; font-weight:bold;">' + data_json['movie_review']['movie_name'] + '</div>'

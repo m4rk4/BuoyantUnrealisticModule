@@ -1,17 +1,19 @@
 import asyncio, base64, glob, importlib, io, json, os, re, sys
+import subprocess, time
 # import certifi, primp
-# import requests
-from curl_cffi import requests
+import requests
+from bs4 import BeautifulSoup
+from curl_cffi import requests as curl_cffi_requests
 import logging, logging.handlers
-from flask import Flask, jsonify, render_template, redirect, Response, request, send_file, stream_with_context
+from flask import Flask, jsonify, make_response, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
 from io import BytesIO
 from playwright.async_api import Playwright, async_playwright
 from staticmap import StaticMap, CircleMarker
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, urlsplit
 
 import config, image_utils, utils
-from feedhandlers import google, ytdl
+from feedhandlers import google, spotify
 
 app = Flask(__name__)
 CORS(app)
@@ -200,9 +202,13 @@ def audio():
     if not content.get('_audio'):
         return 'No audio sources found for this url'
 
-    audio_url = config.server + '/videojs?src=' + quote_plus(content['_audio'])
+    if '_audio_key' in args:
+        # print(content['_audio'])
+        audio_url = config.server + '/videojs-decrypt?src=' + quote_plus(content['_audio']) + '&key=' + content['_audio_key']
+    else:
+        audio_url = config.server + '/videojs?src=' + quote_plus(content['_audio'])
     if content.get('_audio_type'):
-        audio_url += '&type=' + quote_plus(content['_video_type'])
+        audio_url += '&type=' + quote_plus(content['_audio_type'])
     else:
         audio_url += '&type=audio%2Fmpeg'
     if content.get('image'):
@@ -308,6 +314,24 @@ def videojs():
         elif video_args['player'] == 'test':
             return render_template('videojs-test.html', args=video_args)
     return render_template('videojs.html', args=video_args)
+
+
+@app.route('/videojs-decrypt')
+def videojs_decrypt():
+    args = request.args
+    video_args = args.copy()
+    if not video_args.get('src'):
+        return 'No video src specified'
+    if not video_args.get('key'):
+        return 'No decryption key specified'
+    if video_args.get('poster'):
+        # Make poster image local due to the CORS headers
+        video_args['poster'] = '/image?url=' + quote_plus(args['poster']) + '&width=640'
+    response = make_response(render_template('videojs-decrypt.html', args=video_args))
+    # Need CORS headers headers for ffmpeg.wasm
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+    response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+    return response
 
 
 @app.route('/playlist')
@@ -617,12 +641,6 @@ def proxy(url):
     logger.debug('proxy url: ' + proxy_url)
     headers = None
 
-    if 'www.youtube.com/watch' in proxy_url:
-        content = ytdl.get_content(proxy_url, {"player_client": "mediaconnect"}, {"module": "ytdl"}, False)
-        if content and '_m3u8' in content:
-            f_io = BytesIO(content['_m3u8'].encode())
-            return send_file(f_io, mimetype='text/html')
-
     if 'drive.google.com/' in proxy_url:
         # Google drive videos need to be requested with the headers & cookies
         content = google.get_content(proxy_url, {}, {"module": "google"}, False)
@@ -632,16 +650,20 @@ def proxy(url):
                 headers = content['_video_headers']
 
     if 'manifest.googlevideo.com/api' in proxy_url:
-        cookies = []
-        for key, val in config.youtube_cookies.items():
-            cookies.append('{}={}'.format(key, val))
-        headers = {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-us,en;q=0.5",
-            "Cookie": "; ".join(cookies),
-            "Sec-Fetch-Mode": "navigate",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36"
-        }
+        # headers = {
+        #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        #     "Accept-Language": "en-us,en;q=0.5",
+        #     "Sec-Fetch-Mode": "navigate",
+        #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.24 Safari/537.36",
+        # }
+        # cookies = []
+        # for key, val in config.youtube_cookies.items():
+        #     cookies.append('{}={}'.format(key, val))
+        # headers['Cookie'] = "; ".join(cookies)
+        # Force IPV4
+        # https://github.com/yt-dlp/yt-dlp/issues/11868
+        # https://stackoverflow.com/questions/33046733/force-requests-to-use-ipv4-ipv6
+        requests.packages.urllib3.util.connection.HAS_IPV6 = False
         #print(headers)
 
     if 'tt_chain_token' in proxy_url:
@@ -659,10 +681,14 @@ def proxy(url):
     if '.m3u8' in proxy_url and not proxy_url.endswith('.ts'):
         # This doen't reliably work for youtube m3u8 urls. They return 403 for methods here, but work fine in the console or module
         # r = requests.get(proxy_url, headers=headers)
-        if headers:
-            r = requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+        if 'manifest.googlevideo.com/api' in proxy_url:
+            r = curl_cffi_requests.get(proxy_url, impersonate='safari', proxies=config.proxies)
+        elif headers:
+            # r = curl_cffi_requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+            r = requests.get(proxy_url, headers=headers)
         else:
-            r = requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies)
+            # r = curl_cffi_requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies)
+            r = requests.get(proxy_url)
         if r.status_code != 200:
             logger.warning('requests error {} getting {}'.format(r.status_code, proxy_url))
             if r.text:
@@ -677,14 +703,214 @@ def proxy(url):
 
     # r = requests.get(proxy_url, headers=headers, stream=True)
     if headers:
-        r = requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
+        r = curl_cffi_requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     else:
-        r = requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
+        r = curl_cffi_requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     # Note on chunk size: https://stackoverflow.com/questions/34229349/flask-streaming-file-with-stream-with-context-is-very-slow
     resp = Response(stream_with_context(r.iter_content(chunk_size=1024)), status=r.status_code)
     resp.headers['Content-Type'] = r.headers['content-type']
     resp.headers['Access-Control-Allow-Origin'] = '*'
     return resp
+
+
+@app.route('/test_stream_spotify')
+def test_stream_spotify():
+    args = request.args
+    if not args.get('url'):
+        return 'No url specified'
+    split_url = urlsplit(args['url'])
+    paths = list(filter(None, split_url.path.split('/')))
+    content_id = paths[-1]
+    content_type = paths[-2]
+    if content_type != 'episode':
+        return 'Content not supported'
+
+    url = 'https://open.spotify.com/get_access_token'
+    r = curl_cffi_requests.get(url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code == 200:
+        access_token = r.json()['accessToken']
+    else:
+        logger.warning('Error {} getting {}'.format(r.status_code, url))
+        url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
+        r = curl_cffi_requests.get(url, impersonate="chrome", proxies=config.proxies)
+        if r.status_code != 200:
+            return 'Error {} getting {}'.format(r.status_code, url)
+        soup = BeautifulSoup(r.text, 'lxml')
+        el = soup.find('script', id='session')
+        if not el:
+            return 'unable to get Spotify authorization token'
+        session_json = json.loads(el.string)
+        access_token = session_json['accessToken']
+
+    headers = {
+        "accept": "application/json",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "authorization": 'Bearer ' + access_token,
+        "content-type": "application/json",
+        "origin": "https://embed-standalone.spotify.com",
+        "priority": "u=1, i",
+        "referer": "https://embed-standalone.spotify.com/",
+        "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-site",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+    }
+    url = 'https://spclient.wg.spotify.com/soundfinder/v1/unauth/episode/{}/com.widevine.alpha'.format(content_id)
+    r = requests.get(url, headers=headers)
+    if r.status_code != 200:
+        return 'Error {} getting {}'.format(r.status_code, url)
+    widevine = r.json()
+    utils.write_file(widevine, './debug/widevine.json')
+
+    if widevine.get('url'):
+        audio_file = widevine['url'][0]
+    else:
+        params = {
+            'version': 10000000,
+            'product': 9,
+            'platform': 39,
+            'alt': 'json'
+        }
+        headers['TE'] = 'Trailers'
+        url = 'https://gew1-spclient.spotify.com/storage-resolve/v2/files/audio/interactive/11/' + widevine['fileId']
+        r = requests.get(url, params=params, headers=headers)
+        if r.status_code != 200:
+            return 'Error {} getting {}'.format(r.status_code, url)
+        spotify_files = r.json()
+        utils.write_file(spotify_files, './debug/spotify_files.json')
+        audio_file = spotify_files['cdnurl'][0]
+    print(audio_file)
+
+    if 'key' in args:
+        if args['key'] == '':
+            key = 'deadbeefdeadbeefdeadbeefdeadbeef'
+        else:
+            key = args['key']
+    else:
+        headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "origin": "https://embed-standalone.spotify.com",
+            "referer": "https://embed-standalone.spotify.com/",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-site",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
+        }
+        url = 'https://seektables.scdn.co/seektable/{}.json'.format(widevine['fileId'])
+        r = requests.get(url, headers=headers)
+        if r.status_code != 200:
+            return 'Error {} getting {}'.format(r.status_code, url)
+        seektables = r.json()
+        utils.write_file(seektables, './debug/seektables.json')
+
+        # pssh = seektables['pssh_widevine']
+        pssh = seektables['pssh']
+        license_url = 'https://spclient.wg.spotify.com/widevine-license/v1/unauth/audio/license'
+        license_headers = \
+'''{
+    'accept': '*/*',
+    'accept-language': 'en-US,en;q=0.9,en-GB;q=0.8',
+    'origin': 'https://embed-standalone.spotify.com',
+    'priority': 'u=1, i',
+    'referrer': 'https://embed-standalone.spotify.com/',
+    'sec-ch-ua': '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-site',
+    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
+}'''
+        cdrm_data = {
+            'PSSH': pssh,
+            'License URL': license_url,
+            'Headers': license_headers,
+            'JSON': "{}",
+            'Cookies': "{}",
+            'Data': "{}",
+            'Proxy': "",
+        }
+        r = requests.post('https://cdrm-project.com/', json=cdrm_data)
+        if r.status_code != 200:
+            return 'Error {} getting keys from https://cdrm-project.com/'.format(r.status_code)
+        cdrm_result = r.json()
+        utils.write_file(cdrm_result, './debug/cdrm.json')
+        key = cdrm_result['Message'].split(':')[1].strip()
+        print(key)
+        # key seems to be 'deadbeefdeadbeefdeadbeefdeadbeef'
+
+    # TODO: play with videojs-contrib-eme or shaka-player?
+
+    if True:
+        video_args = {
+            "key": key,
+            "src": audio_file,
+            "type": "audio/mp4",
+            "poster": args['poster'] if 'poster' in args else config.server + '/static/video_poster-640x360.webp'
+        }
+        response = make_response(render_template('videojs-decrypt.html', args=video_args))
+        # required headers for ffmpeg.wasm
+        response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+        response.headers['Cross-Origin-Embedder-Policy'] = 'require-corp'
+        return response
+
+    # Decrypt and stream
+    # https://gist.github.com/anthonyeden/f3b3bdf6f62badd8f87bb574283f488a
+    # Other formats?
+    # Can't ffwd/rewind?
+    # mime_type = 'audio/mpeg'
+    # ffmpeg_cmd = ['ffmpeg', '-decryption_key', key, '-i', audio_file, '-f', 'mp3', '-']
+    # mime_type = 'audio/aac'
+    # ffmpeg_cmd = ['ffmpeg', '-decryption_key', key, '-i', audio_file, '-c:a', 'aac', '-f', 'adts', '-']
+    # process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=-1)
+    mime_type = 'audio/mp4'
+    ffmpeg_cmd = ['ffmpeg', '-decryption_key', key, '-i', audio_file, '-c', 'copy', '-']
+    process = subprocess.Popen(ffmpeg_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    out, err = process.communicate()
+    return send_file(io.BytesIO(out), mimetype=mime_type)
+    # def generate():
+    #     nonlocal process
+    #     startTime = time.time()
+    #     buffer = []
+    #     sentBurst = False
+    #     try:
+    #         while True:
+    #             # Get some data from ffmpeg
+    #             line = process.stdout.read(1024)
+    #             # We buffer everything before outputting it
+    #             buffer.append(line)
+    #             # Minimum buffer time, 3 seconds
+    #             if sentBurst is False and time.time() > startTime + 3 and len(buffer) > 0:
+    #                 sentBurst = True
+    #                 for i in range(0, len(buffer) - 2):
+    #                     print('Send initial burst #{}'.format(i))
+    #                     yield buffer.pop(0)
+    #             elif time.time() > startTime + 3 and len(buffer) > 0:
+    #                 yield buffer.pop(0)
+    #             process.poll()
+    #             if isinstance(process.returncode, int):
+    #                 if process.returncode > 0:
+    #                     print('FFmpeg Error {}'.format(process.returncode))
+    #                 break
+    #     except GeneratorExit:
+    #         print('stream_spotify GeneratorExit')
+    #         process.kill()
+    # response = Response(stream_with_context(generate()), mimetype=mime_type)
+    # @response.call_on_close
+    # def on_close():
+    #     nonlocal process
+    #     print('stream_spotify on_close')
+    #     if process:
+    #         process.kill()
+    # # GeneratorExit/on_close don't get triggered when window is closed so the process doen't get killed
+    # return response
 
 
 @app.route('/')

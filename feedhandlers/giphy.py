@@ -23,7 +23,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     giphy_html = ''
     for path in paths[1:]:
-        giphy_html = utils.get_url_html('https://giphy.com/gifs/' + path)
+        giphy_html = utils.get_url_html('https://giphy.com/embed/' + path)
         if giphy_html:
             break
     if not giphy_html:
@@ -31,7 +31,8 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(giphy_html, './debug/debug.html')
 
-    m = re.search(r'Giphy\.renderDesktop\(document\.querySelector\(\'\.gif-detail-page\'\), {\s+gif: ({.*}),\n', giphy_html)
+    m = re.search(r'gif:\s(\{.*?\}),\n', giphy_html)
+    # m = re.search(r'Giphy\.renderDesktop\(document\.querySelector\(\'\.gif-detail-page\'\), {\s+gif: ({.*}),\n', giphy_html)
     if not m:
         return None
     giphy_json = json.loads(m.group(1))
@@ -52,8 +53,10 @@ def get_content(url, args, site_json, save_debug=False):
         date = giphy_json['update_datetime']
     elif giphy_json.get('trending_datetime'):
         date = giphy_json['trending_datetime']
+    else:
+        date = ''
     if date:
-        date = re.sub('\+(\d\d)(\d\d)$', r'+\1:\2', date)
+        date = re.sub(r'\+(\d\d)(\d\d)$', r'+\1:\2', date)
         dt = datetime.fromisoformat(date)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
@@ -68,20 +71,18 @@ def get_content(url, args, site_json, save_debug=False):
     if giphy_json.get('tags'):
         item['tags'] = giphy_json['tags'].copy()
 
-    item['_image'] = get_image(giphy_json['images']['original_still']['url'])
-    item['_gif'] = get_image(giphy_json['images']['original']['url'])
+    item['image'] = get_image(giphy_json['images']['original_still']['url'])
+    if giphy_json['images']['original'].get('mp4'):
+        item['_video'] = giphy_json['images']['original']['mp4']
 
     caption = '{} | <a href="{}">Watch on Giphy</a>'.format(giphy_json['title'], giphy_json['url'])
-    if args:
-        if 'mp4' in args:
-            item['content_html'] = utils.add_video(get_image(giphy_json['images']['original']['mp4']), 'video/mp4',
-                                                   item['_image'], caption)
-        elif 'webp' in args:
-            item['content_html'] = utils.add_video(get_image(giphy_json['images']['original']['webp']), 'video/mp4',
-                                                   item['_image'], caption)
-    if not item.get('content_html'):
-        item['content_html'] = utils.add_image(get_image(giphy_json['images']['original']['url']), caption,
-                                               giphy_json['images']['original']['width'])
+    if 'mp4' in args and giphy_json['images']['original'].get('mp4'):
+        item['content_html'] = utils.add_video(get_image(giphy_json['images']['original']['mp4']), 'video/mp4', item['image'], caption, use_videojs=True)
+    elif giphy_json['images']['original'].get('webp'):
+        item['content_html'] = utils.add_image(get_image(giphy_json['images']['original']['webp']), caption, giphy_json['images']['original']['width'])
+    else:
+        # GIF
+        item['content_html'] = utils.add_image(get_image(giphy_json['images']['original']['url']), caption, giphy_json['images']['original']['width'])
     return item
 
 

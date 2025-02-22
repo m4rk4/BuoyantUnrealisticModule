@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import utils
-from feedhandlers import rss
+from feedhandlers import jwplayer, rss
 
 import logging
 
@@ -124,7 +124,23 @@ def get_video_content(url, args, site_json, save_debug=False):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    if split_url.netloc.startswith('video.'):
+    if split_url.netloc == 'video.outkick.com':
+        m = re.search(r'/m/([^/]+)/', split_url.path)
+        if m:
+            item = jwplayer.get_content('https://content.jwplatform.com/players/{}.html'.format(m.group(1)), args, {"module": "jwplayer"}, save_debug)
+            if item:
+                item['url'] = url
+                split_title = item['title'].split('|')
+                if len(split_title) == 2:
+                    item['author'] = {
+                        "name": split_title[-1].strip()
+                    }
+                    item['authors'] = []
+                    item['authors'].append(item['author'])
+                return item
+        logger.warning('unhandled video url ' + url)
+        return None
+    elif split_url.netloc.startswith('video.'):
         return get_video_content(url, args, site_json, save_debug)
     elif 'foxbusiness' in split_url.netloc:
         canonical_url = 'foxbusiness.com' + split_url.path
@@ -141,6 +157,9 @@ def get_content(url, args, site_json, save_debug=False):
             api_url = 'https://prod-api.foxsports.com/fs/videos?searchBy=urls&values=' + quote_plus(canonical_url)
         else:
             api_url = 'https://prod-api.foxsports.com/fs/articles?searchBy=urls&values=' + quote_plus(canonical_url)
+    elif 'outkick' in split_url.netloc:
+        canonical_url = 'outkick.com' + split_url.path
+        api_url = 'https://api.outkick.com/spark/articles?searchBy=urls&type=&values=' + quote_plus(canonical_url)
     else:
         logger.warning('unhandled url ' + url)
         return None
@@ -164,6 +183,10 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
+    return get_item(article_json, args, site_json, save_debug)
+
+
+def get_item(article_json, args, site_json, save_debug):
     item = {}
     item['id'] = article_json['id']
     item['url'] = 'https://www.' + article_json['canonical_url']
@@ -264,7 +287,7 @@ def get_content(url, args, site_json, save_debug=False):
         elif component['content_type'] == 'image_gallery':
             for image in component['content']['images']:
                 item['content_html'] += add_image(image) + '<br/>'
-        elif component['content_type'] == 'youtube_video' or component['content_type'] == 'twitter_tweet':
+        elif component['content_type'] == 'youtube_video' or component['content_type'] == 'twitter_tweet' or component['content_type'] == 'instagram_media' or component['content_type'] == 'tiktok_video':
             item['content_html'] += utils.add_embed(component['content']['url'])
         elif re.search(r'brightcove|delta_video', component['content_type']):
             item['content_html'] += add_video(component['content'])
@@ -331,68 +354,133 @@ def get_feed(url, args, site_json, save_debug=False):
     if re.search(r'\.xml|rss', args['url']):
         return rss.get_feed(url, args, site_json, save_debug, get_content)
 
-    page_html = utils.get_url_html(args['url'])
-    if not page_html:
-        return None
-
     split_url = urlsplit(args['url'])
+    paths = list(filter(None, split_url.path.split('/')))
+
     n = 0
-    items = []
-    if split_url.netloc.startswith('video.'):
-        m = re.search(r'site: "([^"]+)".*playlistId: "([^"]+)"', page_html, flags=re.S)
-        if not m:
-            logger.warning('unable to find playlistId for ' + args['url'])
-            return None
-        site = m.group(1)
-        playlist_id = m.group(2)
-        api_url = 'https://video.{}.com/v/feed/playlist/{}.json'.format(site, playlist_id)
-        api_json = utils.get_url_json(api_url)
+    feed_items = []
+
+    if split_url.netloc == 'www.outkick.com':
+        if len(paths) > 1:
+            if paths[0] == 'person':
+                post_data = {
+                    "searchBy": "contributor",
+                    "value": "content/ok" + split_url.path,
+                    "from": 1,
+                    "size": 10,
+                    "type": "articles,videos",
+                    "endpoint": "feed",
+                    "context": {
+                        "url": split_url.path,
+                        "path": split_url.path,
+                        "queryString": "{}",
+                        "component": "components/layoutComponents/ContentRiver/ContentRiver.vue"
+                    }
+                }
+            elif paths[0] == 'category':
+                post_data = {
+                    "tags": "outkick/" + paths[1],
+                    "from": 1,
+                    "size": 10,
+                    "endpoint": "feed",
+                    "context": {
+                        "url": split_url.path,
+                        "path": split_url.path,
+                        "queryString": "{}",
+                        "component": "components/layoutComponents/ContentRiver/ContentRiver.vue"
+                    }
+                }
+            elif len(paths) == 1:
+                post_data = {
+                    "searchBy": "categories",
+                    "values": "outkick/" + paths[0],
+                    "from": 1,
+                    "size": 10,
+                    "media_tags": "",
+                    "type": "articles,videos",
+                    "endpoint": "feed",
+                    "context": {
+                        "url": split_url.path,
+                        "path": split_url.path,
+                        "queryString": "{}",
+                        "component": "components/layoutComponents/ContentRiver/ContentRiver.vue"
+                    }
+                }
+        api_json = utils.post_url('https://www.outkick.com/api/spark', json_data=post_data)
         if not api_json:
             return None
         if save_debug:
             utils.write_file(api_json, './debug/feed.json')
-        for it in api_json['channel']['item']:
-            url = 'https://video.{}.com/v/{}/?playlist_id={}'.format(site, it['media-content']['mvn-assetUUID'], playlist_id)
-            if save_debug:
-                logger.debug('getting content from ' + url)
-            item = get_video_content(url, args, site_json, save_debug)
+        for article in api_json['results']:
+            item = get_item(article, args, site_json, save_debug)
             if item:
                 if utils.filter_item(item, args) == True:
-                    items.append(item)
+                    feed_items.append(item)
                     n += 1
                     if 'max' in args:
                         if n == int(args['max']):
                             break
+    else:
+        page_html = utils.get_url_html(args['url'])
+        if not page_html:
+            return None
 
-    elif 'foxsports' in split_url.netloc:
-        if split_url.path.startswith('/shows/'):
-            soup = BeautifulSoup(page_html, 'html.parser')
-            for el in soup.find_all(attrs={"data-psu":True}):
-                split_url = urlsplit(el['data-psu'])
-                paths = list(filter(None, split_url.path.split('/')))
-                url = 'https://www.foxsports.com/watch/' + paths[-1]
+        if split_url.netloc.startswith('video.'):
+            m = re.search(r'site: "([^"]+)".*playlistId: "([^"]+)"', page_html, flags=re.S)
+            if not m:
+                logger.warning('unable to find playlistId for ' + args['url'])
+                return None
+            site = m.group(1)
+            playlist_id = m.group(2)
+            api_url = 'https://video.{}.com/v/feed/playlist/{}.json'.format(site, playlist_id)
+            api_json = utils.get_url_json(api_url)
+            if not api_json:
+                return None
+            if save_debug:
+                utils.write_file(api_json, './debug/feed.json')
+            for it in api_json['channel']['item']:
+                url = 'https://video.{}.com/v/{}/?playlist_id={}'.format(site, it['media-content']['mvn-assetUUID'], playlist_id)
                 if save_debug:
                     logger.debug('getting content from ' + url)
-                item = get_content(url, args, site_json, save_debug)
+                item = get_video_content(url, args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
-                        items.append(item)
+                        feed_items.append(item)
                         n += 1
                         if 'max' in args:
                             if n == int(args['max']):
                                 break
-        else:
-            m = re.search(r'apiEndpointUrl:"([^"]+)"', page_html)
-            if m:
-                api_url = m.group(1).replace('\\u002F', '/')
-                split_url = urlsplit(api_url)
-                query = parse_qs(split_url.query)
-                args_copy = args.copy()
-                args_copy['url'] = 'https://api.foxsports.com/v2/content/optimized-rss?partnerKey=MB0Wehpmuj2lUhuRhQaafhBjAJqaPU244mlTDK1i&size=10&tags=' + query['uri'][0]
-                return rss.get_feed(url, args_copy, site_json, save_debug, get_content)
 
-    if not items:
+        elif 'foxsports' in split_url.netloc:
+            if split_url.path.startswith('/shows/'):
+                soup = BeautifulSoup(page_html, 'html.parser')
+                for el in soup.find_all(attrs={"data-psu":True}):
+                    split_url = urlsplit(el['data-psu'])
+                    paths = list(filter(None, split_url.path.split('/')))
+                    url = 'https://www.foxsports.com/watch/' + paths[-1]
+                    if save_debug:
+                        logger.debug('getting content from ' + url)
+                    item = get_content(url, args, site_json, save_debug)
+                    if item:
+                        if utils.filter_item(item, args) == True:
+                            feed_items.append(item)
+                            n += 1
+                            if 'max' in args:
+                                if n == int(args['max']):
+                                    break
+            else:
+                m = re.search(r'apiEndpointUrl:"([^"]+)"', page_html)
+                if m:
+                    api_url = m.group(1).replace('\\u002F', '/')
+                    split_url = urlsplit(api_url)
+                    query = parse_qs(split_url.query)
+                    args_copy = args.copy()
+                    args_copy['url'] = 'https://api.foxsports.com/v2/content/optimized-rss?partnerKey=MB0Wehpmuj2lUhuRhQaafhBjAJqaPU244mlTDK1i&size=10&tags=' + query['uri'][0]
+                    return rss.get_feed(url, args_copy, site_json, save_debug, get_content)
+
+    if not feed_items:
         return None
+
     feed = utils.init_jsonfeed(args)
-    feed['items'] = items.copy()
+    feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

@@ -37,22 +37,19 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(api_json['lastModifiedDate']).astimezone(timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    authors = []
+    item['authors'] = []
     if api_json['metadata'].get('authorsList'):
-        for it in api_json['metadata']['authorsList']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in api_json['metadata']['authorsList']]
     elif api_json['metadata'].get('agency'):
-        item['author']['name'] = api_json['metadata']['agency']
-    authors = []
+        item['authors'] = [{
+            "name": api_json['metadata']['agency']
+        }]
     if api_json['metadata'].get('editedByList'):
-        for it in api_json['metadata']['editedByList']:
-            authors.append(it['name'])
-        if item['author'].get('name'):
-            item['author']['name'] += ' | Edited by ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-        else:
-            item['author']['name'] = 'Edited by ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] += [{"name": x['name'] + '(editor)'} for x in api_json['metadata']['editedByList']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if api_json['metadata'].get('affKeywordsSet'):
         item['tags'] = []
@@ -75,6 +72,13 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = api_json['summary']
         item['content_html'] += '<p><em>{}</em></p>'.format(api_json['summary'])
 
+    if api_json.get('leadMedia') and api_json['leadMedia'].get('image'):
+        item['image'] = api_json['leadMedia']['image']['images']['ampImage']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     if api_json.get('leadMedia'):
         if api_json['leadMedia'].get('video'):
             if api_json['leadMedia']['video'].get('embedUrl'):
@@ -82,14 +86,13 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 logger.warning('unhandled leadMedia video in ' + item['url'])
         elif api_json['leadMedia'].get('image'):
-            item['_image'] = api_json['leadMedia']['image']['images']['ampImage']
             if not (api_json.get('listElement') and api_json['listElement'][0]['type'] == 'slide'):
                 captions = []
                 if api_json['leadMedia']['image'].get('caption'):
                     captions.append(api_json['leadMedia']['image']['caption'])
                 if api_json['leadMedia']['image'].get('imageCredit'):
                     captions.append(api_json['leadMedia']['image']['imageCredit'])
-                item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+                item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
 
     if api_json.get('introBody'):
         item['content_html'] += api_json['introBody']

@@ -14,14 +14,11 @@ logger = logging.getLogger(__name__)
 def get_next_data(url):
     page_html = utils.get_url_html(url)
     soup = BeautifulSoup(page_html, 'html.parser')
-    el = soup.find('script', string=re.compile(r'^__NEXT_DATA__'))
+    el = soup.find('script', id='__NEXT_DATA__')
     if not el:
         logger.warning('unable to find NEXT_DATA in ' + url)
         return None
-    next_data = re.sub(r';__NEXT_LOADED_PAGES__.*', '', el.string[16:])
-    return json.loads(next_data)
-
-
+    return json.loads(el.string)
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -29,6 +26,7 @@ def get_content(url, args, site_json, save_debug=False):
     if not next_data:
         return None
     return get_article_content(next_data['props']['pageProps']['initialProps']['article'], args, site_json, save_debug)
+
 
 def get_article_content(article_json, args, site_json, save_debug=False):
     if save_debug:

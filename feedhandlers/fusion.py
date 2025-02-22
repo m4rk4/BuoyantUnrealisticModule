@@ -65,6 +65,9 @@ def resize_image(image_item, site_json, width=1280):
         #resizer_hash = base64.b64encode(hashed.digest()).decode().replace('+', '-').replace('/', '_')
         resizer_hash = base64.urlsafe_b64encode(hashed.digest()).decode()
         img_src = '{}{}/{}{}'.format(site_json['resizer_url'], resizer_hash, operation_path, image_path)
+    elif image_item.get('auth'):
+        paths = list(filter(None, urlsplit(image_item['url']).path[1:].split('/')))
+        img_src = '{}/{}?auth={}&smart=true&width={}&quality=85'.format(site_json['resizer_url'], paths[-1], image_item['auth']['1'], width)
     elif image_item.get('renditions'):
         images = []
         for key, val in image_item['renditions']['original'].items():
@@ -81,8 +84,8 @@ def resize_image(image_item, site_json, width=1280):
 
 
 def process_content_element(element, url, site_json, save_debug):
+    # print(element)
     split_url = urlsplit(url)
-
     element_html = ''
     if element['type'] == 'text' or element['type'] == 'paragraph':
         # Filter out ad content
@@ -100,7 +103,10 @@ def process_content_element(element, url, site_json, save_debug):
                 el['href'] = link
             element_html = str(raw_soup)
         elif element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
-            raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
+            if element['content'].startswith('%3C'):
+                raw_soup = BeautifulSoup(unquote_plus(element['content']).strip(), 'html.parser')
+            else:
+                raw_soup = BeautifulSoup(element['content'].strip(), 'html.parser')
             #print(raw_soup.contents[0].name)
             if raw_soup.iframe:
                 if raw_soup.iframe.get('data-fallback-image-url'):
@@ -191,8 +197,12 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += audio_html
             else:
                 logger.warning('unhandled custom_embed inline_audio')
+        elif element['subtype'] == 'video' and element['embed']['config'].get('contentUrl') and 'jwplayer' in element['embed']['config']['contentUrl']:
+            element_html += utils.add_embed(element['embed']['config']['contentUrl'])
         elif element['subtype'] == 'videoplayer' and element['embed']['config'].get('videoCode'):
             element_html += utils.add_embed(element['embed']['config']['videoCode'])
+        elif element['subtype'] == 'video_dm':
+            element_html += utils.add_embed(element['embed']['config']['url'])
         elif element['subtype'] == 'oovvuu-video':
             video_json = utils.get_url_json('https://playback.oovvuu.media/embed/d3d3LnRoZXN0YXIuY29t/{}'.format(element['embed']['config']['embedId']))
             if video_json:
@@ -283,6 +293,12 @@ def process_content_element(element, url, site_json, save_debug):
         elif element['subtype'] == 'flourish_visualisation':
             embed_url = 'https://flo.uri.sh/visualisation/{}/embed?auto=1'.format(element['embed']['config']['visualizationNumber'])
             element_html += utils.add_image('{}/screenshot?url={}&locator=main&width=1200&height=800'.format(config.server, quote_plus(embed_url)), '<a href="{}">View Flourish Visualization</a>'.format(embed_url))
+        elif element['subtype'] == 'stars_notation':
+            if element['embed']['config'].get('notationTitle'):
+                element_html += '<div style="font-size:1.2em; font-weight:bold; text-align:center;">' + element['embed']['config']['notationTitle'] + '</div>'
+            element_html += utils.add_stars(float(element['embed']['config']['notationValue']))
+            if element['embed']['config'].get('notationDescription'):
+                element_html += '<div style="font-size:0.8em; width:20em; margin:auto;">' + BeautifulSoup(element['embed']['config']['notationDescription'].replace('&nbsp;', ' '), 'html.parser').get_text() + '</div>'
         elif element['subtype'] == 'tabseparator':
             element_html += '<div>&nbsp;</div><hr/><div>&nbsp;<h2>{}</h2></div>'.format(unquote_plus(element['embed']['config']['tabTitle']))
             if element['embed']['config']['contentSource'] == 'dynamic':
@@ -385,7 +401,7 @@ def process_content_element(element, url, site_json, save_debug):
                     else:
                         color = 'green'
                     element_html += '<h3 style="text-align:center;">{} (<a href="https://www.bnnbloomberg.ca/stock/{}/">{}</a>): ${} <span style="color:{};">{} ({}%)</span></h3>'.format(stock_json[0]['name'], stock_json[0]['symbol'], stock_json[0]['symbol'], stock_json[0]['price'], color, stock_json[0]['netChange'], stock_json[0]['percentChange'])
-        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag' or element['subtype'] == 'Alternate Headlines':
+        elif element['subtype'] == 'magnet' or element['subtype'] == 'newsletter_signup' or element['subtype'] == 'newslettersignup-composer' or element['subtype'] == 'now-read' or element['subtype'] == 'read_also' or element['subtype'] == 'related_story' or element['subtype'] == 'SubjectTag' or element['subtype'] == 'Alternate Headlines':
             pass
         else:
             logger.warning('unhandled custom_embed ' + element['subtype'])
@@ -419,7 +435,7 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'oembed_response':
         if element.get('subtype'):
-            if element['subtype'] == 'instagram' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube':
+            if element['subtype'] == 'instagram' or element['subtype'] == 'spotify' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube':
                 element_html += utils.add_embed(element['referent']['id'])
             else:
                 logger.warning('unhandled oembed_response subtype ' + element['subtype'])
@@ -721,7 +737,9 @@ def get_content_html(content, url, site_json, save_debug):
         # elif content['content_elements'][1]['_id'] == lead_image['_id']:
         #     lead_image = None
     if lead_image:
-        if not content.get('content_elements') or content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube'):
+        if not lead_image.get('type'):
+            lead_image['type'] = 'image'
+        if not content.get('content_elements') or content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube' and content['content_elements'][0].get('subtype') != 'video'):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
 
     if content.get('content_elements'):
@@ -781,6 +799,9 @@ def get_content_html(content, url, site_json, save_debug):
                 content_html += audio_html
             else:
                 logger.warning('unhandled audio subtype in ' + url)
+
+    if content.get('content_restrictions') and content['content_restrictions'].get('content_code') and content['content_restrictions']['content_code'] == 'hard-paywall':
+        content_html += '<h2 style="text-align:center;"><a href="{}">This post is for paid subscribers</a></h2>'.format(url)
 
     content_html = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', content_html)
     return content_html
@@ -896,7 +917,9 @@ def get_item(content, url, args, site_json, save_debug):
         item['tags'] = list(set(tags))
 
     if content.get('promo_items'):
-        if content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
+        if content['promo_items'].get('basic') and not content['promo_items']['basic'].get('type'):
+            item['_image'] = resize_image(content['promo_items']['basic'], site_json)
+        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
             item['_image'] = resize_image(content['promo_items']['basic'], site_json)
         elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'gallery':
             item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
@@ -1069,7 +1092,7 @@ def get_feed(url, args, site_json, save_debug=False):
         if len(paths) == 0:
             source = site_json['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
-        elif re.search(r'about|author|people|staff|team', paths[0]) or (len(paths) > 1 and paths[1].lower() == 'author'):
+        elif re.search(r'about|author|auteur|autor|people|staff|team', paths[0]) or (len(paths) > 1 and paths[1].lower() == 'author'):
             author = ''
             if split_url.netloc == 'www.dlnews.com':
                 authors_json = utils.get_url_json('https://api.dlnews.com/authors')
@@ -1077,6 +1100,9 @@ def get_feed(url, args, site_json, save_debug=False):
                     author_data = next((it for it in authors_json['data'] if it['slug'] == paths[1]), None)
                     if author_data:
                         author = author_data['id']
+            elif split_url.netloc == 'www.leparisien.fr':
+                # TODO: need the author name not the slug
+                author = paths[-1].replace('-', ' ').title()
             elif paths[0] == 'about':
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
                 author = paths[-1]

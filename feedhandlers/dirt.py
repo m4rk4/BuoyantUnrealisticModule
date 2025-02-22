@@ -135,14 +135,24 @@ def render_content(node, links):
         content_html += '</li>'
 
     elif node['nodeType'] == 'embedded-asset-block':
-        if node['data']['target']['fields'].get('file') and node['data']['target']['fields']['file']['contentType'].startswith('image/'):
-            if node['data']['target']['fields'].get('description'):
-                caption = node['data']['target']['fields']['description']
-            elif node['data']['target']['fields'].get('title') and node['data']['target']['fields']['title'] not in node['data']['target']['fields']['file']['fileName']:
-                caption = node['data']['target']['fields']['title']
+        if node['data']['target'].get('fields'):
+            if node['data']['target']['fields'].get('file') and node['data']['target']['fields']['file']['contentType'].startswith('image/'):
+                if node['data']['target']['fields'].get('description'):
+                    caption = node['data']['target']['fields']['description']
+                elif node['data']['target']['fields'].get('title') and node['data']['target']['fields']['title'] not in node['data']['target']['fields']['file']['fileName']:
+                    caption = node['data']['target']['fields']['title']
+                else:
+                    caption = ''
+                content_html += utils.add_image(resize_image('https:' + node['data']['target']['fields']['file']['url']), caption)
             else:
-                caption = ''
-            content_html += utils.add_image(resize_image('https:' + node['data']['target']['fields']['file']['url']), caption)
+                logger.warning('unhandled embedded-asset-block')
+        elif node['data']['target'].get('sys'):
+            # print(node['data']['target']['sys']['id'])
+            block = next((it for it in links['assets']['block'] if it['sys']['id'] == node['data']['target']['sys']['id']), None)
+            if block and block['contentType'].startswith('image'):
+                content_html += utils.add_image(block['url'], block['description'])
+            else:
+                logger.warning('unhandled embedded-asset-block')
         else:
             logger.warning('unhandled embedded-asset-block')
 
@@ -163,8 +173,18 @@ def render_content(node, links):
 
     elif node['nodeType'] == 'embedded-entry-block':
         block_html = ''
-        if node['data']['target'].get('sys') and links and links.get('entries') and links['entries'].get('block'):
-            block = next((it for it in links['entries']['block'] if it['sys']['__ref'] == 'Sys:' + node['data']['target']['sys']['id']), None)
+        if node['data'].get('target') and node['data']['target'].get('sys') and links and links.get('entries') and links['entries'].get('block'):
+            # block = next((it for it in links['entries']['block'] if it['sys']['__ref'] == 'Sys:' + node['data']['target']['sys']['id']), None)
+            block = None
+            for it in links['entries']['block']:
+                if it['sys'].get('__ref'):
+                    if it['sys']['__ref'] == 'Sys:' + node['data']['target']['sys']['id']:
+                        block = it
+                elif it['sys'].get('id'):
+                    if it['sys']['id'] == node['data']['target']['sys']['id']:
+                        block = it
+                if block:
+                    break
             logger.debug('embedded-entry-block __typename ' + block['__typename'])
             if block and block['__typename'] == 'Image':
                 if block.get('imageV2'):
@@ -227,12 +247,30 @@ def render_content(node, links):
                             block_html += '<h3>' + it['name'] + '</h3>'
                             if it.get('description'):
                                 block_html += '<p>' + it['description'] + '</p><div>&nbsp;</div>'
+            elif block and block['__typename'] == 'ComponentVideo' and block.get('provider') == 'YouTube':
+                block_html += utils.add_embed(block['url'], {"skip_playlist": True})
             elif block and block['__typename'] == 'SocialMediaEmbed':
                 block_html += utils.add_embed(block['socialMediaUrl'])
-        if node['data']['target'].get('fields') and node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I):
-            pass
-        elif block_html:
-            content_html += block_html
+        elif node['data'].get('target') and node['data']['target'].get('fields') and node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I):
+            block_html = 'SKIP'
+        elif node['data'].get('type'):
+            if node['data']['type'] == 'html':
+                m = re.search(r'src="([^"]+)', node['data']['value'])
+                if m:
+                    block_html += utils.add_embed(m.group(1))
+            elif node['data']['type'] == 'image':
+                if node['data']['props']['src'].startswith('//'):
+                    img_src = 'https:' + node['data']['props']['src']
+                else:
+                    img_src = node['data']['props']['src']
+                if 'images.twnmm.com' in img_src:
+                    img_src += '?w=1080&q=80&fm=webp'
+                block_html += utils.add_image(img_src)
+            elif node['data']['type'] == 'injected-ad-slot':
+                block_html = 'SKIP'
+        if block_html:
+            if block_html != 'SKIP':
+                content_html += block_html
         else:
             logger.warning('unhandled embedded-entry-block')
 

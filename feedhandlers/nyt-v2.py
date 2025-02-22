@@ -198,15 +198,18 @@ def render_block(block, full_header=False, headline_url=''):
         block_html += render_block(block['media'])
 
     elif block['__typename'] == 'Video':
-        for it in block['renditions']:
-            if it.get('type'):
-                if re.search(r'video_480p_mp4', it['type']):
-                    video = it
+        video = next((it for it in block['renditions'] if it.get('type') == 'hls'), None)
+        if video:
+            video_type = 'application/x-mpegURL'
+        else:
+            for video_type in ['video_720p_mp4', 'video_1080p_mp4', 'video_480p_mp4']:
+                video = next((it for it in block['renditions'] if it.get('type') == video_type), None)
+                if video:
+                    video_type = 'video/mp4'
                     break
-            else:
-                if re.search(r'480p\.mp4', it['url']):
-                    video = it
-                    break
+            if not video:
+                video = block['renditions'][0]
+                video_type = 'application/x-mpegURL'
         for it in block['promotionalMedia']['crops']:
             if it['name'] == 'MASTER':
                 image = utils.closest_dict(it['renditions'], 'width', 1000)
@@ -218,7 +221,7 @@ def render_block(block, full_header=False, headline_url=''):
         elif block.get('bylines'):
             for it in block['bylines']:
                 captions.append(it['renderedRepresentation'])
-        block_html += utils.add_video(video['url'], 'video/mp4', image['url'], ' | '.join(captions))
+        block_html += utils.add_video(video['url'], video_type, image['url'], ' | '.join(captions), use_videojs=True)
 
     elif block['__typename'] == 'AudioBlock':
         block_html += render_block(block['media'])
@@ -295,8 +298,11 @@ def render_block(block, full_header=False, headline_url=''):
             else:
                 logger.warning('unhandled card in Pilot EmbeddedInteractive')
         elif block['appName'] == 'Runway':
-            embed_url = 'data:text/html;base64,' + base64.b64encode(block['html'].encode()).decode()
-            block_html += utils.add_image('{}/screenshot?url={}&browser=chrome&waitfortime=5000&locator=div.birdkit-body'.format(config.server, quote_plus(embed_url)), link=embed_url)
+            # https://www.nytimes.com/2025/01/27/us/earthquake-boston-new-hampshire-maine.html
+            # TODO: fix - screenshot doesn't use playwright to render html now
+            # embed_url = 'data:text/html;base64,' + base64.b64encode(block['html'].encode()).decode()
+            # block_html += utils.add_image('{}/screenshot?url={}&browser=chrome&waitfortime=5000&locator=div.birdkit-body'.format(config.server, quote_plus(embed_url)), link=embed_url)
+            block_html += '<blockquote><b>Unable to display embedded content</b></blockquote>'
         elif soup.find('blockquote', class_='tiktok-embed'):
             block_html += utils.add_embed(soup.blockquote['cite'])
         elif block.get('slug') and 'burst-video' in block['slug']:

@@ -720,11 +720,20 @@ def get_content(url, args, site_json, save_debug=False):
                         captions.insert(0, it.get_text().strip())
                     lede += utils.add_image(div['data-url'], ' | '.join(captions))
         item['content_html'] = lede
+        new_html = ''
         source = ''
+        image_expandable = False
         for el in content.find_all(class_=['product-offer-card-container_listing', 'product-offer-card-container_listing__container', 'product-offer-card-container_listing__container-items']):
             el.unwrap()
         for el in content.find_all(recursive=False):
-            new_html = ''
+            if image_expandable == True:
+                # Successive image_expandable's get combined into one flex box
+                if 'image_expandable' not in el['class']:
+                    # Close the flex box
+                    new_html += '</div><div>&nbsp;</div>'
+                    image_expandable = False
+            else:
+                new_html = ''
             if 'paragraph' in el['class'] or 'subheader' in el['class']:
                 el.attrs = {}
                 if source:
@@ -740,7 +749,7 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(attrs={"itemprop": "caption"})
                 if it and it.get_text().strip():
                     captions.insert(0, it.get_text().strip())
-                new_html = utils.add_image(resize_image(el['data-url']), ' | '.join(captions))
+                new_html += utils.add_image(resize_image(el['data-url']), ' | '.join(captions))
             elif 'image-slider' in el['class']:
                 captions = []
                 it = el.find(class_=re.compile(r'^image_.*_credit$'))
@@ -750,13 +759,29 @@ def get_content(url, args, site_json, save_debug=False):
                 it = el.find(attrs={"itemprop": "caption"})
                 if it and it.get_text().strip():
                     captions.insert(0, it.get_text().strip())
-                new_html = '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap;">'
+                new_html += '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap;">'
                 for it in el.find_all(class_='image'):
                     new_html += '<div style="flex:1; min-width:360px;"><img src="{}" style="width:100%;" /></div>'.format(resize_image(it['data-url']))
                 new_html += '</div>'
                 if captions:
                     new_html += '<figcaption><small>{}</small></figcaption>'.format(' | '.join(captions))
                 new_html += '</figure>'
+            elif 'image_expandable' in el['class']:
+                if image_expandable == False:
+                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                    image_expandable = True
+                captions = []
+                it = el.find(attrs={"data-editable": "metaCaption"})
+                if it and it.get_text().strip():
+                    captions.append(it.decode_contents())
+                else:
+                    it = el.find(class_='image_expandable__caption')
+                    if it and it.get_text().strip():
+                        captions.append(it.get_text().strip())
+                it = el.find(class_='image_expandable__credit')
+                if it and it.get_text().strip():
+                    captions.append(it.get_text().strip())
+                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(resize_image(el['data-url']), ' | '.join(captions)) + '</div>'
             elif 'gallery-inline' in el['class']:
                 gallery_images = []
                 new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
@@ -785,7 +810,7 @@ def get_content(url, args, site_json, save_debug=False):
             elif 'interactive-video' in el['class']:
                 video = el.find('video')
                 if video:
-                    new_html = utils.add_video(video.source['src'], video.source['type'], video.get('poster'))
+                    new_html += utils.add_video(video.source['src'], video.source['type'], video.get('poster'))
             elif 'video-resource' in el['class']:
                 video = None
                 for it in article_json['video']:
@@ -804,42 +829,42 @@ def get_content(url, args, site_json, save_debug=False):
                         source = BeautifulSoup(html.unescape(el['data-source-html']), 'html.parser').get_text().strip()
                         captions.append(re.sub(r'^-\s*', '', source))
                         source = ''
-                    new_html = utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
+                    new_html += utils.add_video(video['contentUrl'], 'video/mp4', image['big']['uri'], 'Watch: ' + ' | '.join(captions))
                 elif el.get('data-parent-uri'):
                     # CONTENT_HUB_UNIQUE_DEPLOYMENT_KEY = rn0624cy
                     video = utils.get_url_json('https://fave.api.cnn.io/v1/video?stellarUri={}&stellarUdk=rn0624cy&edition=domestic&customer=cnn&env=prod'.format(el['data-parent-uri']))
                     image = utils.closest_dict(video['images'], 'imageWidth', 1200)
                     if video:
-                        new_html = utils.add_video(video['files'][0]['fileUri'], 'video/mp4', image['uri'], 'Watch: ' + video['headline'])
+                        new_html += utils.add_video(video['files'][0]['fileUri'], 'video/mp4', image['uri'], 'Watch: ' + video['headline'])
             elif 'youtube' in el['class']:
                 it = el.find(class_='youtube__content')
                 if it:
-                    new_html = utils.add_embed('https://www.youtube.com/embed/' + it['data-video-id'])
+                    new_html += utils.add_embed('https://www.youtube.com/embed/' + it['data-video-id'])
             elif 'twitter' in el['class']:
                 links = el.find_all('a')
-                new_html = utils.add_embed(links[-1]['href'])
+                new_html += utils.add_embed(links[-1]['href'])
             elif 'instagram' in el['class']:
                 it = el.find(attrs={"data-instgrm-permalink": True})
                 if it:
-                    new_html = utils.add_embed(it['data-instgrm-permalink'])
+                    new_html += utils.add_embed(it['data-instgrm-permalink'])
             elif 'map' in el['class']:
-                new_html = utils.add_image('{}/screenshot?url={}&locator={}'.format(config.server, quote_plus(item['url']), quote_plus('[data-id="{}"]'.format(el['data-id']))))
+                new_html += utils.add_image('{}/screenshot?url={}&locator={}'.format(config.server, quote_plus(item['url']), quote_plus('[data-id="{}"]'.format(el['data-id']))))
             elif 'graphic' in el['class']:
                 it = el.find(class_='graphic__anchor')
                 if it:
-                    new_html = utils.add_embed(it['data-url'])
+                    new_html += utils.add_embed(it['data-url'])
             elif 'html-embed' in el['class']:
                 it = el.find('iframe')
                 if it:
-                    new_html = utils.add_embed(it['src'])
+                    new_html += utils.add_embed(it['src'])
                 else:
                     it = el.find('blockquote', class_='tiktok-embed')
                     if it:
-                        new_html = utils.add_embed(it['cite'])
+                        new_html += utils.add_embed(it['cite'])
                 if not new_html:
                     it = el.find(attrs={"data-type": "dailygraphics"})
                     if it:
-                        new_html = utils.add_image('{}/screenshot?url={}&locator=%23root'.format(config.server, quote_plus(it['data-url'])), link=it['data-url'])
+                        new_html += utils.add_image('{}/screenshot?url={}&locator=%23root'.format(config.server, quote_plus(it['data-url'])), link=it['data-url'])
                     else:
                         it = el.find(class_='cnn-pcl-embed')
                         if it:
@@ -849,7 +874,7 @@ def get_content(url, args, site_json, save_debug=False):
                             elif it.get('data-click-through'):
                                 new_item = get_content(it['data-click-through'], ['embed'], site_json, False)
                             if new_item:
-                                new_html = new_item['content_html']
+                                new_html += new_item['content_html']
                 if not new_html:
                     div = el.find(class_=re.compile(r'^m-infographic'))
                     if div:
@@ -863,9 +888,9 @@ def get_content(url, args, site_json, save_debug=False):
                                     img_src = 'https://www.cnn.com' + img_src
                                 h = re.search(r'height:([^;]+);', el.style.string)
                                 if h:
-                                    new_html = '<div style="width:100%; text-align:center;"><img src="{}" style="width:{};" /></div>'.format(img_src, h.group(1))
+                                    new_html += '<div style="width:100%; text-align:center;"><img src="{}" style="width:{};" /></div>'.format(img_src, h.group(1))
                                 else:
-                                    new_html = utils.add_image(img_src)
+                                    new_html += utils.add_image(img_src)
                         elif div.get('id') and div['id'] == 'ck-st-video-wt':
                             video = div.find('video', class_='ck-vid-desk')
                             if video:
@@ -883,10 +908,10 @@ def get_content(url, args, site_json, save_debug=False):
                                             caption += '<a href="{}">{}</a>'.format(link, m.group(1))
                                         else:
                                             caption += m.group(1)
-                                new_html = utils.add_video(video.source['src'], video.source['type'], video['poster'], caption)
+                                new_html += utils.add_video(video.source['src'], video.source['type'], video['poster'], caption)
                         elif div.find(class_='cnnix-tout'):
                             link = div.find('a')
-                            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
                             it = div.find('img')
                             if it:
                                 new_html += '<div style="flex:1; min-width:128px; max-width:160px; margin:auto;"><a href="{}"><img style="width:100%;" src="{}"/></a></div>'.format(link['href'], it['src'])
@@ -895,7 +920,7 @@ def get_content(url, args, site_json, save_debug=False):
                                 new_html += '<div style="flex:2; min-width:256px; margin:auto; font-size:1.2em; font-weight:bold;"><a href="{}">{}</a></div>'.format(link['href'], it.get_text())
                             new_html += '</div>'
                         elif div.find(class_='v-photo-container'):
-                            new_html = '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                            new_html += '<figure style="margin:0; padding:0;"><div style="display:flex; flex-wrap:wrap; gap:1em;">'
                             for it in div.find_all(class_='v-photo-container'):
                                 image = it.find('img')
                                 if image:
@@ -912,7 +937,7 @@ def get_content(url, args, site_json, save_debug=False):
                                 if m:
                                     new_item = get_content('https:' + m.group(1), args, site_json, False)
                                     if new_item:
-                                        new_html = new_item['content_html']
+                                        new_html += new_item['content_html']
             elif 'source' in el['class']:
                 source = '<b>'
                 it = el.find(class_='source__location')
@@ -939,17 +964,17 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     author = ''
                 if quote:
-                    new_html = utils.add_pullquote(quote, author)
+                    new_html += utils.add_pullquote(quote, author)
             elif 'highlights' in el['class']:
-                new_html = utils.add_blockquote(el.decode_contents())
+                new_html += utils.add_blockquote(el.decode_contents())
             elif 'editor-note' in el['class'] or 'correction' in el['class']:
                 el.attrs = {}
                 el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px; font-style:italic;'
-                continue
+                new_html += str(el)
             elif 'footnote' in el['class']:
                 el.attrs = {}
                 el['style'] = 'font-style:italic;'
-                continue
+                new_html += str(el)
             elif 'factbox_inline-small' in el['class']:
                 it = el.find(attrs={"data-editable": "title"})
                 if it:
@@ -960,7 +985,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if it:
                     el.decompose()
                     continue
-                new_html = utils.add_blockquote(el.decode_contents())
+                new_html += utils.add_blockquote(el.decode_contents())
             elif 'product-offer-card' in el['class'] or 'product-offer-card_listing-item' in el['class']:
                 new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px; margin:8px; padding:8px; border:1px solid #ccc; border-radius:10px;">'
                 it = el.find('a', class_='offer-link')
@@ -1004,8 +1029,9 @@ def get_content(url, args, site_json, save_debug=False):
                 el.decompose()
                 continue
             if new_html:
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
+                if image_expandable == False:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    el.insert_after(new_el)
                 el.decompose()
             else:
                 logger.warning('unhandled content element {} in {}'.format(el['class'], item['url']))

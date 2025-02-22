@@ -306,10 +306,10 @@ def get_content(url, args, site_json, save_debug=False):
         for el in body.find_all('template', class_='newsletter-inbodyContent-slice'):
             el.decompose()
 
-        for el in body.find_all('script', id=re.compile('vanilla-slice-person-\d+-hydrate')):
+        for el in body.find_all('script', id=re.compile(r'vanilla-slice-person-\d+-hydrate')):
             el.decompose()
 
-        for el in body.find_all('script', attrs={"data-id": re.compile('vanilla-slice-newsletter')}):
+        for el in body.find_all('script', attrs={"data-id": re.compile(r'vanilla-slice-newsletter')}):
             el.decompose()
 
         for el in body.find_all(id=re.compile(r'slice-container-person-\d+')):

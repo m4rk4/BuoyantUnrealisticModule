@@ -31,7 +31,7 @@ def get_content(url, args, site_json, save_debug=False):
     dm_url = 'https://www.dailymotion.com/player/metadata/video/' + video_id
     if 'embedder' in args:
         dm_url += '?embedder=' + quote_plus(args['embedder'])
-    print(dm_url)
+    # print(dm_url)
     video_json = utils.get_url_json(dm_url)
     if not video_json:
         return None

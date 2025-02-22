@@ -59,12 +59,12 @@ def get_content(url, args, site_json, save_debug=False):
     elif subreddit_json['data'].get('icon_img'):
         img_src = subreddit_json['data']['icon_img'].replace('&amp;', '&')
     else:
-        img_src = 'https://www.redditinc.com/assets/images/site/reddit-logo.png'
+        img_src = 'https://redditinc.com/hubfs/Reddit%20Logos/Reddit_Favicon_FullColor_64x64-1.png'
     avatar = '{}/image?url={}&height=48&mask=circle'.format(config.server, quote_plus(img_src))
 
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px black;">'
+    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px light-dark(#ccc, #333);">'
 
-    item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.reddit.com/r/{1}"><b>r/{1}</b></a><br/><small>Posted by u/{2}</small></td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{3}"><img src="https://www.redditinc.com/assets/images/site/Reddit_Icon_FullColor-1_2023-11-29-161416_munx.jpg" style="width:100%;"/></a></td></tr>'.format(avatar, post_json['subreddit'], post_json['author'], item['url'])
+    item['content_html'] += '<tr><td style="width:48px; padding:8px;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.reddit.com/r/{1}"><b>r/{1}</b></a><br/><small>Posted by u/{2}</small></td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{3}"><img src="https://redditinc.com/hubfs/Reddit%20Logos/Reddit_Favicon_FullColor_64x64-1.png" style="width:100%;"/></a></td></tr>'.format(avatar, post_json['subreddit'], post_json['author'], item['url'])
 
     # item['content_html'] = '<div style="width:488px; padding:8px 0 8px 8px; border:1px solid black; border-radius:10px; font-family:Roboto,Helvetica,Arial,sans-serif;"><div><img style="float:left; margin-right:8px;" src="{0}"/><a href="https://www.reddit.com/r/{1}"><b>r/{1}</b></a>&nbsp;&bull;&nbsp;Posted by u/{2}<br/><small>{3}</small></div><div style="clear:left;"></div>'.format(avatar, post_json['subreddit'], post_json['author'], utils.format_display_date(dt, False))
 

@@ -1244,6 +1244,10 @@ def get_content(url, args, site_json, save_debug=False):
                         video_item = get_content('https://www.wsj.com/video/' + it['data-src'], {"embed": True}, {}, False)
                         if video_item:
                             new_html = video_item['content_html']
+                elif 'type-InsetTweet' in el['class']:
+                    it = el.select('blockquote.twitter-tweet > a')
+                    if it:
+                        new_html = utils.add_embed(it[0]['href'])
                 elif 'type-InsetDynamic' in el['class']:
                     group_captions = []
                     it = el.find(class_='origami-grouped-caption')

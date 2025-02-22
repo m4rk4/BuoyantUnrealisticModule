@@ -146,11 +146,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if article_json and save_debug:
         utils.write_file(article_json, './debug/article.json')
 
-    el = soup.find('link', attrs={"type": "application/json+oembed"})
-    if el:
-        oembed_json = utils.get_url_json(el['href'])
-    else:
-        oembed_json = None
+    oembed_json = None
+    if 'skip_wp_oembed' not in args:
+        el = soup.find('link', attrs={"type": "application/json+oembed"})
+        if el:
+            oembed_json = utils.get_url_json(el['href'])
 
     data_layer = None
     el = soup.find('script', string=re.compile(r'var tempDataLayer'))
@@ -296,9 +296,9 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                     else:
                         date = el.get_text().strip()
                     if site_json['date'].get('date_regex'):
-                        m = re.search(site_json['date']['date_regex'], date)
+                        m = re.search(site_json['date']['date_regex'], date, flags=re.S)
                         if m:
-                            date = m.group(site_json['date']['date_regex_group'])
+                            date = m.group(site_json['date']['date_regex_group']).strip()
                     if site_json['date'].get('strptime'):
                         dt = datetime.strptime(date, site_json['date']['strptime'])
                     else:
@@ -390,7 +390,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 if not authors and 'author_regex' in site_json['author']:
                     m = re.search(site_json['author']['author_regex'], el.get_text().strip())
                     if m:
-                        authors.append(m.group(site_json['author']['author_regex_group']))
+                        authors.append(m.group(site_json['author']['author_regex_group']).strip())
                 if not authors and el.get_text().strip():
                     author = re.sub(r'^By:?\s*(.*?)[\s\W]*$', r'\1', el.get_text().strip(), flags=re.I)
                 if author:
@@ -546,6 +546,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     lede = False
     if site_json.get('lede_video'):
         elements = utils.get_soup_elements(site_json['lede_video'], soup)
+        print(elements)
         if elements:
             # print(elements)
             el = elements[0]
@@ -632,21 +633,58 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     if not lede and site_json.get('lede_img'):
         elements = utils.get_soup_elements(site_json['lede_img'], soup)
         if elements:
+            # print(elements)
             el = elements[0]
             if el:
                 if el.find(class_='rslides'):
                     it = el.find('li')
                     item['content_html'] += wp_posts.add_image(copy.copy(it), None, base_url, site_json, caption, add_caption)
                     lede = True
-                    gallery = wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
+                    gallery = '<h3>Gallery</h3>' + wp_posts.format_content(str(el), item, site_json, module_format_content, soup)
+                elif el.get('class') and 'st-image-gallery' in el['class']:
+                    gallery_json = json.loads(el['data-gallery'])
+                    gallery_url = ''
+                    if len(gallery_json['images']) > 1:
+                        gallery_images = []
+                        new_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        for image in gallery_json['images']:
+                            img_src = utils.image_from_srcset(image['srcset'], 2000)
+                            thumb = utils.image_from_srcset(image['srcset'], 800)
+                            if image.get('caption'):
+                                caption = image['caption']
+                            else:
+                                caption = ''
+                            new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+                            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                        new_html += '</div>'
+                        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                        gallery = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
+                    image = gallery_json['images'][0]
+                    img_src = utils.image_from_srcset(image['srcset'], 1200)
+                    if image.get('caption'):
+                        caption = image['caption']
+                    else:
+                        caption = ''
+                    if gallery_url:
+                        if caption:
+                            caption += '<br>'
+                        caption += '<a href="{}">View photo gallery</a>'.format(gallery_url)
+                    item['content_html'] += utils.add_image(img_src, caption)
+                    lede = True
                 elif el.find('img') or (el.get('style') and 'background-image' in el['style']):
                     item['content_html'] += wp_posts.add_image(el, el, base_url, site_json, caption, add_caption)
                     lede = True
+                elif el.get('data-bg'):
+                    img_src = el['data-bg']
+                    if img_src.startswith('/'):
+                        img_src = base_url + img_src
+                    item['content_html'] += utils.add_image(img_src)
+                    lede = True
+                elif el.find('iframe'):
+                    item['content_html'] += utils.add_embed(el.find('iframe')['src'])
+                    lede = True
                 else:
-                    it = el.find('iframe')
-                    if it:
-                        item['content_html'] += utils.add_embed(it['src'])
-                        lede = True
+                    logger.warning('unhandled lede_img in ' + item['url'])
     if 'add_lede_img' in args and not lede and item.get('_image'):
         item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
 
@@ -691,7 +729,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                         item['content_html'] += wp_posts.format_content(el.decode_contents(), item, site_json, module_format_content, soup)
 
     if gallery:
-        item['content_html'] += '<h3>Gallery</h3>' + gallery
+        item['content_html'] += gallery
 
     if site_json.get('text_encode'):
         def encode_item(item, enc):

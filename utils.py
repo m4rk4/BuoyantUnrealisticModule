@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, time, tldextract
+from browserforge.headers import HeaderGenerator
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime, timedelta
@@ -173,20 +174,32 @@ def requests_retry_session(retries=4):
   session.mount('https://', adapter)
   return session
 
-def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False):
+def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=False):
   # https://www.whatismybrowser.com/guides/the-latest-user-agent/
   # https://developers.whatismybrowser.com/
   if user_agent == 'desktop':
-    ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
+    # ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
+    header_gen = HeaderGenerator(
+      browser='chrome',
+      os='windows',
+      device='desktop',
+      locale='en-US',
+      http_version=2
+    )
+    ua = header_gen.generate()['User-Agent']
   elif user_agent == 'mobile':
-    ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Mobile/15E148 Safari/604.1'
+    # ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_1_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Mobile/15E148 Safari/604.1'
+    header_gen = HeaderGenerator(
+      browser='safari',
+      os='ios',
+      device='mobile',
+      locale='en-US',
+      http_version=2
+    )
+    ua = header_gen.generate()['User-Agent']
   elif user_agent == 'googlebot':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-  elif user_agent == 'googlecache':
-    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
-    ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-    url = 'https://webcache.googleusercontent.com/search?q=cache:' + url
   elif user_agent == 'chatgpt':
     # https://platform.openai.com/docs/plugins/bot
     ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
@@ -202,10 +215,18 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = 'Mozilla/5.0 (compatible; Twitterbot/1.0)'
   elif user_agent == 'grapeshot':
     ua = 'Mozilla/5.0 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)'
+  elif user_agent == 'gumgumbot':
+    ua = 'GumGum-Bot/1.0 (http://gumgum.com; verity-support@gumgum.com)'
   elif user_agent == 'none':
     ua = ''
   else: # Googlebot
     ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+
+  # No more Google cache
+  # elif user_agent == 'googlecache':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    # ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+    # url = 'https://webcache.googleusercontent.com/search?q=cache:' + url
 
   if headers and ua:
     if not (headers.get('user-agent') or headers.get('User-Agent') or headers.get('sec-ch-ua')):
@@ -214,18 +235,24 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     headers = {
       "user-agent": ua
     }
+  # print(headers)
 
   if use_proxy:
     proxies = config.proxies
   else:
     proxies = {}
 
+  if use_certifi:
+    verify = certifi.where()
+  else:
+    verify = False
+
   r = None
   try:
     if use_curl_cffi:
       r = curl_cffi_requests.get(url, impersonate=config.impersonate, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     else:
-      r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=certifi.where())
+      r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=verify)
     r.raise_for_status()
   except Exception as e:
     if r != None:
@@ -241,7 +268,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
       logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, status_code, url))
       if e.__class__.__name__ == 'SSLError':
         try:
-          r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=config.verify_path)
+          r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=verify)
           r.raise_for_status()
         except Exception as e:
           if r != None:
@@ -308,14 +335,19 @@ def get_browser_request(url, get_json=False, save_screenshot=False):
     browser.close()
     return content
 
-def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
+def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url, get_json=True)
-  if not use_proxy and site_json and site_json.get('use_proxy'):
-    use_proxy = site_json['use_proxy']
-  if not use_curl_cffi and site_json and site_json.get('use_curl_cffi'):
-    use_curl_cffi = site_json['use_curl_cffi']
-  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
+  if site_json:
+    if 'user_agent' in site_json:
+      user_agent = site_json['user_agent']
+    if 'use_proxy' in site_json:
+      use_proxy = site_json['use_proxy']
+    if 'use_curl_cffi' in site_json:
+      use_curl_cffi = site_json['use_curl_cffi']
+    if 'use_certifi' in site_json:
+      use_certifi = site_json['use_certifi']
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi, use_certifi)
   if r != None and (r.status_code == 200 or r.status_code == 402 or r.status_code == 404 or r.status_code == 500):
     try:
       return r.json()
@@ -327,18 +359,19 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
         write_file(r.text, './debug/json.txt')
   return None
 
-def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
+def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
     return get_browser_request(url)
-  if site_json and site_json.get('user_agent'):
-    ua = site_json['user_agent']
-  else:
-    ua = user_agent
-  if not use_proxy and site_json and site_json.get('use_proxy'):
-    use_proxy = site_json['use_proxy']
-  if not use_curl_cffi and site_json and site_json.get('use_curl_cffi'):
-    use_curl_cffi = site_json['use_curl_cffi']
-  r = get_request(url, ua, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
+  if site_json:
+    if 'user_agent' in site_json:
+      user_agent = site_json['user_agent']
+    if 'use_proxy' in site_json:
+      use_proxy = site_json['use_proxy']
+    if 'use_curl_cffi' in site_json:
+      use_curl_cffi = site_json['use_curl_cffi']
+    if 'use_certifi' in site_json:
+      use_certifi = site_json['use_certifi']
+  r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi, use_certifi)
   if r != None and (r.status_code == 200 or r.status_code == 402):
     return r.text
   return None
@@ -635,6 +668,7 @@ def image_from_srcset(srcset, target):
   #  Absolute width: elva-fairy-480w.jpg 480w, elva-fairy-800w.jpg 800w
   #  Relative width: elva-fairy-320w.jpg, elva-fairy-480w.jpg 1.5x, elva-fairy-640w.jpg 2x
   # TODO: use parser from https://github.com/surfly/srcset
+  # print(srcset)
   base_width = -1
   images = []
   srcset = srcset.strip()
@@ -642,7 +676,7 @@ def image_from_srcset(srcset, target):
     srcset = srcset[:-1]
   # print(srcset)
   if srcset.endswith('w'):
-    ss = list(filter(None, re.split(r'\s(\d+)w', srcset)))
+    ss = list(filter(None, re.split(r'\s(\d+)v?w', srcset)))
     for i in range(0, len(ss), 2):
       image = {}
       if ss[i].startswith(','):
@@ -937,10 +971,10 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   return fig_html
 
 
-def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, desc='', use_video_js=True):
+def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, desc='', use_video_js=True):
   audio_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
 
-  if poster and show_poster == True:
+  if poster and show_poster == True and small_poster == False:
     audio_html += '<div style="flex:1; min-width:128px; max-width:160px;">'
   else:
     audio_html += '<div style="flex:1; min-width:48px; max-width:64px;">'
@@ -959,10 +993,14 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
       audio_html += '<a href="{}" target="_blank">'.format(audio_src)
 
   if poster and show_poster == True:
-    if audio_src:
-      audio_html += '<img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/>'.format(config.server, quote_plus(poster))
+    if small_poster == False:
+      w = 160
     else:
-      audio_html += '<img src="{}/image?url={}&width=160" style="width:100%;"/>'.format(config.server, quote_plus(poster))
+      w = 64
+    if audio_src:
+      audio_html += '<img src="{}/image?url={}&width={}&overlay=audio" style="width:100%;"/>'.format(config.server, quote_plus(poster), w)
+    else:
+      audio_html += '<img src="{}/image?url={}&width={}" style="width:100%;"/>'.format(config.server, quote_plus(poster), w)
   elif audio_src:
     audio_html += '<img src="{}/static/play_button-64x64.png" style="width:100%;"/>'.format(config.server)
   else:
@@ -1022,6 +1060,8 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
   return audio_html
 
 def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False, use_proxy=False):
+  video_type = video_type.lower()
+
   if use_proxy:
     video_src = config.server + '/proxy/' + video_url
   else:
@@ -1031,7 +1071,7 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     if use_videojs:
       video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
-  elif video_type.lower() == 'application/x-mpegurl' or video_type == 'application/dash+xml' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
+  elif video_type == 'application/x-mpegurl' or video_type == 'application/dash+xml' or video_type == 'application/vnd.apple.mpegurl' or video_type == 'audio/mp4':
     video_src = '{}/videojs?src={}&type={}&poster={}'.format(config.server, quote_plus(video_src), quote_plus(video_type), quote_plus(poster))
 
   elif video_type == 'vimeo':

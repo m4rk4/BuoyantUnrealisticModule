@@ -64,7 +64,7 @@ def get_next_data(url):
     if not el:
         logger.warning('unable to find __NEXT_DATA__ in ' + url)
         return None
-    #utils.write_file(el.string, './debug/debug.txt')
+    # utils.write_file(el.string, './debug/debug.txt')
     return json.loads(el.string)
 
 
@@ -76,14 +76,16 @@ def format_block(block):
     if block['type'] == 'tagname':
         if block['key'].startswith('@@'):
             if block['key'] == '@@standfirst':
-                start_tag = '<p>'
-                end_tag = '</p>'
+                start_tag = '<p><em>'
+                end_tag = '</em></p>'
             elif block['key'] == '@@embed-link':
                 start_tag = '<a href="{}">'.format(block['props']['to'])
                 end_tag = '</a>'
             elif block['key'] == '@@embed-keypoints':
                 start_tag = '<blockquote style="border-left: 3px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px;"><h3>Key points</h3><ul>'
                 end_tag = '</ul></blockquote>'
+            elif block['key'] != '@@anchor':
+                logger.debug('skipping tagname ' + block['key'])
         elif block.get('props'):
             start_tag = '<{}'.format(block['key'])
             for key, val in block['props'].items():
@@ -225,7 +227,7 @@ def get_content(url, args, site_json, save_debug):
         if article_json['headlinePrepared']['media'].get('caption'):
             caption += ' | ' + article_json['headlinePrepared']['media']['caption']['plain']
         item['content_html'] += utils.add_video(video['url'], video['contentType'], poster, caption)
-    if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
+    elif article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
         item['_audio'] = article_json['renditions'][0]['url']
         attachment = {
             "url": article_json['renditions'][0]['url'],
@@ -265,14 +267,24 @@ def get_content(url, args, site_json, save_debug):
         return item
 
     if article_json.get('summary'):
-        item['content_html'] += '<div>&nbsp;</div><div style="background-color:#ecf2fb; border-radius:10px; padding:1px 1em 8px 1em;">'
+        item['content_html'] += '<div>&nbsp;</div><div style="background-color:light-dark(#ccc, #333); border-radius:10px; padding:1px 1em 8px 1em;">'
         for block in article_json['summary']['descriptor']['children']:
             item['content_html'] += format_block(block)
         item['content_html'] += '</div>'
 
     if article_json.get('text'):
+        header = True
         for block in article_json['text']['descriptor']['children']:
-            item['content_html'] += format_block(block)
+            if block['type'] == 'tagname':
+                if block['key'] == '@@standfirst':
+                    # dek
+                    item['content_html'] = format_block(block) + item['content_html']
+                elif block['key'] == '@@anchor' and block['props']['id'] == 'endheader':
+                    header = False
+                elif block['key'] == 'p':
+                    header = False
+            if not header:
+                item['content_html'] += format_block(block)
     elif article_json.get('richTextCaption'):
         for block in article_json['richTextCaption']['descriptor']['children']:
             item['content_html'] += format_block(block)

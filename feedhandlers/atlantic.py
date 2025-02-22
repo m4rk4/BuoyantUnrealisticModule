@@ -219,6 +219,22 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         item['image'] = article_json['shareImageDefault']['url']
 
+    if article_json.get('audio') and article_json['audio']['type'] == 'narrated':
+        if article_json['audio'].get('urlAdfree'):
+            item['_audio'] = article_json['audio']['urlAdfree']
+        else:
+            item['_audio'] = article_json['audio']['url']
+        attachment = {}
+        attachment['url'] = item['_audio']
+        attachment['mime_type'] = 'audio/mpeg'
+        item['attachments'] = []
+        item['attachments'].append(attachment)
+        content_html += utils.add_audio(item['_audio'], '', 'Listen to article', '', '', '', '', article_json['audio']['duration'], show_poster=False)
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     is_floating = False
     for content in article_json['content']:
         if content['__typename'] == 'ArticleParagraphContent':

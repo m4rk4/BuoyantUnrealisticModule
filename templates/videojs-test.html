@@ -5,30 +5,28 @@
   </head>
   <body>
     <div id="player1">
-      <video id="vid1" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto" poster="{{ args.poster }}" style="position: absolute; top: 0px; right: 0px; bottom: 0px; left: 0px; width: 100%; height: 100%;" data-setup="{}">
+      <video id="videojs-contrib-eme-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto" poster="{{ args.poster }}" style="position: absolute; top: 0px; right: 0px; bottom: 0px; left: 0px; width: 100%; height: 100%;" data-setup="{}">
       </video>
     </div>
     <script src="https://unpkg.com/video.js/dist/video.min.js"></script>
+    <script src="https://unpkg.com/videojs-contrib-eme/dist/videojs-contrib-eme.min.js"></script>
     <script>
-  var player = videojs('vid1');
-
-  player.src({
-    src: '{{ args.src }}',
-    type: '{{ args.type }}'
-  });
-
-  var track = new videojs.AudioTrack({
-    id: 'main-audio-track',
-    kind: 'main',
-    label: 'audio',
-    language: 'en',
-    src: '{{ args.type }}',
-    enabled: true
-  });
-  player.audioTracks().addTrack(track);
-  player.load();
-  player.play();
-
+      let player = window.player = videojs('videojs-contrib-eme-player', {
+        plugins: {
+          eme: {
+            drm: {
+              clearKeys: {
+                'deadbeefdeadbeefdeadbeefdeadbeef': 'deadbeefdeadbeefdeadbeefdeadbeef'
+              }
+            }
+          }
+        }
+      });
+      player.src({
+        src: '{{ args.src }}',
+        type: '{{ args.type }}'
+      });
+      player.load()
     </script>
   </body>
 </html>

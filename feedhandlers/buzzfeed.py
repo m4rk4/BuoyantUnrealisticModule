@@ -193,8 +193,12 @@ def get_content(url, args, site_json, save_debug=False):
                 buzz_html += add_image(buzz, True)
 
         elif buzz['form'] == 'photo_set':
-            for it in buzz['photo_set_collection']:
-                buzz_html += add_image(it)
+            buzz_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+            for n, it in enumerate(buzz['photo_set_collection']):
+                buzz_html += '<div style="flex:1; min-width:360px;">' + add_image(it) + '</div>'
+            if n % 2 == 0:
+                buzz_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+            buzz_html += '</div><div>&nbsp;</div>'
 
         elif buzz['form'] == 'video':
             if buzz['source'] == 'youtube':
@@ -209,7 +213,11 @@ def get_content(url, args, site_json, save_debug=False):
             buzz_html += utils.add_embed(buzz['original_url'])
 
         elif buzz['form'] == 'bfp' and buzz['format_name'] == 'client_embed':
-            buzz_html += utils.add_embed(buzz['bfp_data']['data']['oembed_url'])
+            if buzz['bfp_data']['data']['vendor'] == 'twitter':
+                buzz_html += utils.add_embed(buzz['bfp_data']['data']['via'])
+            else:
+                logger.debug('client_embed vendor ' + buzz['bfp_data']['data']['vendor'])
+                buzz_html += utils.add_embed(buzz['bfp_data']['data']['oembed_url'])
 
         elif buzz['form'] == 'section_divider':
             buzz_html = '<hr/>'

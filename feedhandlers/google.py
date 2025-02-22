@@ -165,14 +165,23 @@ def get_content(url, args, site_json, save_debug=False):
             # https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d316.0465152882427!2d-81.5512302066608!3d41.09612587494313!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8830d7ae81e95ae5%3A0xb29f75ec4aac5a3c!2sLeeAngelo%E2%80%99s%20(Akron)!5e0!3m2!1sen!2sus!4v1687347021057!5m2!1sen!2sus
             lat = ''
             lon = ''
-            m = re.search(r'!2d([\-\.0-9]+)', url)
-            if m:
-                lon = m.group(1)
-            m = re.search(r'!3d([\-\.0-9]+)', url)
-            if m:
-                lat = m.group(1)
+            if '!1m3!' in url:
+                m = re.search(r'!2d([\-\.0-9]+)', url)
+                if m:
+                    lon = m.group(1)
+                m = re.search(r'!3d([\-\.0-9]+)', url)
+                if m:
+                    lat = m.group(1)
+            elif '!1m7!' in url:
+                m = re.search(r'!1d([\-\.0-9]+)', url)
+                if m:
+                    lat = m.group(1)
+                m = re.search(r'!2d([\-\.0-9]+)', url)
+                if m:
+                    lon = m.group(1)
             if not (lat and lon):
                 logger.warning('unable to parse lat & lon in ' + url)
+                return None
             item = {}
             m = re.search(r'!2s([^!]+)', url)
             if m:

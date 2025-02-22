@@ -60,13 +60,17 @@ def get_video(video_wrapper):
     else:
         logger.warning('unknown video id in ' + str(yvideo))
         return ''
-    video_json = utils.get_url_json('https://video-api.yql.yahoo.com/v1/video/sapi/streams/{}?protocol=http&format=mp4,webm,m3u8'.format(video_id))
+    video_json = utils.get_url_json('https://video-api.yql.yahoo.com/v1/video/sapi/streams/{}?protocol=http&format=m3u8,mp4,webm&site=news'.format(video_id))
     if not video_json:
         return ''
     # utils.write_file(video_json, './debug/video.json')
-    video = utils.closest_dict(video_json['query']['results']['mediaObj'][0]['streams'], 'height', 360)
-    if not video:
-        video = video_json['query']['results']['mediaObj'][0]['streams'][0]
+    for video in video_json['query']['results']['mediaObj'][0]['streams']:
+        if video['format'] == 'm3u8':
+            break
+    if video['format'] != 'm3u8':
+        video = utils.closest_dict(video_json['query']['results']['mediaObj'][0]['streams'], 'height', 480)
+        if not video:
+            video = video_json['query']['results']['mediaObj'][0]['streams'][0]
     caption = []
     if video_json['query']['results']['mediaObj'][0]['meta'].get('title'):
         caption.append(video_json['query']['results']['mediaObj'][0]['meta']['title'])
@@ -88,6 +92,18 @@ def get_iframe(iframe_wrapper):
     if not embed_src:
         return ''
     return utils.add_embed(embed_src)
+
+
+def get_iframely(iframely_wrapper):
+    el = iframely_wrapper.find(attrs={"data-iframely-url": True})
+    if el:
+        iframely_html = utils.get_url_html(el['data-iframely-url'])
+        if iframely_html:
+            iframely_soup = BeautifulSoup(iframely_html, 'lxml')
+            it = iframely_soup.find('meta', attrs={"name": "canonical"})
+            if it:
+                return utils.add_embed(it['content'])
+    return ''
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -189,7 +205,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     caas_soup = BeautifulSoup(caas_json['items'][0]['markup'], 'html.parser')
     caas_body = caas_soup.find(class_='caas-body')
-    # utils.write_file(str(caas_body), './debug/debug.html')
+    if save_debug:
+        utils.write_file(str(caas_body), './debug/debug.html')
 
     for el in caas_body.find_all(class_='caas-curated-links'):
         el.decompose()
@@ -222,6 +239,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in caas_body.find_all(class_='caas-yvideo-wrapper'):
         new_html = get_video(el)
+        if new_html:
+            el.insert_after(BeautifulSoup(new_html, 'html.parser'))
+            el.decompose()
+
+    for el in caas_body.find_all(class_='caas-iframely'):
+        new_html = get_iframely(el)
         if new_html:
             el.insert_after(BeautifulSoup(new_html, 'html.parser'))
             el.decompose()
@@ -379,7 +402,11 @@ def get_content(url, args, site_json, save_debug=False):
     for el in caas_body.find_all('a'):
         href = el.get('href')
         if href:
-            el.attrs = {}
+            if el.get('target'):
+                el.attrs = {}
+                el['target'] = '_blank'
+            else:
+                el.attrs = {}
             if href.startswith('https://shopping.yahoo.com/'):
                 el['href'] = utils.get_redirect_url(href)
             else:
@@ -414,13 +441,28 @@ def get_content(url, args, site_json, save_debug=False):
             content_html += get_image(el)
         elif 'caas-carousel' in el['class']:
             # Slideshow - add lead image and remaining slides to end
+            gallery_images = []
+            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
             for i, slide in enumerate(el.find_all(class_='caas-carousel-slide')):
-                gallery_html += '<h3>Gallery</h3>'
                 new_html = get_image(slide)
                 if new_html:
                     if i == 0:
                         content_html += new_html
-                    gallery_html += new_html
+                    gallery_html += '<div style="flex:1; min-width:360px;">' + new_html + '</div>'
+                    m = re.search(r'src="([^"]+)"', new_html)
+                    img_src = m.group(1)
+                    m = re.search(r'<figcaption><small>(.*?)</small>', new_html)
+                    if m:
+                        caption = m.group(1)
+                    else:
+                        caption = ''
+                    gallery_images.append({"src": img_src, "caption": caption, "thumb": img_src})
+            if i % 2 == 0:
+                gallery_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+            gallery_html += '</div>'
+            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+            content_html += '<div><small><a href="{}" target="_blank">View photo gallery</a></small></div><div>&nbsp;</div>'.format(gallery_url)
+            gallery_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
         elif 'yvideo' in el['class']:
             content_html += get_video(el)
         elif 'caas-iframe' in el['class']:

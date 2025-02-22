@@ -20,7 +20,7 @@ def get_content_html(content_uri):
 
     # Handle these without loading the content_uri
     if '/divider/' in content_uri:
-        return '<hr width="80%" />'
+        return '<div>&nbsp;</div><hr width="80%" /><div>&nbsp;</div>'
 
     content_json = utils.get_url_json('https://' + content_uri)
     if not content_json:
@@ -67,18 +67,22 @@ def get_content_html(content_uri):
             content_html += get_content_html(image['_ref'])
 
     elif '/image-collection/' in content_uri:
+        content_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
         for image in content_json['imageCollection']:
             caption = []
             if image.get('imageCaption'):
                 caption.append(image['imageCaption'].strip())
-            if image.get('imageType'):
-                caption.append(image['imageType'].strip() + ':')
             if image.get('imageCredit'):
+                if image.get('imageType'):
+                    caption.append(image['imageType'].strip() + ':')
                 caption.append(image['imageCredit'].strip())
             else:
                 if content_json['imageCollection'][-1].get('imageCredit'):
+                    if image.get('imageType'):
+                        caption.append(image['imageType'].strip() + ':')
                     caption.append(content_json['imageCollection'][-1]['imageCredit'].strip())
-            content_html = utils.add_image(image['imageUrl'], ' '.join(caption))
+            content_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(image['imageUrl'], ' '.join(caption), link=image['imageUrl']) + '</div>'
+        content_html += '</div>'
 
     elif '/video/' in content_uri:
         if content_json.get('youtubeId'):
@@ -147,13 +151,13 @@ def get_content_html(content_uri):
     elif '/subsection/' in content_uri:
         content_html = ''
         if content_json['borders']['top'] == True:
-            content_html += '<hr width="80%">'
+            content_html += '<div>&nbsp;</div><hr width="80%"><div>&nbsp;</div>'
         if content_json.get('title'):
             content_html += '<h4>{}</h4>'.format(content_json['title'])
         for content in content_json['content']:
             content_html += get_content_html(content['_ref'])
         if content_json['borders']['bottom'] == True:
-            content_html += '<hr width="80%">'
+            content_html += '<div>&nbsp;</div><hr width="80%"><div>&nbsp;</div>'
 
     elif '/errata/' in content_uri:
         content_html = content_json['text']

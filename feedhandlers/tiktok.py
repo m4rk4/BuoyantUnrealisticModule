@@ -272,7 +272,7 @@ def get_item(item_info, args, site_json, save_debug):
         item['content_html'] += '<p>&#127925;&nbsp;{}</p>'.format(music_info)
 
     item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='border-radius:10px; width:100%;')
-    item['content_html'] += '<br/><a href="{}"><small>Open in TikTok</small></a></td></tr></table>'.format(item['url'])
+    item['content_html'] += '<br/><a href="{}" target="_blank"><small>Open in TikTok</small></a></td></tr></table>'.format(item['url'])
     return item
 
 
@@ -398,10 +398,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = '<table style="min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border-collapse:collapse; border-style:hidden; border-radius:10px; box-shadow:0 0 0 1px light-dark(#ccc, #333); font-family:Roboto,Helvetica,Arial,sans-serif;"><tr><td colspan="3" style="margin:0; padding:0 0 8px 0;">'
 
     # item['content_html'] += utils.add_video(item['_video'], 'video/mp4', item['_image'], width=540, img_style='width:100%;')
-    poster = '{}/image?url={}&width=540&overlay=video'.format(config.server, quote_plus(item['_image']))
+    poster = config.server + '/image?url=' + quote_plus(item['_image']) + '&width=540&overlay=video'
     # video_src = '{}/videojs?src={}&poster={}'.format(config.server, quote_plus(item['_video']), quote_plus(item['_image']))
     video_src = config.server + '/video?url=' + quote_plus(item['url'])
-    item['content_html'] += '<a href="{}" target="_blank"><img src="{}" style="width:100%; border-radius:10px 10px 0 0;"</a>'.format(video_src, poster)
+    item['content_html'] += '<a href="{}" target="_blank"><img src="{}" style="width:100%; border-radius:10px 10px 0 0;"></a>'.format(video_src, poster)
 
     item['content_html'] += '</td></tr><tr><td style="width:48px; padding:0 8px 0 8px; vertical-align:middle;"><img src="{0}"/></td><td style="text-align:left; vertical-align:middle;"><a href="https://www.tiktok.com/@{1}"><b>{1}</b></a>'.format(avatar, item_info['author']['uniqueId'])
     if item_info['author']['verified']:
