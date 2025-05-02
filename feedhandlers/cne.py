@@ -25,24 +25,34 @@ def get_caption(props, credit_only=False):
     captions = []
     if not credit_only:
         if props.get('dangerousCaption'):
-            m = re.search(r'^<p>(.*)</p>\s*$', props['dangerousCaption'], flags=re.S)
-            if m:
-                captions.append(m.group(1))
-            else:
-                captions.append(props['dangerousCaption'])
+            caption =  props['dangerousCaption'].strip()
+        elif props.get('image') and props['image'].get('dangerousCaption'):
+            caption = props['image']['dangerousCaption'].strip()
         elif props.get('caption'):
-            captions.append(props['caption'])
+            caption = props['caption'].strip()
+        else:
+            caption = ''
+        if caption:
+            caption = re.sub(r'^<p>|</p>$', '', caption)
+            captions.append(caption)
 
     if props.get('dangerousCredit'):
-        captions.append(props['dangerousCredit'])
+        caption = props['dangerousCredit'].strip()
+    elif props.get('image') and props['image'].get('dangerousCredit'):
+        caption = props['image']['dangerousCredit'].strip()
     elif props.get('credit'):
-        captions.append(props['credit'])
+        caption = props['credit']
+    else:
+        caption = ''
+    if caption:
+        caption = re.sub(r'^<p>|</p>$', '', caption)
+        captions.append(caption)
 
     return ' | '.join(captions)
 
 
 def get_image_src(image, width=1200):
-    print(image)
+    # print(image)
     sources = []
     if image.get('sources'):
         for key, val in image['sources'].items():
@@ -117,7 +127,7 @@ def add_product(props):
 
 def format_body(body_json):
     #print(body_json[0])
-    if body_json[0] == 'ad' or body_json[0] == 'native-ad' or body_json[0] == 'cm-unit' or body_json[0] == 'inline-newsletter':
+    if body_json[0] == 'ad' or body_json[0] == 'native-ad' or body_json[0] == 'cm-unit' or body_json[0] == 'inline-newsletter' or body_json[0] == 'journey-inline-newsletter':
         return ''
 
     start_tag = '<{}>'.format(body_json[0])
@@ -126,7 +136,7 @@ def format_body(body_json):
     if body_json[0] == 'blockquote':
         start_tag = '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">'
     elif body_json[0] == 'inline-embed':
-        if body_json[1]['type'] == 'image':
+        if body_json[1]['type'] == 'image' or body_json[1]['type'] == 'cartoon':
             return add_image(body_json[1]['props'])
         elif body_json[1]['type'] == 'gallery':
             caption = '<a href="{}"><b>View Gallery</b></a>: {}'.format(body_json[1]['props']['url'], body_json[1]['props']['dangerousHed'])
@@ -178,7 +188,7 @@ def format_body(body_json):
                         date = utils.format_display_date(datetime.fromisoformat(audio['pubDate']), False)
                     else:
                         date = ''
-                    return utils.add_audio(audio['files'][0], poster, audio['title'], '', audio_json['title'], '', date, audio['duration'])
+                    return '<div>&nbsp;</div>' + utils.add_audio_v2(audio['files'][0], poster, audio['title'], '', audio_json['title'], '', date, audio['duration'])
         elif body_json[1]['type'] == 'firework':
             firework_api = 'https://fireworkapi1.com/embed/v2/playlists/{}/feeds?page_size=10'.format(body_json[1]['ref'])
             firework_json = utils.post_url(firework_api)
@@ -234,7 +244,7 @@ def format_body(body_json):
             logger.warning('unhandled inline-embed type ' + body_json[1]['type'])
 
     lead_in = False
-    dropcap = False
+    has_dropcap = False
     content_html = start_tag
     for block in body_json[1:]:
         if isinstance(block, dict) and start_tag:
@@ -242,7 +252,7 @@ def format_body(body_json):
             for key, val in block.items():
                 if key == 'class':
                     if 'has-dropcap' in val:
-                        dropcap = True
+                        has_dropcap = True
                     if 'heading' in val:
                         m = re.search(r'heading-(h\d)', val)
                         if m:
@@ -250,7 +260,7 @@ def format_body(body_json):
                             content_html = content_html[:-n] + '<{}>'.format(m.group(1))
                             end_tag = '</{}>'.format(m.group(1))
                         else:
-                            if not dropcap:
+                            if not has_dropcap:
                                 logger.warning('unknown heading level ' + val)
                     if 'paywall' in val:
                         continue
@@ -272,8 +282,9 @@ def format_body(body_json):
             else:
                 content_html += block
 
-    if dropcap:
-        content_html = re.sub(r'^(<[^>]+>)(\w)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>', content_html) + '<span style="clear:left;">&nbsp;</span>'
+    if has_dropcap:
+        # content_html = re.sub(r'^(<[^>]+>)(\w)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>', content_html) + '<span style="clear:left;">&nbsp;</span>'
+        content_html = re.sub(r'^<([\w\d]+)[^>]*>', r'<\1 class="dropcap">', content_html)
 
     content_html += end_tag
 
@@ -440,7 +451,12 @@ def get_content(url, args, site_json, save_debug=False):
 
     split_url = urlsplit(url)
     item['content_html'] = item['content_html'].replace('<a href="/', '<a href="{}://{}/'.format(split_url.scheme, split_url.netloc))
-    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
+
+    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
+
+    if 'class="dropcap"' in item['content_html']:
+        item['content_html'] += '<style>' + config.dropcap_style + '</style>'
+
     return item
 
 

@@ -141,6 +141,8 @@ def render_components(components):
             component_html += component['content']['text']
         elif component['content_type'] == 'heading':
             component_html += '<h{0}>{1}</h{0}>'.format(component['content']['rank'], component['content']['text'])
+        elif component['content_type'] == 'subheader':
+            component_html += '<h3>' + component['content']['subheader'] + '</h3>'
         elif component['content_type'] == 'image':
             captions = []
             if component['content'].get('caption') and component['content']['caption'].strip():
@@ -198,8 +200,18 @@ def render_components(components):
                 component_html += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(component['content']['url'], component['content']['thumbnail'])
             component_html += '<div style="padding:8px;"><div style="font-size:1.1em; font-weight:bold;"><a href="http://{}">{}</a></div>'.format(component['content']['url'], component['content']['title'])
             if component['content'].get('dek'):
-                component_html += '<p>{}</p>'.format(component['content']['dek'])
+                component_html += '<p>' + component['content']['dek'] + '</p>'
             component_html += '</div></div>'
+        elif component['content_type'] == 'group':
+            component_html += '<div style="margin:1em 0; padding:1em; border-top:1px solid light-dark(#333,#ccc); border-bottom:1px solid light-dark(#333,#ccc);">'
+            if component['content'].get('title'):
+                component_html += '<div style="font-weight:bold;">' + component['content']['title'] + '</div>'
+            component_html += render_components(component['content']['items']) + '</div>'
+        elif component['content_type'] == 'group_source':
+            component_html += '<div style="margin:1em 0; padding:1em; background-color:#ccc;">'
+            if component['content'].get('title'):
+                component_html += '<div style="font-weight:bold;">' + component['content']['title'] + '</div>'
+            component_html += component['content']['text'] + '</div>'
         elif component['content_type'] == 'credible':
             # These are ad widgets for credible.com
             pass

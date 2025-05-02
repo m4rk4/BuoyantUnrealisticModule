@@ -58,7 +58,7 @@ def render_content(node, links):
         content_html += '</p>'
 
     elif node['nodeType'] == 'text':
-        if node['value'].startswith('<iframe'):
+        if node['value'].startswith('<iframe') or node['value'].startswith('<p><iframe'):
             m = re.search(r'src="([^"]+)"', node['value'])
             if m:
                 content_html += utils.add_embed(m.group(1))
@@ -148,9 +148,16 @@ def render_content(node, links):
                 logger.warning('unhandled embedded-asset-block')
         elif node['data']['target'].get('sys'):
             # print(node['data']['target']['sys']['id'])
-            block = next((it for it in links['assets']['block'] if it['sys']['id'] == node['data']['target']['sys']['id']), None)
-            if block and block['contentType'].startswith('image'):
-                content_html += utils.add_image(block['url'], block['description'])
+            block = next((it for it in links['assets']['block'] if it['sys']['id'] == node['data']['target']['sys']['id']), None)            
+            if block:
+                if block.get('contentType'):
+                    block_type = block['contentType']
+                elif block.get('__typename'):
+                    block_type = block['__typename']
+                if block_type.startswith('image') or (block_type == 'Asset' and block.get('url') and re.search(r'\.(jpg|png)', block['url'])):
+                    content_html += utils.add_image(block['url'], block.get('description'))
+                else:
+                    logger.warning('unhandled embedded-asset-block')
             else:
                 logger.warning('unhandled embedded-asset-block')
         else:
@@ -185,7 +192,7 @@ def render_content(node, links):
                         block = it
                 if block:
                     break
-            logger.debug('embedded-entry-block __typename ' + block['__typename'])
+            # logger.debug('embedded-entry-block __typename ' + block['__typename'])
             if block and block['__typename'] == 'Image':
                 if block.get('imageV2'):
                     m = re.search(r'https?://res.cloudinary.com/.*?/upload/', block['imageV2'][0]['original_secure_url'])
@@ -251,6 +258,8 @@ def render_content(node, links):
                 block_html += utils.add_embed(block['url'], {"skip_playlist": True})
             elif block and block['__typename'] == 'SocialMediaEmbed':
                 block_html += utils.add_embed(block['socialMediaUrl'])
+            elif block and block['__typename'] == 'ExternalLink' and 'play.underdogfantasy.com' in block['url']:
+                block_html = 'SKIP'
         elif node['data'].get('target') and node['data']['target'].get('fields') and node['data']['target']['fields'].get('name') and re.search(r'newsletter signup', node['data']['target']['fields']['name'], flags=re.I):
             block_html = 'SKIP'
         elif node['data'].get('type'):

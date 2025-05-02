@@ -276,8 +276,8 @@ def get_content(url, args, site_json, save_debug=False):
                             for content in module['data']['body']['content']:
                                 item['content_html'] += render_content(content)
                         else:
-                            if item.get('_image'):
-                                item['content_html'] += utils.add_image(resize_image(item['_image']))
+                            if 'image' in item:
+                                item['content_html'] += utils.add_image(resize_image(item['image']))
                             item['content_html'] += module['data']['articleBodyText']
 
     return item

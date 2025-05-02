@@ -1,8 +1,8 @@
-import av, math, re
+import av, curl_cffi, math, re
 from io import BytesIO
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
 
-import utils
+import config, utils
 
 import logging
 
@@ -147,9 +147,24 @@ def add_overlay(im, overlay, args):
             overlay = utils.closest_dict(overlays, 'height', im.width // 3, greater_than=True)
         im_overlay = Image.open(overlay['url'])
 
+    elif overlay == 'gallery':
+        overlays = [
+            {"width": 512, "height": 512, "url": "./static/gallery_button-512x512.png"},
+            {"width": 256, "height": 256, "url": "./static/gallery_button-256x256.png"},
+            {"width": 128, "height": 128, "url": "./static/gallery_button-128x128.png"},
+            {"width": 64, "height": 64, "url": "./static/gallery_button-64x64.png"},
+            {"width": 32, "height": 32, "url": "./static/gallery_button-32x32.png"}
+        ]
+        if im.height < im.width:
+            overlay = utils.closest_dict(overlays, 'height', im.height // 3, greater_than=True)
+        else:
+            overlay = utils.closest_dict(overlays, 'height', im.width // 3, greater_than=True)
+        im_overlay = Image.open(overlay['url'])
+
     elif overlay.startswith('http'):
-        im_overlay = read_image(overlay)
-        if im_overlay:
+        im_io = read_image(overlay)
+        if im_io:
+            im_overlay = Image.open(im_io)
             im_overlay = im_overlay.convert("RGBA")
             im_overlay = resize(im_overlay, args.get('overlay_width'), args.get('overlay_height'), args.get('overlay_scale'))
 
@@ -194,17 +209,27 @@ def read_image(img_src):
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.35"
     }
-    if 'external-preview.redd.it' in img_src:
-        headers['accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
-    im = None
-    if 'www.cbc.ca' in img_src:
-        img_content = utils.get_url_content(img_src, headers=headers, use_proxy=True, use_curl_cffi=True)
+    if 'preview.redd.it' in img_src:
+        # headers['accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+        r = curl_cffi.get(img_src, impersonate="chrome", headers={"accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"}, proxies=config.proxies)
     else:
-        img_content = utils.get_url_content(img_src, headers=headers)
+        r = curl_cffi.get(img_src, impersonate="chrome", proxies=config.proxies)
+    if r.status_code != 200:
+        logger.warning('status code {} getting {}'.format(r.status_code, img_src))
+        return None
+    else:
+        img_content = r.content
+
+    # if 'www.cbc.ca' in img_src:
+    #     img_content = utils.get_url_content(img_src, headers=headers, use_proxy=True, use_curl_cffi=True)
+    # else:
+    #     img_content = utils.get_url_content(img_src, headers=headers)
+
+    # im = None
     if img_content:
         im_io = BytesIO(img_content)
-        im = Image.open(im_io)
-    return im
+        # im = Image.open(im_io)
+    return im_io
 
 def get_image(args):
     im = None
@@ -246,14 +271,15 @@ def get_image(args):
         try:
             #clean_url = utils.clean_url(args['url'])
             container = av.open(args['url'])
-            if re.search(r'mp4|mpeg|webm', container.format.name):
+            if re.search(r'mp4|m4a|mov|mpeg|webm', container.format.name):
                 for frame in container.decode(video=0):
                     im = frame.to_image()
                     break
                 save = True
             elif re.search(r'image|jpeg|png|webp', container.format.name):
-                im = read_image(args['url'])
-                if im:
+                im_io = read_image(args['url'])
+                if im_io:
+                    im = Image.open(im_io)
                     mimetype = im.get_format_mimetype()
         except Exception as e:
             logger.warning('image exception: ' + str(e))
@@ -263,13 +289,18 @@ def get_image(args):
         container.close()
 
     if not im:
-        try:
-            im = read_image(args['url'])
-            if im:
-                mimetype = im.get_format_mimetype()
-        except Exception as e:
-            logger.warning('image exception: ' + str(e))
-            im = None
+        if re.search(r'mp4|m4a|mov|mpeg|webm', args['url']):
+            im = Image.new('RGB', (1280, 720), color='SlateGray')
+            mimetype = 'image/jpg'
+        else:
+            try:
+                im_io = read_image(args['url'])
+                if im_io:
+                    im = Image.open(im_io)
+                    mimetype = im.get_format_mimetype()
+            except Exception as e:
+                logger.warning('image exception: ' + str(e))
+                im = None
 
     if not im:
         return None, 'Something went wrong :('

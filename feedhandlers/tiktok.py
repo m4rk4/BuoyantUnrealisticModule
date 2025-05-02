@@ -318,6 +318,10 @@ def get_content(url, args, site_json, save_debug=False):
             utils.write_file(connect_state, './debug/tiktok.json')
         user_id = connect_state['source']['data'][embed_path]['videoData']['authorInfos']['uniqueId']
 
+    if not user_id:
+        logger.warning('unknown user id for video ' + url)
+        return None
+
     video_url = 'https://www.tiktok.com/@{}/video/{}'.format(user_id, video_id)
     r = requests.get(video_url)
     if r.status_code != 200:

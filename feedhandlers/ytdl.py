@@ -47,7 +47,7 @@ def get_content(url, args, site_json, save_debug=False):
                     "web_safari"
                 ],
                 "po_token": [
-                    "web_safari+" + config.youtube_po_token
+                    "web_safari.gvs+" + config.youtube_po_token
                 ]
             }
         }
@@ -112,27 +112,33 @@ def get_content(url, args, site_json, save_debug=False):
             item['author']['url'] = video_info['uploader_url']
         elif video_info.get('channel_url'):
             item['author']['url'] = video_info['channel_url']
-        uploader_info =  YoutubeDL(ydl_opts).extract_info(item['author']['url'], download=False)
+        uploader_info = YoutubeDL(ydl_opts).extract_info(item['author']['url'], download=False)
         if uploader_info:
             thumb = next((it for it in uploader_info['thumbnails'] if it['id'] == 'avatar_uncropped'), None)
             if thumb:
-                item['author']['avatar'] = '{}/image?url={}&height=32&mask=ellipse'.format(config.server, quote_plus(thumb['url']))
+                # item['author']['avatar'] = thumb['url']
+                item['author']['avatar'] = config.server + '/image?url=' + quote_plus(thumb['url'])
         if 'avatar' not in item['author']:
             page_html = utils.get_url_html(item['author']['url'])
             if page_html:
                 page_soup = BeautifulSoup(page_html, 'lxml')
                 el = page_soup.find('meta', attrs={"property": "og:image"})
                 if el:
-                    item['author']['avatar'] = '{}/image?url={}&height=32&mask=ellipse'.format(config.server, quote_plus(el['content']))
-        if 'avatar' not in item['author']:
+                    # item['author']['avatar'] = el['content']
+                    item['author']['avatar'] = config.server + '/image?url=' + quote_plus(el['content'])
+        if 'avatar' in item['author']:
+            # heading = '<table style="width:100%; border-collapse:collapse; background:rgb(0,0,0,0.5);"><tr><td style="width:32px; padding:4px 0 0 8px; vertical-align:middle; text-align:center;"><img src="{}" /><td style="padding:4px 0 0 8px; vertical-align:middle;"><a href="{}" style="color:white; text-decoration:none;">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="{}" style="float:left; width:32px; height:32px; border-radius:50%;"><a href="{}" style="text-decoration:none;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></a></div>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+        else:
             item['author']['avatar'] = '{}/image?width=32&height=32&mask=ellipse'.format(config.server)
-        heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;"><a href="{}">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><span style="float:left; width:32px; height:32px; background-color:SlateGray; border-radius:50%;"></span><a href="{}" style="text-decoration:none;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></a></div>'.format(item['author']['url'], item['author']['name'])
     else:
         item['author'] = {
             "name": "Private uploader",
             "avatar": '{}/image?width=32&height=32&mask=ellipse'.format(config.server)
         }
-        heading = '<table><tr><td style="width:32px; verticle-align:middle;"><img src="{}" /><td style="verticle-align:middle;">{}</td></tr></table>'.format(item['author']['avatar'], item['author']['name'])
+        # heading = '<table style="width:100%; border-collapse:collapse; background:rgb(0,0,0,0.5);"><tr><td style="width:32px; padding:4px 0 0 8px; vertical-align:middle; text-align:center;"><img src="{}" /><td style="padding:4px 0 0 8px; vertical-align:middle;"><span style="color:white;">{}</span></td></tr></table>'.format(item['author']['avatar'], item['author']['name'])
+        heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><span style="float:left; width:32px; height:32px; background-color:SlateGray; border-radius:50%;"></span><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></div>'.format(item['author']['name'])
 
     item['tags'] = []
     if video_info.get('categories'):
@@ -194,19 +200,21 @@ def get_content(url, args, site_json, save_debug=False):
         item['summary'] = video_info['description']
 
     if '_video' not in item and '_video_mp4' not in item:
+        # TODO: overlay_img and overlay_header
         if item['author']['name'] == 'Private uploader':
             poster = config.server + '/image?width=854&height=480&color=204,204,204&overlay=http%3A%2F%2Flocalhost:8080%2Fstatic%2Fyt_private_overlay.webp'
         else:
             poster = '{}/image?url={}&width=1000'.format(config.server, quote_plus(item['image']))
-        caption = '<b>Video is unavailable:</b> {} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+        caption = '<b>Video is unavailable:</b> {} | <a href="{}" target="_blank">Watch on YouTube</a>'.format(item['title'], item['url'])
         item['content_html'] = utils.add_image(poster, caption, link=item['url'], heading=heading)
     else:
-        poster = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(item['image']))
-        caption = '{} | <a href="{}">Watch on YouTube</a>'.format(item['title'], item['url'])
+        # poster = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(item['image']))
+        poster = '{}/image?url={}&width=1000'.format(config.server, quote_plus(item['image']))
+        caption = '{} | <a href="{}" target="_blank">Watch on YouTube</a>'.format(item['title'], item['url'])
         video_url = config.server + '/video?url=' + quote_plus(item['url'])
         if 'player_client'  in args:
             video_url += '&player_client=' + args['player_client']
-        item['content_html'] = utils.add_image(poster, caption, link=video_url, heading=heading)
+        item['content_html'] = utils.add_image(poster, caption, link=video_url, overlay=config.video_button_overlay, overlay_heading=heading)
 
     if playlist_info:
         item['_playlist'] = []

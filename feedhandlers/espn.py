@@ -279,12 +279,12 @@ def get_content(url, args, site_json, save_debug=False):
                 story_json = api_json['headlines'][0]
     elif '/nota/_/id/' in url:
         split_url = urlsplit(url)
-        if split_url.netloc == 'espndeportes.espn.com':
+        if split_url.netloc == 'espndeportes.espn.com' or split_url.netloc == 'www.espn.com.mx':
             lang = 'es'
         else:
             lang = 'en'
         api_url = 'https://secure.espn.com/core{}?render=true&partial=article&xhr=1&device=tablet&country=us&lang={}&region=us&site=espn&edition-host={}&site-type=full'.format(split_url.path, lang, split_url.netloc)
-        print(api_url)
+        logger.debug('getting content from ' + api_url)
         api_json = utils.get_url_json(api_url)
         if api_json:
             story_json = api_json['content']

@@ -1,9 +1,10 @@
-import base64, feedparser, json, pytz, random, re
+import base64, feedparser, json, pybatchexecute, pytz, random, re
+import curl_cffi, requests
 import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from lxml import etree
-from urllib.parse import parse_qs, quote_plus, urlsplit, unquote_plus
+from urllib.parse import parse_qs, quote_plus, urlencode, urlsplit, unquote_plus
 from yt_dlp import YoutubeDL
 
 import config, utils
@@ -19,25 +20,7 @@ def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if split_url.netloc == 'news.google.com':
-        # https://stackoverflow.com/questions/51131834/decoding-encoded-google-news-urls
-        primary_url = ''
-        _ENCODED_URL_PREFIX = "https://news.google.com/rss/articles/"
-        _ENCODED_URL_RE = re.compile(fr"^{re.escape(_ENCODED_URL_PREFIX)}(?P<encoded_url>[^?]+)")
-        _DECODED_URL_RE = re.compile(rb'^\x08\x13".+?(?P<primary_url>http[^\xd2]+)\xd2\x01')
-        match = _ENCODED_URL_RE.match(url)
-        if match:
-            encoded_text = match.groupdict()["encoded_url"]
-            encoded_text += "==="
-            decoded_text = base64.urlsafe_b64decode(encoded_text)
-            match = _DECODED_URL_RE.match(decoded_text)
-            if match:
-                primary_url = match.groupdict()["primary_url"]
-                primary_url = primary_url.decode()
-        if primary_url:
-            logger.debug('getting content for ' + primary_url)
-            item = utils.get_content(primary_url, args, save_debug)
-        else:
-            logger.warning('unhandled url ' + url)
+        return get_news(url, args, site_json, save_debug)
     elif split_url.netloc == 'docs.google.com' and 'gview' in paths:
         # https://docs.google.com/gview?url=https://static.fox5atlanta.com/www.fox5atlanta.com/content/uploads/2023/09/23.09.07_DOJ-Letter-re-Clayton-County-Jail.pdf
         query = parse_qs(split_url.query)
@@ -366,67 +349,52 @@ def get_trends(url, args, site_json, save_debug=False):
         geo = args['geo']
     else:
         geo = 'US'
+
     if 'hl' in params:
         lang = params['hl'][0]
     elif 'lang' in args:
         lang = args['lang']
     else:
         lang = 'en-US'
+
     if 'hours' in params:
-        hours = params['hours'][0]
+        hours = int(params['hours'][0])
     elif 'hours' in args:
-        hours = args['hours']
+        hours = int(args['hours'])
     else:
         hours = '24'
 
-    page_url = 'https://trends.google.com/trending?geo={}&hl={}'.format(geo, lang)
-    headers = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "priority": "u=0, i",
-        "sec-ch-ua": "\"Chromium\";v=\"128\", \"Not;A=Brand\";v=\"24\", \"Microsoft Edge\";v=\"128\"",
-        "sec-ch-ua-arch": "\"x86\"",
-        "sec-ch-ua-bitness": "\"64\"",
-        "sec-ch-ua-form-factors": "\"Desktop\"",
-        "sec-ch-ua-full-version": "\"128.0.2739.67\"",
-        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"128.0.6613.120\", \"Not;A=Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"128.0.2739.67\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-model": "\"\"",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-ch-ua-platform-version": "\"15.0.0\"",
-        "sec-ch-ua-wow64": "?0",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1"
-    }
-    page_html = utils.get_url_html(page_url, headers=headers)
-    if not page_html:
+    if 'category' in params:
+        cat = int(params['category'][0])
+    elif 'category' in args:
+        cat = int(args['category'])
+    else:
+        cat = 0
+
+    r = curl_cffi.get(url, impersonate="chrome")
+    if not r or r.status_code != 200:
         return None
-    soup = BeautifulSoup(page_html, 'lxml')
+    soup = BeautifulSoup(r.text, 'lxml')
     el = soup.find('script', string=re.compile(r'WIZ_global_data'))
     if not el:
-        logger.warning('unable to find WIZ_global_data in ' + page_url)
+        logger.warning('unable to find WIZ_global_data in ' + url)
+        return None
     i = el.string.find('{')
     j = el.string.rfind('}') + 1
-    global_data = json.loads(el.string[i:j])
+    wiz_global_data = json.loads(el.string[i:j])
+    reqid = random.randint(10000, 99999)
 
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "cache-control": "no-cache",
         "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
-        "pragma": "no-cache",
         "priority": "u=1, i",
-        "sec-ch-ua": "\"Chromium\";v=\"128\", \"Not;A=Brand\";v=\"24\", \"Microsoft Edge\";v=\"128\"",
+        "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"",
         "sec-ch-ua-arch": "\"x86\"",
         "sec-ch-ua-bitness": "\"64\"",
         "sec-ch-ua-form-factors": "\"Desktop\"",
-        "sec-ch-ua-full-version": "\"128.0.2739.67\"",
-        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"128.0.6613.120\", \"Not;A=Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"128.0.2739.67\"",
+        "sec-ch-ua-full-version": "\"134.0.3124.93\"",
+        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"134.0.6998.178\", \"Not:A-Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"134.0.3124.93\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-model": "\"\"",
         "sec-ch-ua-platform": "\"Windows\"",
@@ -437,92 +405,95 @@ def get_trends(url, args, site_json, save_debug=False):
         "sec-fetch-site": "same-origin",
         "x-same-domain": "1"
     }
+
     # i0OFE = /FeTrendingService.ListTrends
-    reqid = random.randint(10000, 99999)
-    data_url = 'https://trends.google.com/{}/data/batchexecute?rpcids=i0OFE&source-path=%2Ftrending&f.sid={}8&bl={}&hl={}&_reqid=2{}&rt=c'.format(global_data['Im6cmf'], global_data['FdrFJe'], global_data['cfb2h'], lang, reqid)
-    data = 'f.req=%5B%5B%5B%22i0OFE%22%2C%22%5Bnull%2Cnull%2C%5C%22{}%5C%22%2C0%2C%5C%22{}%5C%22%2C{}%2C1%5D%22%2Cnull%2C%22generic%22%5D%5D%5D&'.format(geo, lang, hours)
-    list_trends = utils.post_url(data_url, data=data, headers=headers, r_text=True)
-    if not list_trends:
-        logger.warning('unable to get ListTrends data from ' + data_url)
+    rpc = {
+        "rpcid": "i0OFE",
+        "args": [None, None, geo, 0, lang, hours, 1]
+    }
+    pbe = pybatchexecute.PreparedBatchExecute(rpcs=[rpc], host="trends.google.com", app=wiz_global_data['qwAQke'])
+    params = {
+        "rpcids": rpc['rpcid'],
+        "source-path": "/trending",
+        "f.sid": wiz_global_data['FdrFJe'],
+        "bl": wiz_global_data['cfb2h'],
+        "hl": lang,
+        "_reqid": reqid,
+        "rt": "c"
+    }
+    r = requests.post(pbe.url + '?' + urlencode(params), data=urlencode(pbe.data), headers=headers)
+    if r.status_code != 200:
+        logger.warning('unable to get FeTrendingService.ListTrends')
         return None
+    batchexe = pybatchexecute.decode(r.text, rt=params['rt'])
+    idx, rpcid, trend_list = batchexe[0]
     if save_debug:
-        utils.write_file(list_trends, './debug/trends.txt')
+        utils.write_file(trend_list, './debug/trends.json')
 
-    trends_json = None
-    for line in list_trends.splitlines():
-        if line.startswith('[["wrb.fr"'):
-            line_json = json.loads(line)
-            trends_json = json.loads(line_json[0][2])
+    i = 1
+    n = 0
+    feed_items = []
+    for trend in trend_list[1]:
+        print(trend[0], trend[10])
+        if cat > 0:
+            if cat not in trend[10]:
+                continue
+        item = {}
+        # id = title:timestamp
+        item['id'] = quote_plus(trend[0]) + ':' + str(trend[3][0])
+        item['url'] = 'https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}'.format(quote_plus(trend[0]), geo, lang)
+        # item['url'] = 'https://www.google.com/search?q={}&hl=en-US&safe=active&ssui=on'.format(quote_plus(trend[0]), geo, lang)
+        item['title'] = trend[0]
+        tz_loc = pytz.timezone(config.local_tz)
+        dt_loc = datetime.fromtimestamp(trend[3][0])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, False)
+        item['author'] = {
+            "name": "Google Trends"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+        item['content_html'] = ''
+        if len(trend[9]) > 0:
+            item['content_html'] += '<h3>Trend breakdown</h3><p>'
+            item['tags'] = []
+            for j, tag in enumerate(trend[9]):
+                item['tags'].append(tag)
+                if j > 0:
+                    item['content_html'] += ' &bull; '
+                item['content_html'] += '<a href="https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}">{}</a>'.format(quote_plus(tag), geo, lang, tag)
+            item['content_html'] += '</p>'
+    
+        # /FeTrendingService.ListNews
+        rpc = {
+            "rpcid": "w4opAf",
+            "args": [trend[-2], 3]
+        }
+        pbe = pybatchexecute.PreparedBatchExecute(rpcs=[rpc], host="trends.google.com", app=wiz_global_data['qwAQke'])
+        params['rpcids'] = rpc['rpcid']
+        params['_reqid'] = int(str(i) + str(reqid))
+        i += 1
+        # print(pbe.url + '?' + urlencode(params))
+        # print(pbe.data)
+        r = requests.post(pbe.url + '?' + urlencode(params), data=urlencode(pbe.data), headers=headers)
+        if r.status_code == 200:
+            batchexe = pybatchexecute.decode(r.text, rt=params['rt'])
+            idx, rpcid, news_list = batchexe[0]
+            if save_debug:
+                utils.write_file(news_list, './debug/trend_news.json')
+            item['content_html'] += '<h3>In the News</h3>'
+            for news in news_list[0]:
+                item['content_html'] += utils.add_embed(news[1])
+            if 'image' not in item:
+                item['image'] = news[-1]
+        else:
+            logger.warning('unable to get FeTrendingService.ListNews')
+        feed_items.append(item)
+        n += 1
+        if ('max' in args and n == int(args['max'])) or n > 10:
             break
-    if trends_json:
-        if save_debug:
-            utils.write_file(trends_json, './debug/trends.json')
-        feed_items = []
-        for trend in trends_json[1]:
-            item = {}
-            # timestamp:title
-            item['id'] = str(trend[3][0]) + ':' + quote_plus(trend[0])
-            item['url'] = 'https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}'.format(quote_plus(trend[0]), geo, lang)
-            item['title'] = trend[0]
-            tz_loc = pytz.timezone(config.local_tz)
-            dt_loc = datetime.fromtimestamp(trend[3][0])
-            dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-            item['date_published'] = dt.isoformat()
-            item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
-
-            item['author'] = {
-                "name": "Google Trends"
-            }
-            item['authors'] = []
-            item['authors'].append(item['author'])
-            item['tags'] = trend[9].copy()
-            item['content_html'] = ''
-            breakdown_html = '<h3>Trend breakdown</h3><ul>'
-            for it in trend[9]:
-                breakdown_html += '<li><a href="https://trends.google.com/trends/explore?q={}&date=now%201-d&geo={}&hl={}">{}</a></li>'.format(quote_plus(it), geo, lang, it)
-            breakdown_html += '</ul>'
-            n_articles = 3
-            f_req_list = [[], n_articles]
-            for it in trend[11]:
-                if isinstance(it, list):
-                    f_req_list[0].append(it.copy())
-            f_req = [[[
-                "w4opAf",
-                json.dumps(f_req_list, separators=(',', ':')),
-                None,
-                "generic"
-            ]]]
-            data = 'f.req=' + quote_plus(json.dumps(f_req, separators=(',', ':')))
-            data_url = 'https://trends.google.com{}/data/batchexecute?rpcids=w4opAf&source-path=%2Ftrending&f.sid={}8&bl={}&hl={}&_reqid=3{}&rt=c'.format(global_data['Im6cmf'], global_data['FdrFJe'], global_data['cfb2h'], lang, reqid)
-            list_news = utils.post_url(data_url, data=data, headers=headers, r_text=True)
-            if list_news:
-                if save_debug:
-                    utils.write_file(list_news, './debug/news.txt')
-                news_json = None
-                for line in list_news.splitlines():
-                    if line.startswith('[["wrb.fr"'):
-                        line_json = json.loads(line)
-                        news_json = json.loads(line_json[0][2])
-                        break
-                if news_json:
-                    if save_debug:
-                        utils.write_file(news_json, './debug/news.json')
-                    item['content_html'] += '<h3>In the news</h3>'
-                    for news in news_json[0]:
-                        if 'image' not in item:
-                            item['image'] = news[4]
-                        embed_html = utils.add_embed(news[1])
-                        if embed_html.startswith('<blockquote'):
-                            embed_item = {
-                                "url": news[1],
-                                "title": news[0],
-                                "image": news[4]
-                            }
-                            embed_item = utils.format_embed_preview(embed_item, False)
-                        item['content_html'] += embed_html
-            item['content_html'] += breakdown_html
-            feed_items.append(item)
 
     feed = utils.init_jsonfeed(args)
     feed['title'] = 'Google Trends'
@@ -540,12 +511,14 @@ def get_news(url, args, site_json, save_debug=False):
         geo = args['geo']
     else:
         geo = 'US'
+
     if 'hl' in params:
         lang = params['hl'][0]
     elif 'lang' in args:
         lang = args['lang']
     else:
         lang = 'en-US'
+
     if 'ceid' in params:
         ceid = params['ceid'][0]
     elif 'ceid' in args:
@@ -553,52 +526,30 @@ def get_news(url, args, site_json, save_debug=False):
     else:
         ceid = 'US:en'
 
-    page_url = 'https://trends.google.com/trending?geo={}&hl={}'.format(geo, lang)
-    headers = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "priority": "u=0, i",
-        "sec-ch-ua": "\"Chromium\";v=\"128\", \"Not;A=Brand\";v=\"24\", \"Microsoft Edge\";v=\"128\"",
-        "sec-ch-ua-arch": "\"x86\"",
-        "sec-ch-ua-bitness": "\"64\"",
-        "sec-ch-ua-form-factors": "\"Desktop\"",
-        "sec-ch-ua-full-version": "\"128.0.2739.67\"",
-        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"128.0.6613.120\", \"Not;A=Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"128.0.2739.67\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-model": "\"\"",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-ch-ua-platform-version": "\"15.0.0\"",
-        "sec-ch-ua-wow64": "?0",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1"
-    }
-    page_html = utils.get_url_html(page_url, headers=headers)
-    if not page_html:
+    r = curl_cffi.get(url, impersonate="chrome")
+    if not r or r.status_code != 200:
         return None
-    soup = BeautifulSoup(page_html, 'lxml')
+    soup = BeautifulSoup(r.text, 'lxml')
     el = soup.find('script', string=re.compile(r'WIZ_global_data'))
     if not el:
-        logger.warning('unable to find WIZ_global_data in ' + page_url)
+        logger.warning('unable to find WIZ_global_data in ' + url)
+        return None
     i = el.string.find('{')
     j = el.string.rfind('}') + 1
-    global_data = json.loads(el.string[i:j])
+    wiz_global_data = json.loads(el.string[i:j])
+    reqid = random.randint(10000, 99999)
 
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
         "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
         "priority": "u=1, i",
-        "sec-ch-ua": "\"Chromium\";v=\"128\", \"Not;A=Brand\";v=\"24\", \"Microsoft Edge\";v=\"128\"",
+        "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"",
         "sec-ch-ua-arch": "\"x86\"",
         "sec-ch-ua-bitness": "\"64\"",
         "sec-ch-ua-form-factors": "\"Desktop\"",
-        "sec-ch-ua-full-version": "\"128.0.2739.79\"",
-        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"128.0.6613.138\", \"Not;A=Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"128.0.2739.79\"",
+        "sec-ch-ua-full-version": "\"134.0.3124.93\"",
+        "sec-ch-ua-full-version-list": "\"Chromium\";v=\"134.0.6998.178\", \"Not:A-Brand\";v=\"24.0.0.0\", \"Microsoft Edge\";v=\"134.0.3124.93\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-model": "\"\"",
         "sec-ch-ua-platform": "\"Windows\"",
@@ -609,17 +560,104 @@ def get_news(url, args, site_json, save_debug=False):
         "sec-fetch-site": "same-origin",
         "x-same-domain": "1"
     }
-    reqid = random.randint(10000, 99999)
-    if split_url.path == '/home':
-        # HOnZud = /SplashApiRpcService.GetHomeForYouPreviewSection
-        # i6owq = /SplashApiRpcService.GetHomeNewsClustersSection
-        # Rxtpc = /SplashApiRpcService.GetGaramondCarousel
-        # M7NAJd = /SplashApiRpcService.GetHomeGenreModulesSection
-        rpcids = 'M7NAJd'
-        data = 'f.req=%5B%5B%5B%22M7NAJd%22%2C%22%5B%5C%22ghgmsreq%5C%22%2C%5B%5B%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C%5B%5C%22FINANCE_TOP_INDICES%5C%22%2C%5C%22WEB_TEST_1_0_0%5C%22%5D%2Cnull%2Cnull%2C1%2C1%2C%5C%22{2}%5C%22%2Cnull%2C-240%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%2C0%5D%2C%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C1%2C%5B2%2C4%2C8%5D%2C1%2C1%2C%5C%22675824581%5C%22%2C0%2C0%2Cnull%2C0%5D%5D%22%2Cnull%2C%221%22%5D%5D%5D'.format(lang, geo, quote_plus(ceid))
-    else:
-        # Qxytce = /SplashApiRpcService.GetTopicInfo
-        # EAfJqe = /SplashApiRpcService.GetTopicSection
-        rcpids = quote_plus('Qxytce,EAfJqe')
-        data = 'f.req=%5B%5B%5B%22Qxytce%22%2C%22%5B%5C%22gtireq%5C%22%2C%5B%5B%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C%5B%5C%22FINANCE_TOP_INDICES%5C%22%2C%5C%22WEB_TEST_1_0_0%5C%22%5D%2Cnull%2Cnull%2C1%2C1%2C%5C%22{2}%5C%22%2Cnull%2C-240%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%2C0%5D%2C%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C1%2C%5B2%2C4%2C8%5D%2C1%2C1%2C%5C%22675824581%5C%22%2C0%2C0%2Cnull%2C0%5D%2C%5C%22{3}%5C%22%5D%22%2Cnull%2C%221%22%5D%2C%5B%22EAfJqe%22%2C%22%5B%5C%22gtsreq%5C%22%2C%5B%5B%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C%5B%5C%22FINANCE_TOP_INDICES%5C%22%2C%5C%22WEB_TEST_1_0_0%5C%22%5D%2Cnull%2Cnull%2C1%2C1%2C%5C%22{2}%5C%22%2Cnull%2C-240%2Cnull%2Cnull%2Cnull%2Cnull%2Cnull%2C0%5D%2C%5C%22{0}%5C%22%2C%5C%22{1}%5C%22%2C1%2C%5B2%2C4%2C8%5D%2C1%2C1%2C%5C%22675824581%5C%22%2C0%2C0%2Cnull%2C0%5D%2Cnull%2C%5C%22{3}%5C%22%2C%5C%22%5C%22%5D%22%2Cnull%2C%223%22%5D%5D%5D&'.format(lang, geo, quote_plus(ceid), paths[-1])
-    data_url = 'https://news.google.com{}/data/batchexecute?rpcids={}&source-path={}&f.sid={}&bl={}&hl={}&gl={}&soc-app=140&soc-platform=1&soc-device=1&_reqid=1{}&rt=c'.format(rcpids, global_data['Im6cmf'], quote_plus(split_url.path), global_data['FdrFJe'], global_data['cfb2h'], lang, geo, reqid)
+
+    # WuSwme = /WebAppApiRpcService.GetEditionFullFirstPage
+    rpc = {
+        "rpcid": "WuSwme",
+        "args": ["waareq", [lang, geo, ["FINANCE_TOP_INDICES", "WEB_TEST_1_0_0"], None, None, 1, 1, ceid, None, -240, None, None, None, None, None, 0], paths[-1], None, None, None, None, None, None, None, None, None, 0, 1]
+    }
+    pbe = pybatchexecute.PreparedBatchExecute(rpcs=[rpc], host="news.google.com", app=wiz_global_data['qwAQke'])
+    params = {
+        "rpcids": rpc['rpcid'],
+        "source-path": split_url.path,
+        "f.sid": wiz_global_data['FdrFJe'],
+        "bl": wiz_global_data['cfb2h'],
+        "hl": lang,
+        "gl": geo,
+        "soc-app": 140,
+        "soc-platform": 1,
+        "soc-device": 1,
+        "_reqid": reqid,
+        "rt": "c"
+    }
+    r = requests.post(pbe.url + '?' + urlencode(params), data=urlencode(pbe.data), headers=headers)
+    if r.status_code != 200:
+        logger.warning('unable to get WebAppApiRpcService.GetEditionFullFirstPage (status code {})'.format(r.status_code))
+        return None
+    batchexe = pybatchexecute.decode(r.text, rt=params['rt'])
+    idx, rpcid, news_page = batchexe[0]
+    if save_debug:
+        utils.write_file(news_page, './debug/news.json')
+
+    item = {}
+    item['id'] = split_url.path
+    item['url'] = url
+    item['title'] = news_page[2][0][2]
+
+    # TODO: date
+
+    item['author'] = {
+        "name": "Google News"
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
+
+    item['content_html'] = ''
+    for it in news_page[2][1][3]:
+        if isinstance(it[-1], str):
+            if it[-1].startswith('aa|ui|'):
+                i = it[0]
+                section = it[i]
+                if isinstance(section[1], list):
+                    if isinstance(section[1][1], str) and section[1][1].startswith('ui|'):
+                        # section heading
+                        item['content_html'] += '<h3>' + section[2] + '</h3>'
+                        if section[-1][0][0][4] == 'TWITTER_RESULT_GROUP':
+                            # https://news.google.com/stories/CAAqNggKIjBDQklTSGpvSmMzUnZjbmt0TXpZd1NoRUtEd2pydGFUT0RSRW1xeTdUVm5FNjlDZ0FQAQ?hl=en-US&gl=US&ceid=US%3Aen
+                            for story in section[3]:
+                                item['content_html'] += utils.add_embed(story[10][5])
+                        elif section[-1][0][0][4] == 'NEWS_QUESTION_RESULT_GROUP':
+                            # https://news.google.com/stories/CAAqNggKIjBDQklTSGpvSmMzUnZjbmt0TXpZd1NoRUtEd2ptbXJQUERSSG83cFJmemFHTGt5Z0FQAQ?hl=en-US&gl=US&ceid=US%3Aen
+                            for story in section[3]:
+                                j = story[0]
+                                item['content_html'] += '<div style="font-weight:bold;">' + story[j][1] + '</div>'
+                                item['content_html'] += '<p style="margin-left:2em;">' + story[j][2]
+                                if story[j][7][1]:
+                                    item['content_html'] += '<br><span style="font-size:0.8em;">Source: <a href="{}">{}</a> ({})</span>'.format(story[j][7][1], story[j][7][0], urlsplit(story[j][7][1]).netloc)
+                                item['content_html'] += '</p>'
+                        elif section[-1][0][0][4] == 'NEWS_TOP_COVERAGE_RESULT_GROUP' or section[-1][0][0][4] == 'NEWS_POINT_OF_VIEW_RESULT_GROUP' or section[-1][0][0][4] == 'NEWS_OPINION_RESULT_GROUP':
+                            for story in section[3]:
+                                j = story[0]
+                                item['content_html'] += utils.add_embed(story[j][6])
+                        else:
+                            logger.warning('unhandled section type ' + section[-1][0][0][4])
+                elif isinstance(section[1], str):
+                    # section heading
+                    item['content_html'] += '<h3>' + section[1] + '</h3>'
+            elif re.search(r'^aa\|[^\|]+', it[-1]):
+                story = it
+                j = story[0]
+                print('  ' + story[j][2] + ', ' + story[j][6])
+                item['content_html'] += '<li><a href="{}">{}</a> ({})</li>'.format(story[j][6], story[j][2], urlsplit(story[j][6]).netloc)
+    return item
+
+
+def decode_news_url(url):
+    # https://stackoverflow.com/questions/51131834/decoding-encoded-google-news-urls
+    primary_url = ''
+    _ENCODED_URL_PREFIX = "https://news.google.com/rss/articles/"
+    _ENCODED_URL_RE = re.compile(fr"^{re.escape(_ENCODED_URL_PREFIX)}(?P<encoded_url>[^?]+)")
+    _DECODED_URL_RE = re.compile(rb'^\x08\x13".+?(?P<primary_url>http[^\xd2]+)\xd2\x01')
+    match = _ENCODED_URL_RE.match(url)
+    if match:
+        encoded_text = match.groupdict()["encoded_url"]
+        encoded_text += "==="
+        decoded_text = base64.urlsafe_b64decode(encoded_text)
+        match = _DECODED_URL_RE.match(decoded_text)
+        if match:
+            primary_url = match.groupdict()["primary_url"]
+            primary_url = primary_url.decode()
+    if primary_url:
+        return primary_url
+    logger.warning('unhandled url ' + url)
+    return url

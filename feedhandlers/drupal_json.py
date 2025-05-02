@@ -347,6 +347,22 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
         if api_json:
             authors.append(api_json['data']['attributes']['name'])
+    elif page_json['relationships'].get('field_jornalist') and page_json['relationships']['field_jornalist'].get('data'):
+        for data in page_json['relationships']['field_jornalist']['data']:
+            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            if api_json:
+                if api_json['data']['attributes'].get('name'):
+                    authors.append(api_json['data']['attributes']['name'])
+                else:
+                    logger.warning('unknown field_jornalist data attributes')
+    elif page_json['relationships'].get('field_opinion_writer_node') and page_json['relationships']['field_opinion_writer_node'].get('data'):
+        for data in page_json['relationships']['field_opinion_writer_node']['data']:
+            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            if api_json:
+                if api_json['data']['attributes'].get('name'):
+                    authors.append(api_json['data']['attributes']['name'])
+                else:
+                    logger.warning('unknown field_opinion_writer_node data attributes')
     item['author'] = {}
     if authors:
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
@@ -411,6 +427,22 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             data = page_json['relationships']['field_image']['data']
         data_html = get_field_data(data, site_json['api_path'], caption=caption)
         if data['type'] == 'file--file':
+            if not caption and data.get('meta') and data['meta'].get('title'):
+                caption = data['meta']['title']
+            item['_image'] = data_html
+            data_html = utils.add_image(data_html, caption)
+        else:
+            item['_image'], caption = get_img_src(data_html)
+        lede_html = data_html
+    elif page_json['relationships'].get('field_new_photo') and page_json['relationships']['field_new_photo'].get('data'):
+        if isinstance(page_json['relationships']['field_new_photo']['data'], list):
+            data = page_json['relationships']['field_new_photo']['data'][0]
+        else:
+            data = page_json['relationships']['field_new_photo']['data']
+        data_html = get_field_data(data, site_json['api_path'], caption=caption)
+        if data['type'] == 'file--file':
+            if not caption and data.get('meta') and data['meta'].get('title'):
+                caption = data['meta']['title']
             item['_image'] = data_html
             data_html = utils.add_image(data_html, caption)
         else:
@@ -514,7 +546,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             lede_html += '<p><b>PRICE:</b><br/>£{:,.0f} &ndash; £{:,.0f}</p>'.format(float(page_json['attributes']['tg_price_range_field']['min_price_range']), float(page_json['attributes']['tg_price_range_field']['max_price_range']))
         item['content_html'] = lede_html + '<hr/>' + item['content_html']
 
-    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--cars_road_test':
+    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--opinion' or page_json['type'] == 'node--cars_road_test':
         if page_json['attributes'].get('field_introduction'):
             item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_introduction'])
 
@@ -525,19 +557,19 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         if lede_html:
             item['content_html'] += lede_html
 
+        body_html = ''
         if page_json['attributes'].get('body'):
-            body_soup = BeautifulSoup(page_json['attributes']['body']['processed'], 'html.parser')
+            body_html = page_json['attributes']['body']['processed']
         elif page_json['attributes'].get('field_article_body'):
-            body_soup = BeautifulSoup(page_json['attributes']['field_article_body'][0]['processed'], 'html.parser')
+            body_html = page_json['attributes']['field_article_body'][0]['processed']
         elif page_json['relationships'].get('field_paragraphs'):
-            paragraphs = ''
             for data in page_json['relationships']['field_paragraphs']['data']:
-                paragraphs += get_field_data(data, site_json['api_path'])
-            body_soup = BeautifulSoup(paragraphs, 'html.parser')
+                body_html += get_field_data(data, site_json['api_path'])
         else:
             logger.warning('unknown body content in ' + item['url'])
-            body_soup = None
-        if body_soup:
+        if body_html:
+            body_html = re.sub(r'<br\s?/>\n', '<br/><br/>', body_html)
+            body_soup = BeautifulSoup(body_html, 'html.parser')
             for el in body_soup.find_all('div', attrs={"data-embed-button": True}):
                 new_html = ''
                 if el['data-embed-button'] == 'media_entity_embed' or el['data-embed-button'] == 'social_media':

@@ -197,31 +197,33 @@ def get_item(post_json, args, site_json, save_debug):
                 new_html += '<div style="clear:left;"></div></div><div>&nbsp;</div>'
             elif 'kg-bookmark-card' in el['class']:
                 link = el.find('a', class_='kg-bookmark-container')
-                new_html = '<table style="margin-left:1em; width:100%;"><tr>'
-                it = el.find(class_='kg-bookmark-thumbnail')
-                if it:
-                    new_html += '<td style="width:200px;"><a href="{}"><img src="{}" style="width:200px;" /></a></td>'.format(link['href'], it.img['src'])
-                new_html += '<td>'
-                it = el.find(class_='kg-bookmark-title')
-                if it:
-                    new_html += '<a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a>'.format(link['href'], it.get_text())
-                it = el.find(class_='kg-bookmark-description')
-                if it:
-                    new_html += '<br/><small>{}</small>'.format(it.get_text())
-                if el.find(class_='kg-bookmark-metadata'):
-                    new_html += '<br/>'.format(it.get_text())
-                    it = el.find('img', class_='kg-bookmark-icon')
+                new_html = utils.add_embed(link['href'])
+                if new_html.startswith('<blockquote>'):
+                    new_html = '<table style="margin-left:1em; width:100%;"><tr>'
+                    it = el.find(class_='kg-bookmark-thumbnail')
                     if it:
-                        new_html += '<img src="{}" style="float:left; height:1em;"/>&nbsp;'.format(it['src'])
-                    new_html += '<small>'
-                    it = el.find(class_='kg-bookmark-author')
+                        new_html += '<td style="width:200px;"><a href="{}"><img src="{}" style="width:200px;" /></a></td>'.format(link['href'], it.img['src'])
+                    new_html += '<td>'
+                    it = el.find(class_='kg-bookmark-title')
                     if it:
-                        new_html += it.get_text()
-                    it = el.find(class_='kg-bookmark-publisher')
+                        new_html += '<a href="{}"><span style="font-size:1.1em; font-weight:bold;">{}</span></a>'.format(link['href'], it.get_text())
+                    it = el.find(class_='kg-bookmark-description')
                     if it:
-                        new_html += '&nbsp;&bull;&nbsp;' + it.get_text()
-                    new_html += '</small>'
-                new_html += '</td></tr></table>'
+                        new_html += '<br/><small>{}</small>'.format(it.get_text())
+                    if el.find(class_='kg-bookmark-metadata'):
+                        new_html += '<br/>'.format(it.get_text())
+                        it = el.find('img', class_='kg-bookmark-icon')
+                        if it:
+                            new_html += '<img src="{}" style="float:left; height:1em;"/>&nbsp;'.format(it['src'])
+                        new_html += '<small>'
+                        it = el.find(class_='kg-bookmark-author')
+                        if it:
+                            new_html += it.get_text()
+                        it = el.find(class_='kg-bookmark-publisher')
+                        if it:
+                            new_html += '&nbsp;&bull;&nbsp;' + it.get_text()
+                        new_html += '</small>'
+                    new_html += '</td></tr></table>'
             elif 'kg-product-card' in el['class']:
                 link = el.find('a', class_='kg-product-card-button')
                 new_html = '<table style="margin-left:1em; width:100%;"><tr>'
@@ -271,6 +273,18 @@ def get_item(post_json, args, site_json, save_debug):
                     new_html += '</td></tr></table>'
             elif 'kg-signup-card' in el['class']:
                 el.decompose()
+                continue
+            elif el.find(class_='activity-card'):
+                # https://selfh.st/newsletter/2025-03-28/
+                for it in el.find_all(class_='activity-card'):
+                    it.unwrap()
+                for it in el.find_all(class_='activity-card-container'):
+                    it['style'] = 'margin-bottom:1em;'
+                for it in el.find_all('a', class_='activity-tag'):
+                    it['style'] = 'background-color:#007bff; color:white; font-size:0.8em; padding:2px 5px; margin:0 7px; text-decoration:none; border-radius:5px;'
+                for it in el.find_all('img', class_='activity-source-icon'):
+                    it['style'] = 'width:16px; height:16px; margin-top:2px 5px; vertical-align:middle; filter:contrast(0%) brightness(350%); opacity:0.70 !important;'
+                el.unwrap()
                 continue
             elif el.find(class_='twitter-tweet'):
                 links = el.find_all('a')
@@ -326,6 +340,8 @@ def get_item(post_json, args, site_json, save_debug):
             elif el.find(id=['remixd-audio-player-script', 'elevenlabs-audionative-widget']):
                 el.decompose()
                 continue
+            elif el.find('p', class_=re.compile(r'drop-cap')):
+                new_html = re.sub(r'^(<p[^>]+>)(\s*)(\W*\w)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\3</span>', el.decode_contents().strip()) + '<span style="clear:left;"></span>'
             elif el.find('div', class_=['outpost-pub-container', 'subscribe']):
                 el.decompose()
                 continue
@@ -372,10 +388,12 @@ def get_item(post_json, args, site_json, save_debug):
                 it['style'] = 'font-size:0.9em; font-style:italic;'
                 el.unwrap()
                 continue
-            elif el.find(class_='gh-article-collab'):
+            elif el.find(class_='gh-article-collab') or el.find(attrs={"data-umami-event": re.compile(r'newsletter-sponsor-headline')}):
                 el.decompose()
                 continue
-
+            elif all([True if it.name == 'img' or it.name == 'br' else False for it in el.find_all()]) and not el.get_text().strip():
+                # Only and img tag (or br) with no text
+                new_html = utils.add_image(el.img['src'])
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -409,7 +427,7 @@ def get_feed(url, args, site_json, save_debug=False):
         post_filters.append('author:' + paths[-1])
     if post_filters:
         ghost_url += '&filter=' + quote_plus('+'.join(post_filters))
-    print(ghost_url)
+    # print(ghost_url)
     ghost_json = utils.get_url_json(ghost_url)
     if not ghost_json:
         return None

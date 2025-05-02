@@ -622,19 +622,24 @@ def get_content(url, args, site_json, save_debug=False):
 
     if 'gallery' in paths:
         item['content_html'] = ''
+        image = None
         el = soup.find(class_='gallery-inline_unfurled__head')
         if el:
             image = el.find(class_='image')
-            if image:
-                captions = []
-                it = el.find(class_='gallery-inline_unfurled__top--credit')
-                if it:
-                    captions.append(it.get_text().strip())
-                    it.decompose()
-                it = el.find(class_='gallery-inline_unfurled__top--caption')
-                if it:
-                    captions.insert(0, it.get_text().strip())
-                item['content_html'] += utils.add_image(resize_image(image['data-url']), ' | '.join(captions))
+        if not image:
+            el = soup.find(class_='layout-no-rail__topFullBleed')
+            if el:
+                image = el.find(class_='image')
+        if image:
+            captions = []
+            it = el.find(class_='gallery-inline_unfurled__top--credit')
+            if it:
+                captions.append(it.get_text().strip())
+                it.decompose()
+            it = el.find(class_='gallery-inline_unfurled__top--caption')
+            if it:
+                captions.insert(0, it.get_text().strip())
+            item['content_html'] += utils.add_image(resize_image(image['data-url']), ' | '.join(captions))
         el = soup.find(class_='gallery-inline_unfurled__description')
         if el:
             item['content_html'] += el.decode_contents()
@@ -719,6 +724,8 @@ def get_content(url, args, site_json, save_debug=False):
                     if it and it.get_text().strip():
                         captions.insert(0, it.get_text().strip())
                     lede += utils.add_image(div['data-url'], ' | '.join(captions))
+        elif article_json.get('video'):
+            lede = utils.add_video(article_json['video'][0]['contentUrl'], 'video/mp4', article_json['video'][0]['thumbnailUrl'], article_json['video'][0]['name'], use_videojs=True)
         item['content_html'] = lede
         new_html = ''
         source = ''
@@ -739,6 +746,10 @@ def get_content(url, args, site_json, save_debug=False):
                 if source:
                     el.insert(0, BeautifulSoup(source, 'html.parser'))
                     source = ''
+                continue
+            elif 'paragraph_contributors' in el['class']:
+                el.attrs = {}
+                el['style'] = 'font-style:italic;'
                 continue
             elif 'image' in el['class'] or 'image_large' in el['class'] or 'image_inline-small' in el['class']:
                 captions = []

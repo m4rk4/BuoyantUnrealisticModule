@@ -26,6 +26,13 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
     page_html = utils.get_url_html(page_url, site_json=site_json)
     if not page_html:
         return None
+
+    if 'html_encode' in site_json:
+        page_html = page_html.encode(site_json['html_encode']).decode('utf-8')
+
+    if split_url.netloc == 'www.jpost.com':
+        page_html = re.sub(r'<section class=["\']fake-br-for-article-body["\']></section>', '</p>', page_html)
+
     soup = BeautifulSoup(page_html, 'html.parser')
     if save_debug:
         utils.write_file(soup.prettify(), './debug/page.html')
@@ -424,6 +431,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if not authors and site_json.get('authors'):
             authors.append(site_json['authors']['default'])
         if authors:
+            authors = [re.sub(r'^by\s+', '', x, flags=re.I) for x in authors]
             item['author'] = {}
             item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
         elif site_json.get('authors'):
@@ -472,16 +480,26 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             # Remove duplicates (case-insensitive)
             item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
 
+    image_caption = ''
     if not item.get('_image'):
         if ld_images:
             item['_image'] = ld_images[0]['url']
+            if ld_images[0].get('caption'):
+                image_caption = ld_images[0]['caption']
         if not item.get('_image') and article_json:
             if article_json.get('image'):
                 if isinstance(article_json['image'], dict):
                     if article_json['image'].get('url'):
                         item['_image'] = article_json['image']['url']
+                        if article_json['image'].get('caption'):
+                            image_caption = article_json['image']['caption']
                 elif isinstance(article_json['image'], list):
-                    item['_image'] = article_json['image'][0]
+                    if isinstance(article_json['image'][0], dict):
+                        item['_image'] = article_json['image'][0]['url']
+                        if article_json['image'][0].get('caption'):
+                            image_caption = article_json['image'][0]['caption']
+                    elif isinstance(article_json['image'][0], str):
+                        item['_image'] = article_json['image'][0]
                 elif isinstance(article_json['image'], str):
                     item['_image'] = article_json['image']
             if not item.get('_image') and article_json.get('thumbnailUrl'):
@@ -686,11 +704,11 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
                 else:
                     logger.warning('unhandled lede_img in ' + item['url'])
     if 'add_lede_img' in args and not lede and item.get('_image'):
-        item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json))
+        item['content_html'] += utils.add_image(wp_posts.resize_image(item['_image'], site_json), image_caption)
 
     if site_json.get('add_content'):
         for it in site_json['add_content']:
-            if it['position'] == 'top':
+            if not it.get('position') or it['position'] == 'top':
                 contents = utils.get_soup_elements(it, soup)
                 for el in contents:
                     # print(el)

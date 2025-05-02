@@ -86,20 +86,26 @@ def render_content(content_list):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     if '/story/' in split_url.path:
-        gql_query = {
-            "operationName": "story",
-            "variables": {
-                "contentAreaSlug": site_json['contentAreaSlug'],
-                "slug": split_url.path[7:]
-            },
-            "query": "query story($contentAreaSlug: String!, $slug: String!, $previewToken: String) {\n  story: story(\n    contentAreaSlug: $contentAreaSlug\n    slug: $slug\n    previewToken: $previewToken\n  ) {\n    id\n    title\n    shortTitle\n    subtitle\n    originalSourceUrl\n    supportedOutputFormats\n    resourceType\n    dateline\n    canonicalSlug\n    primaryCollection {\n      id\n      title\n      canonicalSlug\n      resourceType\n      templateName\n      results(pageSize: 4) {\n        items {\n          subtitle\n          title\n          resourceType\n          canonicalSlug\n          canonicalUrl\n          publishDate\n          collectionRelatedLinks {\n            url\n            title\n            prefix\n          }\n        }\n      }\n    }\n    collections {\n      rssUrl\n      canonicalSlug\n    }\n    contributors {\n      profile {\n        id\n        title\n        canonicalSlug\n      }\n      roles {\n        name\n      }\n      order\n    }\n    publishDate\n    updatedAt\n    body\n    description\n    descriptionText\n    resourceType\n    primaryAudio {\n      title\n      credit\n      durationHms\n      durationMs\n      transcriptText\n      transcripts {\n        mediaType\n        formatSlug\n        url\n      }\n      encodings {\n        format\n        mediaType\n        httpFilePath\n        filename\n        playFilePath\n      }\n    }\n    embeddedAssets {\n      audio\n      attachments\n      images\n      oembeds\n    }\n    primaryVisuals {\n      video {\n        url\n        caption\n        background\n        credit {\n          name\n          url\n        }\n      }\n      social {\n        aspect_ratios: aspectRatios {\n          uncropped {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          widescreen {\n            instances {\n              url\n              width\n              height\n            }\n          }\n        }\n        fallback\n      }\n      lead {\n        preferredAspectRatio {\n          instances {\n            url\n            width\n            height\n          }\n        }\n        aspect_ratios: aspectRatios {\n          uncropped {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          widescreen {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          square {\n            instances {\n              url\n              width\n              height\n            }\n          }\n        }\n        contentArea\n        credit {\n          name\n          url\n        }\n        dateTaken\n        dateline\n        fallback\n        longCaption\n        rights {\n          redistributable\n        }\n        shortCaption\n        xid\n      }\n    }\n  }\n  alertConfig: potlatch(slug: \"mprnews/info-alert\") {\n    slug\n    json\n  }\n  blacklist: potlatch(slug: \"mprnews/related-stories-blacklist\") {\n    json\n  }\n  viafoura: potlatch(slug: \"mprnews/viafoura\") {\n    json\n  }\n  livechat: potlatch(slug: \"mprnews/viafoura-livechat\") {\n    json\n  }\n  donateAsk: potlatch(slug: \"mprnews/donate-ask-config\") {\n    json\n  }\n}\n"
-        }
-        gql_json = utils.post_url('https://cmsapi.publicradio.org/graphql', json_data=gql_query)
-        if not gql_json:
+        # gql_query = {
+        #     "operationName": "story",
+        #     "variables": {
+        #         "contentAreaSlug": site_json['contentAreaSlug'],
+        #         "slug": split_url.path[7:]
+        #     },
+        #     "query": "query story($contentAreaSlug: String!, $slug: String!, $previewToken: String) {\n  story: story(\n    contentAreaSlug: $contentAreaSlug\n    slug: $slug\n    previewToken: $previewToken\n  ) {\n    id\n    title\n    shortTitle\n    subtitle\n    originalSourceUrl\n    supportedOutputFormats\n    resourceType\n    dateline\n    canonicalSlug\n    primaryCollection {\n      id\n      title\n      canonicalSlug\n      resourceType\n      templateName\n      results(pageSize: 4) {\n        items {\n          subtitle\n          title\n          resourceType\n          canonicalSlug\n          canonicalUrl\n          publishDate\n          collectionRelatedLinks {\n            url\n            title\n            prefix\n          }\n        }\n      }\n    }\n    collections {\n      rssUrl\n      canonicalSlug\n    }\n    contributors {\n      profile {\n        id\n        title\n        canonicalSlug\n      }\n      roles {\n        name\n      }\n      order\n    }\n    publishDate\n    updatedAt\n    body\n    description\n    descriptionText\n    resourceType\n    primaryAudio {\n      title\n      credit\n      durationHms\n      durationMs\n      transcriptText\n      transcripts {\n        mediaType\n        formatSlug\n        url\n      }\n      encodings {\n        format\n        mediaType\n        httpFilePath\n        filename\n        playFilePath\n      }\n    }\n    embeddedAssets {\n      audio\n      attachments\n      images\n      oembeds\n    }\n    primaryVisuals {\n      video {\n        url\n        caption\n        background\n        credit {\n          name\n          url\n        }\n      }\n      social {\n        aspect_ratios: aspectRatios {\n          uncropped {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          widescreen {\n            instances {\n              url\n              width\n              height\n            }\n          }\n        }\n        fallback\n      }\n      lead {\n        preferredAspectRatio {\n          instances {\n            url\n            width\n            height\n          }\n        }\n        aspect_ratios: aspectRatios {\n          uncropped {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          widescreen {\n            instances {\n              url\n              width\n              height\n            }\n          }\n          square {\n            instances {\n              url\n              width\n              height\n            }\n          }\n        }\n        contentArea\n        credit {\n          name\n          url\n        }\n        dateTaken\n        dateline\n        fallback\n        longCaption\n        rights {\n          redistributable\n        }\n        shortCaption\n        xid\n      }\n    }\n  }\n  alertConfig: potlatch(slug: \"mprnews/info-alert\") {\n    slug\n    json\n  }\n  blacklist: potlatch(slug: \"mprnews/related-stories-blacklist\") {\n    json\n  }\n  viafoura: potlatch(slug: \"mprnews/viafoura\") {\n    json\n  }\n  livechat: potlatch(slug: \"mprnews/viafoura-livechat\") {\n    json\n  }\n  donateAsk: potlatch(slug: \"mprnews/donate-ask-config\") {\n    json\n  }\n}\n"
+        # }
+        # gql_json = utils.post_url('https://cmsapi.publicradio.org/graphql', json_data=gql_query)
+        # if not gql_json:
+        #     return None
+        # if save_debug:
+        #     utils.write_file(gql_json, './debug/debug.json')
+        # story_json = gql_json['data']['story']
+        next_data = get_next_data(url, site_json)
+        if not next_data:
             return None
         if save_debug:
-            utils.write_file(gql_json, './debug/debug.json')
-        story_json = gql_json['data']['story']
+            utils.write_file(next_data, './debug/debug.json')
+        story_json = next_data['pageProps']['data']['story']
     elif '/episode/' in split_url.path:
         gql_query = {
             "operationName": "episode",
@@ -194,7 +200,8 @@ def get_content(url, args, site_json, save_debug=False):
         item['_audio'] = utils.get_redirect_url(audio['playFilePath'].replace('%user_agent', 'web'))
         attachment = {}
         attachment['url'] = item['_audio']
-        attachment['mime_type'] = audio['mediaType']
+        # attachment['mime_type'] = audio['mediaType']
+        attachment['mime_type'] = 'audio/mpeg'
         item['attachments'] = []
         item['attachments'].append(attachment)
         item['content_html'] += '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span style="padding-left:8px;"><a href="{0}">Listen:</a> <em>{2}</em></span></div>'.format(item['_audio'], config.server, story_json['primaryAudio']['title'])

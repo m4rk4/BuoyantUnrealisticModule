@@ -145,6 +145,16 @@ def get_content_html(content_uri):
             else:
                 logger.warning('unable to determine instagram url in https://' + content_uri)
 
+    elif re.search(r'\/\w+-tiktok\/', content_uri):
+        if content_json.get('url'):
+            content_html = utils.add_embed(content_json['url'])
+        else:
+            m = re.search(r'cite="([^\?"]+)', content_json['html'])
+            if m:
+                content_html = utils.add_embed(m.group(1))
+            else:
+                logger.warning('unable to determine tiktok url in https://' + content_uri)
+
     elif re.search(r'\/\w+-megaphone\/', content_uri):
         content_html = utils.add_embed(content_json['publicIframeUrl'])
 

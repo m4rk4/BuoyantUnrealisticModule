@@ -124,7 +124,7 @@ def render_content(content):
         content_html += '<br />'
 
     elif content['type'] == 'PageBreak' or content['type'] == 'HorizontalRule':
-        content_html += '<hr style="width:80%;"/>'
+        content_html += '<hr style="width:80%; margin:2em auto;"/>'
 
     elif content['type'] == 'Link':
         content_html += '<a href="{}">'.format(content['reference'])
@@ -218,7 +218,8 @@ def render_content(content):
         content_html += '</div>'
 
     elif content['type'] == 'CommerceLink':
-        content_html += '<p><a href="{}">{}</a></p>'.format(content['url'], content['text'])
+        # content_html += '<p><a href="{}">{}</a></p>'.format(content['url'], content['text'])
+        content_html += utils.add_button(content['url'], content['text'], 'rgb(143, 8, 94)')
 
     elif content['type'] == 'ContainerBreak':
         content_html += '<!-- ContainerBreak -->'
@@ -283,28 +284,27 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_modified'] = dt_utc.isoformat()
 
     if article_json.get('authorIds'):
-        api_url = 'https://{}/api/profile/users?'.format(split_url.netloc)
-        for author_id in article_json['authorIds']:
-            api_url += 'ids={}&'.format(author_id)
-        api_url = api_url[:-1]
+        api_url = 'https://' + split_url.netloc + '/api/profile/users?ids=' + '&ids='.join(article_json['authorIds'])
         author_json = utils.get_url_json(api_url)
         if author_json:
-            authors = []
-            for author in author_json['data']:
-                authors.append(author['displayName'])
-            if authors:
-                item['author'] = {}
-                item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+            item['authors'] = [{"name": x['displayName']} for x in author_json['data']]
+            if len(item['authors']) > 0:
+                item['author'] = {
+                    "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+                }
 
     if article_json.get('tags'):
-        item['tags'] = []
-        for tag in article_json['tags']:
-            item['tags'].append(tag['displayName'])
+        item['tags'] = [x['displayName'] for x in article_json['tags']]
 
     if article_json.get('sharingMainImage'):
-        item['_image'] = get_image_src(article_json['sharingMainImage']['id'], article_json['sharingMainImage']['format'], article_json['sharingMainImage']['width'])
+        item['image'] = get_image_src(article_json['sharingMainImage']['id'], article_json['sharingMainImage']['format'], article_json['sharingMainImage']['width'])
 
-    item['summary'] = article_json['plaintext']
+    if article_json.get('plaintext'):
+        item['summary'] = article_json['plaintext']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
     if article_json.get('subhead'):
@@ -329,10 +329,3 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     return rss.get_feed(url, args, site_json, save_debug, get_content)
-
-
-def test_handler():
-    feeds = ['https://gizmodo.com/rss',
-             'https://theinventory.com/rss']
-    for url in feeds:
-        get_feed({"url": url}, True)

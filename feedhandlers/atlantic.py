@@ -2,7 +2,7 @@ import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -236,6 +236,7 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     is_floating = False
+    dropcap = ''
     for content in article_json['content']:
         if content['__typename'] == 'ArticleParagraphContent':
             if content['subtype'] == 'DROPCAP':
@@ -244,15 +245,19 @@ def get_content(url, args, site_json, save_debug=False):
                     if el.string:
                         el.string = el.string.upper()
                     el.unwrap()
-                inner_html = str(soup)
-                if inner_html[0] == '“':
-                    dropcap = inner_html[0:2]
-                    inner_html = inner_html[2:]
-                else:
-                    dropcap = inner_html[0]
-                    inner_html = inner_html[1:]
-                content_html += '<p><span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(dropcap, inner_html)
-                is_floating = True
+                if not dropcap:
+                    dropcap = '<style>' + config.dropcap_style + '</style>'
+                    content_html += dropcap
+                content_html += '<p class="dropcap">' + str(soup) + '</p>'
+                # inner_html = str(soup)
+                # if inner_html[0] == '“':
+                #     dropcap = inner_html[0:2]
+                #     inner_html = inner_html[2:]
+                # else:
+                #     dropcap = inner_html[0]
+                #     inner_html = inner_html[1:]
+                # content_html += '<p><span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(dropcap, inner_html)
+                # is_floating = True
             else:
                 if content.get('subtype'):
                     logger.warning('unhandled ArticleParagraphContent subtype {} in {}'.format(content['subtype'], url))

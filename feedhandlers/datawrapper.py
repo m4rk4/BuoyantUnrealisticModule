@@ -76,21 +76,39 @@ def get_content(url, args, site_json, save_debug=False):
     if not utils.url_exists(item['_image']):
         item['_image'] = '{}/screenshot?url={}&width=800&height=800&locator=.dw-chart'.format(config.server, quote_plus(url))
 
-    captions = []
-    item['content_html'] = '<div style="font-size:1.2em; font-weight:bold;">{}</div>'.format(chart_json['title'])
-    if chart_json['metadata'].get('describe') and chart_json['metadata']['describe'].get('intro'):
-        item['content_html'] += '<div>{}</div>'.format(chart_json['metadata']['describe']['intro'])
+    img_src = 'https://datawrapper.dwcdn.net/{}/fallback.png'.format(item['id'])
+    caption = '<a href="{}" target="_blank">View chart</a>'.format(item['url'])
+    if not utils.url_exists(img_src):
+        img_src = item['_image']
+        caption = '<b>' + chart_json['title'] + '</b>'
+        if chart_json['metadata'].get('annotate') and chart_json['metadata']['annotate'].get('notes'):
+            caption += '<br/>' + chart_json['metadata']['annotate']['notes']
+        if chart_json['metadata'].get('describe'):
+            credits = []
+            if chart_json['metadata']['describe'].get('source-name'):
+                credits.append('Source: ' + chart_json['metadata']['describe']['source-name'])
+            if chart_json['metadata']['describe'].get('byline'):
+                credits.append('Graphic: ' + chart_json['metadata']['describe']['byline'])
+            if len(credits) > 0:
+                caption += '<br/>' + ' | '.join(credits)
+        caption += '<br/><a href="{}" target="_blank">View chart</a>'.format(item['url'])
+    item['content_html'] = utils.add_image(img_src, caption, link=url)
 
-    if chart_json['metadata'].get('annotate'):
-        if chart_json['metadata']['annotate'].get('notes'):
-            captions.append(chart_json['metadata']['annotate']['notes'])
-    if chart_json['metadata'].get('describe'):
-        if chart_json['metadata']['describe'].get('source-name'):
-            captions.append('Source: ' + chart_json['metadata']['describe']['source-name'])
-        if chart_json['metadata']['describe'].get('byline'):
-            captions.append('Graphic: ' + chart_json['metadata']['describe']['byline'])
-    caption = '<br/>'.join(captions) + '<br/><a href="{}">View chart</a>'.format(item['url'])
-    item['content_html'] += utils.add_image(item['_image'], caption, link=url)
+    # captions = []
+    # item['content_html'] = '<div style="font-size:1.2em; font-weight:bold;">{}</div>'.format(chart_json['title'])
+    # if chart_json['metadata'].get('describe') and chart_json['metadata']['describe'].get('intro'):
+    #     item['content_html'] += '<div>{}</div>'.format(chart_json['metadata']['describe']['intro'])
+
+    # if chart_json['metadata'].get('annotate'):
+    #     if chart_json['metadata']['annotate'].get('notes'):
+    #         captions.append(chart_json['metadata']['annotate']['notes'])
+    # if chart_json['metadata'].get('describe'):
+    #     if chart_json['metadata']['describe'].get('source-name'):
+    #         captions.append('Source: ' + chart_json['metadata']['describe']['source-name'])
+    #     if chart_json['metadata']['describe'].get('byline'):
+    #         captions.append('Graphic: ' + chart_json['metadata']['describe']['byline'])
+    # caption = '<br/>'.join(captions) + '<br/><a href="{}" target="_blank">View chart</a>'.format(item['url'])
+    # item['content_html'] += utils.add_image(item['_image'], caption, link=url)
     return item
 
 

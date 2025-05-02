@@ -140,6 +140,9 @@ def get_post(post_json, args, site_json, save_debug):
     if post_json.get('body_html'):
         # utils.write_file(post_json['body_html'], './debug/debug.html')
         soup = BeautifulSoup(post_json['body_html'], 'html.parser')
+        if save_debug:
+            utils.write_file(str(soup), './debug/debug.html')
+
         if content_soup:
             paywall = False
             for it in content_soup.find_all(recursive=False):
@@ -156,7 +159,7 @@ def get_post(post_json, args, site_json, save_debug):
                 continue
             if el.get('data-attrs'):
                 data_json = json.loads(el['data-attrs'])
-                if re.search(r'comment|follow|learn more|schedule|share|subscribe|subscription', data_json['text'], flags=re.I) or re.search(r'subscribe', data_json['url']):
+                if re.search(r'comment|email preferences|follow|learn more|schedule|share|subscribe|subscription', data_json['text'], flags=re.I) or re.search(r'subscribe', data_json['url']):
                     el.decompose()
 
         for el in soup.find_all('h5'):

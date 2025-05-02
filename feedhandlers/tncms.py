@@ -33,6 +33,8 @@ def get_content(url, args, site_json, save_debug=False):
     tn_json = None
     page_html = utils.get_url_html(url)
     if page_html:
+        if save_debug:
+            utils.write_file(page_html, './debug/debug.html')
         soup = BeautifulSoup(page_html, 'lxml')
         el = soup.find('meta', attrs={"property": "og:title"})
         if el:
@@ -176,8 +178,13 @@ def get_content(url, args, site_json, save_debug=False):
         item['authors'] = []
         item['authors'].append(item['author'])
 
+    item['tags'] = []
     if article_json.get('keywords'):
-        item['tags'] = article_json['keywords'].copy()
+        item['tags'] += article_json['keywords'].copy()
+    if article_json.get('sections'):
+        item['tags'] += article_json['sections'].copy()
+    if len(item['tags']) == 0:
+        del item['tags']
 
     item['content_html'] = ''
 
@@ -213,9 +220,8 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 el = soup.find(id='asset-video-primary')
             if el:
-                # https://lancasteronline.com/sports/highschool/baseball/l-l-spring-sports-roundtable-2023-dont-look-now-but-playoff-push-is-on-around/article_11e57042-df73-11ed-b9c0-5b61d37c0a43.html
                 it = el.find('script', attrs={"src": True})
-                if it:
+                if it and 'spot.im' not in it['src']:
                     player_html = utils.get_url_html(it['src'])
                     if player_html:
                         m = re.search(r'"m3u8"\s?:\s?"([^"]+)"', player_html)
@@ -237,11 +243,11 @@ def get_content(url, args, site_json, save_debug=False):
                     videos = el.find_all('video', class_='tnt-video')
                     for video in videos:
                         # print(video)
-                        it = video.find('source', attrs={"type": "video/mp4"})
+                        it = video.find('source', attrs={"type": "application/x-mpegURL"})
                         if not it:
-                            it = video.find('source', attrs={"type": "application/x-mpegURL"})
+                            it = video.find('source', attrs={"type": "video/mp4"})
                         if it and it['src'] not in lede_img:
-                            lede_img += utils.add_video(it['src'], it['type'], video['poster'], video.get('data-title'))
+                            lede_img += utils.add_video(it['src'], it['type'], video['poster'], video.get('data-title'), use_videojs=True)
                         else:
                             logger.warning('unknown tnt-video source in ' + item['url'])
                 elif el.find('iframe'):

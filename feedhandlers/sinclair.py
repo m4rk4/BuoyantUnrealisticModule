@@ -44,13 +44,30 @@ def get_content(url, args, site_json, save_debug=False):
         for it in article_json['tags']:
             item['tags'].append(it['name'])
 
-    item['image'] = '{}{}'.format(base_url, article_json['teaserImage']['image']['originalUrl'])
+    if article_json.get('teaserImage'):
+        item['image'] = '{}{}'.format(base_url, article_json['teaserImage']['image']['originalUrl'])
+    elif article_json.get('heroImage'):
+        item['image'] = '{}{}'.format(base_url, article_json['heroImage']['image']['originalUrl'])
+    elif article_json.get('videos'):
+        item['image'] = article_json['videos'][0]['thumbUrl']
 
-    item['summary'] = article_json['summary']
+    if article_json.get('summary'):
+        item['summary'] = article_json['summary']
 
-    item['content_html'] = article_json['richText'].replace('{&nbsp;}', '&nbsp;')
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
+    item['content_html'] = ''
+    if article_json.get('dateLine'):
+        item['content_html'] += '{p}' + article_json['dateLine'] + ' &mdash; '
+        if article_json.get('richText'):
+            item['content_html'] += re.sub(r'^\{p\}', '', article_json['richText'].replace('{&nbsp;}', '&nbsp;'))
+    elif article_json.get('richText'):
+        item['content_html'] += article_json['richText'].replace('{&nbsp;}', '&nbsp;')
+
     item['content_html'] = re.sub(r'\{h2\}(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/h2\}', '', item['content_html'])
-    item['content_html'] = re.sub(r'\{p\}\{strong\}.*?(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/a\}\{/strong\}\{/p\}', '', item['content_html'])
+    item['content_html'] = re.sub(r'\{p\}\{strong\}.*?(ALSO|ALSO READ|MORE|RELATED)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/a\}\{/strong\}\{/p\}', '', item['content_html'])
     item['content_html'] = re.sub(r'\{ul\}\{li\}\{em\}\{strong\}.*?(MORE|ALSO)(\s|\{?&nbsp;\}?)?(:|\|)(\s|\{?&nbsp;\}?)\{a .*?\{/li\}\{/ul\}', '', item['content_html'])
     item['content_html'] = re.sub(r'{(/?(a|blockquote|em|h\d|li|p|strong|ul))}', r'<\1>', item['content_html'])
     item['content_html'] = item['content_html'].replace('<blockquote>', '<blockquote style="border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;">')
@@ -116,6 +133,7 @@ def get_content(url, args, site_json, save_debug=False):
                 m = re.search(r'data-embed-file="([^"]+)"', matchobj.group(0))
                 if m:
                     soup = BeautifulSoup(unquote_plus(m.group(1)), 'html.parser')
+                    utils.write_file(str(soup), './debug/code.html')
                     el = soup.find('iframe')
                     if el:
                         return utils.add_embed(el['src'])
@@ -128,12 +146,25 @@ def get_content(url, args, site_json, save_debug=False):
                     el = soup.find(class_='tagboard-embed')
                     if el:
                         return utils.add_embed('https://embed.tagboard.com/{}'.format(el['tgb-embed-id']), {"referer": base_url})
+                    el = soup.select('a:has(> div:is(.subscribeShortcodeContainer, .donateContainer))')
+                    if el:
+                        # https://cbs2iowa.com/news/local/iowa-educators-breathe-sigh-of-relief-as-court-blocks-controversial-book-ban-law
+                        for it in el:
+                            it.decompose()
+                        for it in soup.find_all(['script', 'style']):
+                            it.decompose()
+                        if m.group(1).startswith('<div>'):
+                            return soup.div.decode_contents()
+                        else:
+                            return str(soup)
             logger.warning('unhandled sd-embed type ' + embed_type)
         return matchobj.group(0)
 
     item['content_html'] = re.sub(r'{sd-embed [^}]+}(<="" sd-embed="">)?{/sd-embed}', sub_embeds, item['content_html'])
 
-    if article_json.get('heroImage'):
+    if article_json.get('videos'):
+        item['content_html'] = utils.add_video(article_json['videos'][0]['mp4Url'], 'video/mp4', article_json['videos'][0]['thumbUrl'], article_json['videos'][0]['title'], use_videojs=True) + item['content_html']
+    elif article_json.get('heroImage'):
         img_src = base_url + article_json['heroImage']['image']['originalUrl']
         if article_json['heroImage']['image'].get('caption'):
             caption = re.sub(r'\{/?(p|&nbsp;)\}', '', article_json['heroImage']['image']['caption'])
@@ -141,31 +172,36 @@ def get_content(url, args, site_json, save_debug=False):
             caption = ''
         item['content_html'] = utils.add_image(img_src, caption) + item['content_html']
 
-    gallery_html = ''
-    for video in article_json['videos']:
-        if video['externalId'] not in item['content_html']:
-            if video['thumbUrl'].startswith('/'):
-                img_src = base_url + video['thumbUrl']
-            else:
-                img_src = video['thumbUrl']
-            gallery_html += utils.add_video(video['mp4Url'], 'video/mp4', img_src, video['title']) + '<div>&nbsp</div>'
-    if gallery_html:
-        item['content_html'] += '<h2>Videos</h2>' + gallery_html
-
-    if len(article_json['images']) > 1:
+    if len(article_json['images']) + len(article_json['videos']) > 1:
         item['_gallery'] = []
-        item['content_html'] += '<h2><a href="{}/gallery?url={}" target="_blank">View photo gallery</a></h2>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] += '<h2><a href="{}/gallery?url={}" target="_blank">View gallery</a></h2>'.format(config.server, quote_plus(item['url']))
         item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-        for image in article_json['images']:
-            img_src = base_url + image['originalUrl']
-            thumb = img_src.replace('/resources/media/', '/resources/media2/original/full/640/center/80/')
-            if image.get('caption'):
-                caption = re.sub(r'\{/?(p|&nbsp;)\}', '', image['caption'])
+        for i in range(len(article_json['images']) + len(article_json['videos'])):
+            image = next((it for it in article_json['images'] if it['orderNumber'] == i + 1), None)
+            if image:
+                img_src = base_url + image['originalUrl']
+                thumb = img_src.replace('/resources/media/', '/resources/media2/original/full/640/center/80/')
+                if image.get('caption'):
+                    caption = re.sub(r'\{/?(p|&nbsp;)\}', '', image['caption'])
+                else:
+                    caption = ''
+                item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
+                item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
             else:
-                caption = ''
-            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
-            item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
+                video = next((it for it in article_json['videos'] if it['orderNumber'] == i + 1), None)
+                if video:
+                    if video['thumbUrl'].startswith('/'):
+                        img_src = base_url + video['thumbUrl']
+                    else:
+                        img_src = video['thumbUrl']
+                    if video.get('title'):
+                        caption = video['title']
+                    else:
+                        caption = ''
+                    item['_gallery'].append({"src": video['mp4Url'], "caption": caption, "thumb": img_src})
+                    item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_video(video['mp4Url'], 'video/mp4', img_src, caption, use_videojs=True) + '</div>'
         item['content_html'] += '</div>'
+
     return item
 
 

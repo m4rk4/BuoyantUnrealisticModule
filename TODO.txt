@@ -72,16 +72,6 @@ https://content.api.news/v3/articles/18bdd4c20fa61155ce5a7ab8e474c52b?api_key=9u
 https://content.api.news/v3/videos/84f0160df72fdd0774995355c245b0d5?api_key=9uz93nsd4pggfwhqcjnhmafw
 api_key in https://resourcesssl.newscdn.com.au/cs/video/vjs/stable/build/player.js
 
-
-Use google cache:
-https://webcache.googleusercontent.com/search?q=cache:https://asia.nikkei.com/Economy/Japan-PM-eyes-wage-hikes-October-stimulus-after-cabinet-reshuffle
-https://webcache.googleusercontent.com/search?q=cache:https://www.newscientist.com/article/mg25934570-800-dark-stars-have-we-finally-found-a-weird-sun-powered-by-dark-matter/
-https://webcache.googleusercontent.com/search?q=cache:https://www.standard.co.uk/news/london/rubbish-tower-hamlets-bin-bags-waste-collection-strike-brick-lane-b1109492.html
-https://webcache.googleusercontent.com/search?q=cache:https://www.ft.com/content/a8348e2a-a90f-474c-baa6-8c2eb0e263c2
-
-
-https://maps.google.com/?q=1993+Rd+G,+Emporia,+KS+66801,+USA&ftid=0x87b95287ab2f87a5:0x3d5c6a9144567c6b&output=embed&z=16
-
 https://stackoverflow.com/questions/6535362/gitignore-after-commit
 https://stackoverflow.com/questions/6535362/gitignore-after-commit
 
@@ -144,8 +134,12 @@ https://www.coindesk.com/tech/2022/11/05/litecoin-mining-difficulty-is-hitting-n
 Ghost - unknown data-key
 http://www.whatimade.today/
 
+Eleventy (11ty)
+https://justin.how/
+https://www.kctofel.com/
+https://crashthearcade.com/about
+
 WP
-https://www.positive.news/environment/agriculture/fixing-the-food-chain/
 https://www.kitguru.net/reviews/
 https://www.nexstar.tv/stations/
 
@@ -342,6 +336,9 @@ https://www.wcvb.com/article/powerball-winning-numbers-october-11-2023/45514619
 
 
 DRUPAL
+https://www.record.com.mx/
+https://news.un.org/en/
+https://nsarchive.gwu.edu/
 https://cepr.org
 https://www.cookpolitical.com
 https://natlawreview.com/
@@ -425,6 +422,7 @@ https://www.hydrogeninsight.com/policy/a-campaign-built-on-dishonesty-hydrogen-h
 https://www.rechargenews.com/wind/avangrid-doubles-down-on-power-deal-pull-out-as-economic-gales-hit-us-offshore-wind/2-1-1392327
 
 Hugo-based blogs (https://github.com/gohugoio/hugo)
+https://mtlynch.io/
 https://vickiboykis.com/
 https://www.fpgadeveloper.com
 https://longform.asmartbear.com/

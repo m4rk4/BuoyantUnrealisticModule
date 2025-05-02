@@ -13,35 +13,91 @@
                 color: color-mix(in srgb, CanvasText, Canvas 15%);
                 color-scheme: light dark;
             }
+            summary {
+                display: flex;
+                height: 110px;
+            }
+            summary::before {
+                flex-shrink: 0;
+                content: '';
+                width: 36px;
+                height: 36px;
+                background: url(https://upload.wikimedia.org/wikipedia/commons/4/4a/Arrow-drop-right-line.svg');
+                background-size: cover;
+                transition: 0.2s;
+            }
+            details[open] > summary::before {
+                transform: rotate(180deg);
+            }
+            summary > div {
+                flex-grow: 1;
+            }
+            summary > div > a {
+                text-decoration: none;
+                font-size: 1.2em;
+                font-weight: bold;
+                color: color-mix(in srgb, CanvasText, Canvas 15%);
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+            summary > div > p {
+                margin: 8px 0 0 0;
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+                -webkit-box-orient: vertical;
+            }
+            summary > img {
+                flex-shrink: 0;
+                object-fit: cover;
+                width: 120px;
+                height: 100px;
+            }
+            div.tag-break {
+                width: 100%;
+                text-align: center;
+                border-bottom: 1px solid light-dark(black, white);
+                border-top: 1px solid light-dark(black, white);
+                line-height: 0.1em;
+                margin: 10px 0 20px;
+            }
         </style>
 		<title>{{ title }}</title>
 	</head>
 	<body style="max-width:800px; font-size:18px;">
-        <h2><a href="{{ link }}">{{ title }}</a></h2>
-        {% for item in items %}
-            {% if item._image %}
-                <img src="{{ item._image | make_thumbnail }}" style="float:right;" />
-            {% elif item.image %}
-                <img src="{{ item.image | make_thumbnail }}" style="float:right;" />
-            {% endif %}
-            <details>
-                <summary style="height:108px;">
-                    <a href="{{ item.url }}" style="text-decoration:none; font-size:1.2em; font-weight:bold; color:color-mix(in srgb, CanvasText, Canvas 15%);">{{ item.title }}</a>
-                </summary>
-                <div style="clear:right;"></div>
-                <div class="content">
-                    <p>
-                        {% if item.author %} By {{ item.author.name }} {% endif %}
-                        {% if item.author and item._display_date %} <br /> {% endif %}
-                        {% if item._display_date %} Published {{ item._display_date }} {% endif %}
-                    </p>
-                    {{ item.content_html | safe }}
-                    {% if item.tags %}
-                        <div style="width:100%; text-align:center; border-bottom:1px solid light-dark(black, white); border-top:1px solid light-dark(black, white); line-height:0.1em; margin:10px 0 20px;">&nbsp;</div>
-                        <p>Tags: {{ ', '.join(item.tags) | safe }}</p>
-                        {% endif %}
+        <h2><a href="{{ link }}" target="_blank">{{ title }}</a></h2>
+{% for item in items %}
+        <details name="article">
+            <summary style="height:108px;">
+                <div>
+                    <a href="{{ item.url }}">{{ item.title }}</a>
+{% if item.summary %}
+                    <p>{{ item.summary }}</p>
+{% endif %}
                 </div>
-            </details>
-        {% endfor %}
+{% if item._image %}
+                <img src="{{ item._image }}" />
+{% elif item.image %}
+                <img src="{{ item.image }}" />
+{% endif %}        
+            </summary>
+            <article>
+                <p>
+                    {% if item.author %} By {{ item.author.name }} {% endif %}
+                    {% if item.author and item._display_date %} <br /> {% endif %}
+                    {% if item._display_date %} Published {{ item._display_date }} {% endif %}
+                </p>
+                {{ item.content_html | safe }}
+{% if item.tags %}
+                <div class="tag-break"></div>
+                <p>Tags: {{ ', '.join(item.tags) | safe }}</p>
+{% endif %}
+            </article>
+        </details>
+{% endfor %}
 	</body>
 </html>

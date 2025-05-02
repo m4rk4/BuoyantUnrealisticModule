@@ -1,9 +1,8 @@
-import asyncio, base64, glob, importlib, io, json, os, re, sys
+import asyncio, curl_cffi, base64, glob, importlib, io, json, os, re, sys
 import subprocess, time
 # import certifi, primp
 import requests
 from bs4 import BeautifulSoup
-from curl_cffi import requests as curl_cffi_requests
 import logging, logging.handlers
 from flask import Flask, jsonify, make_response, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
@@ -137,6 +136,14 @@ def content():
         args_copy.update(site_json['args'])
 
     content = module.get_content(url, args_copy, site_json, save_debug)
+
+    if 'ai_summary' in args:
+        if args['ai_summary']:
+            content['_ai_summary'] = utils.get_ai_summary(content['content_html'], feature=args['ai_summary'])
+        else:
+            content['_ai_summary'] = utils.get_ai_summary(content['content_html'])
+        content['content_html'] += '<hr style="margin:2em 0;"><h2>AI Summary:</h2>' + content['_ai_summary']
+
     if 'read' in args:
         return render_template('content.html', content=content)
 
@@ -569,6 +576,7 @@ def screenshot():
         if args.get('noanimate'):
             thumb_url += '/noanimate'
         thumb_url += '/' + args['url']
+        logger.debug('screenshot url ' + thumb_url)
         if 'cropbbox' in args:
             im_args = {
                 'url': thumb_url,
@@ -682,12 +690,14 @@ def proxy(url):
         # This doen't reliably work for youtube m3u8 urls. They return 403 for methods here, but work fine in the console or module
         # r = requests.get(proxy_url, headers=headers)
         if 'manifest.googlevideo.com/api' in proxy_url:
-            r = curl_cffi_requests.get(proxy_url, impersonate='safari', proxies=config.proxies)
+            r = curl_cffi.get(proxy_url, impersonate='safari', proxies=config.proxies)
+        elif 'cdn.rasset.ie' in proxy_url:
+            r = curl_cffi.get(proxy_url, impersonate='chrome')
         elif headers:
-            # r = curl_cffi_requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+            # r = curl_cffi.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
             r = requests.get(proxy_url, headers=headers)
         else:
-            # r = curl_cffi_requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies)
+            # r = curl_cffi.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies)
             r = requests.get(proxy_url)
         if r.status_code != 200:
             logger.warning('requests error {} getting {}'.format(r.status_code, proxy_url))
@@ -697,15 +707,18 @@ def proxy(url):
             return 'Something went wrong ({})'.format(r.status_code), r.status_code
         m3u8_playlist = r.text
         # Rewrite playlist files to proxy the contents
-        m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
+        if 'cdn.rasset.ie' in proxy_url:
+            m3u8_playlist = m3u8_playlist.replace('/hls-vod', config.server + '/proxy/https://cdn.rasset.ie/hls-vod')
+        else:
+            m3u8_playlist = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
         f_io = BytesIO(m3u8_playlist.encode())
         return send_file(f_io, mimetype='text/plain')
 
     # r = requests.get(proxy_url, headers=headers, stream=True)
     if headers:
-        r = curl_cffi_requests.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
+        r = curl_cffi.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     else:
-        r = curl_cffi_requests.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
+        r = curl_cffi.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     # Note on chunk size: https://stackoverflow.com/questions/34229349/flask-streaming-file-with-stream-with-context-is-very-slow
     resp = Response(stream_with_context(r.iter_content(chunk_size=1024)), status=r.status_code)
     resp.headers['Content-Type'] = r.headers['content-type']
@@ -726,13 +739,13 @@ def test_stream_spotify():
         return 'Content not supported'
 
     url = 'https://open.spotify.com/get_access_token'
-    r = curl_cffi_requests.get(url, impersonate="chrome", proxies=config.proxies)
+    r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
     if r.status_code == 200:
         access_token = r.json()['accessToken']
     else:
         logger.warning('Error {} getting {}'.format(r.status_code, url))
         url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
-        r = curl_cffi_requests.get(url, impersonate="chrome", proxies=config.proxies)
+        r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
         if r.status_code != 200:
             return 'Error {} getting {}'.format(r.status_code, url)
         soup = BeautifulSoup(r.text, 'lxml')

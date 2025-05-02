@@ -446,7 +446,11 @@ def get_content(url, args, site_json, save_debug=False):
     if not item.get('tags'):
         del item['tags']
 
-    if post_json.get('meta_description'):
+    if post_json.get('sharing_post_texts') and post_json['sharing_post_texts'].get('variables') and post_json['sharing_post_texts']['variables'].get('Post_Description'):
+        item['summary'] = post_json['sharing_post_texts']['variables']['Post_Description']
+    elif post_json.get('sharing_post_texts') and post_json['sharing_post_texts'].get('facebook_desc'):
+        item['summary'] = post_json['sharing_post_texts']['facebook_desc']
+    elif post_json.get('meta_description'):
         item['summary'] = post_json['meta_description']
     elif post_json.get('og_description'):
         item['summary'] = post_json['og_description']

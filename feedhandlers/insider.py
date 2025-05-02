@@ -43,21 +43,22 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = content_json['links']['site']
     item['title'] = content_json['attributes']['title']
 
-    dt = datetime.fromisoformat(content_json['attributes']['published'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(content_json['attributes']['published'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-    dt = datetime.fromisoformat(content_json['attributes']['modified'].replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
+    item['_display_date'] = utils.format_display_date(dt)
+    if content_json['attributes'].get('modified'):
+        dt = datetime.fromisoformat(content_json['attributes']['modified'])
+        item['date_modified'] = dt.isoformat()
 
-    content_html = ''
+    item['content_html'] = ''
     item['authors'] = []
     if content_json['relationships']['authors'].get('bylineAuthors'):
         for it in content_json['relationships']['authors']['bylineAuthors']:
             item['authors'].append({"name": it['attributes']['label']})
         for it in content_json['relationships']['authors']['data']:
             if it['attributes']['label'] not in [x['name'] for x in item['authors']]:
-                content_html += '<p><strong>{}</strong>&nbsp;&#9989;<br/><small>{}</small></p>'.format(it['attributes']['title'], it['attributes']['description'])
+                item['content_html'] += '<p><strong>{}</strong>&nbsp;&#9989;<br/><small>{}</small></p>'.format(it['attributes']['title'], it['attributes']['description'])
     else:
         for it in content_json['relationships']['authors']['data']:
             item['authors'].append({"name": it['attributes']['label']})
@@ -76,28 +77,44 @@ def get_content(url, args, site_json, save_debug=False):
     if content_json['attributes'].get('description'):
         item['summary'] = content_json['attributes']['description']
         if content_json['attributes']['format'] == 'story' and 'Discourse' in content_json['attributes']['categories']:
-            content_html += '<p><em>' + item['summary'] + '</p></em>'
+            item['content_html'] += '<p><em>' + item['summary'] + '</p></em>'
 
-    #if content_json.get('summaryList'):
-    #    content_html += content_json['summaryList']
+    if content_json['attributes'].get('summaryList'):
+       # item['content_html'] += content_json['attributes']['summaryList']
+       item['content_html'] += re.sub(r'<ul[^>]*>', '<ul style="padding-left:1.2em;">', content_json['attributes']['summaryList'])
 
     if content_json['attributes'].get('hero'):
         if content_json['attributes']['hero']['type'] == 'image':
             item['image'] = content_json['attributes']['hero']['links']['self']
-            content_html += add_image(content_json['attributes']['hero'])
+            item['content_html'] += add_image(content_json['attributes']['hero'])
     elif content_json['relationships']['images'].get('data'):
         item['image'] = content_json['relationships']['images']['data'][0]['links']['self']
+
+    if content_json['attributes']['format'] == 'video':
+        if content_json['relationships']['video']['data']['meta'].get('jwplayer'):
+            it = utils.get_content('https://cdn.jwplayer.com/v2/media/{}'.format(content_json['relationships']['video']['data']['meta']['jwplayer']['assetID']), {"embed": True}, False)
+            if it:
+                item['image'] = it['image']
+                item['content_html'] = it['content_html'] + item['content_html']
+                if 'embed' not in args and content_json['attributes'].get('plainTextContent'):
+                    item['content_html'] += '<p>' + content_json['attributes']['plainTextContent'] + '</p>'
+                return item
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
         return item
 
     soup = BeautifulSoup(content_json['attributes']['content'], 'html.parser')
-    el = soup.find(id='piano-inline-content-wrapper')
-    if el:
-        content_html += str(el.decode_contents())
-    else:
-        logger.warning('unable to find content wrapper in ' + item['url'])
+    content = soup.find(class_='post-body-content')
+    if not content:
+        logger.warning('unable to find post-body-content in ' + item['url'])
+        page_html = utils.get_url_html(item['url'])
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            content = soup.find('section', class_='post-content')
+
+    if save_debug:
+        utils.write_file(str(soup), './debug/debug.html')
 
     if content_json['attributes']['format'] == 'slideshow':
         for slide in content_json['relationships']['slides']['data']:
@@ -110,228 +127,218 @@ def get_content(url, args, site_json, save_debug=False):
         if content_html.endswith('<hr/>'):
             content_html = content_html[:-5]
 
-    elif content_json['attributes']['format'] == 'video':
-        if content_json['relationships']['video']['data']['meta'].get('jwplayer'):
-            it = utils.get_content('https://cdn.jwplayer.com/v2/media/{}'.format(
-                content_json['relationships']['video']['data']['meta']['jwplayer']['assetID']), {"embed": True}, False)
-            if it:
-                item['image'] = it['image']
-                content_html = it['content_html'] + content_html
+    # soup = BeautifulSoup(content_html, 'html.parser')
+    if content:
+        for el in content.find_all(class_=["ad", "ad-wrapper", "app-ad-callout-wrapper", "underline"]):
+            el.decompose()
 
-    soup = BeautifulSoup(content_html, 'html.parser')
-    for el in soup.find_all(class_=["ad", "ad-wrapper", "app-ad-callout-wrapper"]):
-        el.decompose()
+        for el in content.find_all('p', class_='drop-cap'):
+            new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', str(el), 1)
+            new_html += '<span style="clear:left;"></span>'
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
+            el.decompose()
 
-    for el in soup.find_all('p', class_='drop-cap'):
-        new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', str(el), 1)
-        new_html += '<span style="clear:left;"></span>'
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
-
-    for el in soup.find_all('ul', class_='summary-list'):
-        # remove indent
-        el['style'] = 'padding-left:1.2em;'
-        new_el = soup.new_tag('hr')
-        new_el['style'] = 'width:80%; margin:auto;'
-        el.insert_after(new_el)
-
-    for el in soup.find_all('figure'):
-        if not el.get('class'):
-            continue
-        if 'image-figure-image' in el['class']:
-            img_src = ''
-            it = el.find(attrs={"data-srcs": True})
-            if it:
-                srcs = json.loads(html.unescape(it['data-srcs']))
-                img_src = list(srcs.keys())[0]
-                img_src = resize_image(img_src)
+        for el in content.find_all('ul', class_='summary-list'):
+            if content_json['attributes'].get('summaryList'):
+                el.decompose()
             else:
-                for img in el.find_all('img'):
-                    if img.get('src'):
-                        if img['src'].startswith('https://i.insider.com'):
-                            img_src = resize_image(img['src'])
-            if img_src:
-                captions = []
-                it = el.find(class_='image-caption')
+                # remove indent
+                el['style'] = 'padding-left:1.2em;'
+                new_el = content.new_tag('hr')
+                new_el['style'] = 'width:80%; margin:auto;'
+                el.insert_after(new_el)
+
+        for el in content.find_all('figure'):
+            if not el.get('class'):
+                continue
+            if 'image-figure-image' in el['class']:
+                img_src = ''
+                it = el.find(attrs={"data-srcs": True})
                 if it:
-                    captions.append(it.get_text())
-                it = el.find(class_='image-source')
-                if it:
-                    captions.append(it.get_text())
-                new_el = BeautifulSoup(utils.add_image(img_src, ' | '.join(captions)), 'html.parser')
+                    srcs = json.loads(html.unescape(it['data-srcs']))
+                    img_src = list(srcs.keys())[0]
+                    img_src = resize_image(img_src)
+                else:
+                    for img in el.find_all('img'):
+                        if img.get('src'):
+                            if img['src'].startswith('https://i.insider.com'):
+                                img_src = resize_image(img['src'])
+                if img_src:
+                    captions = []
+                    it = el.find(class_='image-caption')
+                    if it:
+                        captions.append(it.get_text())
+                    it = el.find(class_='image-source')
+                    if it:
+                        captions.append(it.get_text())
+                    new_el = BeautifulSoup(utils.add_image(img_src, ' | '.join(captions)), 'html.parser')
+                    el.insert_after(new_el)
+                    el.decompose()
+                else:
+                    logger.warning('unknown image src in ' + item['url'])
+            else:
+                logger.warning('unhandled figure class {} in {}'.format(el['class'], item['url']))
+
+        for el in content.find_all('style'):
+            el.decompose()
+
+        for el in content.find_all(class_='insider-raw-embed'):
+            #print(len(el.contents))
+            if len(el.contents) == 0 or el.find('div', id=re.compile(r'div-gpt-ad-\d+')):
+                el.decompose()
+                continue
+            new_html = ''
+            if el.iframe:
+                if el.iframe.get('data-src'):
+                    src = el.iframe['data-src']
+                else:
+                    src = el.iframe['src']
+                if src.startswith('https://products.gobankingrates.com'):
+                    el.decompose()
+                    continue
+                new_html = utils.add_embed(src)
+            elif el.blockquote:
+                if el.blockquote.get('class'):
+                    if 'instagram-media' in el.blockquote['class']:
+                        new_html = utils.add_embed(el.blockquote['data-instgrm-permalink'])
+                    elif 'tiktok-embed' in el.blockquote['class']:
+                        new_html = utils.add_embed(el.blockquote['cite'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
             else:
-                logger.warning('unknown image src in ' + item['url'])
-        else:
-            logger.warning('unhandled figure class {} in {}'.format(el['class'], item['url']))
+                logger.warning('unhandled insider-raw-embed in ' + item['url'])
 
-    for el in soup.find_all('style'):
-        el.decompose()
-
-    for el in soup.find_all(class_='insider-raw-embed'):
-        #print(len(el.contents))
-        if len(el.contents) == 0 or el.find('div', id=re.compile(r'div-gpt-ad-\d+')):
+        for el in content.find_all('blockquote', class_='twitter-tweet'):
+            links = el.find_all('a')
+            new_html = utils.add_embed(links[-1]['href'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.insert_after(new_el)
             el.decompose()
-            continue
-        new_html = ''
-        it = el.find('iframe')
-        if it:
-            if it.get('data-src'):
-                src = it['data-src']
-            else:
-                src = it['src']
-            if src.startswith('https://products.gobankingrates.com'):
+
+        for el in content.find_all(class_='iframe-container'):
+            it = el.find('iframe')
+            if it:
+                if it.get('data-src'):
+                    new_html = utils.add_embed(it['data-src'])
+                else:
+                    new_html = utils.add_embed(it['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
                 el.decompose()
-                continue
-            new_html = utils.add_embed(src)
-        else:
-            it = el.find('blockquote')
-            if it and it.get('class'):
-                if 'tiktok-embed' in it['class']:
-                    new_html = utils.add_embed(it['cite'])
             else:
-                it = el.find('script')
-                if it and it.get('data-telegram-post'):
-                    logger.warning('unhandled Telegram embed in ' + item['url'])
-                    el.decompose()
-                    continue
-        if new_html:
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
-        else:
-            logger.warning('unhandled insider-raw-embed in ' + item['url'])
+                logger.warning('unhandled iframe-container in ' + item['url'])
 
-    for el in soup.find_all('blockquote', class_='twitter-tweet'):
-        links = el.find_all('a')
-        new_html = utils.add_embed(links[-1]['href'])
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
-
-    for el in soup.find_all(class_='iframe-container'):
-        it = el.find('iframe')
-        if it:
-            if it.get('data-src'):
-                new_html = utils.add_embed(it['data-src'])
+        for el in content.find_all('iframe'):
+            if el.get('src'):
+                new_html = utils.add_embed(el['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
             else:
-                new_html = utils.add_embed(it['src'])
+                logger.warning('unhandled iframe in ' + item['url'])
+
+        for el in content.find_all('es-blockquote'):
+            if el.get('data-source-updated') and el['data-source-updated'] == 'true':
+                new_html = utils.add_pullquote(el.get('data-quote'), el.get('data-source'))
+            else:
+                new_html = utils.add_pullquote(el.get('data-quote'))
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.insert_after(new_el)
             el.decompose()
-        else:
-            logger.warning('unhandled iframe-container in ' + item['url'])
 
-    for el in soup.find_all('iframe'):
-        if el.get('src'):
-            new_html = utils.add_embed(el['src'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
+        for el in content.find_all(class_='product-card'):
+            link = el.find('a', attrs={"data-analytics-product-id": True})
+            if link:
+                product = content_json['attributes']['productMap'][link['data-analytics-product-id']]
+                img_src = resize_image(product['relationships']['image']['data']['links']['self'], 165)
+                new_html = '<table><tr><td><img src="{}" /></td><td><strong>{}</strong><ul>'.format(img_src, product['attributes']['name'])
+                for it in product['attributes']['purchaseOptions']:
+                    new_html += '<li><a href="{}">${} from {}</a></li>'.format(it['originalURL'], it['price']/100, it['merchant'])
+                new_html += '</ul></td></tr></table>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled product-card in ' + item['url'])
+
+        for el in content.find_all(class_='category-stamp'):
+            stamp = ''
+            for it in el.find_all('svg'):
+                if it['class'][0] == 'letter':
+                    stamp += it['class'][1]
+            new_el = BeautifulSoup('<h2>{}</h2>'.format(stamp.title()), 'html.parser')
             el.insert_after(new_el)
             el.decompose()
-        else:
-            logger.warning('unhandled iframe in ' + item['url'])
 
-    for el in soup.find_all('es-blockquote'):
-        if el.get('data-source-updated') and el['data-source-updated'] == 'true':
-            new_html = utils.add_pullquote(el.get('data-quote'), el.get('data-source'))
-        else:
-            new_html = utils.add_pullquote(el.get('data-quote'))
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        for el in content.find_all('aside'):
+            if 'quick-tip' in el['class'] or 'breakout-box' in el['class']:
+                new_el = BeautifulSoup(utils.add_blockquote(el.decode_contents()), 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled aside {} in {}'.format(el['class'], item['url']))
 
-    for el in soup.find_all(class_='product-card'):
-        link = el.find('a', attrs={"data-analytics-product-id": True})
-        if link:
-            product = content_json['attributes']['productMap'][link['data-analytics-product-id']]
-            img_src = resize_image(product['relationships']['image']['data']['links']['self'], 165)
-            new_html = '<table><tr><td><img src="{}" /></td><td><strong>{}</strong><ul>'.format(img_src, product['attributes']['name'])
-            for it in product['attributes']['purchaseOptions']:
-                new_html += '<li><a href="{}">${} from {}</a></li>'.format(it['originalURL'], it['price']/100, it['merchant'])
-            new_html += '</ul></td></tr></table>'
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
+        for el in content.find_all('script'):
             el.decompose()
-        else:
-            logger.warning('unhandled product-card in ' + item['url'])
 
-    for el in soup.find_all(class_='category-stamp'):
-        stamp = ''
-        for it in el.find_all('svg'):
-            if it['class'][0] == 'letter':
-                stamp += it['class'][1]
-        new_el = BeautifulSoup('<h2>{}</h2>'.format(stamp.title()), 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
-
-    for el in soup.find_all('aside'):
-        if 'quick-tip' in el['class'] or 'breakout-box' in el['class']:
-            new_el = BeautifulSoup(utils.add_blockquote(el.decode_contents()), 'html.parser')
-            el.insert_after(new_el)
+        for el in content.find_all(class_=['category-tagline', 'post-authors', 'table-of-contents']):
             el.decompose()
-        else:
-            logger.warning('unhandled aside {} in {}'.format(el['class'], item['url']))
 
-    for el in soup.find_all('script'):
-        el.decompose()
-
-    for el in soup.find_all(class_=['category-tagline', 'post-authors', 'table-of-contents']):
-        el.decompose()
-
-    for el in soup.find_all('a'):
-        href = el['href']
-        if el.has_attr('data-analytics-module'):
-            el.attrs = {}
-        # https://www.businessinsider.com/reviews/out?u=https%3A%2F%2Fwww.disneyplus.com%2Fseries%2Fthats-so-raven%2F7QEGF45PWksK
-        if re.search(r'insider\.com\/reviews\/out\?u=', href):
-            split_url = urlsplit(el['href'])
-            query = parse_qs(split_url.query)
-            href = query['u'][0]
-        elif href.startswith('https://affiliate.insider.com'):
-            split_url = urlsplit(href)
-            query = parse_qs(split_url.query)
-            href = query['u'][0]
-            if href.startswith('https://www.amazon.com'):
-                href = utils.clean_url(href)
-            elif href.startswith('https://prf.hn'):
-                while href.startswith('https://prf.hn'):
-                    m = re.search(r'/destination:(.*)', href)
-                    if m:
-                        href = unquote_plus(m.group(1))
-            elif href.startswith('https://go.redirectingat.com'):
+        for el in content.find_all('a'):
+            href = el['href']
+            if el.has_attr('data-analytics-module'):
+                el.attrs = {}
+            # https://www.businessinsider.com/reviews/out?u=https%3A%2F%2Fwww.disneyplus.com%2Fseries%2Fthats-so-raven%2F7QEGF45PWksK
+            if re.search(r'insider\.com\/reviews\/out\?u=', href):
+                split_url = urlsplit(el['href'])
+                query = parse_qs(split_url.query)
+                href = query['u'][0]
+            elif href.startswith('https://affiliate.insider.com'):
                 split_url = urlsplit(href)
                 query = parse_qs(split_url.query)
-                href = query['url'][0]
-        el['href'] = href
+                href = query['u'][0]
+                if href.startswith('https://www.amazon.com'):
+                    href = utils.clean_url(href)
+                elif href.startswith('https://prf.hn'):
+                    while href.startswith('https://prf.hn'):
+                        m = re.search(r'/destination:(.*)', href)
+                        if m:
+                            href = unquote_plus(m.group(1))
+                elif href.startswith('https://go.redirectingat.com'):
+                    split_url = urlsplit(href)
+                    query = parse_qs(split_url.query)
+                    href = query['url'][0]
+            el['href'] = href
 
-    for el in soup.find_all('span'):
-        if el.get('class'):
-            if 'rich-tooltip' in el['class']:
-                el.unwrap()
-        if el.get('style'):
-            if re.search('font-size: 0px;', el['style']):
-                el.decompose()
+        for el in content.find_all('span'):
+            if el.get('class'):
+                if 'rich-tooltip' in el['class']:
+                    el.unwrap()
+            if el.get('style'):
+                if re.search('font-size: 0px;', el['style']):
+                    el.decompose()
 
-    for el in soup.find_all(re.compile('h\d')):
-        el.attrs = {}
+        for el in content.find_all(re.compile(r'h\d')):
+            el.attrs = {}
 
-    for el in soup.find_all(class_=True):
-        if 'headline-bold' in el['class']:
-            if el.name != 'strong':
-                if el.get('style'):
-                    el['style'] += ' font-weight: bold;'
-                else:
-                    el['style'] = 'font-weight: bold;'
-            del el['class']
-        elif 'horizontal-scroll' in el['class']:
-            del el['class']
-        else:
-            if re.search(r'^(ol|p|strong|table|tbody|th|tr|td|ul)$', el.name):
+        for el in content.find_all(class_=True):
+            if 'headline-bold' in el['class']:
+                if el.name != 'strong':
+                    if el.get('style'):
+                        el['style'] += ' font-weight: bold;'
+                    else:
+                        el['style'] = 'font-weight: bold;'
                 del el['class']
+            elif 'horizontal-scroll' in el['class']:
+                del el['class']
+            else:
+                if re.search(r'^(ol|p|strong|table|tbody|th|tr|td|ul)$', el.name):
+                    del el['class']
 
-    item['content_html'] = str(soup).replace('<p>&nbsp;</p>', '')
+        item['content_html'] += content.decode_contents().replace('<p>&nbsp;</p>', '')
     return item
 
 

@@ -15,6 +15,36 @@ def get_content(url, args, site_json, save_debug=False):
     # https://fossweekly.beehiiv.com/p/foss-weekly-34-another-risc-v-laptop-android-14-updates-from-peertube-and-thunderbird?_data=routes%2Fp%2F%24slug
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
+    if split_url.netloc == 'embeds.beehiiv.com':
+        # https://embeds.beehiiv.com/cab8e4a5-a66e-4cb2-b422-2e720e99d4fc
+        api_url = 'https://embeds.beehiiv.com/api/embeds' + split_url.path
+        api_json = utils.get_url_json(api_url)
+        if api_json:
+            item = {}
+            item['id'] = api_json['id']
+            item['url'] = url
+            item['title'] = api_json['name']
+            dt = datetime.fromisoformat(api_json['created_at'])
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+            if api_json.get('updated_at'):
+                dt = datetime.fromisoformat(api_json['updated_at'])
+                item['date_modified'] = dt.isoformat()
+            item['author'] = {
+                "name": api_json['publication_id']
+            }
+            item['authors'] = []
+            item['authors'].append(item['author'])
+            item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding-bottom:8px; border:1px solid {0}; border-radius:10px; background-color:{0};">'.format(api_json['config']['background_color'])
+            item['content_html'] += '<h3 style="text-align:center; color:{}">{}</h3>'.format(api_json['config']['text_color'], item['title'])
+            if api_json.get('description'):
+                item['summary'] = api_json['description']
+                item['content_html'] += '<p style="text-align:center; color:{}">{}</p>'.format(api_json['config']['text_color'], item['summary'])
+            item['content_html'] += utils.add_button(item['url'], api_json['button_text'], api_json['config']['button_color'], api_json['config']['button_text_color'])
+            item['content_html'] += '</div>'
+            return item
+
     api_url = url + '?_data=routes%2F{}%2F%24slug'.format(paths[0])
     api_json = utils.get_url_json(api_url)
     if not api_json:
@@ -28,11 +58,11 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = api_json['requestUrl']
     item['title'] = post_json['meta_default_title']
 
-    dt = datetime.fromisoformat(post_json['created_at'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(post_json['created_at'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(post_json['updated_at'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(post_json['updated_at'])
     item['date_modified'] = dt.isoformat()
 
     authors = []

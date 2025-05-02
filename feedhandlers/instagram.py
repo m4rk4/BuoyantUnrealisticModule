@@ -1,4 +1,6 @@
 import json, pytz, random, re, string
+import base64, hmac, hashlib, os, time
+import requests, requests_toolbelt
 import dateutil.parser
 from bs4 import BeautifulSoup
 from curl_cffi import requests as curl_requests
@@ -19,6 +21,7 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
     paths = list(filter(None, split_url.path.split('/')))
     # ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[-2], paths[-1])
     ig_url = 'https://www.instagram.com/{}/{}/'.format(paths[0], paths[1])
+    ig_soup = None
     soup = None
     # TODO: Fix
     # if not ig_data:
@@ -998,3 +1001,112 @@ def search_for_fullname(url):
                 if m:
                     return m.group(1)
     return ''
+
+
+def inflact_ig_viewer(username, get_profile=True, get_stories=False, get_reels=False, save_debug=False):
+    # https://inflact.com/instagram-viewer/
+
+    # serverTimeDelta = 1 ??
+    ts = int(time.time()) - 1
+    client_id = ''.join(f'{byte:02x}' for byte in os.urandom(16))
+    client_token = {
+        "timestamp": ts,
+        "clientId": client_id,
+        "nonce": ''.join(f'{byte:02x}' for byte in os.urandom(16))
+    }
+    msg = json.dumps(client_token, separators=(',', ':'))
+
+    Xr = [54, 103, 102, 52, 54, 48, 50, 97, 59, 48, 61, 109, 57, 53, 58, 63, 116, 40, 115, 42]
+    Qr = [56, 96, 59, 102, 98, 49, 50, 97, 57, 57, 60, 111, 53, 61, 62, 55, 33, 114, 113, 118]
+    ei = [98, 99, 54, 50, 96, 96, 103, 48, 57, 106, 57, 59, 57, 108, 56, 60, 36, 112, 116, 34, 112, 116, 116, 38]
+    def Kr(e):
+        return ''.join(chr(ord(t) ^ n % len(e)) for n, t in enumerate(e))
+    def Jr(e):
+        return ''.join(chr(i) for i in e)
+    key = ''.join([Kr(Jr(Xr)), Kr(Jr(Qr)), Kr(Jr(ei))])
+
+    hmac_sig = hmac.new(key.encode(), msg.encode(), hashlib.sha256).hexdigest()
+
+    boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+    fields = {
+        'url': username
+    }
+    m = requests_toolbelt.MultipartEncoder(fields=fields, boundary=boundary)
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "content-type": m.content_type,
+        "priority": "u=1, i",
+        "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Microsoft Edge\";v=\"134\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0",
+        "x-client-signature": hmac_sig,
+        "x-client-token": base64.b64encode(msg.encode()).decode()
+    }
+
+    profile_json = None
+    stories_json = None
+    reels_json = None
+
+    if get_profile == True:
+        r = requests.post('https://inflact.com/downloader/api/downloader/profile/?lang=en', data=m, headers=headers)
+        if r:
+            if r.status_code == 200:
+                profile_json = r.json()
+                if save_debug:
+                    utils.write_file(profile_json, './debug/ig_profile.json')
+            else:
+                logger.warning('requests status {} getting https://inflact.com/downloader/api/downloader/profile/?lang=en'.format(r.status_code))
+
+    if get_stories == True:
+        client_token['nonce'] = ''.join(f'{byte:02x}' for byte in os.urandom(16))
+        msg = json.dumps(client_token, separators=(',', ':'))
+        hmac_sig = hmac.new(key.encode(), msg.encode(), hashlib.sha256).hexdigest()
+        boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+        fields = {
+            'url': username,
+            'cursor': ''
+        }
+        m = requests_toolbelt.MultipartEncoder(fields=fields, boundary=boundary)
+        headers['content-type'] = m.content_type
+        headers['x-client-signature'] = hmac_sig
+        headers['x-client-token'] = base64.b64encode(msg.encode()).decode()
+        r = requests.post('https://inflact.com/downloader/api/viewer/stories/', data=m, headers=headers)
+        if r:
+            if r.status_code == 200:
+                stories_json = r.json()
+                if save_debug:
+                    utils.write_file(stories_json, './debug/ig_reels.json')
+            else:
+                logger.warning('requests status {} getting https://inflact.com/downloader/api/viewer/stories/'.format(r.status_code))
+
+    # Note: profile contains edge_owner_to_timeline_media with recent posts including reels
+    # The following gets only reel posts
+
+    if get_reels == True:
+        client_token['nonce'] = ''.join(f'{byte:02x}' for byte in os.urandom(16))
+        msg = json.dumps(client_token, separators=(',', ':'))
+        hmac_sig = hmac.new(key.encode(), msg.encode(), hashlib.sha256).hexdigest()
+        boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+        fields = {
+            'url': username,
+            'cursor': ''
+        }
+        m = requests_toolbelt.MultipartEncoder(fields=fields, boundary=boundary)
+        headers['content-type'] = m.content_type
+        headers['x-client-signature'] = hmac_sig
+        headers['x-client-token'] = base64.b64encode(msg.encode()).decode()
+        r = requests.post('https://inflact.com/downloader/api/viewer/reels/', data=m, headers=headers)
+        if r:
+            if r.status_code == 200:
+                reels_json = r.json()
+                if save_debug:
+                    utils.write_file(reels_json, './debug/ig_reels.json')
+            else:
+                logger.warning('requests status {} getting https://inflact.com/downloader/api/viewer/reels/'.format(r.status_code))
+
+    return profile_json, stories_json, reels_json

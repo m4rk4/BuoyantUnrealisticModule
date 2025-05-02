@@ -72,8 +72,8 @@ def convert_unicode(matchobj):
 
 
 def resize_image(image, width=1200):
-    img_src = re.sub('^image-', r'https://img.semafor.com/', image['asset']['_ref'])
-    img_src = re.sub('-(\w+)$', r'.\1', img_src)
+    img_src = re.sub(r'^image-', r'https://img.semafor.com/', image['asset']['_ref'])
+    img_src = re.sub(r'-(\w+)$', r'.\1', img_src)
     return img_src + '?w={}&q=75&auto=format'.format(width)
 
 

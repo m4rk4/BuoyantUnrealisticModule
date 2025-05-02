@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, width=1000):
+def resize_image(img_src, width=1200):
     split_url = urlsplit(img_src)
     if split_url.netloc != 'imgix.bustle.com':
         return img_src
@@ -165,7 +165,7 @@ def render_card(card, list_index=0):
         if m:
             field_html = m.group(1)
         card_html += '<center><h3>{}</h3></center>'.format(field_html)
-        img_src = '{}/image?url={}&width=1000&overlay={}&overlay_position=(%2C0)'.format(config.server, quote_plus(resize_image(card['image']['url'])), quote_plus(card['icon']['url']))
+        img_src = '{}/image?url={}&overlay={}&overlay_position=(%2C-1)&width=1200'.format(config.server, quote_plus(card['image']['url']), quote_plus(card['icon']['url']))
         caption = ''
         if card['image'].get('attribution'):
             caption += card['image']['attribution']
@@ -375,17 +375,15 @@ def get_content(url, args, site_json, save_debug=False):
     dt_utc = tz.localize(dt).astimezone(pytz.utc)
     item['date_modified'] = dt_utc.isoformat()
 
-    authors = []
-    for author in article_json['authorConnection']['edges']:
-        authors.append(author['node']['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['node']['name']} for x in article_json['authorConnection']['edges']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
     if article_json.get('categoryConnection'):
-        for tag in article_json['categoryConnection']['nodes']:
-            item['tags'].append(tag['name'])
+        item['tags'] += [x['name'] for x in article_json['categoryConnection']['nodes']]
     if article_json.get('tags'):
         for tag in article_json['tags']:
             if tag['slug'].casefold() in (name.casefold() for name in item['tags']):
@@ -393,18 +391,18 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'].append(tag['slug'])
 
     if article_json.get('metaImage'):
-        item['_image'] = article_json['metaImage']['url']
+        item['image'] = article_json['metaImage']['url']
     elif article_json.get('header'):
         if article_json['header']['card'].get('image'):
-            item['_image'] = article_json['header']['card']['image']['url']
+            item['image'] = article_json['header']['card']['image']['url']
         elif article_json['header']['card'].get('video'):
-            item['_image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
+            item['image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
                 article_json['header']['card']['video']['low']['url']))
     elif article_json.get('teaser'):
         if article_json['teaser'].get('image'):
-            item['_image'] = article_json['teaser']['image']['url']
+            item['image'] = article_json['teaser']['image']['url']
         elif article_json['teaser'].get('video'):
-            item['_image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
+            item['image'] = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(
                 article_json['teaser']['video']['low']['url']))
 
     item['summary'] = article_json['description']

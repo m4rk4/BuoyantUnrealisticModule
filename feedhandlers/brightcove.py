@@ -17,7 +17,7 @@ def get_content(url, args, site_json, save_debug=False):
         r = s.get(url)
         if not r:
             return None
-        m = re.search(r'policyKey:"([^"]+)"', r.text)
+        m = re.search(r'"?policyKey"?:"([^"]+)"', r.text)
         if not m:
             logger.warning('unable to find policyKey in ' + url)
             return None

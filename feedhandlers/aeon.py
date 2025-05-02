@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -180,18 +180,38 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             logger.warning('unhandled figure in ' + item['url'])
 
+    dropcap = ''
     el = soup.find('p')
     if not el.find('span', class_='ld-dropcap'):
-        new_html = re.sub(r'^(<[^>]+>)(<[^>]+>)?(\W*\w)', r'\1\2<span style="float:left; font-size:4em; line-height:0.8em;">\3</span>', str(el), 1)
-        new_html += '<span style="clear:left;"></span>'
-        new_el = BeautifulSoup(new_html, 'html.parser')
-        el.replace_with(new_el)
+        if not dropcap:
+            dropcap = config.dropcap_style
+            new_el = soup.new_tag('style')
+            new_el.string = dropcap
+            el.insert_before(new_el)
+        el.attrs = {}
+        el['class'] = 'dropcap'
+        # new_html = re.sub(r'^(<[^>]+>)(<[^>]+>)?(\W*\w)', r'\1\2<span style="float:left; font-size:4em; line-height:0.8em;">\3</span>', str(el), 1)
+        # new_html += '<span style="clear:left;"></span>'
+        # new_el = BeautifulSoup(new_html, 'html.parser')
+        # el.replace_with(new_el)
 
     for el in soup.find_all('span', class_='ld-dropcap'):
-        el['style'] = 'float:left; font-size:4em; line-height:0.8em;'
-        new_el = soup.new_tag('span')
-        new_el['style'] = 'clear:left;'
-        el.find_parent('p').insert_after(new_el)
+        it = el.find_parent('p')
+        if it:
+            it.attrs = {}
+            it['class'] = 'dropcap'
+            if not dropcap:
+                dropcap = config.dropcap_style
+                new_el = soup.new_tag('style')
+                new_el.string = dropcap
+                it.insert_before(new_el)
+            el.unwrap()
+        else:
+            logger.warning('unhandled ld-dropcap parent in ' + item['url'])
+        # el['style'] = 'float:left; font-size:4em; line-height:0.8em;'
+        # new_el = soup.new_tag('span')
+        # new_el['style'] = 'clear:left;'
+        # el.find_parent('p').insert_after(new_el)
 
     for el in soup.find_all('p', class_='pullquote'):
         new_html = utils.add_pullquote(el.decode_contents())

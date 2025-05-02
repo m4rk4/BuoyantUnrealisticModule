@@ -30,31 +30,42 @@ def get_content(url, args, site_json, save_debug=False):
     item['url'] = episode_json['episode_url']
     item['title'] = episode_json['title']
 
-    dt = datetime.fromisoformat(episode_json['published_at']).astimezone(timezone.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
-    dt = datetime.fromisoformat(episode_json['updated_at']).astimezone(timezone.utc)
-    item['date_modified'] = dt.isoformat()
-
-    authors = []
-    if episode_json.get('authors') and episode_json['authors'].get('collection'):
-        for it in episode_json['authors']['collection']:
-            authors.append(it['name'])
-    item['author'] = {}
-    if authors:
-        item['author']['name'] = '{} with {}'.format(episode_json['podcast']['title'], re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
+    if episode_json.get('published_at'):
+        dt = datetime.fromisoformat(episode_json['published_at']).astimezone(timezone.utc)
+    elif episode_json.get('created_at'):
+        dt = datetime.fromisoformat(episode_json['created_at']).astimezone(timezone.utc)
     else:
-        item['author']['name'] = episode_json['podcast']['title']
+        logger.warning('unknown published date for ' + item['url'])
+        dt = None
+    if dt:
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, False)
+    if episode_json.get('updated_at'):
+        dt = datetime.fromisoformat(episode_json['updated_at']).astimezone(timezone.utc)
+        item['date_modified'] = dt.isoformat()
+
+    item['authors'] = []
+    if episode_json.get('authors') and episode_json['authors'].get('collection'):
+        item['authors'] = [{"name": x['name']} for x in episode_json['authors']['collection']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": episode_json['podcast']['title'] + ' with ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+    else:
+        item['author'] = {
+            "name": episode_json['podcast']['title']
+        }
+    item['authors'].insert(0, {"name": episode_json['podcast']['title']})
+
+    podcast_json = utils.get_url_json(episode_json['podcast']['href'])
+    if podcast_json:
+        item['author']['url'] = podcast_json['site']['url']
 
     if episode_json.get('image_url'):
-        item['_image'] = episode_json['image_url']
+        item['image'] = episode_json['image_url']
     elif episode_json['podcast'].get('image_url'):
-        item['_image'] = episode_json['podcast']['image_url']
-    if item.get('_image'):
-        poster = '{}/image?url={}&height=128&overlay=audio'.format(config.server, quote_plus(item['_image']))
-    else:
-        poster = '{}/image?height=128&width=128&overlay=audio'.format(config.server)
+        item['image'] = episode_json['podcast']['image_url']
 
     attachment = {}
     audio_json = utils.get_url_json(episode_json['audio_file']['href'])
@@ -68,13 +79,15 @@ def get_content(url, args, site_json, save_debug=False):
     item['attachments'].append(attachment)
     item['_audio'] = attachment['url']
 
-    item['summary'] = episode_json['description']
+    desc = ''
+    if episode_json.get('description'):
+        item['summary'] = episode_json['description']
+        if 'embed' not in args:
+            desc = '<p style="white-space:pre-line">' + episode_json['description'] + '</p>'
 
     duration = utils.calc_duration(episode_json['duration'])
 
-    item['content_html'] = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>{}</div><div><small>{}&nbsp;&bull;&nbsp;{}</small></div></td></tr></table>'.format(item['_audio'], poster, item['url'], item['title'], item['author']['name'], item['_display_date'], duration)
-    if 'embed' not in args:
-        item['content_html'] += '<p>{}</p>'.format(item['summary'])
+    item['content_html'] = utils.add_audio_v2(item['_audio'], item.get('image'), item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], duration, episode_json['audio_content_type'], desc=desc)
     return item
 
 

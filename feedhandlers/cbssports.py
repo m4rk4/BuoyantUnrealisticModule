@@ -35,25 +35,41 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['author'] = {}
     if article_json['trackingData'].get('articleAuthorName'):
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(article_json['trackingData']['articleAuthorName']))
+        item['authors'] = [{"name": x} for x in article_json['trackingData']['articleAuthorName']]
+    elif article_json['trackingData'].get('contentOrigin'):
+        item['authors'] = [{
+            "name": article_json['trackingData']['contentOrigin']
+        }]
     else:
-        item['author']['name'] = 'CBSSports'
+        item['authors'] = [{
+            "name": "CBSSports"
+        }]
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
     item['tags'] = article_json['trackingData']['topicName'].copy()
 
     soup = BeautifulSoup(article_json['template'], 'html.parser')
     article_body = soup.find(id='Article-body')
+    if save_debug:
+        utils.write_file(str(article_body), './debug/debug.html')
 
     item['content_html'] = ''
     el = soup.find(class_='Article-subline')
     if el:
-        item['content_html'] += '<p><em>{}</em></p>'.format(el.get_text())
+        item['summary'] = el.get_text().strip()
+        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
 
     el = soup.find(attrs={"itemprop": "image"})
     if el:
         it = el.find('meta', attrs={"itemprop": "url"})
-        item['_image'] = it['content']
-        item['content_html'] += utils.add_image(item['_image'])
+        item['image'] = it['content']
+        item['content_html'] += utils.add_image(item['image'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     el = article_body.find(class_='VideoHero')
     if el:
@@ -88,22 +104,28 @@ def get_content(url, args, site_json, save_debug=False):
         if not el.get('class'):
             new_html = utils.add_blockquote(el.decode_contents())
             new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
 
     for el in body_content.find_all(class_='ArticleContentTable'):
         it = el.find('table')
-        el.insert_after(it)
-        el.decompose()
+        el.replace_with(it)
 
     for el in body_content.find_all('table'):
         el.attrs = {}
-        el['style'] = 'width:90%; margin-left:auto; margin-right:auto;'
+        if el.find(class_='PlayerObjectCell'):
+            el['style'] = 'width:100%;'
+            row_style = ''
+        else:
+            el['style'] = 'width:90%; margin-left:auto; margin-right:auto; border-collapse:collapse; border-top:1px solid light-dark(#333,#ccc);'
+            row_style = 'border-bottom:1px solid light-dark(#333,#ccc);'
         for it in el.find_all(['thead', 'tr']):
             it.attrs = {}
+            it['style'] = row_style
         for it in el.find_all(['th', 'td']):
             it.attrs = {}
-            it['style'] = 'text-align:left;'
+            it['style'] = 'text-align:left; padding:8px;'
+            if it.p:
+                it.p.unwrap()
 
     for el in body_content.find_all(class_='TeamLogoNameLockup'):
         it = el.find('img', class_='TeamLogo-image')
@@ -111,8 +133,7 @@ def get_content(url, args, site_json, save_debug=False):
         it = el.find('span', class_='TeamName')
         new_html += '&nbsp;<a href="{}">{}</a>'.format(it.a['href'], it.a.get_text())
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        el.replace_with(new_el)
 
     for el in body_content.find_all(class_='shortcode'):
         if el.find('section', class_='Newsletter-container'):
@@ -158,10 +179,60 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unhandled MediaShortcode' + str(el['class']))
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
-            el.insert_after(new_el)
-            el.decompose()
+            el.replace_with(new_el)
 
-    for el in body_content(class_='PlayerSnippet'):
+    for el in body_content.find_all(attrs={"data-shortcode": True}):
+        if el['data-shortcode'] == 'mtechprtcomponent':
+            el.decompose()
+        else:
+            logger.warning('unhandled data-shortcode {} in {}'.format(el['data-shortcode'], item['url']))
+
+    for el in body_content.find_all(class_='PlayerObjectCell'):
+        new_html = ''
+        it = el.find(class_='PlayerObjectV4Pick-roundPickInfo')
+        if it:
+            new_html += '<div style="margin-bottom:8px; padding:4px; background-color:#ccc; font-weight:bold;">' + it.get_text().strip() + '</div>'
+        new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; font-size:0.8em;">'
+        if el.find(class_='PlayerObjectV4-nameBox'):
+            new_html += '<div style="flex:1; text-align:center;"><div>'
+            it = el.select('div.PlayerObjectV4-nameBox > div.PlayerObjectV4-logoNameLockup > div.HeadshotAndLogoLockup > div.HeadshotAndLogoLockup-logo img.TeamLogo-image')
+            if it:
+                new_html += '<img src="{}" style="width:64px;">'.format(it[0]['data-lazy'])
+            it = el.select('div.PlayerObjectV4-nameBox > div.PlayerObjectV4-logoNameLockup > div.HeadshotAndLogoLockup > div.HeadshotAndLogoLockup-headshot figure.Headshot-image > img')
+            if it:
+                new_html += '<img src="{}" style="width:64px;">'.format(it[0]['data-lazy'])
+            new_html += '</div><div>'
+            it = el.select('div.PlayerObjectV4-nameBox > div.PlayerObjectV4-player > div.PlayerObjectV4-playerName > span.PlayerName')
+            if it:
+                new_html += '<span style="font-size:1.2em; font-weight:bold;">' + it[0].decode_contents() + '</span>'
+            it = el.select('div.PlayerObjectV4-nameBox > div.PlayerObjectV4-player > div.PlayerObjectV4-playerName > span.PlayerObjectV4-playerPosition')
+            if it:
+                new_html += ' <span style="color:#555;">' + it[0].decode_contents() + '</span>'
+            new_html += '</div>'
+            it = el.select('div.PlayerObjectV4-nameBox > div.PlayerObjectV4-player > div.PlayerObjectV4-playerInfo')
+            if it:
+                new_html += it[0].decode_contents()
+            new_html += '</div>'
+        if el.find(class_='PlayerObjectV4-playerStatBox'):
+            new_html += '<div style="flex:2;">'
+            for it in el.select('div.PlayerObjectV4-playerStatBox > div:is(.PlayerObjectV4-playerStatRow, .PlayerObjectV4-playerStatNewRow) > table'):
+                it.attrs = {}
+                it['style'] = 'width:100%;'
+                for x in el.find_all('h6', class_='PlayerObjectV4-label'):
+                    x.attrs = {}
+                    x.name = 'div'
+                for x in el.find_all(['thead', 'tr']):
+                    x.attrs = {}
+                new_html += str(it) + '<!-- -->'
+            it = el.select('div.PlayerObjectV4-playerStatBox > div.PlayerObjectV4-analysis')
+            if it:
+                new_html += '<p>' + it[0].decode_contents() + '</p>'
+            new_html += '</div>'
+        new_html += '</div>'
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in body_content.find_all(class_='PlayerSnippet'):
         new_html = '<table><tr><td>'
         it = el.find('figure', class_='Headshot-image')
         if it:
@@ -187,15 +258,18 @@ def get_content(url, args, site_json, save_debug=False):
             new_html += '</tr></table>'
         new_html += '</td></tr></table>'
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        el.replace_with(new_el)
 
     for el in body_content.find_all(class_='iframe'):
         it = el.find('iframe')
         new_html = utils.add_embed(it['src'])
         new_el = BeautifulSoup(new_html, 'html.parser')
-        el.insert_after(new_el)
-        el.decompose()
+        el.replace_with(new_el)
+
+    for el in body_content.select('a:has(> div.ArticleShortcode-container)'):
+        new_html = utils.add_embed(el['href'])
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
 
     for el in body_content.find_all('a'):
         href = el['href']

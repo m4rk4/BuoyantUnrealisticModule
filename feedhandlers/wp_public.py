@@ -1,6 +1,6 @@
 import html, re
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import utils
 from feedhandlers import rss, wp_posts
@@ -13,9 +13,17 @@ logger = logging.getLogger(__name__)
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    slug = paths[-1].split('.')[0]
-
-    api_url = 'https://public-api.wordpress.com/rest/v1.1/sites/{}/posts/slug:{}'.format(site_json['site_id'], slug)
+    api_url = ''
+    if len(paths) > 0:
+        slug = paths[-1].split('.')[0]
+        api_url = 'https://public-api.wordpress.com/rest/v1.1/sites/{}/posts/slug:{}'.format(site_json['site_id'], slug)
+    elif split_url.query:
+        params = parse_qs(split_url.query)
+        if params.get('p'):
+            api_url = 'https://public-api.wordpress.com/rest/v1.1/sites/{}/posts/{}'.format(site_json['site_id'], params['p'][0])
+    if not api_url:
+        logger.warning('unhandled url ' + url)
+        return None
     post_json = utils.get_url_json(api_url)
     if not post_json:
         return None

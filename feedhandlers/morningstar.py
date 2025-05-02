@@ -55,10 +55,16 @@ def render_content(content_elements):
         start_tag = ''
         end_tag = ''
         if element['type'] == 'text':
-            content_html += element['text']
-        elif element['type'] == 'paragraph':
+            if element.get('text'):
+                content_html += element['text']
+            elif element.get('content'):
+                content_html += element['content']
+        elif element['type'] == 'p' or element['type'] == 'paragraph':
             start_tag = '<p>'
             end_tag = '</p>'
+        elif element['type'] == 'pre':
+            start_tag = '<pre>'
+            end_tag = '</pre>'
         elif element['type'] == 'a':
             if element.get('href'):
                 start_tag = '<a href="{}">'.format(element['href'])
@@ -92,6 +98,9 @@ def render_content(content_elements):
         elif element['type'] == 'list-item':
             start_tag = '<li>'
             end_tag = '</li>'
+        elif element['type'] == 'pullquote':
+            start_tag = utils.open_pullquote()
+            end_tag = utils.close_pullquote()
         elif element['type'] == 'image':
             captions = []
             if element.get('caption'):
@@ -116,7 +125,7 @@ def render_content(content_elements):
             if streams:
                 video = utils.closest_dict(streams, 'bitrate', 1500)
             if video:
-                content_html += utils.add_video(video['url'], video['streamType'], element['video']['promoImage'], element['video']['headline']['title'])
+                content_html += utils.add_video(video['url'], video['streamType'], element['video']['promoImage'], element['video']['headline']['title'], use_videojs=True)
             else:
                 logger.warning('unhandled video element')
         elif element['type'] == 'embed':
@@ -127,6 +136,12 @@ def render_content(content_elements):
                 if element.get('dataSource'):
                     captions.append(element['dataSource'])
                 content_html += utils.add_image(element['imageUri'], ' | '.join(captions), link=element['uri'])
+            elif element['providerName'] == 'Datawrapper':
+                m = re.search(r'src="([^"]+)"', element['html'])
+                if m:
+                    content_html += utils.add_embed(m.group(1))
+                else:
+                    logger.warning('unhandled Datawrapper embed')
             else:
                 logger.warning('unhandled embed provider ' + element['providerName'])
         else:
@@ -253,20 +268,22 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path.split('/')))
 
     if split_url.path.startswith('/news/'):
-        api_url = 'https://www.morningstar.com/api/v2/' + '/'.join(paths[:3])
+        api_url = 'https://www.morningstar.com/api/v2' + split_url.path
         key = 'article'
     elif split_url.path.startswith('/specials/'):
         return get_special_content(url, args, site_json, save_debug)
     else:
         api_url = 'https://www.morningstar.com/api/v2/stories?section=%2F{}&slug={}'.format(paths[0], paths[1])
         key = 'story'
-    api_json = utils.get_url_json(api_url)
+    logger.debug(api_url)
+    api_json = utils.get_url_json(api_url, use_proxy=True, use_curl_cffi=True)
     if not api_json:
         return None
     if save_debug:
         utils.write_file(api_json, './debug/debug.json')
 
-    story_json = api_json[key]['payload']
+    # story_json = api_json[key]['payload']
+    story_json = api_json['page']
     item = {}
     item['id'] = story_json['id']
     if story_json.get('canonicalURL'):
@@ -311,8 +328,12 @@ def get_content(url, args, site_json, save_debug=False):
         item['author'] = {}
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
 
+    item['tags'] = []
+    if story_json.get('sections'):
+        item['tags'] += [x['title'] for x in story_json['sections']]
+    if story_json.get('tags'):
+        item['tags'] += [x['name'] for x in story_json['tags']]
     if story_json.get('relatedSecurities'):
-        item['tags'] = []
         for it in story_json['relatedSecurities']:
             item['tags'].append(it['name'])
             if it.get('ticker'):
@@ -324,18 +345,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<p><em>{}</em></p>'.format(item['summary'])
 
     if story_json.get('promoItems'):
-        if story_json['promoItems'].get('image'):
-            item['_image'] = story_json['promoItems']['image']['src']
-            item['content_html'] += render_content([story_json['promoItems']['image']])
-        elif story_json['promoItems'].get('video'):
+        if story_json['promoItems'].get('video'):
             item['_image'] = story_json['promoItems']['video']['video']['promoImage']
             item['content_html'] += render_content([story_json['promoItems']['video']])
+        elif story_json['promoItems'].get('image'):
+            item['_image'] = story_json['promoItems']['image']['src']
+            item['content_html'] += render_content([story_json['promoItems']['image']])
 
     if story_json.get('contentElements'):
         item['content_html'] += render_content(story_json['contentElements'])
 
     if story_json.get('body'):
-        item['content_html'] += render_body_content(story_json['body'])
+        item['content_html'] += render_content(story_json['body'])
 
     return item
 

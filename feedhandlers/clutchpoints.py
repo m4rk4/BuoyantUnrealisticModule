@@ -70,8 +70,11 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(post_json['modifiedGmt']).replace(tzinfo=timezone.utc)
     item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
-    item['author']['name'] = post_json['author']['node']['name']
+    item['author'] = {
+        "name": post_json['author']['node']['name']
+    }
+    item['authors'] = []
+    item['authors'].append(item['author'])
 
     if post_json.get('tags') and post_json['tags'].get('edges'):
         item['tags'] = []
@@ -87,10 +90,13 @@ def get_content(url, args, site_json, save_debug=False):
             item['summary'] = post_json['seo']['twitterDescription']
 
     item['content_html'] = ''
-
     if post_json.get('featuredImage') and post_json['featuredImage'].get('node'):
-        item['_image'] = post_json['featuredImage']['node']['sourceUrl']
+        item['image'] = post_json['featuredImage']['node']['sourceUrl']
         item['content_html'] += utils.add_image(resize_image(item['_image']))
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
     return item

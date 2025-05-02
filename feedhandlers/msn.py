@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, width=1000):
+def resize_image(img_src, width=1200):
     split_url = urlsplit(img_src)
     return '{}://{}{}?w={}'.format(split_url.scheme, split_url.netloc, split_url.path, width)
 
@@ -19,6 +19,7 @@ def resize_image(img_src, width=1000):
 def add_media(media_id):
     media_html = ''
     media_json = utils.get_url_json('https://assets.msn.com/breakingnews/v1/' + media_id)
+    # media_json = utils.get_url_json('https://cdn.query.prod.cms.msn.com/' + media_id)
     if not media_json:
         return media_html
 
@@ -30,28 +31,53 @@ def add_media(media_id):
             captions.append(media_json['attribution'])
         media_html = utils.add_image(resize_image(media_json['href']), ' | '.join(captions))
     elif media_json['$type'] == 'slideshow':
-        for slide in media_json['slides']:
-            media_html += add_media(slide['image']['href'])
+        ss_url = config.server + '/gallery?url=' + quote_plus('https://www.msn.com/' + media_json['_locale'] + '/' + '/ss-' + media_json['_id'])
+        caption = '<a href="{}" target="_blank">View slideshow</a>: {}'.format(ss_url, media_json['title'])
+        img_src = 'https://img-s-msn-com.akamaized.net/tenant/amp/entityid/{}.img'.format(media_json['slides'][0]['image']['href'].split('/')[-1])
+        media_html = utils.add_image(resize_image(img_src), caption, link=ss_url, overlay=config.gallery_button_overlay)
     elif media_json['$type'] == 'video':
-        if media_json.get('thumbnail'):
-            poster_json = utils.get_url_json('https://assets.msn.com/breakingnews/v1/' + media_json['thumbnail']['href'])
-            if poster_json:
-                poster = resize_image(poster_json['href'])
-            else:
-                poster = media_json['thumbnail']['sourceHref']
+        if 'www.youtube.com' in media_json['sourceHref']:
+            media_html = utils.add_embed(media_json['sourceHref'])
         else:
-            poster = ''
-        video = next((it for it in media_json['videoFiles'] if it['format'] == '1001'), None)
-        if video:
-            video_src = video['href']
-            video_type = video['contentType']
-        else:
-            video_src = media_json['sourceHref']
-            if '.mp4' in video_src:
-                video_type = 'video/mp4'
+            if media_json.get('thumbnail'):
+                poster_json = utils.get_url_json('https://assets.msn.com/breakingnews/v1/' + media_json['thumbnail']['href'])
+                # poster_json = utils.get_url_json('https://cdn.query.prod.cms.msn.com/' + media_json['thumbnail']['href'])
+                if poster_json:
+                    poster = resize_image(poster_json['href'])
+                else:
+                    poster = media_json['thumbnail']['sourceHref']
             else:
-                video_type = 'application/x-mpegURL'
-        media_html = utils.add_video(video_src, video_type, poster, media_json.get('caption'))
+                poster = ''
+            # format 1004 = m3u8
+            video = next((it for it in media_json['videoFiles'] if it['format'] == '1004'), None)
+            if not video:
+                # format 1006 = m3u8
+                video = next((it for it in media_json['videoFiles'] if it['format'] == '1006'), None)
+                if not video:
+                    # format 103 = mp4 (960x540)
+                    video = next((it for it in media_json['videoFiles'] if it['format'] == '103'), None)
+                    if not video:
+                        # format 104 = mp4 (1280x720)
+                        video = next((it for it in media_json['videoFiles'] if it['format'] == '104'), None)
+            if video:
+                video_src = video['href']
+                if video.get('contentType'):
+                    video_type = video['contentType']
+                elif '.mp4' in video_src:
+                    video_type = 'video/mp4'
+                elif '.mpd' in video_src:
+                    video_type = 'application/dash+xml'
+                else:
+                    video_type = 'application/x-mpegURL'
+            else:
+                video_src = media_json['sourceHref']
+                if '.mp4' in video_src:
+                    video_type = 'video/mp4'
+                elif '.mpd' in video_src:
+                    video_type = 'application/dash+xml'
+                else:
+                    video_type = 'application/x-mpegURL'
+            media_html = utils.add_video(video_src, video_type, poster, media_json.get('caption'))
     return media_html
 
 
@@ -66,18 +92,28 @@ def get_content(url, args, site_json, save_debug=False):
     if save_debug:
         utils.write_file(article_json, './debug/debug.json')
 
+    if article_json['jsonDataMap'].get('displayValue'):
+        display_value = json.loads(article_json['jsonDataMap']['displayValue'])
+    else:
+        display_value = None
+
     item = {}
     item['id'] = article_json['id']
-    #item['url'] = article_json['sourceHref']
-    item['url'] = utils.clean_url(url)
+
+    if display_value:
+        item['url'] = display_value['Url']
+    else:
+        #item['url'] = article_json['sourceHref']
+        item['url'] = utils.clean_url(url)
     item['title'] = article_json['title']
 
-    dt = datetime.fromisoformat(article_json['publishedDateTime'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['publishedDateTime'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(article_json['updatedDateTime'].replace('Z', '+00:00'))
-    item['date_modified'] = dt.isoformat()
+    if article_json.get('updatedDateTime'):
+        dt = datetime.fromisoformat(article_json['updatedDateTime'])
+        item['date_modified'] = dt.isoformat()
 
     item['author'] = {}
     if article_json.get('authors'):
@@ -93,9 +129,9 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['tags'] = []
     if article_json.get('tags'):
-        for it in article_json['tags']:
-            if it['label'] not in item['tags']:
-                item['tags'].append(it['label'])
+        item['tags'] += [x['label'] for x in article_json['tags']]
+    if article_json.get('satoriTags'):
+        item['tags'] += [x['label'] for x in article_json['satoriTags'] if not x['label'].startswith('wf_')]
     if article_json.get('keywords'):
         item['tags'] += article_json['keywords'].copy()
     if article_json.get('facets'):
@@ -107,24 +143,21 @@ def get_content(url, args, site_json, save_debug=False):
         del item['tags']
 
     if article_json.get('imageResources'):
-        item['_image'] = article_json['imageResources'][0]['url']
+        item['image'] = article_json['imageResources'][0]['url']
     elif article_json.get('thumbnail'):
-        item['_image'] = article_json['thumbnail']['image']['url']
+        item['image'] = article_json['thumbnail']['image']['url']
     elif article_json.get('slides'):
-        item['_image'] = article_json['slides'][0]['image']['url']
+        item['image'] = article_json['slides'][0]['image']['url']
+    elif display_value and display_value.get('ImageUrl'):
+        item['image'] = display_value['ImageUrl']
 
     if article_json.get('abstract'):
         item['summary'] = article_json['abstract']
+    elif display_value and display_value.get('Snippet'):
+        item['summary'] = display_value['Snippet']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
-        return item
+        item['content_html'] = utils.format_embed_preview(item)
 
     item['content_html'] = ''
     if article_json.get('videoMetadata'):
@@ -133,13 +166,38 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             if article_json.get('thumbnail'):
                 poster = resize_image(article_json['thumbnail']['image']['url'])
+            elif 'image' in item:
+                poster = item['image']
             else:
                 poster = ''
-            video = next((it for it in article_json['videoMetadata']['externalVideoFiles'] if it['format'] == '1001'), None)
+            # format 1004 = m3u8
+            video = next((it for it in article_json['videoMetadata']['externalVideoFiles'] if it['format'] == '1004'), None)
+            if not video:
+                # format 1006 = m3u8
+                video = next((it for it in article_json['videoMetadata']['externalVideoFiles'] if it['format'] == '1006'), None)
+                if not video:
+                    # format 103 = mp4 (960x540)
+                    video = next((it for it in article_json['videoMetadata']['externalVideoFiles'] if it['format'] == '103'), None)
+                    if not video:
+                        # format 104 = mp4 (1280x720)
+                        video = next((it for it in article_json['videoMetadata']['externalVideoFiles'] if it['format'] == '104'), None)
+                        if not video:
+                            video = article_json['videoMetadata']['externalVideoFiles'][0]
             if video:
-                item['content_html'] = utils.add_video(video['url'], video['contentType'], poster, article_json.get('abstract'))
-            else:
-                logger.warning('unhandled videoMetadata in ' + item['url'])
+                video_src = video['url']
+                if video.get('contentType'):
+                    video_type = video['contentType']
+                elif '.mp4' in video_src:
+                    video_type = 'video/mp4'
+                elif '.mpd' in video_src:
+                    video_type = 'application/dash+xml'
+                else:
+                    video_type = 'application/x-mpegURL'
+            item['content_html'] += utils.add_video(video_src, video_type, poster, item['title'])
+        if article_json['type'] == 'video':
+            if 'summary' in item:
+                item['content_html'] += '<p>' + item['summary'] + '</p>'
+            return item
 
     if article_json.get('body'):
         soup = BeautifulSoup(article_json['body'], 'html.parser')
@@ -186,15 +244,28 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += str(soup)
 
     if article_json.get('slides'):
-        for it in article_json['slides']:
+        item['_gallery'] = []
+        item['content_html'] += '<h3><a href="{}/gallery?url={}" target="_blank">View as slideshow</a></h3>'.format(config.server, quote_plus(item['url']))
+        for slide in article_json['slides']:
+            img_src = slide['image']['url']
+            thumb = resize_image(img_src, 640)
+            if slide['image'].get('attribution'):
+                caption = slide['image']['attribution']
+            else:
+                caption = ''
             desc = ''
-            if it.get('title'):
-                desc += '<h4>{}</h4>'.format(it['title'])
-            if it.get('body'):
-                desc += it['body']
-            item['content_html'] += utils.add_image(resize_image(it['image']['url']), it['image'].get('attribution'), desc=desc)
+            if slide.get('title'):
+                desc += '<h4>{}</h4>'.format(slide['title'])
+            if slide.get('body'):
+                desc += slide['body']
+            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": img_src, "desc": desc})
+            item['content_html'] += utils.add_image(resize_image(slide['image']['url']), caption, desc=desc)
 
     item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
+
+    if article_json.get('sourceHref') and urlsplit(article_json['sourceHref']).netloc != 'www.msn.com':
+        item['content_html'] += '<h2>Original article</h2>'
+        item['content_html'] += utils.add_embed(article_json['sourceHref'])
     return item
 
 
@@ -208,244 +279,63 @@ def get_card_item(url, args, site_json, save_debug):
     return None
 
 
-def get_feed(url, args, site_json, save_debug=False):
-    page_html = utils.get_url_html(args['url'])
-    if not page_html:
-        return None
-    soup = BeautifulSoup(page_html, 'lxml')
-    el = soup.find('head', attrs={"data-client-settings": True})
-    if not el:
-        logger.warning('unable to determine data-client-settings in ' + args['url'])
-    client_settings = json.loads(html.unescape(el['data-client-settings']))
-    if save_debug:
-        utils.write_file(client_settings, './debug/settings.json')
-    config_url = 'https://www.msn.com{}/{}/config/?expType=AppConfig&expInstance=default&apptype={}&v={}&targetScope='.format(client_settings['servicesEndpoints']['crs']['path'], client_settings['servicesEndpoints']['crs']['v'], client_settings['apptype'], client_settings['bundleInfo']['v'])
-    target_scope = {
-        "audienceMode": "adult",
-        "browser": client_settings['browser'],
-        "deviceFormFactor": client_settings['deviceFormFactor'],
-        "domain": client_settings['domain'],
-        "locale": client_settings['locale'],
-        "os": client_settings['os'],
-        "platform": "web",
-        "pageType": client_settings['pagetype'],
-        "pageExperiments": [
-            "prg-1s-boostcoach", "prg-1s-p2boostads", "prg-1s-vlprecalllog2",
-            "prg-1s-whp-sport", "prg-1sw-11refre", "prg-1sw-2cmoney", "prg-1sw-aqhfc",
-            "prg-1sw-aqnew", "prg-1sw-bnpttcg1", "prg-1sw-cbm0", "prg-1sw-cinlnftch",
-            "prg-1sw-crfy22c", "prg-1sw-crprepwl", "prg-1sw-dcwxcf", "prg-1sw-ebrfnt3",
-            "prg-1sw-enablenpq", "prg-1sw-esp", "prg-1sw-eup2", "prg-1sw-fwc", "prg-1sw-fwc",
-            "prg-1sw-fwc", "prg-1sw-fwcntp", "prg-1sw-fwcp1", "prg-1sw-fwcp2",
-            "prg-1sw-gempcv5p8", "prg-1sw-ip2msfeamkc", "prg-1sw-multif1", "prg-1sw-multif2",
-            "prg-1sw-multifn", "prg-1sw-nearss", "prg-1sw-ntpxap", "prg-1sw-p1wtrclm",
-            "prg-1sw-p2video", "prg-1sw-pde0", "prg-1sw-remvtfi", "prg-1sw-rhani",
-            "prg-1sw-saclfen1c", "prg-1sw-saecmig4", "prg-1sw-sagefreroc",
-            "prg-1sw-sagfswingt22", "prg-1sw-sbn-mm", "prg-1sw-secbadge", "prg-1sw-ski1",
-            "prg-1sw-sptprvmax5", "prg-1sw-tbrcounter", "prg-1sw-ulce1", "prg-1sw-wcf1",
-            "prg-1sw-wcf2", "prg-1sw-wcfnt", "prg-1sw-wcsfrwma", "prg-1sw-wcstart",
-            "prg-1sw-wxhf-ht-ct", "prg-1sw-wxtsetr9", "prg-2sw-esprtcsp", "prg-ads-ip11c",
-            "prg-adspeek", "prg-boostcoach", "prg-cookiecont", "prg-e-whp-sport-r",
-            "prg-feed2p2-t1", "prg-gridbyregion", "prg-hprewflyout-t", "prg-ias",
-            "prg-live-crd2", "prg-minusfdhead", "prg-nlclose", "prg-ntbl-cmhpc",
-            "prg-p2-pinsame1", "prg-pr2-boostr3c", "prg-pr2-casl-c", "prg-pr2-csgm4-c",
-            "prg-pr2-csgm4e-c", "prg-pr2-csv2", "prg-pr2-csv2t", "prg-pr2-lfnoph",
-            "prg-pr2-pvcold", "prg-pr2-telpin", "prg-prong2-boost2c", "prg-sc-prong2",
-            "prg-sh-automo7", "prg-sh-caka", "prg-sh-mbcfrp", "prg-sh-nl-ctrl",
-            "prg-sh-xpayv2", "prg-spr-t-d3at35", "prg-ugc-proforma", "prg-ugc-test-3",
-            "prg-upsaip-r-t", "prg-upsaip-w1-t", "prg-useplmtmgr", "prg-videoimp0s",
-            "prg-wea-allxap", "prg-wea-subxap", "prg-weanouser1", "prg-wpo-pnpc",
-            "prg-wpo-sagernk", "prg-wpo-tscgct", "prg-wscards-t1", "prg-wx-anmpr",
-            "prg-wx-aqnew", "prg-wx-aqzoom", "prg-wx-auto3d1", "prg-wx-morci",
-            "prg-wx-morl1ci", "prg-wx-sbn-vm"
-        ]
-    }
-    if client_settings.get('ocid'):
-        target_scope['ocid'] = client_settings['ocid']
-    config_url += json.dumps(target_scope).replace(' ', '').replace('"', '%22')
-    config_json = utils.get_url_json(config_url)
-    if not config_json:
-        logger.warning('unable to get AppConfig for ' + args['url'])
-        return None
-    if save_debug:
-        utils.write_file(config_json, './debug/config.json')
-
-    # https://assets.msn.com/bundles/v1/hub/latest/common.701d10a50cf16e1df0da.js
-    # function getOneServiceApiKey
-    api_key = '0QfOX3Vn51YCzitbLaRkTTBadtWpgTN8NZLW0C1SEM'
-    if client_settings.get('locale'):
-        locale = '{}-{}'.format(client_settings['locale']['language'], client_settings['locale']['market'])
-    else:
-        locale = config.locale
-    location = '|'.join(config.location)
-
-    split_url = urlsplit(args['url'])
-    paths = list(filter(None, split_url.path[1:].split('/')))
-    if len(paths) > 0 and paths[1] == 'sports':
-        if paths[-1] == 'sports':
-            sport = 'default'
-        elif paths[-1] == 'ncaafb':
-            sport = 'collegefootball'
-        elif paths[-1] == 'ncaabk':
-            sport = 'collegebasketball'
-        elif paths[-1] == 'ncaawbk':
-            sport = 'wcbk'
-        elif 'soccer' in paths:
-            if paths[-1] == 'soccer':
-                sport = 'soccer'
-            elif paths[-1] == 'mls':
-                sport = 'usamajorleaguesoccer'
-            elif paths[-1] == 'fifa-world-cup':
-                sport = 'internationalworldcup'
-            elif paths[-1] == 'nwsl':
-                sport = 'usanationalwomenssoccerleague'
-            elif paths[-1] == 'uefa-champions-league':
-                sport = 'internationalclubsuefachampionsleague'
-            elif paths[-1] == 'premier-league':
-                sport = 'englandpremierleague'
-            elif paths[-1] == 'ligue-un':
-                sport = 'franceligue1'
-            elif paths[-1] == 'la-liga':
-                sport = 'spainlaliga'
-            elif paths[-1] == 'bundesliga':
-                sport = 'germanybundesliga'
-            elif paths[-1] == 'serie-a':
-                sport = 'italyseriea'
-            elif paths[-1] == 'uefa-europa-league':
-                sport = 'uefaeuropaleague'
-            elif paths[-1] == 'europa-conference-league':
-                sport = 'soccer'
-            elif paths[-1] == 'wc-concacaf-qualifiers':
-                sport = 'internationalworldcupqualificationconcacaf'
-            elif paths[-1] == 'concacaf-champions-league':
-                sport = 'internationalclubsconcacafchampionsleague'
-            elif paths[-1] == 'coppa-italia':
-                sport = 'italycoppaitalia'
-            elif paths[-1] == 'brasileirao-serie-a':
-                sport = 'brazilbrasileiroseriea'
-        elif 'cricket' in paths:
-            if paths[-1] == 'cricket':
-                sport = 'cricket'
-            elif paths[-1] == 't20wc':
-                sport = 'ICCWorldTwenty20'
-            elif paths[-1] == 'cricket-internationals':
-                sport = 'cricket'
-            elif paths[-1] == 'bbl':
-                sport = 'bigbashleaguet20'
-            elif paths[-1] == 'lpl':
-                sport = 'lankapremierleaguet20'
-            elif paths[-1] == 'supersmasht20':
-                sport = 'supersmasht20'
-            elif paths[-1] == 'sa20':
-                sport = 'cricket'
-        elif 'motorsports' in paths:
-            if paths[-1] == 'motorsports':
-                sport = 'racing'
-            elif paths[-1] == 'nascar-two':
-                sport = 'nascar2'
-            else:
-                sport = paths[-1]
-                # TODO: indycar and moto-gp use different page format - need to scrape the links from the page
-        else:
-            sport = paths[-1]
-        feed_id = next((it['feedId'] for it in config_json['configs']['SportsPage/default']['properties']['superFeedIds'] if (it.get('league') == sport or it.get('sport') == sport)), None)
-        if not feed_id:
-            logger.warning('unknown feedId for ' + args['url'])
-            return None
-        card_config = config_json['configs']['GridViewFeed/default']['properties']['riverSectionCardProviderConfig']['initialRequest']
-        feed_url = 'https://assets.msn.com/service/news/feed/pages/ntpxfeed?User=m-{}&apikey={}&audienceMode=adult&cm={}&contentType={}&interestids={}&memory=8&newsSkip=0&newsTop=48&ocid={}&timeOut={}'.format(
-            client_settings['fd_muid'],
-            card_config['apiKey'],
-            locale,
-            card_config['contentType'],
-            feed_id,
-            card_config['ocid'],
-            card_config['timeoutMs']
-        )
-    elif len(paths) > 0 and paths[1] == 'video':
-        card_config = config_json['configs']['Watch/windows']['properties']['riverSectionCardProviderConfig']['initialRequest']
-        feed_url = 'https://assets.msn.com/service/MSN/Feed/me?$top={}&DisableTypeSerialization=true&apikey={}&cm={}&contentType={}&location={}&query={}&queryType={}&responseSchema=cardview&timeOut={}&wrapodata=false'.format(
-            card_config['count'],
-            api_key,
-            locale,
-            card_config['contentType'],
-            location,
-            card_config['query'],
-            card_config['queryType'],
-            card_config['timeoutMs']
-        )
-    else:
-        for key, val in config_json['configs'].items():
-            if key.startswith('River/') or key.startswith('StripeFeed/default'):
-                if val['properties'].get('cardProviderConfig'):
-                    card_config = val['properties']['cardProviderConfig']['initialRequest']
-                    feed_url = 'https://assets.msn.com/service/MSN/Feed?$top={}&DisableTypeSerialization=true&apikey={}&cipenabled={}&cm={}&ids={}&location={}&infopaneCount={}&ocid={}&queryType=myfeed&responseSchema=cardview&timeOut={}&wrapodata=false'.format(
-                        card_config['count'],
-                        api_key,
-                        str(card_config['complexInfopaneEnabled']),
-                        locale,
-                        card_config['feedId'],
-                        location,
-                        card_config['infopaneItemCount'],
-                        card_config['ocid'],
-                        card_config['timeoutMs'])
-            elif key.startswith('StripeView/default'):
-                for k, v in val['properties']['staticStripeExperiences'].items():
-                    if v.get('feedId'):
-                        if config_json['configs'].get('StripeFeed/' + v['configRef']['instanceSrc']):
-                            card_config = config_json['configs']['StripeFeed/' + v['configRef']['instanceSrc']]['properties']['cardProviderConfig']['initialRequest']
-                            feed_url = 'https://assets.msn.com/service/MSN/Feed?$top={}&DisableTypeSerialization=true&apikey={}&cipenabled={}&cm={}&ids={}&location={}&infopaneCount={}&ocid={}&queryType=myfeed&responseSchema=cardview&timeOut={}&wrapodata=false'.format(
-                                card_config['count'],
-                                api_key,
-                                str(card_config['complexInfopaneEnabled']),
-                                locale,
-                                v['feedId'],
-                                location,
-                                card_config['infopaneItemCount'],
-                                card_config['ocid'],
-                                card_config['timeoutMs'])
-
-    if not feed_url:
-        logger.warning('unhandled page feed in ' + args['url'])
-        return None
-
-    urls = []
-    feed_json = utils.get_url_json(feed_url)
-    if not feed_json:
-        return None
-    if save_debug:
-        utils.write_file(feed_json, './debug/feed.json')
-
-    def iter_cards(cards):
-        nonlocal urls
-        for card in cards:
-            if card.get('subCards'):
-                iter_cards(card['subCards'])
-            elif card.get('url'):
-                urls.append(card['url'])
-            else:
-                logger.debug('skipping card type ' + card['type'])
-    if feed_json.get('sections'):
-        for section in feed_json['sections']:
-            iter_cards(section['cards'])
-    else:
-        iter_cards(feed_json['subCards'])
-
-    feed_items = []
-    for url in urls:
-        if 'www.msn.com' in url:
-            if save_debug:
-                logger.debug('getting content for ' + url)
-            item = get_content(url, args, site_json, save_debug)
-        else:
-            logger.debug('skipping url ' + url)
+def get_card_items(cards, args, site_json, save_debug):
+    card_items = []
+    for card in cards:
+        if card.get('subCards'):
+            return get_card_items(card['subCards'], args, site_json, save_debug)
+        elif not card.get('type'):
             continue
-        if item:
-            if utils.filter_item(item, args) == True:
-                feed_items.append(item)
+        elif card['type'] == 'nativead' or card['type'] == 'infopane' or card['type'] == 'placeholder':
+            continue
+        elif card['type'] == 'article' or card['type'] == 'video' or card['type'] == 'slideshow':
+            card_url = 'https://www.msn.com/' + card['locale'] + '/' + card['id']
+            if save_debug:
+                logger.debug('getting content for ' + card_url)
+            item = get_content(card_url, args, site_json, save_debug)
+            if item:
+                card_items.append(item)
+        else:
+            logger.warning('unhandled card type ' + card['type'])
+    return card_items
 
+
+def get_section_items(sections, args, site_json, save_debug):
+    section_items = []
+    for section in sections:
+        if section.get('cards'):
+            section_items += get_card_items(section['cards'], args, site_json, save_debug)
+        elif section.get('subSections'):
+            section_items += get_section_items(section['subSections'], args, site_json, save_debug)
+    return section_items
+
+
+def get_feed(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    api_url = ''
+    # TODO: homepage
+    if 'source' in paths:
+        id = re.sub(r'^sr-', '', paths[-1])
+        api_url = 'https://assets.msn.com/service/news/feed/pages/providerfullpage?market={}&query=newest&CommunityProfileId={}&apikey=0QfOX3Vn51YCzitbLaRkTTBadtWpgTN8NZLW0C1SEM'.format(paths[0], id)
+    elif 'topic' in paths:
+        id = re.sub(r'^tp-', '', paths[-1])
+        api_url = 'https://assets.msn.com/service/news/feed/pages/channelfeed?InterestIds={}&apikey=0QfOX3Vn51YCzitbLaRkTTBadtWpgTN8NZLW0C1SEM&cm={}'.format(id, paths[0])
+    elif len(paths) == 1:
+        api_url = 'https://assets.msn.com/service/news/feed/pages/weblayout?apikey=0QfOX3Vn51YCzitbLaRkTTBadtWpgTN8NZLW0C1SEM&audienceMode=adult&cm=' + paths[0]
+    elif len(paths) == 0:
+        api_url = 'https://assets.msn.com/service/news/feed/pages/weblayout?apikey=0QfOX3Vn51YCzitbLaRkTTBadtWpgTN8NZLW0C1SEM&audienceMode=adult&cm=en-us'
+    if not api_url:
+        logger.warning('unhandled feed url ' + url)
+        return None
+
+    api_json = utils.get_url_json(api_url)
+    if not api_json:
+        return None
+
+    if save_debug:
+        utils.write_file(api_json, './debug/feed.json')
+    feed_items = get_section_items(api_json['sections'], args, site_json, save_debug)
     feed = utils.init_jsonfeed(args)
-    if config_json['configs'].get('EntryPoint/default'):
-        if config_json['configs']['EntryPoint/default']['properties'].get('initialPageTitle'):
-            feed['title'] = 'MSN | ' + config_json['configs']['EntryPoint/default']['properties']['initialPageTitle'].replace(' | MSN', '')
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed

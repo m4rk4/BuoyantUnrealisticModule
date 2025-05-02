@@ -37,9 +37,10 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt_loc = datetime.fromtimestamp(post_json['updatedOn']/1000)
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-    item['date_modified'] = dt.isoformat()
+    if post_json.get('updatedOn'):
+        dt_loc = datetime.fromtimestamp(post_json['updatedOn']/1000)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_modified'] = dt.isoformat()
 
     item['author'] = {
         "name": post_json['author']['displayName']
@@ -52,6 +53,8 @@ def get_content(url, args, site_json, save_debug=False):
         item['tags'] += post_json['categories']
     if post_json.get('tags'):
         item['tags'] += post_json['tags']
+    if len(item['tags']) == 0:
+        del item['tags']
 
     if post_json.get('assetUrl'):
         if post_json['assetUrl'].endswith('/'):
@@ -64,6 +67,10 @@ def get_content(url, args, site_json, save_debug=False):
     if post_json.get('excerpt'):
         soup = BeautifulSoup(post_json['excerpt'], 'html.parser')
         item['summary'] = soup.get_text()
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
 

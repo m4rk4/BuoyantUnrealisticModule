@@ -159,14 +159,15 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     if 'storytelling' in paths:
         logger.warning('unhandled storytelling content ' + url)
         return None
-    elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
-        return usatoday_sportswire.get_content(url, args, site_json, save_debug)
+    # elif tld.domain == 'usatoday' and re.search(r'ftw|wire$', tld.subdomain):
+    #     return usatoday_sportswire.get_content(url, args, site_json, save_debug)
 
     if tld.subdomain and tld.subdomain != 'www':
         article_url = '{}://www.{}.{}{}'.format(split_url.scheme, tld.domain, tld.suffix, split_url.path)
     else:
         article_url = url
     article_html = utils.get_url_html(article_url, user_agent='twitterbot')
+    # article_html = utils.get_url_html(article_url, use_curl_cffi=True, use_proxy=True)
     if not article_html:
         return None
     if save_debug:
@@ -237,15 +238,15 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         item['author']['name'] = article_json['source']
 
     item['tags'] = []
-    for it in article_json['tags']:
-        item['tags'].append(it['name'])
+    if article_json.get('tags'):
+        item['tags'] += [x['name'] for x in article_json['tags']]
 
     if article_json.get('links') and article_json['links'].get('photo') and article_json['links']['photo'].get('crops'):
         image = next((it for it in article_json['links']['photo']['crops'] if it['name'] == '16_9'), None)
         if image:
-            item['_image'] = image['path']
-    if not item.get('_image') and article_json.get('thumbnail'):
-        item['_image'] = article_json['thumbnail']
+            item['image'] = image['path']
+    if 'image' not in item and article_json.get('thumbnail'):
+        item['image'] = article_json['thumbnail']
 
     soup = BeautifulSoup(article_html, 'lxml')
     if site_json:
@@ -262,10 +263,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                 for el in utils.get_soup_elements(it, soup):
                     el.name = it['name']
 
-    if not item.get('_image'):
+    if 'image' not in item:
         el = soup.find('meta', attrs={"property": "og:image"})
         if el:
-            item['_image'] = el['content']
+            item['image'] = el['content']
 
     if article_json.get('hlsURL'):
         item['_video'] = article_json['hlsURL']
@@ -280,19 +281,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     item['summary'] = article_json['promoBrief']
 
     if article_json['type'] == 'video':
-        item['content_html'] = utils.add_video(item['_video'], item['_video_type'], item['_image'], item['title'], use_videojs=True)
+        item['content_html'] = utils.add_video(item['_video'], item['_video_type'], item['image'], item['title'], use_videojs=True)
         if 'embed' not in args and 'summary' in item:
             item['content_html'] += '<p>{}</p>'.format(item['summary'])
         return item
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     item['content_html'] = ''
@@ -316,13 +311,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             el.decompose()
 
         # Lead image
+        new_el = None
         el = soup.find(class_='gnt_em__fp')
         if not el:
             el = soup.find('h1', class_=re.compile(r'gnt_\w+_hl'))
             if el:
                 el = el.next_sibling
         if el:
-            new_el = None
             if el.name == 'figure':
                 img_src, caption = get_image(el)
                 if img_src.startswith(':'):
@@ -337,9 +332,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                         logger.warning('unhandled lede video in ' + item['url'])
                 elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
                     new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
-            if new_el:
-                article.insert(0, new_el)
-                el.decompose()
+        if new_el:
+            article.insert(0, new_el)
+            el.decompose()
+        elif 'image' in item:
+            new_html = utils.add_image(item['image'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            article.insert(0, new_el)
 
         # Images
         for el in article.find_all('figure', class_='gnt_em_img'):
@@ -357,7 +356,11 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             if it:
                 img_src = resize_image('{}://{}{}'.format(split_url.scheme, split_url.netloc, it['src']))
             else:
-                img_src, caption = get_image(el)
+                it = el.find('img', class_='gnt_em_gl_i')
+                if it:
+                    img_src = resize_image('{}://{}{}'.format(split_url.scheme, split_url.netloc, it['data-gl-src']))
+                else:
+                    img_src, caption = get_image(el)
             if not caption:
                 it = el.find('div', class_='gnt_em_t', attrs={"aria-label": True})
                 if it:
@@ -369,6 +372,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             if img_src:
                 if img_src.startswith(':'):
                     img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
+                img_src = config.server + '/image?url=' + quote_plus(img_src) + '&overlay=gallery'
                 new_html = utils.add_image(img_src, caption, link=gallery_url)
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -383,9 +387,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             el.decompose()
 
         for el in article.find_all('aside'):
+            print(str(el))
             new_html = ''
             if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
                 logger.debug('skipping aside ' + str(el['class']))
+                el.decompose()
+                continue
+            elif 'gnt_ar_b_sp' in el['class']:
                 el.decompose()
                 continue
             elif 'gnt_em_cp' in el['class'] and el['data-c-cta'] == 'DIG DEEPER':
@@ -418,7 +426,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                         new_html = utils.add_embed(it['data-v-pdfurl'])
                     else:
                         new_html = utils.add_embed('https://drive.google.com/viewerng/viewer?url=' + quote_plus(it['data-v-pdfurl']))
-            if 'gnt_em_gm' in el['class']:
+            elif 'gnt_em_gm' in el['class']:
                 # Google Map
                 print(el.iframe)
                 new_html = utils.add_embed(el.iframe['src'])
@@ -482,10 +490,10 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
 
         item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
 
-    if not item.get('_image'):
+    if 'image' not in item:
         el = article.find('img')
         if el:
-            item['_image'] = el['src']
+            item['image'] = el['src']
     return item
 
 

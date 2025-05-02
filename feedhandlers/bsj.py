@@ -64,7 +64,7 @@ def random_date(delta=None):
     random_second = randrange(abs(int_delta))
     if int_delta < 0:
         random_second = -random_second
-    rand_dt = datetime.utcnow() + timedelta(seconds=random_second)
+    rand_dt = datetime.now(timezone.utc) + timedelta(seconds=random_second)
     # format 2023-10-19T20:33:38.864Z
     return rand_dt.isoformat(timespec='milliseconds') + 'Z'
 

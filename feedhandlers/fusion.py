@@ -1,4 +1,4 @@
-import base64, hashlib, hmac, json, math, pytz, re
+import base64, hashlib, hmac, json, math, pytz, random, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlsplit, unquote_plus, quote_plus
@@ -65,9 +65,54 @@ def resize_image(image_item, site_json, width=1280):
         #resizer_hash = base64.b64encode(hashed.digest()).decode().replace('+', '-').replace('/', '_')
         resizer_hash = base64.urlsafe_b64encode(hashed.digest()).decode()
         img_src = '{}{}/{}{}'.format(site_json['resizer_url'], resizer_hash, operation_path, image_path)
+    elif '/gmg/' in image_item['url']:
+        split_url = urlsplit(image_item['url'])
+        paths = list(filter(None, split_url.path[1:].split('/')))
+        img_src = 'https://res.cloudinary.com/graham-media-group/image/upload/f_auto/q_auto/c_scale,w_{}/v1/media/gmg/{}?_a=DAJAUVWIZAAA'.format(width, paths[-1])
+    elif site_json.get('resizer_url') and ((image_item.get('additional_properties') and (image_item['additional_properties'].get('fullSizeResizeUrl') or image_item['additional_properties'].get('thumbnailResizeUrl') or image_item['additional_properties'].get('resizeUrl'))) or image_item.get('imageWebUrl') or image_item.get('resizer_url')):
+        for key in ['additional_properties/fullSizeResizeUrl', 'additional_properties/thumbnailResizeUrl', 'additional_properties/resizeUrl', 'imageWebUrl', 'resizer_url']:
+            keys = key.split('/')
+            if len(keys) == 2 and image_item.get(keys[0]) and image_item[keys[0]].get(keys[1]):
+                src = image_item[keys[0]][keys[1]]
+            elif len(keys) == 1 and image_item.get(key):
+                src = image_item[key]
+            else:
+                src = ''
+            if src:
+                split_url = urlsplit(src)
+                params = parse_qs(split_url.query)
+                if 'auth' in params:
+                    break
+        if 'auth' in params:
+            img_src = site_json['resizer_url'] + split_url.path + '?auth=' + params['auth'][0] + '&width=' + str(width) + '&quality=80&smart=true'
+        elif image_item.get('auth') and image_item['_id'] in image_item['url']:
+            auth = list(image_item['auth'].values())[0]
+            split_url = urlsplit(image_item['url'])
+            paths = list(filter(None, split_url.path[1:].split('/')))
+            img_src = site_json['resizer_url'] + site_json['resizer_path'] + paths[-1] + '?auth=' + auth + '&width=' + str(width) + '&quality=80&smart=true'
+        else:
+            logger.warning('fullSizeResizeUrl image without auth ' + image_item['_id'])
+            img_src = image_item['url']
     elif image_item.get('auth'):
-        paths = list(filter(None, urlsplit(image_item['url']).path[1:].split('/')))
-        img_src = '{}/{}?auth={}&smart=true&width={}&quality=85'.format(site_json['resizer_url'], paths[-1], image_item['auth']['1'], width)
+        auth = list(image_item['auth'].values())[0]
+        img_src = site_json['resizer_url'] + site_json['resizer_path'] + quote_plus(image_item['url']) + '?auth=' + auth + '&width=' + str(width) + '&quality=80&smart=true'
+    elif image_item.get('resized_obj'):
+        images = []
+        for key, val in image_item['resized_obj'].items():
+            split_url = urlsplit(val['src'])
+            params = parse_qs(split_url.query)
+            if 'auth' in params:
+                img_src = site_json['resizer_url'] + split_url.path + '?auth=' + params['auth'][0] + '&width=' + str(width) + '&quality=80&smart=true'
+                break
+            elif 'width' in params:
+                image = {
+                    "width": int(params['width'][0]),
+                    "src": val['src']
+                }
+                images.append(image)
+        if not img_src and images:
+            image = utils.closest_dict(images, 'width', width)
+            img_src = image['src']
     elif image_item.get('renditions'):
         images = []
         for key, val in image_item['renditions']['original'].items():
@@ -89,9 +134,9 @@ def process_content_element(element, url, site_json, save_debug):
     element_html = ''
     if element['type'] == 'text' or element['type'] == 'paragraph':
         # Filter out ad content
-        if not re.search(r'adsrv|amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|nflshop\.com', element['content'], flags=re.I):
+        if not re.search(r'adsrv|amzn\.to|fanatics\.com|joinsubtext\.com|lids\.com|nflshop\.com|^<b>\[DOWNLOAD:\s*</b>|^<b>\[SIGN UP:\s*</b>|^<b>Read:\s*</b>|/live-breaking/.*STREAM|/our-apps/.*instructions', element['content'], flags=re.I):
             content = re.sub(r'href="/', 'href="https://{}/'.format(split_url.netloc), element['content'])
-            element_html += '<p>{}</p>'.format(content)
+            element_html += '<p>' + content + '</p>'
 
     elif element['type'] == 'raw_html':
         # Filter out ad content
@@ -102,7 +147,7 @@ def process_content_element(element, url, site_json, save_debug):
                 el.attrs = {}
                 el['href'] = link
             element_html = str(raw_soup)
-        elif element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com', element['content'], flags=re.I):
+        elif element['content'].strip() and not re.search(r'adiWidgetId|adsrv|amzn\.to|EMAIL/TWITTER|fanatics\.com|joinsubtext\.com|lids\.com|link\.[^\.]+\.com/s/Newsletter|mass-live-fanduel|nflshop\.com|\boffer\b|subscriptionPanel|tarot\.com|mailto:newsdesk\@nzme', element['content'], flags=re.I):
             if element['content'].startswith('%3C'):
                 raw_soup = BeautifulSoup(unquote_plus(element['content']).strip(), 'html.parser')
             else:
@@ -200,7 +245,17 @@ def process_content_element(element, url, site_json, save_debug):
         elif element['subtype'] == 'video' and element['embed']['config'].get('contentUrl') and 'jwplayer' in element['embed']['config']['contentUrl']:
             element_html += utils.add_embed(element['embed']['config']['contentUrl'])
         elif element['subtype'] == 'videoplayer' and element['embed']['config'].get('videoCode'):
-            element_html += utils.add_embed(element['embed']['config']['videoCode'])
+            if element['embed']['config']['videoCode'].startswith('http'):
+                element_html += utils.add_embed(element['embed']['config']['videoCode'])
+            elif element['embed']['config']['videoCode'].startswith('<script'):
+                m = re.search(r'src="([^"]+)', element['embed']['config']['videoCode'])
+                if m:
+                    element_html += utils.add_embed(m.group(1))
+            else:
+                logger.warning('unhandled custom_embed videoplayer videoCode')
+        elif element['subtype'] == 'jwplayer':
+            video_url = 'https://cdn.jwplayer.com/players/{}-{}.html'.format(element['embed']['config']['videoId'], element['embed']['config']['playerId'])
+            element_html += utils.add_embed(video_url)
         elif element['subtype'] == 'video_dm':
             element_html += utils.add_embed(element['embed']['config']['url'])
         elif element['subtype'] == 'oovvuu-video':
@@ -222,6 +277,11 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += utils.add_embed(video_json['playerScript'], video_args)
             else:
                 logger.warning('unhandled oovvuu-video custom-embed')
+        elif element['subtype'] == 'nzh_video':
+            video_url = site_json['api_url'] + 'full-content-by-id?query=%7B%22id%22%3A%22{}%22%2C%22site%22%3A%22{}%22%7D&d={}&mxId=00000000&_website={}'.format(element['embed']['id'], element['embed']['config']['website'], site_json['deployment'], element['embed']['config']['website'])
+            video_json = utils.get_url_json(video_url)
+            if video_json:
+                element_html += get_content_html(video_json, url, {"embed": True}, site_json, save_debug)
         elif element['subtype'] == 'Video Playlist':
             # https://www.atlantanewsfirst.com/2024/01/15/read-fulton-county-da-fani-willis-improper-relationship-charges/
             video_pls = utils.get_url_json('https://gray-config-prod.api.arc-cdn.net/video/v1/ans/playlists/findByPlaylist?name=' + quote_plus(element['embed']['id']))
@@ -257,37 +317,54 @@ def process_content_element(element, url, site_json, save_debug):
                     poster = video['promo_image']['url']
                     element_html += utils.add_video(stream['url'], stream_type, poster, video['headlines']['basic'])
         elif element['subtype'] == 'syncbak-graph-livestream':
-            # https://www.wbay.com/pf/api/v3/content/fetch/syncbak-default-request-placeholder?query=%7B%22excludeStreamUrls%22%3Atrue%2C%22queryString%22%3A%22%7B%5C%22query%5C%22%3A%5C%22%20query%20GrayWebAppsLiveChannelData(%20%24liveChannelId%3A%20ID!)%20%7B%20liveChannel%20(id%3A%20%24liveChannelId%2C%20orEquivalent%3A%20true)%7B%20id%20title%20description%20callsign%20listImages%20%7B%20type%20url%20size%20%7D%20posterImages%20%7B%20type%20url%20size%20%7D%20isNew%20type%20status%20onNow%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20onNext%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20isNielsenEnabled%20isClosedCaptionEnabled%20location%20networkAffiliation%20taxonomy%20%7B%20facet%20terms%20%7D%20%7D%20liveChannels%20%7B%20id%20title%20description%20callsign%20listImages%20%7B%20type%20url%20size%20%7D%20posterImages%20%7B%20type%20url%20size%20%7D%20isNew%20type%20status%20onNow%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20onNext%20%7B%20id%20title%20description%20episodeTitle%20tvRating%20startTime%20endTime%20duration%20isLooped%20isOffAir%20airDate%7D%20isNielsenEnabled%20isClosedCaptionEnabled%20location%20networkAffiliation%20taxonomy%20%7B%20facet%20terms%20%7D%20%7D%20%7D%5C%22%2C%5C%22variables%5C%22%3A%7B%5C%22liveChannelId%5C%22%3A%5C%229AsMpiBNm%5C%22%7D%7D%22%2C%22websiteOverride%22%3A%22wbay%22%7D&d=396&_website=wbay
-            # Need proper device_id
-            device_id = "Ic2CQjCXmyCaPFetDNFx_duwEX6SRTXKnpIND9lv2kgonDtpFp"
-            # device_id = ''
-            api_url = '{}syncbak-get-tokens?query=%7B%22deviceId%22:%22{}%22,%22queryString%22:%22%7B%5C%22query%5C%22:%5C%22+query+GrayWebAppsLiveChannelData($expirationSeconds:+Int,+$liveChannelId:+ID!)+%7B+liveChannel+(id:+$liveChannelId,+orEquivalent:+true)%7B+id+title+description+callsign+listImages+%7B+type+url+size+%7D+posterImages+%7B+type+url+size+%7D+isNew+type+status+onNow+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+onNext+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+isNielsenEnabled+isClosedCaptionEnabled+location+networkAffiliation+taxonomy+%7B+facet+terms+%7D+streamUrl(expiresIn:+$expirationSeconds)+%7D+liveChannels+%7B+id+title+description+callsign+listImages+%7B+type+url+size+%7D+posterImages+%7B+type+url+size+%7D+isNew+type+status+onNow+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+onNext+%7B+id+title+description+episodeTitle+tvRating+startTime+endTime+duration+isLooped+isOffAir+airDate%7D+isNielsenEnabled+isClosedCaptionEnabled+location+networkAffiliation+taxonomy+%7B+facet+terms+%7D+%7D+%7D%5C%22,%5C%22variables%5C%22:%7B%5C%22expirationSeconds%5C%22:300,%5C%22liveChannelId%5C%22:%5C%22{}%5C%22%7D%7D%22,%22websiteOverride%22:%22{}%22%7D&_website={}'.format(site_json['api_url'], device_id, element['embed']['config']['channelId'], element['embed']['config']['website'], element['embed']['config']['website'])
-            api_json = utils.get_url_json(api_url)
-            if api_json:
-                headers = {
-                    "accept": "application/json, text/plain, */*",
-                    "accept-language": "en-US,en;q=0.9",
-                    "api-token": api_json['apiToken'],
-                    "cache-control": "no-cache",
-                    "content-type": "application/json",
-                    "pragma": "no-cache",
-                    "query-signature-token": api_json['querySignatureToken'],
-                    "sec-ch-ua": "\"Chromium\";v=\"122\", \"Not(A:Brand\";v=\"24\", \"Microsoft Edge\";v=\"122\"",
-                    "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": "\"Windows\"",
-                    "sec-fetch-dest": "empty",
-                    "sec-fetch-mode": "cors",
-                    "sec-fetch-site": "cross-site",
-                    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
-                }
-                gql_json = utils.post_url('https://graphql-api.aws.syncbak.com/graphql', json_data=json.loads(api_json['query']), headers=headers)
-                if gql_json:
-                    utils.write_file(gql_json, './debug/video.json')
-                    if gql_json['data']['liveChannel'].get('streamUrl'):
-                        element_html += utils.add_video(gql_json['data']['liveChannel']['streamUrl'], 'application/x-mpegURL', gql_json['data']['liveChannel']['posterImages'][0]['url'], gql_json['data']['liveChannel']['title'])
-                    else:
-                        logger.warning('unable to get syncbak-graph-livestream streamUrl')
-                        element_html += utils.add_image(gql_json['data']['liveChannel']['posterImages'][0]['url'], 'Live stream: ' + gql_json['data']['liveChannel']['title'])
+            engine_js = utils.get_url_html('https://{}/pf/dist/engine/react.js?d=901&mxId=00000000'.format(urlsplit(site_json['api_url']).netloc, site_json['deployment']))
+            if engine_js:
+                for site in re.findall(r'\{e.exports=JSON.parse\(\'(.*?)\'\)\}', engine_js):
+                    if re.search(r'"siteShorthand":"{}"'.format(element['embed']['config']['website']), site):
+                        break
+                m = re.search(r'"appName":"([^"]+)', site)
+                if m:
+                    def device_id(e=21):
+                        t = ""
+                        r = e
+                        characters = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict"
+                        while r > 0:
+                            t += characters[int(64 * random.random())]
+                            r -= 1
+                        return t
+                    device_data = {
+                        "appName": m.group(1),
+                        "appPlatform": "web",
+                        "bundleId": "dev",
+                        "deviceId": device_id(50),
+                        "deviceType": 8
+                    }
+                    m = re.search(r'{}_ZEAM_TOKEN:"([^"]+)'.format(element['embed']['config']['website']), engine_js, flags=re.I)
+                    if m:
+                        headers = {
+                            "accept": "application/json",
+                            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+                            "api-device-data": base64.b64encode(json.dumps(device_data, separators=(',', ':')).encode()).decode(),
+                            "api-token": m.group(1),
+                            "content-type": "application/json",
+                            "priority": "u=1, i",
+                            "sec-ch-ua": "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
+                            "sec-ch-ua-mobile": "?0",
+                            "sec-ch-ua-platform": "\"Windows\"",
+                            "sec-fetch-dest": "empty",
+                            "sec-fetch-mode": "cors",
+                            "sec-fetch-site": "cross-site"
+                        }
+                        data = {
+                            "query": " query GrayWebAppsLiveChannelData($expirationSeconds: Int, $liveChannelId: ID!) { liveChannel (id: $liveChannelId, orEquivalent: true){ id title description callsign listImages { type url size } posterImages { type url size } isNew type status onNow { id title description episodeTitle tvRating startTime endTime duration isLooped isOffAir airDate} onNext { id title description episodeTitle tvRating startTime endTime duration isLooped isOffAir airDate} isNielsenEnabled isClosedCaptionEnabled location networkAffiliation taxonomy { facet terms } streamUrl(expiresIn: $expirationSeconds) } liveChannels { id title description callsign listImages { type url size } posterImages { type url size } isNew type status onNow { id title description episodeTitle tvRating startTime endTime duration isLooped isOffAir airDate} onNext { id title description episodeTitle tvRating startTime endTime duration isLooped isOffAir airDate} isNielsenEnabled isClosedCaptionEnabled location networkAffiliation taxonomy { facet terms } } }",
+                            "variables": {
+                                "expirationSeconds": 300,
+                                "liveChannelId": element['embed']['config']['channelId']
+                            }
+                        }
+                        video_json = utils.post_url('https://graphql-api.aws.syncbak.com/graphql', json_data=data, headers=headers)
+                        if video_json:
+                            element_html += utils.add_video(video_json['data']['liveChannel']['streamUrl'], 'application/x-mpegURL', video_json['data']['posterImages'][0]['url'], 'Live stream: ' + video_json['data']['title'])
         elif element['subtype'] == 'datawrapper':
             element_html += utils.add_embed(element['embed']['url'])
         elif element['subtype'] == 'flourish_visualisation':
@@ -435,8 +512,13 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'oembed_response':
         if element.get('subtype'):
-            if element['subtype'] == 'instagram' or element['subtype'] == 'spotify' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube':
-                element_html += utils.add_embed(element['referent']['id'])
+            if element['subtype'] == 'instagram' or element['subtype'] == 'spotify' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube' or element['subtype'] == 'facebook-post':
+                if element.get('referent'):
+                    element_html += utils.add_embed(element['referent']['id'])
+                elif element.get('raw_oembed'):
+                    element_html += utils.add_embed(element['raw_oembed']['_id'])
+                else:
+                    logger.warning('unhandled oembed_response subtype ' + element['subtype'])    
             else:
                 logger.warning('unhandled oembed_response subtype ' + element['subtype'])
         elif element['raw_oembed'].get('_id') and element['raw_oembed']['_id'].startswith('http'):
@@ -488,6 +570,9 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += '</table>'
 
     elif element['type'] == 'image':
+        if element['image_type'] == 'graphic' and re.search(r'Roku|Watch Anywhere', element['alt_text']):
+            # Skip
+            return ''
         img_src = resize_image(element, site_json)
         captions = []
         if element.get('credits_caption_display'):
@@ -524,7 +609,7 @@ def process_content_element(element, url, site_json, save_debug):
         caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
         link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
         if img_src:
-            element_html += utils.add_image(img_src, caption, link=link)
+            element_html += utils.add_image(img_src, caption, link=link, overlay=config.gallery_button_overlay)
 
     elif element['type'] == 'graphic':
         if element['graphic_type'] == 'image':
@@ -534,6 +619,13 @@ def process_content_element(element, url, site_json, save_debug):
             if element.get('byline'):
                 captions.append(element['byline'])
             element_html += utils.add_image(element['url'], ' | '.join(captions))
+        elif element.get('preview_image'):
+            captions = []
+            if element.get('title'):
+                captions.append(element['title'])
+            if element.get('byline'):
+                captions.append(element['byline'])
+            element_html += utils.add_image(element['preview_image']['url'], ' | '.join(captions), link=element['url'])
         else:
             logger.warning('unhandled graphic type {}'.format(element['graphic_type']))
 
@@ -638,11 +730,18 @@ def process_content_element(element, url, site_json, save_debug):
                 element_html += '<p>by {} (updated {})</p>'.format(byline, date)
             else:
                 element_html += '<p>updated {}</p>'.format(date)
-            element_html += get_content_html(element, url, site_json, save_debug)
+            element_html += get_content_html(element, url, {}, site_json, save_debug)
             element_html += '<div>&nbsp;</div><hr><div>&nbsp;</div>'.format(headline)
 
     elif element['type'] == 'link_list':
-        if element['subtype'] == 'key-moments':
+        if 'subtype' not in element and element['items'][0]['type'] == 'interstitial_link':
+            if element.get('title'):
+                element_html += '<h3>{}</h3>'.format(element['title'])
+            element_html += '<ul>'
+            for it in element['items']:
+                element_html += '<li><a href="{}" target="_blank">{}</a></li>'.format(it['url'], it['content'])
+            element_html += '</ul>'
+        elif element['subtype'] == 'key-moments' :
             if element.get('title'):
                 element_html += '<h3>{}</h3>'.format(element['title'])
             element_html += '<ul>'
@@ -654,7 +753,7 @@ def process_content_element(element, url, site_json, save_debug):
             if element.get('title'):
                 element_html += '<h3>{}</h3>'.format(element['title'])
             for it in element['items']:
-                element_html += '<div style="width:80%; margin-left:auto; margin-right:auto; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:180px; text-align: center; padding:0.5em; font-size:0.8em; color:white; background-color:#0072ed; border:1px solid #0072ed;">{}</span></a></div>'.format(it['url'], it['content'])
+                element_html += utils.add_button(it['url'], it['content'])
         elif element['subtype'] == 'link-list' or element['subtype'] == 'splash-story-bullet':
             pass
         else:
@@ -669,10 +768,24 @@ def process_content_element(element, url, site_json, save_debug):
     return element_html
 
 
-def get_content_html(content, url, site_json, save_debug):
+def get_content_html(content, url, args, site_json, save_debug):
     split_url = urlsplit(url)
     content_html = ''
-    if content['type'] == 'video':
+    if content['type'] == 'video' and content.get('brightcoveId'):
+        engine_js = utils.get_url_html('https://{}/pf/dist/engine/react.js?d=901&mxId=00000000'.format(urlsplit(site_json['api_url']).netloc, site_json['deployment']))
+        if engine_js:
+            video_url = 'https://players.brightcove.net/'
+            m = re.search(r'BC_ACCOUNT_ID:"([^"]+)"', engine_js)
+            if m:
+                video_url += m.group(1) + '/'
+                m = re.search(r'BC_PLAYER_ID:"([^"]+)"', engine_js)
+                if m:
+                    video_url += m.group(1) + '_default/index.html?videoId=' + content['brightcoveId']
+                    content_html += utils.add_embed(video_url)
+                    if 'embed' not in args and content.get('description'):
+                        content_html += '<p>' + content['description'] + '</p>'
+                    return content_html
+    elif content['type'] == 'video':
         streams_mp4 = []
         streams_ts = []
         for stream in content['streams']:
@@ -703,8 +816,10 @@ def get_content_html(content, url, site_json, save_debug):
             logger.warning('no handled streams found for video content in ' + url)
         return content_html
 
-    if content.get('subheadlines'):
-        content_html += '<p><em>{}</em></p>'.format(content['subheadlines']['basic'])
+    if content.get('subheadlines') and content['subheadlines'].get('basic'):
+        content_html += '<p><em>' + content['subheadlines']['basic'] + '</em></p>'
+    elif 'args' in site_json and 'add_subtitle' in site_json['args'] and content.get('description') and content['description'].get('basic'):
+        content_html += '<p><em>' + content['description']['basic'] + '</em></p>'
 
     if content.get('summary'):
         content_html += '<ul>'
@@ -719,14 +834,18 @@ def get_content_html(content, url, site_json, save_debug):
     if content.get('multimedia_main'):
         lead_image = content['multimedia_main']
     elif content.get('promo_items'):
-        if content['promo_items'].get('youtube'):
+        if content['promo_items'].get('video'):
+            content_html += process_content_element(content['promo_items']['video'], url, site_json, save_debug)
+        elif content['promo_items'].get('youtube'):
             content_html += utils.add_embed(content['promo_items']['youtube']['content'])
-        elif content['promo_items'].get('lead_art'):
+        elif content['promo_items'].get('lead_art') and content['promo_items']['lead_art'].get('subtype') != 'syncbak-graph-livestream':
             lead_image = content['promo_items']['lead_art']
         elif content['promo_items'].get('basic'):
             lead_image = content['promo_items']['basic']
         elif content['promo_items'].get('images'):
             lead_image = content['promo_items']['images'][0]
+    elif content.get('customVideo'):
+        content_html += process_content_element(content['customVideo'], url, site_json, save_debug)
     if lead_image and lead_image.get('_id') and content.get('content_elements'):
         for i in range(min(2, len(content['content_elements']))):
             if content['content_elements'][i]['_id'] == lead_image['_id']:
@@ -743,7 +862,14 @@ def get_content_html(content, url, site_json, save_debug):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
 
     if content.get('content_elements'):
-        for element in content['content_elements']:
+        skip_next = False
+        for n, element in enumerate(content['content_elements']):
+            if skip_next:
+                skip_next = False
+                continue
+            if element['type'] == 'text' and (element['content'] == '<b>TRENDING STORIES:</b>' or element['content'] == '<b>RELATED COVERAGE:</b>') and content['content_elements'][n + 1]['type'] == 'list':
+                skip_next = True
+                continue
             content_html += process_content_element(element, url, site_json, save_debug)
     if content.get('elements'):
         for element in content['elements']:
@@ -765,10 +891,17 @@ def get_content_html(content, url, site_json, save_debug):
         content_html += '<h3>Related Videos</h3>'
         for video in content['related_content']['videos']:
             caption = '<b>{}</b> &mdash; {}'.format(video['title'], video['description'])
+            if video['thumbnail'].get('renditions'):
+                poster = video['thumbnail']['renditions']['original']['480w']
+            elif video['thumbnail'].get('url'):
+                poster = video['thumbnail']['url']
+            else:
+                logger.warning('unknown video thumbnail for id ' + video['id'])
+                poster = ''
             if video['source'].get('mp4'):
-                content_html += utils.add_video(video['source']['mp4'], 'video/mp4', video['thumbnail']['renditions']['original']['480w'], caption)
+                content_html += utils.add_video(video['source']['mp4'], 'video/mp4', poster, caption)
             elif video['source'].get('hls'):
-                content_html += utils.add_video(video['source']['hls'], 'application/x-mpegURL', video['thumbnail']['renditions']['original']['480w'], caption)
+                content_html += utils.add_video(video['source']['hls'], 'application/x-mpegURL', poster, caption)
             else:
                 logger.warning('unhandled related content video in ' + url)
 
@@ -985,10 +1118,11 @@ def get_item(content, url, args, site_json, save_debug):
         item['content_html'] += '</div>'
         return item
     else:
-        item['content_html'] = get_content_html(content, url, site_json, save_debug)
+        item['content_html'] = get_content_html(content, url, args, site_json, save_debug)
 
     if content.get('label') and content['label'].get('read_it_at_url'):
         item['content_html'] += utils.add_embed(content['label']['read_it_at_url']['text'])
+
     return item
 
 
@@ -1030,9 +1164,9 @@ def get_content(url, args, site_json, save_debug=False):
             query = query.replace('"ALL_PATHS"', json.dumps({"all": paths}).replace(' ', ''))
             api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['story']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
         else:
-            if '/galleries/' in split_url.path and 'gallery' in site_json:
+            if 'galleries' in paths and 'gallery' in site_json:
                 # https://www.cleveland.com/galleries/MWY2D3UWRRC6HMDMV6KQWI6ACM/
-                query = re.sub(r'\s', '', json.dumps(site_json['gallery']['query'])).replace('PATH', path)
+                query = re.sub(r'\s', '', json.dumps(site_json['gallery']['query'])).replace('PATH', path).replace('ID', paths[-1])
                 api_url = '{}{}'.format(site_json['api_url'], site_json['gallery']['source'])
             else:
                 query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
@@ -1262,3 +1396,11 @@ def get_feed(url, args, site_json, save_debug=False):
         feed['title'] = feed_title
     feed['items'] = items.copy()
     return feed
+
+
+
+# TODO:
+# custom_embed video clip:
+#   https://www.clickorlando.com/news/local/2025/04/29/mount-doras-starry-night-home-gets-fresh-coat-of-paint-new-symbol-for-autism-awareness/
+#   https://www.local10.com/news/local/2025/04/29/watch-live-broward-superintendent-gives-update-after-2nd-weapon-found-at-miramar-high-school/
+#   https://www.clickondetroit.com/news/local/2025/04/30/detroit-strip-club-shut-down-over-video-of-kids-partying-inside-police-say/

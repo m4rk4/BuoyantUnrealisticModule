@@ -20,8 +20,11 @@ def get_content(url, args, site_json, save_debug=False):
     else:
         split_url = urlsplit(url)
         paths = list(filter(None, split_url.path.split('/')))
+        if 'profile' not in paths:
+            logger.warning('unhandled url ' + url)
+            return None
         api_url = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at%3A%2F%2F{}%2Fapp.bsky.feed.post%2F{}'.format(quote_plus(paths[1]), paths[-1])
-    print(api_url)
+    # print(api_url)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None

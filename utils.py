@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
-import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, requests, secrets, string, time, tldextract
+import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, secrets, string, time, tldextract
+import curl_cffi, requests
 from browserforge.headers import HeaderGenerator
 from bs4 import BeautifulSoup
-from curl_cffi import requests as curl_cffi_requests
 from datetime import datetime, timedelta
 from duckduckgo_search import DDGS
+from markdown2 import markdown
 from PIL import ImageFile
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from requests.adapters import HTTPAdapter
@@ -250,7 +251,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
   r = None
   try:
     if use_curl_cffi:
-      r = curl_cffi_requests.get(url, impersonate=config.impersonate, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+      r = curl_cffi.get(url, impersonate=config.impersonate, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
     else:
       r = requests_retry_session(retries).get(url, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies, verify=verify)
     r.raise_for_status()
@@ -282,8 +283,8 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying curl_cffi')
       try:
-        r = curl_cffi_requests.get(url, impersonate=config.impersonate, proxies=config.proxies)
-        # r = curl_cffi_requests.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
+        r = curl_cffi.get(url, impersonate=config.impersonate, proxies=config.proxies)
+        # r = curl_cffi.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
         r.raise_for_status()
       except Exception as e:
         if r != None:
@@ -537,19 +538,19 @@ def post_url(url, data=None, json_data=None, headers=None, r_text=False, use_pro
     try:
       if data:
         if headers:
-          r = curl_cffi_requests.post(url, data=data, headers=headers, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, data=data, headers=headers, impersonate=config.impersonate, proxies=proxies)
         else:
-          r = curl_cffi_requests.post(url, data=data, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, data=data, impersonate=config.impersonate, proxies=proxies)
       elif json_data:
         if headers:
-          r = curl_cffi_requests.post(url, json=json_data, headers=headers, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, json=json_data, headers=headers, impersonate=config.impersonate, proxies=proxies)
         else:
-          r = curl_cffi_requests.post(url, json=json_data, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, json=json_data, impersonate=config.impersonate, proxies=proxies)
       else:
         if headers:
-          r = curl_cffi_requests.post(url, headers=headers, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, headers=headers, impersonate=config.impersonate, proxies=proxies)
         else:
-          r = curl_cffi_requests.post(url, impersonate=config.impersonate, proxies=proxies)
+          r = curl_cffi.post(url, impersonate=config.impersonate, proxies=proxies)
       r.raise_for_status()
     except requests.exceptions.HTTPError as e:
       status_code = e.response.status_code
@@ -604,12 +605,12 @@ def url_exists(url):
   except Exception as e:
     if e.__class__.__name__ == 'SSLError':
       try:
-        r = curl_cffi_requests.get(url, impersonate=config.impersonate, proxies=config.proxies)
+        r = curl_cffi.get(url, impersonate=config.impersonate, proxies=config.proxies)
         if r.status_code == 301 and r.headers.get('location'):
           r = requests.head(r.headers['location'], proxies=config.proxies)
         return r.status_code == requests.codes.ok
       except Exception as e:
-        logger.warning('curl_cffi_requests exception error {} getting {}'.format(e.__class__.__name__, url))
+        logger.warning('curl_cffi exception error {} getting {}'.format(e.__class__.__name__, url))
         return None
     logger.warning('requests exception error {} getting {}'.format(e.__class__.__name__, url))
     return None
@@ -838,7 +839,7 @@ def bs_get_inner_html(soup):
   # Also strips \n
   return re.sub(r'^<[^>]+>|<\/[^>]+>$|\n', '', str(soup))
 
-def add_blockquote(quote, pullquote_check=True, border_color='light-dark(#ccc, #333)'):
+def add_blockquote(quote, pullquote_check=True, border_color='light-dark(#ccc,#333)'):
   quote = html.unescape(quote.strip())
   # print(quote)
   if quote.startswith('<p'):
@@ -926,37 +927,80 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style=''):
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
+  fig_html = '<figure style="'
   if fig_style:
-    fig_html = '<figure style="{}">'.format(fig_style)
+    fig_html += fig_style
   else:
-    fig_html = '<figure style="margin:0; padding:0;">'
+    fig_html += 'margin:0; padding:0;'
+  fig_html += '">'
 
   if heading:
     fig_html += heading
     #fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
 
+  if overlay_heading:
+    fig_html += '<div style="position:relative;">'
+    fig_html += '<div style="position:absolute; z-index:2; top:0; left:0; right:0;">' + overlay_heading + '</div>'
+
+  if overlay or overlay_heading:
+    fig_html += '<div style="position:relative; z-index:1;">'
+
   if link:
     fig_html += '<a href="{}" target="_blank">'.format(link)
 
-  fig_html += '<img src="{}" loading="lazy" style="display:block; margin-left:auto; margin-right:auto;'.format(img_src)
+  style = 'display:block; margin-left:auto; margin-right:auto;'
   if width:
     if width != '0':
-      fig_html += ' width:{};'.format(width)
+      style += ' width:{};'.format(width)
   elif not re.search(r'width:\s?\d+', img_style):
-    fig_html += ' width:auto; max-width:100%;'
+    style += ' width:auto; max-width:100%;'
     #fig_html += ' width:100%;'
   if height:
     if height != '0':
-      fig_html += ' height:{};'.format(height)
+      style += ' height:{};'.format(height)
   else:
-    fig_html += ' max-height:800px;'
+    style += ' max-height:800px;'
   if img_style:
-    fig_html += ' {}'.format(img_style)
-  fig_html += '"/>'
+    style += ' {}'.format(img_style)
+
+  if fallback_img:
+    fig_html += '<object data="{}" '.format(fallback_img)
+    if '.jpg' in fallback_img or '.jpeg' in fallback_img:
+      fig_html += 'type="image/jpeg"'
+    elif '.png' in fallback_img:
+      fig_html += 'type="image/png"'
+    elif '.webp' in fallback_img:
+      fig_html += 'type="image/webp"'
+    elif '.gif' in fallback_img:
+      fig_html += 'type="image/gif"'
+    else:
+      fig_html += 'type="image/jpeg"'
+    fig_html += ' style="{}">'.format(style)
+
+  fig_html += '<img src="{}" loading="lazy" style="{}"/>'.format(img_src, style)
+
+  if fallback_img:
+    fig_html += '</object>'
+
+  if overlay:
+    fig_html += '<div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'{}\') no-repeat center center;'.format(overlay['src'])
+    if overlay.get('size'):
+      fig_html += ' background-size:{};'.format(overlay['size'])
+    if overlay.get('opacity'):
+      fig_html += ' opacity:{};'.format(overlay['opacity'])
+    if overlay.get('filter'):
+      fig_html += ' filter:{};'.format(overlay['filter'])
+    fig_html += '"></div>'
 
   if link:
     fig_html += '</a>'
+
+  if overlay or overlay_heading:
+    fig_html += '</div>'
+
+  if overlay_heading:
+    fig_html += '</div>'
 
   if caption:
     if figcap_style:
@@ -970,6 +1014,153 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   fig_html += '</figure>'
   return fig_html
 
+
+def format_small_card(image_html, content_html, footer_html='', image_size='160px', content_style='', border=True, margin='2em auto 2em auto'):
+  # assumes a square image
+  # min-width = 2*w + 4
+  template_areas = "'image content'"
+  if footer_html:
+    template_areas += " 'footer footer'"
+  card_html = '<div style="display:grid; grid-template-areas:{}; grid-template-columns:{} auto; width:99%; min-width:324px; max-width:540px; margin:{};'.format(template_areas, image_size, margin)
+  if border:
+    card_html += ' border:1px solid light-dark(#333,#ccc); border-radius:10px;'
+  card_html += '">'
+
+  card_html += '<div style="grid-area:image; max-width:{}; aspect-ratio:1/1;">'.format(image_size) + image_html + '</div>'
+
+  card_html += '<div style="grid-area:content; min-width:128px;{}">'.format(content_style) + content_html + '</div>'
+
+  if footer_html:
+    card_html +=  '<div style="grid-area:footer; padding:8px;">' + footer_html + '</div>'
+
+  card_html += '</div>'
+  return card_html
+
+def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, border=True, desc='', use_video_js=True, margin='2em auto 2em auto'):
+  if small_poster == True or (audio_src and not poster) or (audio_src and show_poster == False):
+    w = '64px'
+  else:
+    w = '160px'
+
+  if border:
+    if desc:
+      border_style = ' border-radius:10px 0 0 0;'
+    else:
+      border_style = ' border-radius:10px 0 0 10px;'
+  else:
+    border_style = ''
+
+  audio_link = ''
+  if audio_src:
+    if audio_type == 'audio_link':
+      audio_link = '<a href="{}" target="_blank">'.format(audio_src)
+    elif use_video_js and audio_type != 'audio_redirect':
+      audio_link = '<a href="{}/videojs?src={}&type={}'.format(config.server, quote_plus(audio_src), quote_plus(audio_type))
+      if poster:
+        audio_link += '&poster=' + quote_plus(poster)
+      audio_link += '" target="_blank">'
+    elif audio_type == 'audio_redirect':
+      audio_link += '<a href="{}/audio?url={}" target="_blank">'.format(config.server, quote_plus(audio_src))
+    else:
+      audio_link += '<a href="{}" target="_blank">'.format(audio_src)
+
+  img = ''
+  if show_poster == True:
+    if poster:
+      img = '<img src="{}" style="width:100%; border-radius:10px 0 0 10px;">'.format(poster)
+    else:
+      img = '<div style="width:{0}; height:{0}; background-color:SlateGray; border-radius:10px 0 0 10px;"></div>'.format(w)
+
+  image_html = ''
+  if audio_link:
+    image_html += audio_link
+  if show_poster:
+    if poster:
+      image_html += '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; text-align:center;{}">'.format(poster, border_style)
+    else:
+      image_html += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center;{}">'.format(poster, border_style)
+  else:
+    image_html += '<div style="width:100%; height:100%; background-color:rgb(0,0,0,0); border-radius:50%; text-align:center;{}">'.format(poster, border_style)
+  if audio_link:
+    image_html += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span>'
+    if show_poster:
+      image_html += '<img src="{}" style="width:96px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(config.audio_button_overlay['src'])
+      if config.audio_button_overlay.get('opacity'):
+        image_html += ' opacity:{};'.format(config.audio_button_overlay['opacity'])
+      if config.audio_button_overlay.get('filter'):
+        image_html += ' filter:{};'.format(config.audio_button_overlay['filter'])
+      image_html += '">'
+    else:
+      image_html += '<img src="{}" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(config.audio_button_overlay['src'])
+      if config.audio_button_overlay.get('opacity'):
+        image_html += ' opacity:{};'.format(config.audio_button_overlay['opacity'])
+      if config.audio_button_overlay.get('filter'):
+        image_html += ' filter:{};'.format(config.audio_button_overlay['filter'])
+      image_html += '">'
+  image_html += '</div>'
+  if audio_link:
+    image_html += '</a>'
+
+  n = 0.0
+  content_html = ''
+  if title or author:
+    if title:
+      # Limit to 2 lines
+      content_html += '<div style="margin-top:0.2em; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;" title="{}">'.format(title)
+      n += 2.2
+      if title_url:
+        content_html += '<a href="{}">{}</a>'.format(title_url, title)
+      else:
+        content_html += title
+      content_html += '</div>'
+    if author:
+      content_html += '<div style="margin-top:0.3em; font-size:0.9em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;" title="{}">'.format(author)
+      n += 0.9*2.3
+      if author_url:
+        content_html += '<a href="{}">{}</a>'.format(author_url, author)
+      else:
+        content_html += author
+      content_html += '</div>'
+
+  has_duration = False
+  try:
+    # duration is an int or float
+    d = float(duration)
+    if d > 0:
+      has_duration = True
+  except:
+    # duration is string
+    d = -1
+    if len(duration) > 0:
+      has_duration = True
+
+  if date or has_duration:
+    # Limit to 1 line, position at bottom
+    content_html += '<div style="margin-top:auto; margin-bottom:0.2em; font-size:0.8em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+    n += 0.8
+    if date:
+      content_html += date
+    if date and has_duration:
+      content_html += '&nbsp;&bull;&nbsp;'
+    if has_duration:
+      if d > 0:
+        content_html += calc_duration(d)
+      else:
+        content_html += duration
+    content_html += '</div>'
+
+  if w == '64px':
+    height = 'max-height:' + str(math.ceil(n) + 1) + 'em;'
+  else:
+    height = 'height:160px;'
+  content_html = '<div style="display:flex; flex-direction:column; flex:1; justify-content:space-between; ' + height + ' padding-left:8px;">'  + content_html + '</div>'
+
+  if desc:
+    footer_html = desc
+  else:
+    footer_html = ''
+
+  return format_small_card(image_html, content_html, footer_html, image_size=w, border=border, margin=margin)
 
 def add_audio(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, desc='', use_video_js=True):
   audio_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
@@ -1013,7 +1204,8 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
   audio_html += '</div><div style="flex:2; min-width:256px;">'
 
   if title:
-    audio_html += '<div style="font-size:1.1em; font-weight:bold;">'
+    # Limit to 2 lines
+    audio_html += '<div style="font-size:1.1em; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">'
     if title_url:
       audio_html += '<a href="{}">{}</a>'.format(title_url, title)
     else:
@@ -1021,7 +1213,8 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     audio_html += '</div>'
 
   if author:
-    audio_html += '<div style="margin:4px 0 4px 0;">'
+    # Limit to 1 line
+    audio_html += '<div style="margin:4px 0 4px 0; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
     if author_url:
       audio_html += '<a href="{}">{}</a>'.format(author_url, author)
     else:
@@ -1059,7 +1252,7 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
   audio_html += '</div></div>'
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width=1280, height='', img_style='', fig_style='', heading='', desc='', use_videojs=False, use_proxy=False):
+def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='', fig_style='', heading='', desc='', use_videojs=False, use_proxy=False):
   video_type = video_type.lower()
 
   if use_proxy:
@@ -1100,22 +1293,33 @@ def add_video(video_url, video_type, poster='', caption='', width=1280, height='
     return '<p><em>Unable to embed video from <a href="{0}" target="_blank">{0}</a></em></p>'.format(video_url)
 
   if poster:
-    poster = '{}/image?url={}&width={}'.format(config.server, quote_plus(poster), width)
-    if height:
-      poster += '&height={}'.format(height)
-    poster += '&overlay=video'
+    if width or height:
+      poster = config.server + '/image?url=' + quote_plus(poster)
+      if width:
+        poster += '&width=' + str(width)
+      if height:
+        poster += '&height=' + str(height)
+    # poster += '&overlay=video'
   elif video_type == 'video/mp4':
-    poster = '{}/image?url={}&width={}&overlay=video'.format(config.server, quote_plus(video_url), width)
-  else:
-    poster = '{}/image?width={}'.format(config.server, width)
+    poster = config.server + '/image?url=' + quote_plus(video_url)
+    if width:
+      poster += '&width=' + str(width)
     if height:
-      poster += '&height={}'.format(height)
+      poster += '&height=' + str(height)
+  else:
+    poster = config.server + '/image'
+    if width:
+      poster += '?width=' + str(width)
+    else:
+      poster += '?width=1280'
+    if height:
+      poster += '&height=' + str(height)
     else:
       poster += '&height=720'
-    poster += '&overlay=video'
+    # poster += '&overlay=video'
 
-  #def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc=''):
-  return add_image(poster, caption, '', '', video_src, img_style, fig_style, heading, desc)
+  # def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
+  return add_image(poster, caption, '', '', link=video_src, img_style=img_style, fig_style=fig_style, heading=heading, desc=desc, overlay=config.video_button_overlay)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -1234,7 +1438,7 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
   graph_html += '</div>'
   return graph_html
 
-def add_button(link, text, button_color='light-dark(#ccc, #333)', text_color='white', center=True, border=True, border_color="black", font_size='1em'):
+def add_button(link, text, button_color='light-dark(#555, #ccc)', text_color='light-dark(white,black)', center=True, border=True, border_color="black", font_size='1em'):
   style = 'display:inline-block; min-width:180px; text-align:center; padding:0.5em; background-color:{}; color:{}; font-size:{}; border-radius:10px;'.format(button_color, text_color, font_size)
   if border:
     style += ' border:1px solid {};'.format(border_color)
@@ -1514,7 +1718,7 @@ def get_bing_cache(url, slug=-1, save_debug=False):
     "x-search-safesearch": "Moderate"
   }
   # bing_html = get_url_html(bing_url, headers=headers)
-  r = curl_cffi_requests.get(bing_url, impersonate=config.impersonate, proxies=config.proxies)
+  r = curl_cffi.get(bing_url, impersonate=config.impersonate, proxies=config.proxies)
   if r.status_code != 200:
     logger.warning('curl cffi requests error {} getting {}'.format(r.status_code, bing_url))
     return ''
@@ -1626,7 +1830,7 @@ def get_stock_price(stock_sym, stock_name):
   if stock_name:
     api_url = 'https://query2.finance.yahoo.com/v1/finance/search?q={}&lang=en-US&region=US&quotesCount=7&quotesQueryId=tss_match_phrase_query&multiQuoteQueryId=multi_quote_single_token_query&enableCb=false&enableNavLinks=true&enableCulturalAssets=true&enableNews=false&enableResearchReports=false&listsCount=2&recommendCount=6'.format(quote_plus(stock_name))
     # print(api_url)
-    r = curl_cffi_requests.get(api_url, impersonate="chrome", proxies=config.proxies)
+    r = curl_cffi.get(api_url, impersonate="chrome", proxies=config.proxies)
     if r.status_code == 200:
       api_json = r.json()
       # write_file(api_json, './debug/stock.json')
@@ -1658,7 +1862,7 @@ def get_stock_price(stock_sym, stock_name):
   for sym in symbols:
     api_url = 'https://query1.finance.yahoo.com/v8/finance/chart/{}?period1={}&period2={}&interval=1m&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US'.format(sym, int(dt1.timestamp()), int(dt2.timestamp()))
     # print(api_url)
-    r = curl_cffi_requests.get(api_url, impersonate="chrome", proxies=config.proxies)
+    r = curl_cffi.get(api_url, impersonate="chrome", proxies=config.proxies)
     if r.status_code == 200:
       api_json = r.json()
       # write_file(api_json, './debug/stock.json')
@@ -1834,3 +2038,98 @@ def get_datadome_cookie(website, dd_key):
     dd = r.json()
     return dd['cookie']
   return ''
+
+def get_dict_value_from_path(dict, path):
+  val = dict
+  for key in path:
+    try:
+      val = val[key]
+    except KeyError:
+      return None
+  return val
+
+
+def get_ai_summary(content_html, is_text=False, feature='overview', length='medium', lang='same-as-input'):
+  # https://decopy.ai/summarizer/
+  # feature = overview, main-points, faq
+  # length = short, medium, long
+  # lang = same-as-input, English, etc (search languageOptions)
+  if feature not in ['faq', 'main-points', 'overview']:
+    feature = 'overview'
+
+  summary = ''
+
+  if is_text:
+    content = content_html
+  else:
+    soup = BeautifulSoup(content_html, 'html.parser')
+    # for el in soup.find_all(['div', 'figure', 'table'], recursive=False):
+    #   el.decompose()
+    content = ''
+    for el in soup.find_all('p', recursive=False):
+      content += el.get_text() + '\r\n\r\n'
+
+  boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+  headers = {
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+    "content-type": "multipart/form-data; boundary=" + boundary,
+    "priority": "u=1, i",
+    "product-code": "067003",
+    "product-serial": "621da01dbe8455fd917ea80145967fbf",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site"
+  }
+  body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"mode\"\r\n\r\nSummary\r\n'
+  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"feature\"\r\n\r\n' + feature + '\r\n'
+  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"entertext\"\r\n\r\n' + content + '\r\n'
+  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n' + lang + '\r\n'
+  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"length\"\r\n\r\n' + length + '\r\n'
+  body += '--' + boundary + '--\r\n'
+  # print(body)
+  r = requests.post('https://api.decopy.ai/api/decopy/ai-summarizer/create-job', data=body, headers=headers)
+  if r.status_code != 200:
+    logger.warning('status error {} getting creating ai summary job'.format(r.status_code))
+    return summary
+  
+  job_json = r.json()
+  if job_json['code'] != 100000:
+    logger.warning('unhandled ai-summarizer code {}, message {}'.format(job_json['code'], job_json['message']['en']))
+    return ''
+
+  job_url = 'https://api.decopy.ai/api/decopy/ai-summarizer/get-job/' + job_json['result']['job_id']
+  headers = {
+    "accept": "text/event-stream",
+    "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+    "cache-control": "no-cache",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"Windows\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site"
+  }
+  r = requests.get(job_url, headers=headers, stream=True)
+  if r.status_code != 200:
+    logger.warning('status code {} getting job {}'.format(r.status_code, job_json['result']['job_id']))
+    return summary
+
+  for line in r.iter_lines():
+    if line:
+      s = line.decode('utf-8')
+      # print(s)
+      if s.startswith('data:'):
+        i = s.find('{')
+        if i > 0:
+          j = s.rfind('}') + 1
+          data = json.loads(s[i:j])
+          if data['state'] == 100000:
+            summary += data['data']
+
+  # result is markdown, covert to html
+  return markdown(summary)

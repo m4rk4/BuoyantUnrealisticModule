@@ -1,4 +1,4 @@
-import markdown2, pytz, re
+import json, markdown2, pytz, re
 import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -315,62 +315,44 @@ def get_content(url, args, site_json, save_debug=False):
                 item['_image'] = 'https://' + split_url.netloc + post_json['thumbnail']['ImageSharp_vertical']['images']['fallback']['src']
 
         item['content_html'] = ''
-        if item.get('_image'):
+        if '_image' in item:
             item['content_html'] += utils.add_image(item['_image'])
 
-        def render_mdx(mdx_str):
-            n = len(mdx_str)
-            m = re.search(r'^"([^"]+)"', mdx_str, flags=re.S)
-            if not m:
-                logger.warning('unknown mdx tag in ' + mdx_str)
-                return
-            tag = m.group(1)
-            end_tag = ''
-            mdx_html = ''
-            i = mdx_str.find(',') + 2
-            if mdx_str[i] == '{':
-                params = re.search(r'\{(.*?)\}(?=,|$)', mdx_str[i:], flags=re.S)
-            else:
-                params = re.search(r'([^,]+)', mdx_str[i:], flags=re.S)
-            if tag == 'a':
-                m = re.search(r'"href": "([^"]+)"', params.group(1), flags=re.S)
-                if m:
-                    mdx_html = '<a href="{}">'.format(m.group(1))
-                    end_tag = '</a>'
-                else:
-                    logger.warning('unknown link href in ' + mdx_str)
-            elif tag == 'img':
-                m = re.search(r'"src": "([^"]+)"', params.group(1), flags=re.S)
-                if m:
-                    # TODO: captions
-                    mdx_html = utils.add_image(m.group(1))
-                else:
-                    logger.warning('unknown img src in ' + mdx_str)
-            else:
-                mdx_html = '<{}>'.format(tag)
-                end_tag = '</{}>'.format(tag)
-            i += len(params.group(0))
-            while i < n and mdx_str[i] == ',':
-                i += 2
-                # print('value: ' + mdx_str[i:])
-                if mdx_str[i] == '"':
-                    val = re.search(r'"(.*?)"(?=,|\)|$)', mdx_str[i:], flags=re.S)
-                    if val:
-                        mdx_html += val.group(1).replace('\\u2019', '&#x2019')
-                elif mdx_str[i:i+3] == 'mdx':
-                    val = re.search(r'mdx\((.*)\)(?=,|\)|$)', mdx_str, flags=re.S)
-                    if val:
-                        mdx_html += render_mdx(val.group(1))
-                if val:
-                    i += len(val.group(0))
-                else:
-                    logger.warning('unknown value in ' + mdx_str[i:])
-                    break
-            mdx_html += end_tag
-            return mdx_html
+        # for mdx in re.findall(r'mdx\((\".*?)\)(?=, mdx\(\"|\);\n}\n;)', post_json['body'], flags=re.S):
+        #     item['content_html'] += render_mdx(mdx, 'https://' + split_url.netloc)
+        item['content_html'] += render_mdx_layout(post_json['body'], split_url.netloc, save_debug)
 
-        for mdx in re.findall(r'mdx\((\".*?)\)(?=, mdx\(\"|\);\n}\n;)', post_json['body'], flags=re.S):
-            item['content_html'] += render_mdx(mdx)
+    elif api_json['result']['data'].get('mdx'):
+        # https://ericmigi.com/blog/introducing-two-new-pebbleos-watches
+        item['id'] = api_json['result']['pageContext']['id']
+        item['url'] = url
+        item['title'] = api_json['result']['data']['mdx']['frontmatter']['title']
+
+        tz_loc = pytz.timezone(config.local_tz)
+        dt_loc = dateutil.parser.parse(api_json['result']['data']['mdx']['frontmatter']['date'])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        m = re.search(r'"lastEditedTime":\s*"([^"]+)', api_json['result']['data']['mdx']['body'])
+        if m:
+            dt = datetime.fromisoformat(m.group(1))
+            item['date_modified'] = dt.isoformat()
+
+        # TODO: author?
+        item['author'] = {
+            "name": split_url.netloc
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
+        if api_json['result']['data']['mdx']['frontmatter'].get('socialImage'):
+            item['_image'] = 'https://' + split_url.netloc + api_json['result']['data']['mdx']['frontmatter']['socialImage']
+
+        if api_json['result']['data']['mdx']['frontmatter'].get('subtitle'):
+            item['summery'] = api_json['result']['data']['mdx']['frontmatter']['subtitle']
+
+        item['content_html'] = render_mdx_layout(api_json['result']['data']['mdx']['body'], split_url.netloc, save_debug)
 
     elif api_json['result']['data'].get('essay'):
         # https://publicdomainreview.org/essays/
@@ -493,3 +475,197 @@ def get_feed(url, args, site_json, save_debug=False):
     feed['items'] = sorted(feed_items, key=lambda i: i['_timestamp'], reverse=True)
     return feed
 
+
+def parse_mdx_str(mdx_str):
+    # tag
+    m = re.search(r'mdx\("([^"]+)",\s+', mdx_str)
+    if not m:
+        return None
+    tag = m.group(1)
+    n = len(m.group(0))
+
+    # null or {params}
+    if mdx_str[n:].startswith('null'):
+        params = None
+        n += 4
+    elif mdx_str[n] == '{':
+        m = re.search(r'{\s*', mdx_str[n:])
+        n += len(m.group(0))
+        params = {}
+        while True:
+            m = re.search(r'"?([^:\"]+)"?:\s+', mdx_str[n:])
+            if m:
+                key = m.group(1)
+                n += len(m.group(0))
+                if mdx_str[n] == '{':
+                    params[key] = {}
+                    m = re.search(r'{\s*', mdx_str[n:])
+                    n += len(m.group(0))
+                    while True:
+                        m = re.search(r'"([^"]+)":\s?"([^"]+)"', mdx_str[n:])
+                        if m:
+                            k = m.group(1)
+                            v = m.group(2)
+                            params[key][k] = v
+                            # print(m.group(0))
+                            n += len(m.group(0))
+                            m = re.search(r',?\s*', mdx_str[n:])
+                            if m:
+                                n += len(m.group(0))
+                            if mdx_str[n] == '}':
+                                m = re.search(r'}\s+', mdx_str[n:])
+                                n += len(m.group(0))
+                                break
+                else:                            
+                    m = re.search(r'(null|true|false|"[^"]*"),?\s+', mdx_str[n:])
+                    if m:
+                        if m.group(1) == 'null':
+                            val = None
+                        elif m.group(1) == 'true':
+                            val = True
+                        elif m.group(1) == 'false':
+                            val = False
+                        else:
+                            val = m.group(1).strip('"')
+                        n += len(m.group(0))
+                        params[key] = val
+            if mdx_str[n] == '}':
+                n += 1
+                break
+
+    # content: missing, string, or mdx
+    content = []
+    while True:
+        # print(n, mdx_str[n:n+50])
+        if mdx_str[n] == ')':
+            n += 1
+            break
+        elif mdx_str[n] == ',':
+            m = re.search(r',\s*', mdx_str[n:])
+            n += len(m.group(0))
+            if mdx_str[n] == '"':
+                m = re.search(r'"(.*?)"(\)|,)', mdx_str[n:])
+                c = m.group(1).encode().decode('unicode-escape')
+                try:
+                    c = c.encode('utf-8').decode('utf-8')
+                except:
+                    c = c.encode('utf-16', 'surrogatepass').decode('utf-16')
+                content.append(c)
+                n += len(m.group(0)) - 1
+            elif mdx_str[n:n+3] == 'mdx':
+                c, x = parse_mdx_str(mdx_str[n:])
+                content.append(c)
+                n += x
+    # print(n)
+    return [tag, params, content], n
+
+
+def render_mdx_html(mdx):
+    mdx_html = '<' + mdx[0]
+    if mdx[1]:
+        for key, val in mdx[1].items():
+            if key == 'parentName' or not val:
+                continue
+            mdx_html += ' {}="'.format(key)
+            if isinstance(val, str):
+                mdx_html += val
+            elif isinstance(val, dict):
+                mdx_html += '; '.join([':'.join(list(x)) for x in val.items()])
+            mdx_html += '"'
+    mdx_html += '>'
+    if len(mdx) > 2:
+        for mdx_content in mdx[2:]:
+            for content in mdx_content:
+                if isinstance(content, str):
+                    mdx_html += content
+                else:
+                    mdx_html += render_mdx_html(content)
+    if mdx[0] != 'img' or mdx[0] != 'br' or mdx[0] != 'hr':
+        mdx_html += '</' + mdx[0] + '>'
+    return mdx_html
+
+
+def render_mdx_layout(mdx_body, netloc='', save_debug=False):
+    m = re.search(r'mdx\(".*\)', mdx_body, flags=re.S)
+    mdx_str = m.group(0)
+    n = 0
+    mdx_content = []
+    while True:
+        mdx, x = parse_mdx_str(mdx_str[n:])
+        mdx_content.append(mdx)
+        n += x
+        if mdx_str[n] == ',':
+            m = re.search(r',\s+', mdx_str[n:])                                                                                                                                                                                              
+            n += len(m.group(0))
+        else:
+            break
+
+    if save_debug:
+        utils.write_file(mdx_content, './debug/mdx.json')
+
+    mdx_layout = ''
+    for mdx in mdx_content:
+        mdx_layout += render_mdx_html(mdx)
+
+    if save_debug:
+        utils.write_file(mdx_layout, './debug/mdx.html')
+
+    soup = BeautifulSoup(mdx_layout, 'html.parser')
+
+    for el in soup.find_all(['img', 'source']):
+        if el['src'].startswith('/'):
+            el['src'] = 'https://' + netloc + el['src']
+
+    for el in soup.select('p:has(> img)'):
+        it = el.find_next_sibling()
+        if it and it.name == 'p' and it.get('classname') and 'caption' in it['classname']:
+            caption = it.decode_contents()
+            it.decompose()
+        else:
+            caption = ''
+        if el.a:
+            link = el.a['href']
+        else:
+            link = ''
+        new_html = utils.add_image(el.img['src'], caption, link=link)
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.select('a:has(> img)'):
+        it = el.find_next_sibling()
+        if it and it.name == 'p' and it.get('classname') and 'caption' in it['classname']:
+            caption = it.decode_contents()
+            it.decompose()
+        else:
+            caption = ''
+        link = el['href']
+        new_html = utils.add_image(el.img['src'], caption, link=link)
+        new_el = BeautifulSoup(new_html, 'html.parser')
+        el.replace_with(new_el)
+
+    for el in soup.find_all(attrs={"classname": "video-container"}):
+        new_html = ''
+        if el.source:
+            it = el.find_next_sibling()
+            if it and it.name == 'p' and it.get('classname') and 'caption' in it['classname']:
+                caption = it.decode_contents()
+                it.decompose()
+            else:
+                caption = ''
+            new_html = utils.add_video(el.source['src'], el.source['type'], '', caption, use_videojs=True)
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        else:
+            logger.warning('unhandled video-container')
+
+    for el in soup.find_all(attrs={"style": re.compile('justifyContent')}):
+        el['style'] = el['style'].replace('justifyContent', 'justify-content')
+
+    for el in soup.find_all('blockquote', recursive=False):
+        el['style'] = 'border-left:3px solid light-dark(#ccc, #333); margin:1.5em 10px; padding:0.5em 10px;'
+
+    for el in soup.find_all('hr', recursive=False):
+        el['style'] = 'margin:2em 0'
+
+    return str(soup)

@@ -1,7 +1,8 @@
 import json, re, requests
+import base64, curl_cffi, hashlib, pyotp, time
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import quote_plus, urlencode, urlsplit
 
 import config, utils
 
@@ -64,6 +65,24 @@ def get_key(file_id, save_debug=False):
         utils.write_file(cdrm_result, './debug/cdrm.json')
     key = cdrm_result['Message'].split(':')[1].strip()
     return key
+
+
+# https://github.com/jdemaeyer/spoqify/blob/master/spoqify/anonymization.py
+def _generate_totp(timestamp):
+    # via https://github.com/kunesj/holo-spotify-stats/blob/ebdcbbb22904946ec518cbf6cac74fec94a01f64/fetch_spotify_stats.py#L129
+    uint8_secret = bytearray([
+        53, 53, 48, 55, 49, 52, 53, 56, 53, 51, 52, 56, 55, 52, 57, 57, 53, 57,
+        50, 50, 52, 56, 54, 51, 48, 51, 50, 57, 51, 52, 55,
+    ])
+    secret = base64.b32encode(bytes(uint8_secret)).decode("ascii")
+    period = 30
+    return pyotp.hotp.HOTP(
+        s=secret,
+        digits=6,
+        digest=hashlib.sha1,
+    ).at(
+        int(timestamp / period),
+    )
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -180,59 +199,84 @@ def get_content(url, args, site_json, save_debug=False):
             logger.warning('unable to parse Spotify url ' + url)
             return None
 
-    # can get accessToken and clientId from https://open.spotify.com/get_access_token but would still need correlationId from the web page
-    # Top Songs - USA
-    page_html = utils.get_url_html('https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI', use_proxy=True, use_curl_cffi=True)
-    if not page_html:
-        page_html = utils.get_url_html(url, use_proxy=True, use_curl_cffi=True)
-        if not page_html:
-            return None
-    # utils.write_file(page_html, './debug/spotify-token.html')
-    soup = BeautifulSoup(page_html, 'lxml')
-    el = soup.find('script', id='session')
-    if not el:
-        logger.warning('unable to get Spotify authorization token')
-        return None
-    session_json = json.loads(el.string)
-    if save_debug:
-        logger.debug('Spotify accessToken ' + session_json['accessToken'])
-    access_token = session_json['accessToken']
+    # Find web-player.xxx.js and parse needed parameters
+    # Top Songs - USA playlist
+    r = curl_cffi.get('https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI', impersonate='chrome')
+    if r.status_code == 200:
+        soup = BeautifulSoup(r.text, 'lxml')
+        el = soup.find('script', id='appServerConfig')
+        if el:
+            params = json.loads(base64.b64decode(el.string).decode())
+            if params.get('correlationId'):
+                cid = params['correlationId']
+        el = soup.find('script', attrs={"src": re.compile(r'web-player/web-player')})
+        if el:
+            r = curl_cffi.get(el['src'], impersonate='chrome')
+            if r and r.status_code == 200:
+                web_player_js = r.text
+                m = re.search(r'buildVer:"([^"]+)', web_player_js)
+                if m:
+                    build_version = m.group(1)
+                m = re.search(r'buildDate:"([^"]+)', web_player_js)
+                if m:
+                    build_date = m.group(1)
+                m = re.search(r'clientVersion:"([^"]+)', web_player_js)
+                if m:
+                    client_version = m.group(1)
+                m = re.search(r'clientId:"([^"]+)', web_player_js)
+                if m:
+                    client_id = m.group(1)
 
-    client_token = None
-    el = soup.find('script', id='config')
-    if el:
-        config_json = json.loads(el.string)
-        client_data = {
-            "client_data": {
-                "client_version": "1.2.55.220.g964de25f",
-                "client_id": session_json['clientId'],
-                "js_sdk_data": {
-                    "device_brand": "unknown",
-                    "device_model": "unknown",
-                    "os": "windows",
-                    "os_version": "NT 10.0",
-                    "device_id": config_json['correlationId'],
-                    "device_type": "computer"
-                }
+    client_time = int(time.time() * 1000)
+    server_time = client_time // 1000
+    totp = _generate_totp(client_time / 1000)
+    params = {
+        "reason": "init",
+        "productType": "web-player",
+        "totp": totp,
+        "totpServer": totp,
+        "totpVer": 5,
+        "sTime": server_time,
+        "cTime": client_time,
+        "buildVer": build_version,
+        "buildDate": build_date
+    }
+    r = curl_cffi.get('https://open.spotify.com/get_access_token?' + urlencode(params), impersonate='chrome')
+    if not r or r.status_code != 200:
+        logger.warning('unable to get access token from https://open.spotify.com/get_access_token')
+        return None
+    access_data = r.json()
+    access_token = access_data['accessToken']
+
+    headers = {
+        "accept": "application/json",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "content-type": "application/json",
+        "priority": "u=1, i"
+    }
+    data = {
+        "client_data": {
+            "client_version": client_version,
+            "client_id": client_id,
+            "js_sdk_data": {
+                "device_brand": "unknown",
+                "device_model": "unknown",
+                "os": "windows",
+                "os_version": "NT 10.0",
+                "device_id": cid,
+                "device_type": "computer"
             }
         }
-        headers = {
-            "accept": "application/json",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "content-type": "application/json",
-            "priority": "u=1, i",
-            "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-site"
-        }
-        clienttoken = utils.post_url('https://clienttoken.spotify.com/v1/clienttoken', json_data=client_data, headers=headers)
-        if clienttoken and clienttoken['response_type'] == 'RESPONSE_GRANTED_TOKEN_RESPONSE':
-            if save_debug:
-                logger.debug('Spotify client-token ' + clienttoken['granted_token']['token'])
-            client_token = clienttoken['granted_token']['token']
+    }
+    r = curl_cffi.post('https://clienttoken.spotify.com/v1/clienttoken', json=data, impersonate='chrome', headers=headers)
+    if not r or r.status_code != 200:
+        logger.warning('unable to get client token from https://clienttoken.spotify.com/v1/clienttoken')
+        return None
+    client_data = r.json()
+    if client_data['response_type'] != 'RESPONSE_GRANTED_TOKEN_RESPONSE':
+        logger.warning('invalid clienttoken response_type ' + client_data['response_type'])
+        return None
+    client_token = client_data['granted_token']['token']
 
     headers = {
         "accept": "application/json",
@@ -248,19 +292,31 @@ def get_content(url, args, site_json, save_debug=False):
         "sec-fetch-dest": "empty",
         "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-site",
-        "spotify-app-version": "1.2.55.197.g9b096077"
+        "spotify-app-version": client_version
     }
 
     item = {}
     if content_type == 'track':
+        extensions = {}
+        m = re.search(r'(\d+):"xpui-routes-track-v2"', web_player_js)
+        if m:
+            m = re.search(r'{}:"([0-9a-f]+)"'.format(m.group(1)), web_player_js)
+            if m:
+                r = curl_cffi.get('https://open.spotifycdn.com/cdn/build/web-player/xpui-routes-track-v2.{}.js'.format(m.group(1)), impersonate='chrome')
+                if r and r.status_code == 200:
+                    m = re.search(r'"getTrack","query","([^"]+)', r.text)
+                    if m:
+                        extensions = {
+                            "persistedQuery": {
+                                "version": 1,
+                                "sha256Hash": m.group(1)
+                            }
+                        }
+        if not extensions:
+            logger.warning('unable to find getTrack persistedQuery hash')
+            return None
         variables = {
             "uri": "spotify:track:" + content_id
-        }
-        extensions = {
-            "persistedQuery": {
-                "version":1,
-                "sha256Hash":"5c5ec8c973a0ac2d5b38d7064056c45103c5a062ee12b62ce683ab397b5fbe7d"
-            }
         }
         api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getTrack&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
         api_json = utils.get_url_json(api_url, headers=headers)
@@ -301,17 +357,21 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] = utils.add_audio(playback_url, item['image'], item['title'], item['url'], artist, '', 'Released: ' + item['_display_date'], -1, audio_type)
 
     elif content_type == 'album':
+        m = re.search(r'"getAlbum","query","([^"]+)', web_player_js)
+        if not m:
+            logger.warning('unable to find getAlbum persistedQuery hash')
+            return None
+        extensions = {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": m.group(1)
+            }
+        }
         variables = {
             "uri": "spotify:album:" + content_id,
             "locale": "",
             "offset": 0,
             "limit": 50
-        }
-        extensions = {
-            "persistedQuery": {
-                "version":1,
-                "sha256Hash":"8f4cd5650f9d80349dbe68684057476d8bf27a5c51687b2b1686099ab5631589"
-            }
         }
         api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getAlbum&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
         api_json = utils.get_url_json(api_url, headers=headers)
@@ -359,16 +419,20 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '</div>'
 
     elif content_type == 'playlist':
+        m = re.search(r'"fetchPlaylist","query","([^"]+)', web_player_js)
+        if not m:
+            logger.warning('unable to find fetchPlaylist persistedQuery hash')
+            return None
+        extensions = {
+            "persistedQuery": {
+                "version": 1,
+                "sha256Hash": m.group(1)
+            }
+        }
         variables = {
             "uri": "spotify:playlist:" + content_id,
             "offset": 0,
             "limit": 25
-        }
-        extensions = {
-            "persistedQuery": {
-                "version":1,
-                "sha256Hash":"19ff1327c29e99c208c86d7a9d8f1929cfdf3d3202a0ff4253c821f1901aa94d"
-            }
         }
         api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=fetchPlaylist&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
         api_json = utils.get_url_json(api_url, headers=headers)
@@ -417,14 +481,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '</div>'
 
     elif content_type == 'show':
-        variables = {
-            "uri": "spotify:show:" + content_id
-        }
+        m = re.search(r'"queryShowMetadataV2","query","([^"]+)', web_player_js)
+        if not m:
+            logger.warning('unable to find queryShowMetadataV2 persistedQuery hash')
+            return None
         extensions = {
             "persistedQuery": {
-                "version":1,
-                "sha256Hash":"8ecbb8477e896c28ef9fd1afa521b253b2ab817387fd13f2be6cc8874bf2aa06"
+                "version": 1,
+                "sha256Hash": m.group(1)
             }
+        }
+        variables = {
+            "uri": "spotify:show:" + content_id
         }
         api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=queryShowMetadataV2&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
         api_json = utils.get_url_json(api_url, headers=headers)
@@ -476,14 +544,18 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += utils.add_audio(playback_url, '', episode['name'], utils.clean_url(episode['sharingInfo']['shareUrl']), '', '', utils.format_display_date(dt, False), episode['duration']['totalMilliseconds'] / 1000, audio_type, show_poster=False)
 
     elif content_type == 'episode':
-        variables = {
-            "uri": "spotify:episode:" + content_id
-        }
+        m = re.search(r'"getEpisodeOrChapter","query","([^"]+)', web_player_js)
+        if not m:
+            logger.warning('unable to find getEpisodeOrChapter persistedQuery hash')
+            return None
         extensions = {
             "persistedQuery": {
-                "version":1,
-                "sha256Hash":"64da4fea3a7c4f6bef79aa85b96ba995397b8866dfef5d9e455d1a161437c1c0"
+                "version": 1,
+                "sha256Hash": m.group(1)
             }
+        }
+        variables = {
+            "uri": "spotify:episode:" + content_id
         }
         api_url = 'https://api-partner.spotify.com/pathfinder/v1/query?operationName=getEpisodeOrChapter&variables=' + quote_plus(json.dumps(variables, separators=(',', ':'))) + '&extensions=' + quote_plus(json.dumps(extensions, separators=(',', ':')))
         api_json = utils.get_url_json(api_url, headers=headers)

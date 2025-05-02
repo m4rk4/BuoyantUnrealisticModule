@@ -151,7 +151,7 @@ def format_block(block, content, netloc):
     block_html = ''
     start_tag = ''
     end_tag = ''
-    dropcap = False
+    dropcap = ''
     if block['type'] == 'text':
         return block['data']
     elif block['type'] == 'tag':
@@ -162,9 +162,13 @@ def format_block(block, content, netloc):
 
         elif block['name'] == 'p':
             if block.get('attribs') and block['attribs'].get('class') and 'body-dropcap' in block['attribs']['class']:
-                dropcap = True
-                start_tag = '<p>'
-                end_tag = '</p><span style="clear:left;"></span>'
+                if not dropcap:
+                    dropcap = '<style>' + config.dropcap_style + '</style>'
+                    start_tag = dropcap
+                # dropcap = True
+                start_tag += '<p class="dropcap">'
+                # end_tag = '</p><span style="clear:left;"></span>'
+                end_tag = '</p>'
             elif block.get('attribs') and block['attribs'].get('class') and 'body-tip' in block['attribs']['class']:
                 start_tag = '<div style="font-weight:bold; padding:2em; border-top:1px solid black; border-bottom:1px solid black;">'
                 end_tag = '</div>'
@@ -326,15 +330,15 @@ def format_block(block, content, netloc):
             children_html += format_block(blk, content, netloc)
 
     block_html += start_tag
-    if dropcap:
-        if children_html.startswith('<'):
-            block_html += re.sub(r'^(<[^>]+>)(.)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>', children_html)
-        elif children_html.startswith('“'):
-            block_html += '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(children_html[:2], children_html[2:])
-        else:
-            block_html += '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(children_html[0], children_html[1:])
-    else:
-        block_html += children_html
+    # if dropcap:
+    #     if children_html.startswith('<'):
+    #         block_html += re.sub(r'^(<[^>]+>)(.)', r'\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>', children_html)
+    #     elif children_html.startswith('“'):
+    #         block_html += '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(children_html[:2], children_html[2:])
+    #     else:
+    #         block_html += '<span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}'.format(children_html[0], children_html[1:])
+    # else:
+    block_html += children_html
     block_html += end_tag
     return block_html
 
@@ -429,6 +433,8 @@ def get_gallery_content(soup, url, args, site_json, save_debug):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     page_html = utils.get_url_html(url)
+    if not page_html:
+        return None
     soup = BeautifulSoup(page_html, 'html.parser')
     el = soup.find('script', id='__NEXT_DATA__')
     if not el:

@@ -1204,6 +1204,9 @@ def get_content(url, args, site_json, save_debug=False):
                     elif 'barrons' in split_url.netloc:
                         # https://www.wsj.com/market-data/quotes/AAPL
                         el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.barrons.com/market-data/stocks/')
+                    elif 'marketwatch' in split_url.netloc:
+                        # https://www.marketwatch.com/investing/stock/AAPL
+                        el['href'] = el['href'].replace('https://www.mansionglobal.com/quote/', 'https://www.marketwatch.com/investing/stock/')
                     else:
                         logger.warning('unhandled stock quote link {} in {}'.format(el['href'], item['url']))
                     if el.get('class') and 'chiclet-wrapper' in el['class']:
@@ -1281,6 +1284,12 @@ def get_content(url, args, site_json, save_debug=False):
                             new_html = '<div>&nbsp;</div><div style="display:flex; align-items:center;"><a href="{0}"><img src="{1}/static/play_button-48x48.png"/></a><span>&nbsp;<a href="{0}">Listen to article</a> ({2})</span></div><div>&nbsp;</div>'.format(video_json['items'][0]['audioURL'], config.server, duration)
                 elif 'type-InsetPageRule' in el['class']:
                     new_html += '<div>&nbsp;</div><hr/><div>&nbsp;</div>'
+                elif 'type-InsetPullQuote' in el['class']:
+                    for it in el.find_all(class_=['l-qt', 'r-qt']):
+                        it.decompose()
+                    it = el.find('p', class_='pullquote-content')
+                    if it:
+                        new_html += utils.add_pullquote(it.decode_contents())
                 elif 'type-InsetRichText' in el['class']:
                     it = el.find('h4')
                     if it and re.search(r'MORE IN|SHARE YOUR THOUGHTS', it.get_text().strip()):

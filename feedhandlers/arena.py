@@ -572,7 +572,7 @@ def get_url_html(url, ddk='2AC20A4365547ED96AE26618B66966', ddv='4.38.0'):
     dd_cookie = m.group(1)
     print('datadome=' + dd_cookie)
     headers = fp.headers.copy()
-    headers['cookie'] = 'datadome=' + dd_cookie
+    headers['cookie'] = 'ArenaGeo=eyJjb3VudHJ5Q29kZSI6IlVTIiwicmVnaW9uQ29kZSI6Ik9IIiwiaW5FRUEiOmZhbHNlfQ==;datadome=' + dd_cookie
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
         print(r.status_code)

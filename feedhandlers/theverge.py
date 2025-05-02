@@ -137,8 +137,11 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyImageComparison':
         content_html += '<figure style="margin:0; padding:0;"><img loading="lazy" style="width:50%;" src="{}" /><img loading="lazy" style="width:50%;" src="{}" /><figcaption><small>{}</small></figcaption></figure>'.format(component['imageComparison']['firstImage']['asset']['url'], component['imageComparison']['secondImage']['asset']['url'], component['imageComparison']['caption']['html'])
 
-    elif component['__typename'] == 'EntryBodyGallery' or component['__typename'] == 'ImageSliderBlockType' or (component['__typename'] == 'EntryBodyImageGroup' and component.get('ImageGroupTwoUp')):
-        if component['__typename'] == 'EntryBodyGallery':
+    elif component['__typename'] == 'CoreGalleryBlockType' or component['__typename'] == 'EntryBodyGallery' or component['__typename'] == 'ImageSliderBlockType' or (component['__typename'] == 'EntryBodyImageGroup' and component.get('ImageGroupTwoUp')):
+        if component['__typename'] == 'CoreGalleryBlockType':
+            images = component['images']
+            gallery_title = 'View photo gallery'
+        elif component['__typename'] == 'EntryBodyGallery':
             images = component['gallery']['images']
             gallery_title = component['gallery']['title']
         elif component['__typename'] == 'ImageSliderBlockType':
@@ -173,6 +176,9 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyVideo' or component['__typename'] == 'EntryLeadVideo':
         content_html += add_video_embed(component['video']['uuid'])
 
+    elif component['__typename'] == 'LedeMediaVideoType':
+        content_html += add_video_embed(component['video']['volumeUuid'])
+
     elif component['__typename'] == 'EntryEmbed' or component['__typename'] == 'EntryBodyEmbed' or component['__typename'] == 'EntryLeadEmbed' or component['__typename'] == 'CoreEmbedBlockType':
         if component['__typename'] == 'EntryEmbed' or component['__typename'] == 'CoreEmbedBlockType':
             embed = component
@@ -194,7 +200,7 @@ def render_body_component(component):
                 content_html += utils.add_embed(soup.a['href'])
             elif provider == 'tiktok':
                 content_html += utils.add_embed(soup.blockquote['cite'])
-            elif provider == 'bluesky social':
+            elif provider == 'bluesky-social':
                 content_html += utils.add_embed(soup.blockquote['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('/app.bsky.feed.post/', '/post/'))
             elif provider == 'spotify' or provider == 'youtube':
                 content_html += utils.add_embed(soup.iframe['src'])
@@ -255,20 +261,24 @@ def render_body_component(component):
         dt = datetime.fromisoformat(component['entry']['publishDate'].replace('Z', '+00:00'))
         content_html += '<td><a href="{}"><b>{}</b></a><br/>by {}, {}</td></tr></table>'.format(component['entry']['url'], component['entry']['title'], component['entry']['author']['fullName'], utils.format_display_date(dt, False))
 
-    elif component['__typename'] == 'EntryBodyTable':
-        if component['table'].get('title'):
-            content_html += '<h3>{}</h3>'.format(component['table']['title'])
-        content_html += '<table style="width:100%; border:1px solid black;">'
-        if component['table'].get('columns'):
+    elif component['__typename'] == 'TableBlockType' or component['__typename'] == 'EntryBodyTable':
+        if component['__typename'] == 'EntryBodyTable':
+            table = component['table']
+        else:
+            table = component
+        if table.get('title'):
+            content_html += '<h3>{}</h3>'.format(table['title'])
+        content_html += '<table style="width:100%; border:1px solid light-dark(#ccc, #333);">'
+        if table.get('columns'):
             content_html += '<tr>'
-            for it in component['table']['columns']:
-                content_html += '<th>{}</th>'.format(it)
+            for it in table['columns']:
+                content_html += '<th style="padding: 4px 0 4px 0;">{}</th>'.format(it)
             content_html += '</tr>'
-        for i, row in enumerate(component['table']['rows']):
+        for i, row in enumerate(table['rows']):
             if i%2 == 0:
-                style = 'text-align:center; background-color:lightgray;'
+                style = 'text-align:center; background-color:light-dark(#ccc, #333); padding: 4px 0 4px 0;'
             else:
-                style = 'text-align:center;'
+                style = 'text-align:center; padding: 4px 0 4px 0;'
             content_html += '<tr>'
             for it in row:
                 content_html += '<td style="{}">{}</td>'.format(style, it)
@@ -333,24 +343,39 @@ def render_body_component(component):
         content_html += '</tr></table>'
 
     elif component['__typename'] == 'ProductBlockType':
-        content_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-        if component['product'].get('image'):
-            if component['product']['image']['thumbnails'].get('square') and component['product']['image']['thumbnails']['square'].get('url'):
-                content_html += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['square']['url'])
-            elif component['product']['image']['thumbnails'].get('horizontal') and component['product']['image']['thumbnails']['horizontal'].get('url'):
-                content_html += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['horizontal']['url'])
-        content_html += '<div style="flex:2; min-width:256px;">'
-        content_html += '<div style="font-size:1.05em; font-weight:bold;"><a href="{}" target="_blank">{}</a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['title'])
-        if component['product'].get('description') and component['product']['description'].get('html'):
-            content_html += '<div>' + component['product']['description']['html'] + '</div>'
-        # TODO: pros & cons
+        if component['product'].get('pros') and component['product']['pros'].get('html'):
+            content_html += '<div style="border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
+            if component['product']['image']['thumbnails'].get('horizontal') and component['product']['image']['thumbnails']['horizontal'].get('url'):
+                content_html += '<img src="{}" style="width:100%; border-radius:10px 10px 0 0;">'.format(component['product']['image']['thumbnails']['horizontal']['url'])
+            content_html += '<div style="padding:8px;"><h3 style="text-align:center;"><a href="{}" target="_blank">{}</a></h3>'.format(component['product']['bestRetailLink']['url'], component['product']['title'])
+            if component['product'].get('score'):
+                content_html += '<div style="font-size:1.2em; font-weight:bold; text-align:center; margin:0 0 1em 0;">Score: {}</div>'.format(component['product']['score'])
+            if component['product'].get('description') and component['product']['description'].get('html'):
+                content_html += '<div>' + component['product']['description']['html'] + '</div>'
+            content_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;"><div style="flex:1;">'
+            content_html += '<div><strong>The Good:</strong></div>' + component['product']['pros']['html']
+            content_html += '</div><div style="flex:1;">'
+            content_html += '<div><strong>The Bad:</strong></div>' + component['product']['cons']['html']
+            content_html += '</div></div>'
+        else:
+            content_html = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+            if component['product'].get('image'):
+                if component['product']['image']['thumbnails'].get('square') and component['product']['image']['thumbnails']['square'].get('url'):
+                    content_html += '<div style="flex:1; min-width:240px; max-width:640px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['square']['url'])
+                elif component['product']['image']['thumbnails'].get('horizontal') and component['product']['image']['thumbnails']['horizontal'].get('url'):
+                    content_html += '<div style="flex:1; min-width:240px; max-width:640px;"><a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['image']['thumbnails']['horizontal']['url'])
+            content_html += '<div style="flex:2; min-width:240px;">'
+            content_html += '<div style="font-size:1.05em; font-weight:bold; text-align:center;"><a href="{}" target="_blank">{}</a></div>'.format(component['product']['bestRetailLink']['url'], component['product']['title'])
+            if component['product'].get('description') and component['product']['description'].get('html'):
+                content_html += '<div>' + component['product']['description']['html'] + '</div>'
+
         for it in component['product']['retailLinks']:
             content_html += utils.add_button(it['url'], '${} at {}'.format(it['price'], it['retailer']))
         content_html += '</div></div><div>&nbsp;</div>'
 
     elif component['__typename'] == 'HighlightBlockType':
         # https://www.polygon.com/tabletop-games/464798/halo-flashpoint-review-mantic-miniatures-skirmish
-        content_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;>'
+        content_html = '<div style="width:90%; margin:auto; padding:8px; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
         for it in component['children']:
             content_html += render_body_component(it)
         content_html += '</div><div>&nbsp;</div>'
@@ -459,6 +484,12 @@ def get_item(entry_json, args, site_json, save_debug):
         item['image'] = entry_json['leadImage']['defaultImageUrl']
     elif entry_json.get('leadMedia') and entry_json['leadMedia'].get('image'):
         item['image'] = entry_json['leadMedia']['image']['thumbnails']['horizontal']['url']
+    elif entry_json.get('ledeMedia') and entry_json['ledeMedia'].get('image'):
+        item['image'] = entry_json['ledeMedia']['image']['thumbnails']['horizontal']['url']
+    elif entry_json.get('ledeMediaData') and entry_json['ledeMediaData'].get('image'):
+        item['image'] = entry_json['ledeMediaData']['image']['thumbnails']['horizontal']['url']
+    elif entry_json.get('featuredImage') and entry_json['featuredImage'].get('image'):
+        item['image'] = entry_json['featuredImage']['image']['originalUrl']
     elif entry_json.get('promoImage'):
         item['image'] = entry_json['promoImage']['variantUrl']
     elif entry_json.get('socialImage'):
@@ -466,10 +497,14 @@ def get_item(entry_json, args, site_json, save_debug):
 
     if entry_json.get('seoDescription'):
         item['summary'] = entry_json['seoDescription']['plaintext']
+    elif entry_json.get('seo') and entry_json['seo'].get('description'):
+        item['summary'] = entry_json['seo']['description']
     elif entry_json.get('promoDescription'):
         item['summary'] = entry_json['promoDescription']['plaintext']
     elif entry_json.get('socialDescription'):
         item['summary'] = entry_json['socialDescription']['plaintext']
+    elif entry_json.get('social') and entry_json['social']['description']:
+        item['summary'] = entry_json['social']['description']
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
@@ -478,9 +513,9 @@ def get_item(entry_json, args, site_json, save_debug):
     item['content_html'] = ''
     if entry_json.get('dek'):
         if entry_json['dek'].get('html'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(entry_json['dek']['html'])
+            item['content_html'] += '<p><em>' + entry_json['dek']['html'] + '</em></p>'
         elif entry_json['dek'].get('plaintext'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(entry_json['dek']['plaintext'])
+            item['content_html'] += '<p><em>' + entry_json['dek']['plaintext'] + '</em></p>'
 
     if entry_json.get('leadComponent'):
         item['content_html'] += render_body_component(entry_json['leadComponent'])

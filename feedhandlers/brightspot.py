@@ -492,6 +492,12 @@ def render_content(content, skip_promos=True):
                 paths = list(filter(None, urlsplit(m.group(1)).path[1:].split('/')))
                 link = 'https://www.emailmeform.com/builder/embed/' + paths[-1]
                 content_html += '<blockquote><b>Embedded content from <a href="{0}">{0}</a></b></blockquote>'.format(link)
+            elif 'pym.nprapps.org/npr-pym-loader' in content['html']:
+                m = re.search(r'data-child-src="([^"]+)', content['html'])
+                if m:
+                    content_html += utils.add_image(config.server + '/screenshot?cropbbox=1&url=' + quote_plus(m.group(1)), link=m.group(1))
+                else:
+                    logger.warning('unhandled PymInteractive content')
             elif content['html'].startswith('<iframe'):
                 m = re.search(r'src="([^"]+)"', content['html'])
                 content_html += utils.add_embed(m.group(1))

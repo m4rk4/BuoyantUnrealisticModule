@@ -350,6 +350,10 @@ def get_content(url, args, site_json, save_debug=False):
     if meta:
         item['summary'] = meta['content']
 
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+
     item['content_html'] = ''
     if page_json.get('subtitle'):
         item['content_html'] += '<p><em>{}</em></p>'.format(page_json['subtitle'])
