@@ -135,7 +135,7 @@ def get_post(post_json, args, site_json, save_debug):
             item['attachments'] = []
             item['attachments'].append(attachment)
             # TODO: podcast name & url
-            item['content_html'] += utils.add_audio(item['_audio'], post_json['cover_image'], item['title'], item['url'], '', '', utils.format_display_date(datetime.fromisoformat(post_json['podcastUpload']['uploaded_at']), False), post_json['podcastUpload']['duration'])
+            item['content_html'] += utils.add_audio(item['_audio'], post_json['cover_image'], item['title'], item['url'], '', '', utils.format_display_date(datetime.fromisoformat(post_json['podcastUpload']['uploaded_at']), date_only=True), post_json['podcastUpload']['duration'])
 
     if post_json.get('body_html'):
         # utils.write_file(post_json['body_html'], './debug/debug.html')
@@ -175,7 +175,7 @@ def get_post(post_json, args, site_json, save_debug):
                 it = el.find_next_sibling()
                 if it and it.name == 'blockquote':
                     new_html += '<div>&nbsp;</div><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(data_json['canonical_url'], data_json['title'])
-                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), False))
+                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), date_only=True))
                     new_html += utils.add_image(data_json['cover_image'])
                     new_html += utils.add_blockquote(it.decode_contents(), False)
                     it.decompose()
@@ -183,7 +183,7 @@ def get_post(post_json, args, site_json, save_debug):
                     new_html += '<div>&nbsp;</div><div style="display:flex; flex-wrap:wrap; gap:1em;">'
                     new_html += '<div style="flex:1; min-width:128px;"><a href="{}"><img src="{}" style="width:100%;" /></a></div>'.format(data_json['canonical_url'], data_json['cover_image'])
                     new_html += '<div style="flex:2; min-width:320px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(data_json['canonical_url'], data_json['title'])
-                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), False))
+                    new_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)), utils.format_display_date(datetime.fromisoformat(data_json['post_date']), date_only=True))
                     new_html += '<p><a href="{}" style="text-decoration:none;">Read full story &rarr;</a></p></div></div>'.format(data_json['canonical_url'])
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -368,7 +368,7 @@ def get_post(post_json, args, site_json, save_debug):
                     authors.append(it['name'])
                 new_html = '<div style="margin-left:5%; margin-right:5%; padding:8px; border:1px solid black; border-radius:10px;"><div><a href="{}://{}"><img src="{}" style="float:left; width:48px;"/><span style="font-size:1.1em; font-weight:bold;">{}</span></a></div><div style="clear:left;"></div><hr/>'.format(split_data_url.scheme, split_data_url.netloc, data_json['publication_logo_url'], data_json['publication_name'])
                 new_html += '<div style="padding:8px;"><h4><a href="{}">{}</a></h4>{}</div><hr/>'.format(data_json['url'], data_json['title'], data_json['truncated_body_text'])
-                new_html += '<div style="padding:8px;">{} &bull; {}</div></div>'.format(utils.format_display_date(dt, False), re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
+                new_html += '<div style="padding:8px;">{} &bull; {}</div></div>'.format(utils.format_display_date(dt, date_only=True), re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)))
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()

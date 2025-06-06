@@ -46,7 +46,7 @@ def get_episode_content(ep_json, args):
     dt = datetime.fromisoformat(ep_json['air_date']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {
         "name": ep_json['podcast']['title'],
@@ -144,7 +144,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(podcast_json['date_of_latest_episode']).replace(tzinfo=timezone.utc)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['authors'] = [{"name": x['name']} for x in podcast_json['creator_summary'].values()]
         if len(item['authors']) > 0:
@@ -178,7 +178,7 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 poster = item['image']
             episode_url = item['url'] + '/episodes/{}-{}'.format(episode['slug'], episode['id'])
-            item['content_html'] += utils.add_audio(episode['audio_url'], poster, episode['title'], episode_url, '', '', utils.format_display_date(dt, False), episode['length'], show_poster=False)
+            item['content_html'] += utils.add_audio(episode['audio_url'], poster, episode['title'], episode_url, '', '', utils.format_display_date(dt, date_only=True), episode['length'], show_poster=False)
             item['_playlist'].append({
                 "src": episode['audio_url'],
                 "name": episode['title'],

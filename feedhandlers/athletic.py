@@ -105,7 +105,7 @@ def get_podcast_content(url, args, site_json, save_debug=False):
             dt = tz_est.localize(dt_est).astimezone(pytz.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
             item['author'] = {
                 "name": podcast_json['title'],
                 "url": podcast_json['permalink_url']
@@ -156,9 +156,9 @@ def get_podcast_content(url, args, site_json, save_debug=False):
             # Should be most recent first
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
         audio_src = config.server + '/audio?url=' + quote_plus(episode['permalink'])
-        item['content_html'] += utils.add_audio(audio_src, '', episode['title'], episode['permalink'], '', '', utils.format_display_date(dt, False), episode['duration'], use_video_js=False)
+        item['content_html'] += utils.add_audio(audio_src, '', episode['title'], episode['permalink'], '', '', utils.format_display_date(dt, date_only=True), episode['duration'], use_video_js=False)
     return item
 
 

@@ -410,7 +410,7 @@ def get_content(url, args, site_json, save_debug=False):
                                     date = release['timeframeYear']
                                 elif release.get('date'):
                                     dt = get_datetime(release['date'])
-                                    date = utils.format_display_date(dt, False)
+                                    date = utils.format_display_date(dt, date_only=True)
                                 else:
                                     date = 'N/A'
                                 if not releases.get(date):

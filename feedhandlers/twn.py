@@ -39,7 +39,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(article['createdAt'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
         if article.get('updatedAt'):
             dt = datetime.fromisoformat(article['updatedAt'])
             item['date_modified'] = dt.isoformat()

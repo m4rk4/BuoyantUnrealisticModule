@@ -227,7 +227,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<td style="text-align:center; vertical-align:middle;"><img src="{}" style="width:60px;"/><br/><b>{}</b></td>'.format(article_json['match']['teamA']['crest']['url'], article_json['match']['teamA']['name'])
         tz_loc = pytz.timezone(config.local_tz)
         dt = datetime.fromisoformat(article_json['match']['startDate'].replace('Z', '+00:00')).astimezone(tz_loc)
-        item['content_html'] += '<td style="text-align:center; vertical-align:middle;"><small>{}</small><br/><span style="font-size:1.2em; font-weight:bold;">{}:{}</span></td>'.format(utils.format_display_date(dt, False), dt.hour, dt.minute)
+        item['content_html'] += '<td style="text-align:center; vertical-align:middle;"><small>{}</small><br/><span style="font-size:1.2em; font-weight:bold;">{}:{}</span></td>'.format(utils.format_display_date(dt, date_only=True), dt.hour, dt.minute)
         item['content_html'] += '<td style="text-align:center; vertical-align:middle;"><img src="{}" style="width:60px;"/><br/><b>{}</b></td>'.format(article_json['match']['teamB']['crest']['url'], article_json['match']['teamB']['name'])
         item['content_html'] += '</tr></table><div>&nbsp;</div>'
 

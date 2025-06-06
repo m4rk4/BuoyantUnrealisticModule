@@ -118,16 +118,25 @@ def get_content(url, args, site_json, save_debug=False):
                 end_tag = '</table><div>&nbsp;</div>'
 
             elif section['name'] == 'shortcode-callout':
-                section_html += '<div>&nbsp;</div><div style="width:75%; padding:10px 10px 0 10px; margin-left:auto; margin-right:auto; border:1px solid black; border-radius:10px;">'
                 for callout in section['dbData']['callouts']:
-                    section_html += '<h3 style="margin-top:0; margin-bottom:0;">{}:<br/><em>{}</em></h3><h4 style="margin-top:0; margin-bottom:0;">{}</h4><img width="100%" src="{}"/><p>{}</p>'.format(callout['ribbon'], callout['name'], callout['title'], callout['images']['full'], callout['description'])
+                    link = ''
+                    card_footer = ''
                     if callout.get('sources'):
-                        section_html += '<ul>'
                         for source in callout['sources']:
                             if source.get('rawUrl'):
-                                section_html += '<li><a href="{}">{} from {}</a></li>'.format(source['rawUrl'], source['price']['formatted'], source['store'])
-                        section_html += '</ul>'
-                section_html += '</div><div>&nbsp;</div>'
+                                if not link:
+                                    link = source['rawUrl']
+                                card_footer += utils.add_button(source['rawUrl'], source['price']['formatted'] + ' from ' + source['store'])
+                    card_image = '<a href="{}" target="_blank"><div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:10px 0 0 0;"></div></a>'.format(link, callout['images']['full'])
+                    card_content = ''
+                    if callout.get('ribbon'):
+                        card_content += '<div style="color:red; font-weight:bold;">' + callout['ribbon'] + '</div>'
+                    card_content += '<div style="font-size:1.05em; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;"><a href="{}">{}</a></div>'.format(link, callout['name'])
+                    if callout.get('title'):
+                        card_content += '<div style="margin-top:8px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">' + callout['title'] + '</div>'
+                    if callout.get('description'):
+                        card_content += '<div style="margin-top:8px; font-size:0.8em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">' + callout['description'] + '</div>'
+                    section_html += utils.format_small_card(card_image, card_content, card_footer, content_style='padding:8px;', align_items='start') + '<div>&nbsp;</div>'
 
             elif section['name'] == 'shortcode-caption':
                 img_link = ''
@@ -197,12 +206,12 @@ def get_content(url, args, site_json, save_debug=False):
                 if section.get('children'):
                     logger.warning('unhandled div section')
 
-            elif re.search(r'^(shortcode\-recirc|video)$', section['name']):
+            elif section['name'] == 'adslot' or re.search(r'^(shortcode\-recirc|video)$', section['name']):
                 # recirc is usually related articles
                 pass
 
             else:
-                logger.debug('unhandled tag {}'.format(section['name']))
+                logger.debug('unhandled tag {}' + section['name'])
 
         elif section['type'] == 'text':
             section_html += section['data']

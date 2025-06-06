@@ -75,7 +75,7 @@ def get_episode_content(episode_json, args, site_json, save_debug):
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['authors'] = [{"name": episode_json['episodeSettings']['show']['node']['title']}]
     item['author'] = {
@@ -107,8 +107,8 @@ def get_episode_content(episode_json, args, site_json, save_debug):
 
     if episode_json['episodeSettings'].get('spotifyId'):
         # TODO: use embed link since the Spotify episodes are DRM protected
-        # audio_src = 'https://open.spotify.com/episode/' + episode_json['episodeSettings']['spotifyId']
-        audio_src = 'https://embed-standalone.spotify.com/embed/episode/' + episode_json['episodeSettings']['spotifyId']
+        audio_src = 'https://open.spotify.com/episode/' + episode_json['episodeSettings']['spotifyId']
+        # audio_src = 'https://embed-standalone.spotify.com/embed/episode/' + episode_json['episodeSettings']['spotifyId']
         poster = resize_image(episode_json['episodeSettings']['show']['node']['featuredImage']['node']['sourceUrl'], site_json, 640)
         if 'image' not in item:
             item['image'] = poster
@@ -135,7 +135,7 @@ def get_post_content(post_json, url, args, site_json, save_debug):
     dt = datetime.fromisoformat(post_json['dateGmt']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['authors'] = [{"name": x['name']} for x in post_json['articleSettings']['creators']['nodes']]
     if len(item['authors']) > 0:

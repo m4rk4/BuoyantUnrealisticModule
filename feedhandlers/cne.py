@@ -185,7 +185,7 @@ def format_body(body_json):
                     else:
                         poster = ''
                     if audio.get('pubDate'):
-                        date = utils.format_display_date(datetime.fromisoformat(audio['pubDate']), False)
+                        date = utils.format_display_date(datetime.fromisoformat(audio['pubDate']), date_only=True)
                     else:
                         date = ''
                     return '<div>&nbsp;</div>' + utils.add_audio_v2(audio['files'][0], poster, audio['title'], '', audio_json['title'], '', date, audio['duration'])

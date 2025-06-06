@@ -58,7 +58,7 @@ def get_content(url, args, site_json, save_debug=False):
             dt = datetime.strptime(m.group(0), '%b %d, %Y').replace(tzinfo=timezone.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     el = soup.find(class_='episode__podcast-title')
     if el:

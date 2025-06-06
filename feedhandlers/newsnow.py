@@ -125,7 +125,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['author'] = {
             "name": article_json['pubName']
@@ -144,7 +144,7 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             dt = dateutil.parser.parse(article_info[item['id']]['PublicationTimeUTC'].replace('d', '-')).replace(tzinfo=timezone.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
             item['author'] = {
                 "name": article_info[item['id']]['Publication']['Name']

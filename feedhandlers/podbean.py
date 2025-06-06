@@ -57,7 +57,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
         item['author'] = {
             "name": api_json['setting']['author'],
             "url": api_json['setting']['podcastLink']
@@ -98,7 +98,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
     item['author'] = {}
     item['author']['name'] = ld_json['partOfSeries']['name']
     item['author']['url'] = ld_json['partOfSeries']['url']

@@ -175,7 +175,10 @@ def render_components(components):
             component_html += utils.add_embed('https://docs.google.com/gview?url=' + quote_plus(component['content']['url']))
         elif component['content_type'] == 'freeform' and '<iframe' in component['content']['text']:
             m = re.search(r'src="([^"]+)"', component['content']['text'])
-            if 'media.foxtv.com' in m.group(1) and 'wx' in m.group(1):
+            if 'join.megaphonetv.com' in m.group(1):
+                # skip
+                pass
+            elif 'media.foxtv.com' in m.group(1) and 'wx' in m.group(1):
                 component_html += utils.add_image('{}/screenshot?url={}&browser=chrome&locator=div.wx-map-container-defaults'.format(config.server, quote_plus(m.group(1))), link=m.group(1))
             else:
                 component_html += utils.add_embed(m.group(1))

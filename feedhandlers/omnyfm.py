@@ -66,7 +66,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(clip_json['PublishedUtc'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
         if clip_json.get('ModifiedAtUtc'):
             dt = datetime.fromisoformat(clip_json['ModifiedAtUtc'])
         item['date_modified'] = dt.isoformat()
@@ -96,7 +96,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(program_json['ModifiedAtUtc'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
         item['author'] = {
             "name": item['title'],
             "url": item['url']
@@ -114,7 +114,7 @@ def get_content(url, args, site_json, save_debug=False):
         for i, clip in enumerate(next_json['pageProps']['clips']['Clips']):
             if i == n:
                 break
-            item['content_html'] += utils.add_audio(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(datetime.fromisoformat(clip['PublishedUtc']), False), clip['DurationSeconds'], show_poster=False)
+            item['content_html'] += utils.add_audio(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(datetime.fromisoformat(clip['PublishedUtc']), date_only=True), clip['DurationSeconds'], show_poster=False)
 
     elif 'playlist' in next_json['pageProps']:
         playlist_json = next_json['pageProps']['playlist']
@@ -124,7 +124,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(playlist_json['ModifiedAtUtc'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
         item['author'] = {
             "name": playlist_json['Author'],
             "url": "https://omny.fm/shows/" + playlist_json['ProgramSlug']
@@ -141,7 +141,7 @@ def get_content(url, args, site_json, save_debug=False):
         for i, clip in enumerate(next_json['pageProps']['playlistPage']['Clips']):
             if i == n:
                 break
-            item['content_html'] += utils.add_audio(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(datetime.fromisoformat(clip['PublishedUtc']), False), clip['DurationSeconds'], show_poster=False)
+            item['content_html'] += utils.add_audio(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(datetime.fromisoformat(clip['PublishedUtc']), date_only=True), clip['DurationSeconds'], show_poster=False)
     return item
 
 

@@ -266,14 +266,50 @@ def get_image(args):
         else:
             return None, 'No url given'
 
+    proxy = False
     container = None
     if not im:
         try:
             #clean_url = utils.clean_url(args['url'])
             container = av.open(args['url'])
-            if re.search(r'mp4|m4a|mov|mpeg|webm', container.format.name):
-                for frame in container.decode(video=0):
-                    im = frame.to_image()
+            if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
+                stream = container.streams.video[0]
+                for frame in container.decode(stream):
+                    if frame.width > frame.height:
+                        w = 1280
+                        h = int(frame.height * w / frame.width)
+                    else:
+                        h = 800
+                        w = int(frame.width * h / frame.height)
+                    im = frame.reformat(width=w, height=h).to_image()
+                    # im = frame.to_image()
+                    break
+                save = True
+            elif re.search(r'image|jpeg|png|webp', container.format.name):
+                im_io = read_image(args['url'])
+                if im_io:
+                    im = Image.open(im_io)
+                    mimetype = im.get_format_mimetype()
+        except av.HTTPForbiddenError:
+            proxy = True
+        except Exception as e:
+            logger.warning('image exception: ' + str(e))
+            im = None
+
+    if not im and proxy:
+        try:
+            container = av.open(config.server + '/proxy/' + args['url'])
+            if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
+                stream = container.streams.video[0]
+                for frame in container.decode(stream):
+                    if frame.width > frame.height:
+                        w = 1280
+                        h = int(frame.height * w / frame.width)
+                    else:
+                        h = 800
+                        w = int(frame.width * h / frame.height)
+                    im = frame.reformat(width=w, height=h).to_image()
+                    # im = frame.to_image()
                     break
                 save = True
             elif re.search(r'image|jpeg|png|webp', container.format.name):

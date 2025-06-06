@@ -83,7 +83,7 @@ def get_content(url, args, site_json, save_debug=False):
             dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
         else:
             el = soup.find(attrs={"data-component-id": "SlideshowAuthor"})
             if el:

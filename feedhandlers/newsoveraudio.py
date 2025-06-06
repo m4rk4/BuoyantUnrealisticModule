@@ -53,7 +53,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(article_json['publisherPublicationDate'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {"name": article_json['publisher']['name']}
 

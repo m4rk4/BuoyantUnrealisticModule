@@ -99,12 +99,13 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '</ul></div>'
         item['content_html'] += '</div>'
 
-    qa_json = utils.get_url_json('https://web-api-cdn.ground.news/api/public/search/startingQsForStoryGuide/' + event_json['id'])
-    if qa_json and qa_json.get('questionAnswerPairs'):
-        item['content_html'] += '<h2>Q&A</h2><dl>'
-        for qa in qa_json['questionAnswerPairs']:
-            item['content_html'] += '<dt><b>{}</b></dt><dd style="padding-bottom:1em;">{}</dd>'.format(qa['question'], qa['answer'])
-        item['content_html'] += '</dl>'
+    # TODO: removed?
+    # qa_json = utils.get_url_json('https://web-api-cdn.ground.news/api/public/search/startingQsForStoryGuide/' + event_json['id'])
+    # if qa_json and qa_json.get('questionAnswerPairs'):
+    #     item['content_html'] += '<h2>Q&A</h2><dl>'
+    #     for qa in qa_json['questionAnswerPairs']:
+    #         item['content_html'] += '<dt><b>{}</b></dt><dd style="padding-bottom:1em;">{}</dd>'.format(qa['question'], qa['answer'])
+    #     item['content_html'] += '</dl>'
 
     item['content_html'] += '<h2>Articles</h2>'
     for source in event_json['firstTenSources']:

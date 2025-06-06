@@ -387,9 +387,9 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             el.decompose()
 
         for el in article.find_all('aside'):
-            print(str(el))
+            # print(str(el))
             new_html = ''
-            if (el.get('aria-label') and re.search(r'advertisement|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
+            if (el.get('aria-label') and re.search(r'advertisement|signup|subscribe', el['aria-label'], flags=re.I)) or (el.get('class') and 'gnt_em_fo__bet-best' in el['class']):
                 logger.debug('skipping aside ' + str(el['class']))
                 el.decompose()
                 continue

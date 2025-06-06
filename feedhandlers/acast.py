@@ -32,7 +32,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(audio_json['publishDate'].replace('Z', '+00:00'))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {}
     item['author']['name'] = audio_json['show']['title']
@@ -61,8 +61,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = audio_json['subtitle']
 
-    item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], audio_json['duration'])
-
     if 'embed' not in args:
-        item['content_html'] += '<p>' + item['summary'] + '</p>'
+        desc = '<p>' + item['summary'] + '</p>'
+    else:
+        desc = ''
+
+    item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], audio_json['duration'], desc=desc)
     return item

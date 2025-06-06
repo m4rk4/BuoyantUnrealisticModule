@@ -70,7 +70,7 @@ def make_stock_chart(symbol):
     n = math.ceil(len(x) / 10)
     line_chart = pygal.Line(x_labels_major_every=n, show_minor_x_labels=False, truncate_label=-1, style=custom_style)
     line_chart.title = title
-    line_chart.x_title = utils.format_display_date(x[-1], False)
+    line_chart.x_title = utils.format_display_date(x[-1], date_only=True)
     line_chart.x_labels = map(lambda dt: dt.strftime('%H:%M'), x)
     line_chart.y_title = 'Price ($)'
     line_chart.add(data_json['symbol'], y)

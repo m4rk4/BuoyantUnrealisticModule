@@ -44,7 +44,7 @@ def render_content(blocks):
                 meta_date = next((it for it in meta['data']['components'] if it['type'] == 'datetime'), None)
                 if meta_date:
                     dt = datetime.fromtimestamp(meta_date['datetime']).replace(tzinfo=timezone.utc)
-                    date = utils.format_display_date(dt, False) + ' &bull; '
+                    date = utils.format_display_date(dt, date_only=True) + ' &bull; '
             content_html += '<table><tr><td style="width:128px;"><a href="https://meduza.io{}"><img src="{}" style="width:100%;"/></a></td>'.format(block['data']['mp3_url'], poster)
             content_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold"><a href="https://meduza.io{}">{}</a></div>'.format(block['data']['url'], block['data']['title'])
             content_html += '<div><a href="https://meduza.io{}">{}</a></div>'.format(block['data']['podcast']['url'], block['data']['podcast']['author'])

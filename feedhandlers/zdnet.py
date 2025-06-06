@@ -244,6 +244,8 @@ def get_content(url, args, site_json, save_debug=False):
         soup = BeautifulSoup(article_json['body'], 'html.parser')
 
     if soup:
+        if save_debug:
+            utils.write_file(str(soup), './debug/debug.html')
         for el in soup.find_all('shortcode'):
             new_html = ''
             if el['shortcode'] == 'image':
@@ -370,84 +372,229 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html += '<div><small><b>Note:</b> {}</small></div>'.format(chart_json['explanation'])
 
             elif el['shortcode'] == 'cnetlisticle' or el['shortcode'] == 'cross_content_listicle':
-                if el.get('imagegroup'):
-                    shortcode_json = json.loads(el['imagegroup'].replace('&quot;', '"'))
+                if el.get('api'):
+                    shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
                     # utils.write_file(shortcode_json, './debug/shortcode.json')
-                    if shortcode_json.get('imageData') and shortcode_json['imageData'].get('id'):
-                        img_src = resize_image(shortcode_json['imageData']['path'], secret_key)
+                    img_src = ''
+                    if shortcode_json.get('imageGroup') and shortcode_json['imageGroup'].get('imageData'):
+                        img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
                         captions = []
-                        if shortcode_json.get('imageCaption'):
-                            m = re.search(r'^<p>(.+)</p>', shortcode_json['imageCaption'])
-                            if m:
-                                captions.append(m.group(1))
-                        if shortcode_json.get('imageCredit'):
-                            captions.append(shortcode_json['imageCredit'])
-                        new_html += utils.add_image(img_src, ' | '.join(captions))
-                if el.get('hed'):
-                    new_html += '<h3 style="margin-bottom:0;">{}</h3>'.format(el['hed'])
-                if el.get('superlative'):
-                    new_html += '<h5 style="margin-top:0; margin-bottom:0;">{}</h5>'.format(el['superlative'])
-                if el.get('description'):
-                    new_html += el['description']
-                if el.get('merchantoffers'):
-                    shortcode_json = json.loads(el['merchantoffers'].replace('&quot;', '"'))
-                    for it in shortcode_json:
-                        if it.get('offerPrice'):
-                            label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
-                            new_html += utils.add_button(it['rawUrl'], label)
+                        if shortcode_json.get('imageCaptionOverride') and shortcode_json['imageCaptionOverride'] != '<p></p>':
+                            captions.append(re.sub(r'^<p>|</p>$', '', shortcode_json['imageCaptionOverride'].strip()))
+                        elif shortcode_json['imageGroup']['imageData'].get('caption') and shortcode_json['imageGroup']['imageData']['caption'] != '<p></p>':
+                            captions.append(re.sub(r'^<p>|</p>$', '', shortcode_json['imageGroup']['imageData']['caption'].strip()))
+                        elif shortcode_json['imageGroup'].get('caption') and shortcode_json['imageGroup']['caption'] != '<p></p>':
+                            captions.append(re.sub(r'^<p>|</p>$', '', shortcode_json['imageGroup']['caption'].strip()))
+                        if shortcode_json.get('imageCreditOverride'):
+                            captions.append(shortcode_json['imageCreditOverride'])
+                        elif shortcode_json['imageGroup']['imageData'].get('credits'):
+                            captions.append(shortcode_json['imageGroup']['imageData']['credits'])
+                        elif shortcode_json['imageGroup'].get('credits'):
+                            captions.append(shortcode_json['imageGroup']['credits'])
+                    offers_html = ''
+                    if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
+                        for it in shortcode_json['techProd']['resellers']:
+                            if it.get('price'):
+                                label = '${:.2f} at {}'.format(float(it['price'])/100, it['name'])
+                            else:
+                                label = 'View at ' + it['name']
+                            offers_html += utils.add_button(utils.get_redirect_url(it['url']), label)
+                    elif shortcode_json.get('merchantOffers'):
+                        for it in shortcode_json['merchantOffers']:
+                            if it.get('offerPrice'):
+                                label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
+                            else:
+                                label = 'View at ' + it['offerMerchant']
+                            offers_html += utils.add_button(it['rawUrl'], label)
+                    if img_src and (not shortcode_json.get('description') or len(re.findall(r'</p>', shortcode_json['description'])) == 1):
+                        # Small card: has image and no descripton or a 1-liner
+                        if offers_html:
+                            # card_image = '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:10px 0 0 0;"></div>'.format(img_src)
+                            card_image = '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:0 10px 0 0;"></div>'.format(img_src)
                         else:
-                            label = 'View at ' + it['offerMerchant']
-                            new_html += utils.add_button(it['rawUrl'], label)
-                new_html += '<hr/><div>&nbsp;</div>'
+                            # card_image = '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:10px 0 0 10px;"></div>'.format(img_src)
+                            card_image = '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:0 10px 10px 0;"></div>'.format(img_src)
+                        card_content = '<div style="display:flex; flex-direction:column; flex:1; justify-content:space-evenly; text-align:center; height:160px; padding-left:8px;">'
+                        if shortcode_json.get('supplementalText'):
+                            card_content += '<div style="font-weight:bold; color:red;">' + shortcode_json['supplementalText'] + '</div>'
+                        if shortcode_json.get('hed'):
+                            card_content += '<div style="font-size:1.05em; font-weight:bold;">' + shortcode_json['hed'] + '</div>'
+                        if shortcode_json.get('description'):
+                            card_content += '<div style="font-size:0.9em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;" title="{0}">{0}</div>'.format(re.sub(r'^<p>|</p>$', '', shortcode_json['description'].strip()))
+                        card_content += '</div>'
+                        new_html += utils.format_small_card(card_image, card_content, offers_html, image_position='right')
+                    else:
+                        if img_src:
+                            new_html += '<hr style="margin:2em 0;">'
+                            new_html += utils.add_image(img_src, ' | '.join(captions))
+                        if shortcode_json.get('hed'):
+                            new_html += '<h2>' + shortcode_json['hed'] + '</h2>'
+                        if shortcode_json.get('subhed'):
+                            new_html += '<h3>' + shortcode_json['subhed'] + '</h3>'
+                        if shortcode_json.get('techProd') and shortcode_json['techProd'].get('attributes'):
+                            rating = next((it for it in shortcode_json['techProd']['attributes'] if it['name'] == 'Overall Rating'), None)
+                            if rating:
+                                new_html += utils.add_stars(float(rating['val'][0])/2, show_rating=True)
+                        if shortcode_json.get('like') or shortcode_json.get('dislike'):
+                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                            if shortcode_json.get('like') and shortcode_json['like'].strip():
+                                new_html += '<div style="flex:1; min-width:360px;"><h3>Pros:</h3><ul>'
+                                for it in shortcode_json['like'].split('~'):
+                                    if it.strip():
+                                        new_html += '<li>' + it.strip() + '</li>'
+                                new_html += '</ul></div>'
+                            if shortcode_json.get('dislike') and shortcode_json['dislike'].strip():
+                                new_html += '<div style="flex:1; min-width:360px;"><h3>Cons:</h3><ul>'
+                                for it in shortcode_json['dislike'].split('~'):
+                                    if it.strip():
+                                        new_html += '<li>' + it.strip() + '</li>'
+                                new_html += '</ul></div>'
+                            new_html += '</div>'
+                        if shortcode_json.get('techProd') and shortcode_json['techProd'].get('attributes'):
+                            for it in shortcode_json['techProd']['attributes']:
+                                if 'SKU' in it['name'] or 'UPC' in it['name'] or 'MSRP' in it['name'] or 'Qty' in it['name'] or 'Quantity' in it['name'] or 'Slots' in it['name'] or 'ppi' in it['name']:
+                                    continue
+                                try:
+                                    val = float(it['val'][0])
+                                    new_html += utils.add_bar(it['name'], val, 10, show_percent=False)
+                                except:
+                                    pass
+                        if shortcode_json.get('description'):
+                            new_html += shortcode_json['description']
+                        new_html += offers_html
+                else:
+                    if el.get('imagegroup'):
+                        shortcode_json = json.loads(el['imagegroup'].replace('&quot;', '"'))
+                        # utils.write_file(shortcode_json, './debug/shortcode.json')
+                        if shortcode_json.get('imageData') and shortcode_json['imageData'].get('id'):
+                            img_src = resize_image(shortcode_json['imageData']['path'], secret_key)
+                            captions = []
+                            if shortcode_json.get('imageCaption'):
+                                caption = re.sub(r'^<p>|</p>$', '', shortcode_json['imageCaption'].strip())
+                                if caption:
+                                    caption.append(caption)
+                            if shortcode_json.get('imageCredit'):
+                                captions.append(shortcode_json['imageCredit'])
+                            new_html += utils.add_image(img_src, ' | '.join(captions))
+                    if el.get('hed'):
+                        new_html += '<h3 style="margin-bottom:0;">{}</h3>'.format(el['hed'])
+                    if el.get('superlative'):
+                        new_html += '<h5 style="margin-top:0; margin-bottom:0;">{}</h5>'.format(el['superlative'])
+                    if el.get('description'):
+                        new_html += el['description']
+                    if el.get('merchantoffers'):
+                        shortcode_json = json.loads(el['merchantoffers'].replace('&quot;', '"'))
+                        for it in shortcode_json:
+                            if it.get('offerPrice'):
+                                label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
+                                new_html += utils.add_button(it['rawUrl'], label)
+                            else:
+                                label = 'View at ' + it['offerMerchant']
+                                new_html += utils.add_button(it['rawUrl'], label)
+                    new_html += '<hr/><div>&nbsp;</div>'
 
             elif el['shortcode'] == 'reviewcard':
-                shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
-                #utils.write_file(shortcode_json, './debug/shortcode.json')
-                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;">'
-
-                img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
-                captions = []
-                if shortcode_json['imageGroup'].get('caption'):
-                    m = re.search(r'^<p>(.*)</p>', shortcode_json['imageGroup']['caption'])
-                    if m and m.group(1):
-                        captions.append(m.group(1))
-                    else:
-                        captions.append(shortcode_json['imageGroup']['caption'])
-                if shortcode_json['imageGroup'].get('credit'):
-                    captions.append(shortcode_json['imageGroup']['credit'])
-                new_html += '<div style="flex:1; min-width:256px;"><img src="{}" style="width:100%;">'.format(img_src)
-                if captions:
-                    new_html += '<div><small>{}</small></div>'.format(' | '.join(captions))
-
-                new_html += '<div style="text-align:center; padding-top:8px; font-size:1.1em; font-weight:bold;">{}</div>'.format(shortcode_json['productName'])
-                if shortcode_json.get('rating'):
-                    new_html += '<div style="text-align:center; padding-top:8px; font-size:2em; font-weight:bold;">{}</div>'.format(shortcode_json['rating'])
-                new_html += '</div>'
-
-                new_html += '<div style="flex:1; min-width:256px;">'
-                new_html += '<div style="font-weight:bold;">Like</div><ul style=\'list-style-type:"👍&nbsp;"\'>'
-                for it in list(filter(None, shortcode_json['like'].split('~'))):
-                    new_html += '<li>{}</li>'.format(it.strip())
-                new_html += '</ul><div style="font-weight:bold;">Don\'t Like</div><ul style=\'list-style-type:"👎&nbsp;"\'>'
-                for it in list(filter(None, shortcode_json['dislike'].split('~'))):
-                    new_html += '<li>{}</li>'.format(it.strip())
-                new_html += '</ul></div>'
-
-                new_html += '<div style="flex:1; min-width:256px;">'
-                if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
-                    for it in shortcode_json['techProd']['resellers']:
-                        offer_url = utils.get_redirect_url(it['url'])
-                        label = '${:.2f} at {}'.format(int(it['price']) / 100, it['name'])
-                        new_html += utils.add_button(offer_url, label)
+                if el.get('api'):
+                    shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                    if shortcode_json.get('imageGroup') and shortcode_json['imageGroup'].get('imageData'):
+                        img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
+                        captions = []
+                        if shortcode_json['imageGroup']['imageData'].get('caption') and shortcode_json['imageGroup']['imageData']['caption'] != '<p></p>':
+                            captions.append(re.sub(r'^<p>|</p>$', '', shortcode_json['imageGroup']['imageData']['caption'].strip()))
+                        elif shortcode_json['imageGroup'].get('caption') and shortcode_json['imageGroup']['caption'] != '<p></p>':
+                            captions.append(re.sub(r'^<p>|</p>$', '', shortcode_json['imageGroup']['caption'].strip()))
+                        if shortcode_json['imageGroup']['imageData'].get('credits'):
+                            captions.append(shortcode_json['imageGroup']['imageData']['credits'])
+                        elif shortcode_json['imageGroup'].get('credits'):
+                            captions.append(shortcode_json['imageGroup']['credits'])
+                        new_html += utils.add_image(img_src, ' | '.join(captions))
+                    if shortcode_json.get('productName'):
+                        new_html += '<h2 style="text-align:center;">' + shortcode_json['productName'] + '</h2>'
+                    if shortcode_json.get('rating'):
+                        new_html += utils.add_stars(float(shortcode_json['rating']))
+                    if shortcode_json.get('description'):
+                        new_html += '<h3>Key Takeaways:</h3><ul>'
+                        for it in shortcode_json['description'].split('~'):
+                            if it.strip():
+                                new_html += '<li>' + it.strip() + '</li>'
+                        new_html += '</ul>'
+                    if shortcode_json.get('like') or shortcode_json.get('dislike'):
+                        new_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                        if shortcode_json.get('like') and shortcode_json['like'].strip():
+                            new_html += '<div style="flex:1; min-width:360px;"><h3>Pros:</h3><ul>'
+                            for it in shortcode_json['like'].split('~'):
+                                if it.strip():
+                                    new_html += '<li>' + it.strip() + '</li>'
+                            new_html += '</ul></div>'
+                        if shortcode_json.get('dislike') and shortcode_json['dislike'].strip():
+                            new_html += '<div style="flex:1; min-width:360px;"><h3>Cons:</h3><ul>'
+                            for it in shortcode_json['dislike'].split('~'):
+                                if it.strip():
+                                    new_html += '<li>' + it.strip() + '</li>'
+                            new_html += '</ul></div>'
+                        new_html += '</div>'
+                    if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
+                        for offer in shortcode_json['techProd']['resellers']:
+                            if offer.get('price'):
+                                label = '${:.2f} at {}'.format(float(offer['price'])/100, offer['name'])
+                            else:
+                                label = 'View at ' + offer['name']
+                            new_html += utils.add_button(utils.get_redirect_url(offer['url']), label)
+                    elif shortcode_json.get('merchantOffers'):
+                        for offer in shortcode_json['merchantOffers']:
+                            if offer.get('offerPrice'):
+                                label = '${:.2f} at {}'.format(float(offer['offerPrice']), offer['offerMerchant'])
+                            else:
+                                label = 'View at ' + offer['offerMerchant']
+                            new_html += utils.add_button(offer['rawUrl'], label)
                 else:
-                    for it in shortcode_json['merchantOffers']:
-                        offer_url = it['rawUrl']
-                        if it.get('offerPrice'):
-                            label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
+                    shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
+                    #utils.write_file(shortcode_json, './debug/shortcode.json')
+                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;">'
+
+                    img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key)
+                    captions = []
+                    if shortcode_json['imageGroup'].get('caption'):
+                        m = re.search(r'^<p>(.*)</p>', shortcode_json['imageGroup']['caption'])
+                        if m and m.group(1):
+                            captions.append(m.group(1))
                         else:
-                            label = 'View at ' + it['offerMerchant']
-                        new_html += utils.add_button(offer_url, label)
-                new_html += '</div></div><div>&nbsp;</div>'
+                            captions.append(shortcode_json['imageGroup']['caption'])
+                    if shortcode_json['imageGroup'].get('credit'):
+                        captions.append(shortcode_json['imageGroup']['credit'])
+                    new_html += '<div style="flex:1; min-width:256px;"><img src="{}" style="width:100%;">'.format(img_src)
+                    if captions:
+                        new_html += '<div><small>{}</small></div>'.format(' | '.join(captions))
+
+                    new_html += '<div style="text-align:center; padding-top:8px; font-size:1.1em; font-weight:bold;">{}</div>'.format(shortcode_json['productName'])
+                    if shortcode_json.get('rating'):
+                        new_html += '<div style="text-align:center; padding-top:8px; font-size:2em; font-weight:bold;">{}</div>'.format(shortcode_json['rating'])
+                    new_html += '</div>'
+
+                    new_html += '<div style="flex:1; min-width:256px;">'
+                    new_html += '<div style="font-weight:bold;">Like</div><ul style=\'list-style-type:"👍&nbsp;"\'>'
+                    for it in list(filter(None, shortcode_json['like'].split('~'))):
+                        new_html += '<li>{}</li>'.format(it.strip())
+                    new_html += '</ul><div style="font-weight:bold;">Don\'t Like</div><ul style=\'list-style-type:"👎&nbsp;"\'>'
+                    for it in list(filter(None, shortcode_json['dislike'].split('~'))):
+                        new_html += '<li>{}</li>'.format(it.strip())
+                    new_html += '</ul></div>'
+
+                    new_html += '<div style="flex:1; min-width:256px;">'
+                    if shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
+                        for it in shortcode_json['techProd']['resellers']:
+                            offer_url = utils.get_redirect_url(it['url'])
+                            label = '${:.2f} at {}'.format(int(it['price']) / 100, it['name'])
+                            new_html += utils.add_button(offer_url, label)
+                    else:
+                        for it in shortcode_json['merchantOffers']:
+                            offer_url = it['rawUrl']
+                            if it.get('offerPrice'):
+                                label = '${:.2f} at {}'.format(float(it['offerPrice']), it['offerMerchant'])
+                            else:
+                                label = 'View at ' + it['offerMerchant']
+                            new_html += utils.add_button(offer_url, label)
+                    new_html += '</div></div><div>&nbsp;</div>'
 
             elif el['shortcode'] == 'newscard':
                 new_html += utils.add_blockquote('<h3 style="margin-bottom:0;">What\'s happening</h3><p>{}</p><h3 style="margin-bottom:0;">Why it matters</h3><p>{}</p>'.format(el['whathappening'], el['whymatters']))
@@ -461,24 +608,24 @@ def get_content(url, args, site_json, save_debug=False):
             elif el['shortcode'] == 'commercepromo':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))
                 # utils.write_file(shortcode_json, './debug/shortcode.json')
-                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; width:90%; margin:auto; padding:8px; border:1px solid #444; border-radius:10px;">'
                 img_src = resize_image(shortcode_json['imageGroup']['imageData']['path'], secret_key, 360)
-                new_html += '<div style="flex:1; min-width:160px;"><img src="{}" style="width:100%;"></div>'.format(img_src)
-                new_html += '<div style="flex:2; min-width:256px;"><div style="font-size:1.05em; font-weight:bold;">{}</div>'.format(shortcode_json['hed'])
+                card_image = '<div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:10px 0 0 10px;"></div>'.format(img_src)
+                card_content = '<div style="display:flex; flex-direction:column; flex:1; justify-content:space-evenly; text-align:center; height:160px; padding-left:8px;"><div style="font-size:1.05em; font-weight:bold; text-align:center;">' + shortcode_json['hed'] + '</div>'
                 if shortcode_json.get('offerPrice') and shortcode_json['offerPrice'] != 'undefined':
                     offer_url = shortcode_json['offerUrl']
                     label = '${:.2f} at {}'.format(float(shortcode_json['offerPrice']), shortcode_json['offerMerchant'])
-                    new_html += utils.add_button(offer_url, label)
+                    card_content += utils.add_button(offer_url, label)
                 elif shortcode_json.get('techProd') and shortcode_json['techProd'].get('resellers'):
                     for it in shortcode_json['techProd']['resellers']:
                         offer_url = utils.get_redirect_url(it['url'])
                         label = '${:.2f} at {}'.format(int(it['price']) / 100, it['name'])
-                        new_html += utils.add_button(offer_url, label)
+                        card_content += utils.add_button(offer_url, label)
                 else:
                     offer_url = shortcode_json['offerUrl']
                     label = 'View at ' + shortcode_json['offerMerchant']
-                    new_html += utils.add_button(offer_url, label)
-                new_html += '</div></div><div>&nbsp;</div>'
+                    card_content += utils.add_button(offer_url, label)
+                card_content += '</div>'
+                new_html += utils.format_small_card(card_image, card_content)
 
             elif el['shortcode'] == 'pinbox':
                 shortcode_json = json.loads(el['api'].replace('&quot;', '"'))

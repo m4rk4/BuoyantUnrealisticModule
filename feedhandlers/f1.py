@@ -209,7 +209,7 @@ def get_content(url, args, site_json, save_debug=False):
                             dt = datetime.fromisoformat(fields['audioPodcast']['updatedAt'])
                             poster = '{}/image?url={}&width=128&overlay=audio'.format(config.server, quote_plus(fields['audioPodcast']['postImage']))
                             start_tag = '<table><tr><td style="width:128px;"><a href="{}"><img src="{}"/></a></td><td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="https:{}">{}</a></div><div>{}</div><div><small>{}</small></div></td></tr></table>'.format(
-                                fields['audioPodcast']['mp3Link'], poster, fields['audioPodcast']['iFrameSrc'], fields['audioPodcast']['postTitle'].encode('iso-8859-1').decode('utf-8'), fields['audioPodcast']['channelTitle'], utils.format_display_date(dt, False))
+                                fields['audioPodcast']['mp3Link'], poster, fields['audioPodcast']['iFrameSrc'], fields['audioPodcast']['postTitle'].encode('iso-8859-1').decode('utf-8'), fields['audioPodcast']['channelTitle'], utils.format_display_date(dt, date_only=True))
                         elif content_type == 'AtomGallery':
                             for image in fields['imageGallery']:
                                 if image.get('caption'):

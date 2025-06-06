@@ -19,7 +19,7 @@ def get_episode(episode, show):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     dt_loc = dt.astimezone(pytz.timezone(config.local_tz))
-    item['_display_date'] = utils.format_display_date(dt_loc, False)
+    item['_display_date'] = utils.format_display_date(dt_loc, date_only=True)
 
     item['author'] = {
         "name": show['title']

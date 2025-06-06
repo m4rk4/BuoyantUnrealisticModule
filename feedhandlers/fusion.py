@@ -236,7 +236,7 @@ def process_content_element(element, url, site_json, save_debug):
                     else:
                         m = s / 60
                         duration.append('{} min'.format(math.ceil(m)))
-                    audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), ', '.join(duration))
+                    audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, date_only=True), ', '.join(duration))
                     audio_html += '<div style="font-size:0.8em;">{}</div></td></tr></table>'.format(audio_json['shortDescription'])
             if audio_html:
                 element_html += audio_html
@@ -570,7 +570,7 @@ def process_content_element(element, url, site_json, save_debug):
         element_html += '</table>'
 
     elif element['type'] == 'image':
-        if element['image_type'] == 'graphic' and re.search(r'Roku|Watch Anywhere', element['alt_text']):
+        if element.get('image_type') and element['image_type'] == 'graphic' and element.get('alt_text') and re.search(r'Roku|Watch Anywhere', element['alt_text']):
             # Skip
             return ''
         img_src = resize_image(element, site_json)
@@ -926,7 +926,7 @@ def get_content_html(content, url, args, site_json, save_debug):
                 else:
                     m = s / 60
                     duration.append('{} min'.format(math.ceil(m)))
-                audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), ', '.join(duration))
+                audio_html += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, date_only=True), ', '.join(duration))
                 audio_html += '<div style="font-size:0.8em;">{}</div></td></tr></table>'.format(audio_json['shortDescription'])
             if audio_html:
                 content_html += audio_html
@@ -996,7 +996,9 @@ def get_item(content, url, args, site_json, save_debug):
     if content.get('credits') and content['credits'].get('by'):
         for author in content['credits']['by']:
             if author['type'] == 'author':
-                if author.get('name'):
+                if author.get('additional_properties') and author['additional_properties'].get('original') and author['additional_properties']['original'].get('byline'):
+                    authors.append(author['additional_properties']['original']['byline'])
+                elif author.get('name'):
                     authors.append(author['name'])
                 elif author.get('org'):
                     authors.append(author['org'])
@@ -1226,7 +1228,7 @@ def get_feed(url, args, site_json, save_debug=False):
         if len(paths) == 0:
             source = site_json['homepage_feed']['source']
             query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
-        elif re.search(r'about|author|auteur|autor|people|staff|team', paths[0]) or (len(paths) > 1 and paths[1].lower() == 'author'):
+        elif re.search(r'about|author|auteur|autor|people|staff|team', paths[0]) or (len(paths) > 1 and (paths[1].lower() == 'author' or paths[1].lower() == 'people')):
             author = ''
             if split_url.netloc == 'www.dlnews.com':
                 authors_json = utils.get_url_json('https://api.dlnews.com/authors')
@@ -1241,8 +1243,9 @@ def get_feed(url, args, site_json, save_debug=False):
                 # https://www.bostonglobe.com/about/staff-list/columnist/dan-shaughnessy/
                 author = paths[-1]
             elif len(paths) > 1:
-                if paths[1].lower() == 'author':
+                if paths[1].lower() == 'author' or paths[1].lower() == 'people':
                     # https://www.thenationalnews.com/topics/Author/neil-murphy/
+                    # https://biz.chosun.com/en/people/choi-jihui/
                     author = paths[-1]
                 else:
                     # https://www.cleveland.com/staff/tpluto/posts.html

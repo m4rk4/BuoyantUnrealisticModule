@@ -15,7 +15,7 @@ def get_content(url, args, site_json, save_debug=False):
     if '/EmbeddedPlayer/' in url:
         embed_url = url
     else:
-        page_html = utils.get_url_html(url)
+        page_html = utils.get_url_html(url, use_curl_cffi=True, use_proxy=True)
         if not page_html:
             return None
         soup = BeautifulSoup(page_html, 'lxml')
@@ -25,7 +25,7 @@ def get_content(url, args, site_json, save_debug=False):
             return None
         embed_url = el['content']
 
-    embed_html = utils.get_url_html(embed_url)
+    embed_html = utils.get_url_html(embed_url, use_curl_cffi=True, use_proxy=True)
     if not embed_html:
         return None
 
@@ -56,7 +56,7 @@ def get_content(url, args, site_json, save_debug=False):
             dt = dateutil.parser.parse(bc_json['publish_date'])
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['author'] = {
             "name": track['artist']
@@ -82,7 +82,7 @@ def get_content(url, args, site_json, save_debug=False):
                     item['attachments'].append(attachment)
                     break
 
-        item['content_html'] = utils.add_audio(item['url'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect')
+        item['content_html'] = utils.add_audio_v2(item['url'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect')
 
     elif '/album=' in embed_url:
         if save_debug:
@@ -97,7 +97,7 @@ def get_content(url, args, site_json, save_debug=False):
                 dt = dateutil.parser.parse(package['album_release_date'])
                 item['date_published'] = dt.isoformat()
                 item['_timestamp'] = dt.timestamp()
-                item['_display_date'] = utils.format_display_date(dt, False)
+                item['_display_date'] = utils.format_display_date(dt, date_only=True)
         if 'date_published' not in item and bc_json.get('featured_track_id'):
             track_item = get_content('https://bandcamp.com/EmbeddedPlayer/v=2/track={}/size=large/tracklist=false/artwork=small/'.format(bc_json['featured_track_id']), args, site_json, save_debug)
             if track_item:
@@ -108,7 +108,7 @@ def get_content(url, args, site_json, save_debug=False):
             dt = dateutil.parser.parse(bc_json['publish_date'])
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['author'] = {
             "name": bc_json['artist']
@@ -129,11 +129,11 @@ def get_content(url, args, site_json, save_debug=False):
             item['_playlist'] = []
             tracks_html += '<h3>Tracks:</h3>'
             for i, track in enumerate(bc_json['tracks'], 1):
-                title = '{}. {}'.format(i, track['title'])
+                title = str(i) + '. <a href="' + track['title_link'] + '" target="_blank">' + track['title'] + '</a>'
                 if track['artist'] != bc_json['artist']:
                     title += ' (' + track['artist'] + ')'
                 if track['track_streaming'] == True:
-                    tracks_html += utils.add_audio(track['title_link'], item['image'], title, track['title_link'], '', '', '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect', show_poster=False)
+                    tracks_html += utils.add_audio_v2(track['title_link'], item['image'], title, '', '', '', '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect', show_poster=False, border=False, margin='')
                     if track.get('file'):
                         for key, val in track['file'].items():
                             if 'mp3' in key:
@@ -145,21 +145,23 @@ def get_content(url, args, site_json, save_debug=False):
                                 })
                                 break
                 else:
-                    tracks_html += utils.add_audio('', '', title, track['title_link'], '', '', '', utils.calc_duration(track['duration'], True, ':'))
+                    tracks_html += utils.add_audio_v2('', '', title, '', '', '', '', utils.calc_duration(track['duration'], True, ':'), show_poster=False, border=False, margin='')
 
-        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-        item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;">'
-        if item.get('_playlist'):
-            item['content_html'] += '<a href="{}/playlist?url={}" target="_blank"><img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), config.server, quote_plus(item['image']))
-        else:
-            item['content_html'] += '<a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(item['url'], item['image'])
-        item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        if 'url' in item['author']:
-            item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
-        else:
-            item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(item['author']['name'])
-        item['content_html'] += '<div style="margin:4px 0 4px 0;">Released: {}</div>'.format(item['_display_date'])
-        item['content_html'] += '</div></div>' + tracks_html
+        item['content_html'] = utils.add_audio_v2(config.server + '/playlist?url=' + quote_plus(item['url']), item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], '', audio_type='audio_link', desc=tracks_html)
+
+        # item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
+        # item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;">'
+        # if item.get('_playlist'):
+        #     item['content_html'] += '<a href="{}/playlist?url={}" target="_blank"><img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), config.server, quote_plus(item['image']))
+        # else:
+        #     item['content_html'] += '<a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(item['url'], item['image'])
+        # item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
+        # if 'url' in item['author']:
+        #     item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
+        # else:
+        #     item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(item['author']['name'])
+        # item['content_html'] += '<div style="margin:4px 0 4px 0;">Released: {}</div>'.format(item['_display_date'])
+        # item['content_html'] += '</div></div>' + tracks_html
 
     return item
 

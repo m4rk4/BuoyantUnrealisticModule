@@ -1,4 +1,4 @@
-import asyncio, curl_cffi, base64, glob, importlib, io, json, os, re, sys
+import asyncio, curl_cffi, base64, glob, importlib, io, json, os, random, re, string, sys
 import subprocess, time
 # import certifi, primp
 import requests
@@ -135,13 +135,15 @@ def content():
     if site_json.get('args'):
         args_copy.update(site_json['args'])
 
+
     content = module.get_content(url, args_copy, site_json, save_debug)
 
     if 'ai_summary' in args:
-        if args['ai_summary']:
-            content['_ai_summary'] = utils.get_ai_summary(content['content_html'], feature=args['ai_summary'])
+        if args['ai_summary'] in ['cloudflare', 'hf_summarizer', 'decopy_ai']:
+            provider = args['ai_summary']
         else:
-            content['_ai_summary'] = utils.get_ai_summary(content['content_html'])
+            provider = 'cloudflare'
+        content['_ai_summary'] = utils.get_ai_summary(content['content_html'], False, provider, args)
         content['content_html'] += '<hr style="margin:2em 0;"><h2>AI Summary:</h2>' + content['_ai_summary']
 
     if 'read' in args:
@@ -203,24 +205,26 @@ def audio():
 
     module, site_json = utils.get_module(args['url'], handler)
     if not module:
-        return 'No content module for this url'
+        return 'No content module for this url', 400
 
     content = module.get_content(args['url'], args, site_json, save_debug)
     if not content.get('_audio'):
-        return 'No audio sources found for this url'
+        return 'No audio sources found for this url', 204
 
-    if '_audio_key' in args:
-        # print(content['_audio'])
+    if 'novideojs' in args:
+        return redirect(content['_audio'])
+
+    if '_audio_key' in content:
         audio_url = config.server + '/videojs-decrypt?src=' + quote_plus(content['_audio']) + '&key=' + content['_audio_key']
     else:
         audio_url = config.server + '/videojs?src=' + quote_plus(content['_audio'])
-    if content.get('_audio_type'):
+    if '_audio_type' in content:
         audio_url += '&type=' + quote_plus(content['_audio_type'])
     else:
         audio_url += '&type=audio%2Fmpeg'
-    if content.get('image'):
+    if 'image' in content:
         audio_url += '&poster=' + quote_plus(content['image'])
-    elif content.get('_image'):
+    elif '_image' in content:
         audio_url += '&poster=' + quote_plus(content['_image'])
     return redirect(audio_url)
 
@@ -300,6 +304,8 @@ def videojs():
             video_args['type'] = 'video/webm'
         elif '.m3u8' in video_args['src'].lower():
             video_args['type'] = 'application/x-mpegURL'
+        elif '.mpd' in video_args['src'].lower():
+            video_args['type'] = 'application/dash+xml'
         elif '.avi' in video_args['src'].lower():
             video_args['type'] = 'video/x-msvideo'
         elif '.mov' in video_args['src'].lower():
@@ -554,7 +560,7 @@ def screenshot():
     if not args.get('url'):
         return 'No url specified'
 
-    if True:
+    if args.get('provider') and args['provider'] == 'thumbio':
         # https://www.thum.io/documentation/api/url
         # TODO: use https://image.thum.io/get/prefetch/{url} in get_content to prefetch images
         thumb_url = 'https://image.thum.io/get'
@@ -586,45 +592,71 @@ def screenshot():
             if im_io:
                 return send_file(im_io, mimetype=mimetype)
         return redirect(thumb_url)
+    elif args.get('provider') and args['provider'] == 'pikwy':
+        api_url = 'https://api.pikwy.com/?tkn=125&d=3000&u={}&fs=0&w=1280&h=1200&s=100&z=100&f=jpg&rt=jweb'.format(quote_plus(args['url']))
+        headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "origin": "https://pikwy.com/",
+            "priority": "u=1, i",
+            "referrer": "https://pikwy.com/"
+        }
+        try:
+            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30)
+            if r.status_code == 200 and r.json().get('iurl'):
+                return redirect(r.json()['iurl'])
+        except Exception as e:
+            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+    elif args.get('provider') and args['provider'] == 'web2pdf':
+        boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+        body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"url\"\r\n\r\n' + args['url'] + '\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"pricing\"\r\n\r\nmonthly\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"DstFileFormat\"\r\n\r\njpg\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"ConversionDelay\"\r\n\r\n0\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"CookieConsentBlock\"\r\n\r\ntrue\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"Zoom\"\r\n\r\n1\r\n'
+        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"ParameterPreset\"\r\n\r\nWide\r\n'
+        body += '--' + boundary + '--\r\n'
+        headers = {
+            "accept": "*/*",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "cache-control": "no-cache",
+            "content-type": "multipart/form-data; boundary=" + boundary,
+            "pragma": "no-cache",
+            "priority": "u=1, i",
+            "x-requested-with": "XMLHttpRequest"
+        }
+        api_url = 'https://www.web2pdfconvert.com/api/convert/web/to/jpg?storefile=true&filename=' + urlsplit(args['url']).path[1:].replace('/', '-')
+        try:
+            r = curl_cffi.post(api_url, data=body, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
+            if r.status_code == 200:
+                return redirect(r.json()['Files'][0]['Url'])
+        except Exception as e:
+            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+    else:
+        api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024&time_allocated'.format(quote_plus(args['url']))
+        headers = {
+            "accept": "text/plain, */*; q=0.01",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "origin": "https://urltoscreenshot.com/",
+            "priority": "u=1, i",
+            "referrer": "https://urltoscreenshot.com/",
+            "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
+        }
+        try:
+            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30)
+            if r.status_code == 200:
+                return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
+        except Exception as e:
+            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
 
-    api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024'.format(quote_plus(args['url']))
-    headers = {
-        "accept": "text/plain, */*; q=0.01",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "origin": "https://urltoscreenshot.com/",
-        "priority": "u=1, i",
-        "referrer": "https://urltoscreenshot.com/",
-        "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
-    }
-    try:
-        r = requests.get(api_url, headers=headers, impersonate="chrome", timeout=30)
-        if r.status_code == 200:
-            return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
-    except Exception as e:
-        logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-
-    api_url = 'https://api.pikwy.com/?tkn=125&d=3000&u={}&fs=0&w=1280&h=1200&s=100&z=100&f=jpg&rt=jweb'.format(quote_plus(args['url']))
-    headers = {
-        "accept": "*/*",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "origin": "https://pikwy.com/",
-        "priority": "u=1, i",
-        "referrer": "https://pikwy.com/"
-    }
-    try:
-        r = requests.get(api_url, headers=headers, impersonate="chrome", timeout=30)
-        if r.status_code == 200 and r.json().get('iurl'):
-            return redirect(r.json()['iurl'])
-    except Exception as e:
-        logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-
-    # https://github.com/microsoft/playwright-python/issues/723
-    loop = asyncio.ProactorEventLoop()
-    asyncio.set_event_loop(loop)
-    ss_io = loop.run_until_complete(get_screenshot(args['url'], args))
-    if not ss_io:
-        return 'Something went wrong'
-    return send_file(ss_io, mimetype='image/png')
+    # # https://github.com/microsoft/playwright-python/issues/723
+    # loop = asyncio.ProactorEventLoop()
+    # asyncio.set_event_loop(loop)
+    # ss_io = loop.run_until_complete(get_screenshot(args['url'], args))
+    # if not ss_io:
+    #     return 'Something went wrong'
+    # return send_file(ss_io, mimetype='image/png')
 
 
 @app.route('/send_src')
@@ -703,7 +735,7 @@ def proxy(url):
             logger.warning('requests error {} getting {}'.format(r.status_code, proxy_url))
             if r.text:
                 f_io = BytesIO(r.text.encode())
-                return send_file(f_io, mimetype='text/plain')
+                return send_file(f_io, mimetype='text/plain'), r.status_code
             return 'Something went wrong ({})'.format(r.status_code), r.status_code
         m3u8_playlist = r.text
         # Rewrite playlist files to proxy the contents
@@ -726,8 +758,8 @@ def proxy(url):
     return resp
 
 
-@app.route('/test_stream_spotify')
-def test_stream_spotify():
+@app.route('/stream_spotify')
+def stream_spotify():
     args = request.args
     if not args.get('url'):
         return 'No url specified'
@@ -737,32 +769,18 @@ def test_stream_spotify():
     content_type = paths[-2]
     if content_type != 'episode':
         return 'Content not supported'
-
-    url = 'https://open.spotify.com/get_access_token'
-    r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
-    if r.status_code == 200:
-        access_token = r.json()['accessToken']
-    else:
-        logger.warning('Error {} getting {}'.format(r.status_code, url))
-        url = 'https://open.spotify.com/playlist/37i9dQZEVXbLp5XoPON0wI'
-        r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
-        if r.status_code != 200:
-            return 'Error {} getting {}'.format(r.status_code, url)
-        soup = BeautifulSoup(r.text, 'lxml')
-        el = soup.find('script', id='session')
-        if not el:
-            return 'unable to get Spotify authorization token'
-        session_json = json.loads(el.string)
-        access_token = session_json['accessToken']
+    tokens = spotify.get_tokens()
+    if not tokens:
+        return 'unable to get Spotify access tokens'
 
     headers = {
         "accept": "application/json",
         "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "authorization": 'Bearer ' + access_token,
+        "authorization": 'Bearer ' + tokens['access_token']['accessToken'],
         "content-type": "application/json",
-        "origin": "https://embed-standalone.spotify.com",
+        "origin": "https://open.spotify.com",
         "priority": "u=1, i",
-        "referer": "https://embed-standalone.spotify.com/",
+        "referer": "https://open.spotify.com/",
         "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": "\"Windows\"",
@@ -803,61 +821,7 @@ def test_stream_spotify():
         else:
             key = args['key']
     else:
-        headers = {
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "origin": "https://embed-standalone.spotify.com",
-            "referer": "https://embed-standalone.spotify.com/",
-            "sec-ch-ua": "\"Microsoft Edge\";v=\"131\", \"Chromium\";v=\"131\", \"Not_A Brand\";v=\"24\"",
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": "\"Windows\"",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-site",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0"
-        }
-        url = 'https://seektables.scdn.co/seektable/{}.json'.format(widevine['fileId'])
-        r = requests.get(url, headers=headers)
-        if r.status_code != 200:
-            return 'Error {} getting {}'.format(r.status_code, url)
-        seektables = r.json()
-        utils.write_file(seektables, './debug/seektables.json')
-
-        # pssh = seektables['pssh_widevine']
-        pssh = seektables['pssh']
-        license_url = 'https://spclient.wg.spotify.com/widevine-license/v1/unauth/audio/license'
-        license_headers = \
-'''{
-    'accept': '*/*',
-    'accept-language': 'en-US,en;q=0.9,en-GB;q=0.8',
-    'origin': 'https://embed-standalone.spotify.com',
-    'priority': 'u=1, i',
-    'referrer': 'https://embed-standalone.spotify.com/',
-    'sec-ch-ua': '"Microsoft Edge";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-site',
-    'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0'
-}'''
-        cdrm_data = {
-            'PSSH': pssh,
-            'License URL': license_url,
-            'Headers': license_headers,
-            'JSON': "{}",
-            'Cookies': "{}",
-            'Data': "{}",
-            'Proxy': "",
-        }
-        r = requests.post('https://cdrm-project.com/', json=cdrm_data)
-        if r.status_code != 200:
-            return 'Error {} getting keys from https://cdrm-project.com/'.format(r.status_code)
-        cdrm_result = r.json()
-        utils.write_file(cdrm_result, './debug/cdrm.json')
-        key = cdrm_result['Message'].split(':')[1].strip()
-        print(key)
-        # key seems to be 'deadbeefdeadbeefdeadbeefdeadbeef'
+        key = spotify.get_key(widevine['fileId'])
 
     # TODO: play with videojs-contrib-eme or shaka-player?
 

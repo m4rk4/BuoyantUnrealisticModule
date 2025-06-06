@@ -187,7 +187,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += '<ul>'
         if data_json['movie_review'].get('movie_release_date'):
             dt = datetime.fromisoformat(data_json['movie_review']['movie_release_date']).replace(tzinfo=timezone.utc)
-            item['content_html'] += '<li>Release date: ' + utils.format_display_date(dt, False) + '</li>'
+            item['content_html'] += '<li>Release date: ' + utils.format_display_date(dt, date_only=True) + '</li>'
         if data_json['movie_review'].get('movie_runtime'):
             item['content_html'] += '<li>Run time: {} hr, {} min</li>'.format(int(data_json['movie_review']['movie_runtime'].split(':')[0]), int(data_json['movie_review']['movie_runtime'].split(':')[1]))
         if data_json['movie_review'].get('movie_genre'):

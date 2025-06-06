@@ -22,12 +22,12 @@
                 content: '';
                 width: 36px;
                 height: 36px;
-                background: url(https://upload.wikimedia.org/wikipedia/commons/4/4a/Arrow-drop-right-line.svg');
+                background: url('https://upload.wikimedia.org/wikipedia/commons/4/4a/Arrow-drop-right-line.svg');
                 background-size: cover;
                 transition: 0.2s;
             }
             details[open] > summary::before {
-                transform: rotate(180deg);
+                transform: rotate(90deg);
             }
             summary > div {
                 flex-grow: 1;
@@ -71,10 +71,10 @@
 	<body style="max-width:800px; font-size:18px;">
         <h2><a href="{{ link }}" target="_blank">{{ title }}</a></h2>
 {% for item in items %}
-        <details name="article">
+        <details name="article" style="margin:1em 0;">
             <summary style="height:108px;">
                 <div>
-                    <a href="{{ item.url }}">{{ item.title }}</a>
+                    <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
 {% if item.summary %}
                     <p>{{ item.summary }}</p>
 {% endif %}

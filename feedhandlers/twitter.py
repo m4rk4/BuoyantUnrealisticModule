@@ -390,7 +390,7 @@ def make_card(card_json, tweet_json):
         card_html += '&nbsp;&bull;&nbsp;{} votes'.format(total_count)
         dt = datetime.fromisoformat(
             binding_values['last_updated_datetime_utc']['string_value'].replace('Z', '+00:00'))
-        card_html += '&nbsp;&bull;&nbsp;Last updated {}</small></div>'.format(utils.format_display_date(dt, False))
+        card_html += '&nbsp;&bull;&nbsp;Last updated {}</small></div>'.format(utils.format_display_date(dt, date_only=True))
 
     elif card_json['name'] == 'promo_website':
         card_type = 2

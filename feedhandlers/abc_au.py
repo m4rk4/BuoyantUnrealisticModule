@@ -160,7 +160,7 @@ def get_content(url, args, site_json, save_debug):
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
             if article_json['docType'] == 'audio' or article_json['docType'] == 'audioepisode':
-                item['_display_date'] = utils.format_display_date(dt, False)
+                item['_display_date'] = utils.format_display_date(dt, date_only=True)
             else:
                 item['_display_date'] = utils.format_display_date(dt)
         if article_json['datelinePrepared'].get('updatedDate'):

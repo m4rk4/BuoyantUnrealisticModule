@@ -340,7 +340,7 @@ def get_content(url, args, site_json, save_debug=False):
                 dt = datetime.fromtimestamp(int(params['updated'][0]))
                 item['date_published'] = dt.isoformat()
                 item['_timestamp'] = dt.timestamp()
-                item['_display_date'] = utils.format_display_date(dt, False)
+                item['_display_date'] = utils.format_display_date(dt, date_only=True)
             else:
                 el = audio_player.find(attrs={"slot": "date"})
                 if el:
@@ -348,7 +348,7 @@ def get_content(url, args, site_json, save_debug=False):
                     dt = datetime.strptime(el.string.strip(), '%b %d, %Y')
                     item['date_published'] = dt.isoformat()
                     item['_timestamp'] = dt.timestamp()
-                    item['_display_date'] = utils.format_display_date(dt, False)
+                    item['_display_date'] = utils.format_display_date(dt, date_only=True)
             el = audio_player.find(attrs={"slot": "author"})
             if el:
                 item['author'] = {}

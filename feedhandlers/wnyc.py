@@ -40,7 +40,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(api_json['data']['attributes']['newsdate']).astimezone(timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {
         "name": api_json['data']['attributes']['headers']['brand']['title'],

@@ -259,7 +259,7 @@ def render_body_component(component):
                 img_src = component['entry']['leadComponent']['video']['square']['variantUrl']
             content_html += '<td style="width:128px;"><img src="{}" style="width:100%;" /></td>'.format(img_src)
         dt = datetime.fromisoformat(component['entry']['publishDate'].replace('Z', '+00:00'))
-        content_html += '<td><a href="{}"><b>{}</b></a><br/>by {}, {}</td></tr></table>'.format(component['entry']['url'], component['entry']['title'], component['entry']['author']['fullName'], utils.format_display_date(dt, False))
+        content_html += '<td><a href="{}"><b>{}</b></a><br/>by {}, {}</td></tr></table>'.format(component['entry']['url'], component['entry']['title'], component['entry']['author']['fullName'], utils.format_display_date(dt, date_only=True))
 
     elif component['__typename'] == 'TableBlockType' or component['__typename'] == 'EntryBodyTable':
         if component['__typename'] == 'EntryBodyTable':

@@ -47,7 +47,7 @@ def get_survey(url, args, site_json, save_debug=False):
     item['content_html'] = '<h3>' + survey_json['results'][0]['title'] + '</h3>'
     for data in survey_json['results'][0]['data']:
         item['content_html'] += utils.add_bar(data['label'], data['value'], 100, True)
-    item['content_html'] += '<div>Conducted {}. YouGov surveyed {} US adults.</div>'.format(utils.format_display_date(dt, False), survey_json['total'])
+    item['content_html'] += '<div>Conducted {}. YouGov surveyed {} US adults.</div>'.format(utils.format_display_date(dt, date_only=True), survey_json['total'])
     item['content_html'] += '<div>&nbsp;</div>'
 
     # Tables

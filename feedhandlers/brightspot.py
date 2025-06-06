@@ -126,7 +126,10 @@ def render_content(content, skip_promos=True):
                 content_html += render_content(it, skip_promos)
         elif '/enhancement/Enhancement.hbs' in content['_template'] or '/externalcontent/ExternalContentWrapper.hbs' in content['_template']:
             for it in content['item']:
-                content_html += render_content(it, skip_promos)
+                if content.get('externalContent') and 'ExternalContentEnhancement.hbs' in it['_template']:
+                    content_html += utils.add_embed(content['externalContent']['url'])
+                else:
+                    content_html += render_content(it, skip_promos)
         elif '/enhancement/InlineEnhancement.hbs' in content['_template']:
             if content.get('items'):
                 for it in content['items']:
@@ -504,7 +507,7 @@ def render_content(content, skip_promos=True):
             else:
                 logger.warning('unhandled PymInteractive content')
         elif '/htmlmodule/HtmlModule.hbs' in content['_template'] or '/module/HtmlModule.hbs' in content['_template']:
-            if not re.search(r'download our apps|TOP STORIES|window\.om\d+|piano-sidebar-newsletter|^<style>.*</style>$', content['rawHtml'], flags=re.I|re.S):
+            if content.get('rawHtml') and not re.search(r'download our apps|TOP STORIES|window\.om\d+|piano-sidebar-newsletter|article-inline|^<style>.*</style>$', content['rawHtml'], flags=re.I|re.S):
                 if content['rawHtml'].startswith('<iframe'):
                     m = re.search(r'src="([^"]+)"', content['rawHtml'])
                     if m:
@@ -528,10 +531,14 @@ def render_content(content, skip_promos=True):
                 else:
                     logger.warning('unknown rawHtml content')
                     print(content['rawHtml'])
+        elif '/raw-html/RawHtmlModule.hbs' in content['_template']:
+            if 'flourish-embed' in content['html']:
+                m = re.search(r'data-src="([^"]+)', content['html'])
+                content_html += utils.add_embed('https://flo.uri.sh/' + m.group(1) + '/embed')
         elif content['_template'] == '/customEmbed/EarlyElements.hbs' or content['_template'] == '/customEmbed/CustomEmbedModule.hbs':
             if not re.search(r'OUTBRAIN|Report a typo|ubscribe to', content['html'], flags=re.I):
                 logger.warning('unknown customEmbed content')
-        elif '/ad/' in content['_template'] or 'AdModule' in content['_template'] or '/taboola/' in content['_template'] or '/nativo/NativoModule.hbs' in content['_template'] or '/relatedlist/RelatedList.hbs' in content['_template'] or '/form/Form.hbs' in content['_template'] or '/promo/PromoRichTextElement.hbs' in content['_template'] or '/newsletter/NewsletterModule.hbs' in content['_template']:
+        elif '/ad/' in content['_template'] or 'AdModule' in content['_template'] or '/taboola/' in content['_template'] or '/nativo/NativoModule.hbs' in content['_template'] or '/relatedlist/RelatedList.hbs' in content['_template'] or '/form/Form.hbs' in content['_template'] or '/promo/PromoRichTextElement.hbs' in content['_template'] or '/newsletter/NewsletterModule.hbs' in content['_template'] or '/newsletter/NewsletterSignUpModule.hbs' in content['_template'] or '/packagelistmodule/PackageListModule.hbs' in content['_template']:
             pass
         else:
             logger.warning('unhandled content template ' + content['_template'])
@@ -577,7 +584,7 @@ def get_item(article_json, args, site_json, save_debug):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    short_display_date = utils.format_display_date(dt, False)
+    short_display_date = utils.format_display_date(dt, date_only=True)
 
     if article_json.get('dateModifiedISO'):
         dt = datetime.fromisoformat(article_json['dateModifiedISO'].replace('Z', '+00:00'))
@@ -808,10 +815,17 @@ def get_item(article_json, args, site_json, save_debug):
 
     for el in soup.find_all('p', attrs={"data-has-dropcap-image": True}):
         el.attrs = {}
-        new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em;">\1</span>', str(el), 1)
+        new_html = re.sub(r'>("?\w)', r'><span style="float:left; font-size:4em; line-height:0.8em; padding-right:4px;">\1</span>', str(el), 1)
         new_html += '<span style="clear:left;"></span>'
         new_el = BeautifulSoup(new_html, 'html.parser')
         el.replace_with(new_el)
+
+    for el in soup.select('p:has(> dropcap)'):
+        el.dropcap.attrs = {}
+        el.dropcap['style'] = 'float:left; font-size:4em; line-height:0.8em; padding-right:4px;'
+        el.dropcap.name = 'span'
+        new_el = BeautifulSoup('<span style="clear:left;"></span>', 'html.parser')
+        el.insert_after(new_el)
 
     for el in soup.find_all('script'):
         el.decompose()

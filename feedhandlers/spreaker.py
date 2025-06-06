@@ -63,7 +63,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(episode_json['published_at']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     s = float(episode_json['duration'] / 1000)
     h = math.floor(s / 3600)

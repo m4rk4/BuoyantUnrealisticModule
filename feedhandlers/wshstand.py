@@ -60,7 +60,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['authors'] = [{"name": x['AUTHOR_NAME']} for x in page_json['authorsArray']]
     if len(item['authors']) > 0:
@@ -77,7 +77,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['content_html'] += utils.add_image(page_json['SCREENCAP_IMAGE'])
 
     if page_json['TYPE_DESC'] == 'Podcast':
-        item['content_html'] += '<div>&nbsp;</div>' + utils.add_audio(page_json['audioDetails']['DOWNLOAD_URL'], page_json['SCREENCAP_IMAGE'], item['title'], item['url'], page_json['SERIES_NAME'], 'https://washingtonstand.com/podcast/' +  page_json['SERIES_NAME'].lower(), utils.format_display_date(dt, False), int(page_json['audioDetails']['FILE_LENGTH']))
+        item['content_html'] += '<div>&nbsp;</div>' + utils.add_audio(page_json['audioDetails']['DOWNLOAD_URL'], page_json['SCREENCAP_IMAGE'], item['title'], item['url'], page_json['SERIES_NAME'], 'https://washingtonstand.com/podcast/' +  page_json['SERIES_NAME'].lower(), utils.format_display_date(dt, date_only=True), int(page_json['audioDetails']['FILE_LENGTH']))
 
     if page_json.get('FULL_TEXT'):
         item['content_html'] += page_json['FULL_TEXT']

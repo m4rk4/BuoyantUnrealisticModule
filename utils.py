@@ -178,6 +178,7 @@ def requests_retry_session(retries=4):
 def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=False):
   # https://www.whatismybrowser.com/guides/the-latest-user-agent/
   # https://developers.whatismybrowser.com/
+  # https://github.com/monperrus/crawler-user-agents/blob/master/crawler-user-agents.json
   if user_agent == 'desktop':
     # ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
     header_gen = HeaderGenerator(
@@ -200,13 +201,40 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = header_gen.generate()['User-Agent']
   elif user_agent == 'googlebot':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
-    ua = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+    ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/135.0.0.0 Safari/537.36'
+  elif user_agent == 'googlebot-mobile':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+  elif user_agent == 'googlebot-image':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Googlebot-Image/1.0'
+  elif user_agent == 'googlebot-video':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Googlebot-Video/1.0'
+  elif user_agent == 'google-inspectiontool':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Mozilla/5.0 (compatible; Google-InspectionTool/1.0;)'
+  elif user_agent == 'google-other':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GoogleOther) Chrome/135.0.0.0 Safari/537.36'
   elif user_agent == 'chatgpt':
-    # https://platform.openai.com/docs/plugins/bot
+    # https://platform.openai.com/docs/bots
     ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot'
+  elif user_agent == 'gptbot':
+    # https://platform.openai.com/docs/bots
+    ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.1; +https://openai.com/gptbot'
+  elif user_agent == 'oai-searchbot':
+    # https://platform.openai.com/docs/bots
+    ua = 'OAI-SearchBot/1.0; +https://openai.com/searchbot'
   elif user_agent == 'facebook':
-    # https://gitlab.com/magnolia1234/bypass-paywalls-chrome-clean/-/blob/master/background.js
+    # https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/
     ua = 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
+  elif user_agent == 'meta-externalagent':
+    # https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/
+    ua = 'meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'
+  elif user_agent == 'meta-externalfetcher':
+    # https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/
+    ua = 'meta-externalfetcher/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)'
   elif user_agent == 'applebot':
     # https://support.apple.com/en-us/119829
     ua = 'Mozilla/5.0 (Device; OS_version) AppleWebKit/WebKit_version (KHTML, like Gecko)Version/Safari_version [Mobile/Mobile_version] Safari/WebKit_version (Applebot/Applebot_version; +http://www.apple.com/go/applebot)'
@@ -218,6 +246,8 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     ua = 'Mozilla/5.0 (compatible; GrapeshotCrawler/2.0; +http://www.grapeshot.co.uk/crawler.php)'
   elif user_agent == 'gumgumbot':
     ua = 'GumGum-Bot/1.0 (http://gumgum.com; verity-support@gumgum.com)'
+  elif user_agent == 'ia_archiver':
+    ua = 'ia_archiver (+http://www.alexa.com/site/help/webmasters; crawler@alexa.com)'
   elif user_agent == 'none':
     ua = ''
   else: # Googlebot
@@ -617,8 +647,8 @@ def url_exists(url):
 
 def write_file(data, filename):
   if filename.endswith('.json'):
-    with open(filename, 'w', encoding='utf-8') as file:
-      json.dump(data, file, indent=4, sort_keys=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+      json.dump(data, f, indent=4, sort_keys=True)
   elif filename.endswith('.html'):
     soup = BeautifulSoup(data, 'html.parser')
     with open(filename, 'w', encoding='utf-8') as f:
@@ -750,15 +780,16 @@ def init_jsonfeed(args):
   feed['items'] = []
   return feed
 
-def format_display_date(dt_utc, include_time=True):
+def format_display_date(dt_utc, date_only=False, time_only=False):
   dt_loc = dt_utc.astimezone(pytz.timezone(config.local_tz))
   month = dt_loc.strftime('%b')
   if month != 'May':
     month += '.'
-  if include_time:
-    return '{} {}, {}, {}:{} {} {}'.format(month, dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
-  else:
+  if date_only:
     return '{} {}, {}'.format(month, dt_loc.day, dt_loc.year)
+  if time_only:
+    return '{}:{} {} {}'.format(int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
+  return '{} {}, {}, {}:{} {} {}'.format(month, dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
 
 def random_alphanumeric_string(str_len=8):
   letters_digits = string.ascii_letters + string.digits
@@ -954,15 +985,15 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
     if width != '0':
       style += ' width:{};'.format(width)
   elif not re.search(r'width:\s?\d+', img_style):
-    style += ' width:auto; max-width:100%;'
+    style += ' width:100%;'
     #fig_html += ' width:100%;'
   if height:
     if height != '0':
       style += ' height:{};'.format(height)
   else:
-    style += ' max-height:800px;'
+    style += ' height:100%; max-height:800px; object-fit:contain;'
   if img_style:
-    style += ' {}'.format(img_style)
+    style += ' ' + img_style
 
   if fallback_img:
     fig_html += '<object data="{}" '.format(fallback_img)
@@ -1015,32 +1046,48 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   return fig_html
 
 
-def format_small_card(image_html, content_html, footer_html='', image_size='160px', content_style='', border=True, margin='2em auto 2em auto'):
+def format_small_card(image_html, content_html, footer_html='', image_size='160px', content_style='', border=True, margin='2em auto 2em auto', align_items='center', image_position='left'):
   # assumes a square image
   # min-width = 2*w + 4
-  template_areas = "'image content'"
+  if image_position == 'right':
+    template_areas = "'content image'"
+    template_columns = 'auto ' + image_size
+  else:
+    template_areas = "'image content'"
+    template_columns = image_size + ' auto'
+
   if footer_html:
     template_areas += " 'footer footer'"
-  card_html = '<div style="display:grid; grid-template-areas:{}; grid-template-columns:{} auto; width:99%; min-width:324px; max-width:540px; margin:{};'.format(template_areas, image_size, margin)
+
+  if align_items:
+    align = ' align-items:' + align_items + ';'
+  else:
+    align = ''
+  card_html = '<div style="display:grid; grid-template-areas:{}; grid-template-columns:{}; width:99%; min-width:324px; max-width:540px; margin:{};{}'.format(template_areas, template_columns, margin, align)
   if border:
     card_html += ' border:1px solid light-dark(#333,#ccc); border-radius:10px;'
   card_html += '">'
 
   card_html += '<div style="grid-area:image; max-width:{}; aspect-ratio:1/1;">'.format(image_size) + image_html + '</div>'
 
-  card_html += '<div style="grid-area:content; min-width:128px;{}">'.format(content_style) + content_html + '</div>'
+  card_html += '<div style="grid-area:content; min-width:128px;'
+  if content_style:
+    card_html += ' ' + content_style
+  card_html += '">' + content_html + '</div>'
 
   if footer_html:
-    card_html +=  '<div style="grid-area:footer; padding:8px;">' + footer_html + '</div>'
+    card_html +=  '<div style="grid-area:footer; padding:8px; overflow-wrap:break-word; word-wrap:break-word; word-break:break-word; -ms-hyphens:auto; -moz-hyphens:auto; -webkit-hyphens:auto; hyphens:auto;">' + footer_html + '</div>'
 
   card_html += '</div>'
   return card_html
 
-def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, border=True, desc='', use_video_js=True, margin='2em auto 2em auto'):
+def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, border=True, desc='', use_video_js=True, margin='2em auto 2em auto', button_overlay=config.audio_button_overlay):
   if small_poster == True or (audio_src and not poster) or (audio_src and show_poster == False):
     w = '64px'
+    w_overlay = '40px'
   else:
     w = '160px'
+    w_overlay = '96px'
 
   if border:
     if desc:
@@ -1055,12 +1102,12 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
     if audio_type == 'audio_link':
       audio_link = '<a href="{}" target="_blank">'.format(audio_src)
     elif use_video_js and audio_type != 'audio_redirect':
-      audio_link = '<a href="{}/videojs?src={}&type={}'.format(config.server, quote_plus(audio_src), quote_plus(audio_type))
+      audio_link = '<a href="' + config.server + '/videojs?src=' + quote_plus(audio_src) + '&type=' + quote_plus(audio_type)
       if poster:
         audio_link += '&poster=' + quote_plus(poster)
       audio_link += '" target="_blank">'
     elif audio_type == 'audio_redirect':
-      audio_link += '<a href="{}/audio?url={}" target="_blank">'.format(config.server, quote_plus(audio_src))
+      audio_link += '<a href="' + config.server + '/audio?url=' + quote_plus(audio_src) + '" target="_blank">'
     else:
       audio_link += '<a href="{}" target="_blank">'.format(audio_src)
 
@@ -1081,21 +1128,21 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
       image_html += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center;{}">'.format(poster, border_style)
   else:
     image_html += '<div style="width:100%; height:100%; background-color:rgb(0,0,0,0); border-radius:50%; text-align:center;{}">'.format(poster, border_style)
-  if audio_link:
+  if audio_link or button_overlay != config.audio_button_overlay:
     image_html += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span>'
     if show_poster:
-      image_html += '<img src="{}" style="width:96px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(config.audio_button_overlay['src'])
-      if config.audio_button_overlay.get('opacity'):
-        image_html += ' opacity:{};'.format(config.audio_button_overlay['opacity'])
-      if config.audio_button_overlay.get('filter'):
-        image_html += ' filter:{};'.format(config.audio_button_overlay['filter'])
+      image_html += '<img src="{}" style="width:{}; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(button_overlay['src'], w_overlay)
+      if button_overlay.get('opacity'):
+        image_html += ' opacity:{};'.format(button_overlay['opacity'])
+      if button_overlay.get('filter'):
+        image_html += ' filter:{};'.format(button_overlay['filter'])
       image_html += '">'
     else:
-      image_html += '<img src="{}" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(config.audio_button_overlay['src'])
-      if config.audio_button_overlay.get('opacity'):
-        image_html += ' opacity:{};'.format(config.audio_button_overlay['opacity'])
-      if config.audio_button_overlay.get('filter'):
-        image_html += ' filter:{};'.format(config.audio_button_overlay['filter'])
+      image_html += '<img src="{}" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'.format(button_overlay['src'])
+      if button_overlay.get('opacity'):
+        image_html += ' opacity:{};'.format(button_overlay['opacity'])
+      if button_overlay.get('filter'):
+        image_html += ' filter:{};'.format(button_overlay['filter'])
       image_html += '">'
   image_html += '</div>'
   if audio_link:
@@ -1106,21 +1153,57 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
   if title or author:
     if title:
       # Limit to 2 lines
-      content_html += '<div style="margin-top:0.2em; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;" title="{}">'.format(title)
+      content_html += '<div style="margin-top:0.2em; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;"'
+      if 'href' in title:
+        m = re.search(r'>(.*?)</a>', title)
+        content_html += ' title="' + m.group(1) + '"'
+      else:
+        content_html += ' title="' + title + '"'
+      content_html += '>'
       n += 2.2
       if title_url:
-        content_html += '<a href="{}">{}</a>'.format(title_url, title)
+        content_html += '<a href="' + title_url + '">' + title + '</a>'
       else:
         content_html += title
       content_html += '</div>'
     if author:
-      content_html += '<div style="margin-top:0.3em; font-size:0.9em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;" title="{}">'.format(author)
-      n += 0.9*2.3
-      if author_url:
-        content_html += '<a href="{}">{}</a>'.format(author_url, author)
-      else:
-        content_html += author
-      content_html += '</div>'
+      if isinstance(author, str):
+        content_html += '<div style="'
+        if show_poster:
+          content_html += 'margin-top:0.3em; '
+          n += 0.9*0.3
+        content_html += 'font-size:0.9em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;"'
+        if 'href' in author:
+          m = re.findall('>(.*?)</a>', author)
+          content_html += ' title="' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(m)) + '"'
+        else:
+          content_html += ' title="' + author + '"'
+        content_html += '>'
+        n += 0.9*2
+        if author_url:
+          content_html += '<a href="' + author_url + '">' + author + '</a>'
+        else:
+          content_html += author
+        content_html += '</div>'
+      elif isinstance(author, list):
+        for i, auth in enumerate(author):
+          content_html += '<div style="'
+          if show_poster:
+            content_html += 'margin-top:0.3em; '
+            n += 0.9*0.3
+          content_html += 'font-size:0.9em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;"'
+          if 'href' in auth:
+            m = re.findall('>(.*?)</a>', auth)
+            content_html += ' title="' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(m)) + '"'
+          else:
+            content_html += ' title="' + auth + '"'
+          content_html += '>'
+          n += 0.9*2
+          if author_url and author_url[i]:
+            content_html += '<a href="' + author_url[i] + '">' + auth + '</a>'
+          else:
+            content_html += auth
+          content_html += '</div>'
 
   has_duration = False
   try:
@@ -1134,9 +1217,10 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
     if len(duration) > 0:
       has_duration = True
 
+  content_html += '<div style="margin-top:auto; margin-bottom:0.2em; font-size:0.8em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+
   if date or has_duration:
     # Limit to 1 line, position at bottom
-    content_html += '<div style="margin-top:auto; margin-bottom:0.2em; font-size:0.8em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
     n += 0.8
     if date:
       content_html += date
@@ -1147,7 +1231,8 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
         content_html += calc_duration(d)
       else:
         content_html += duration
-    content_html += '</div>'
+  
+  content_html += '</div>'
 
   if w == '64px':
     height = 'max-height:' + str(math.ceil(n) + 1) + 'em;'
@@ -1448,7 +1533,7 @@ def add_button(link, text, button_color='light-dark(#555, #ccc)', text_color='li
   button += '"><a href="{}" style="text-decoration:none;" target="_blank"><span style="{}">{}</span></a></div>'.format(link, style, text)
   return button
 
-def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False, center=True):
+def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False, center=True, show_rating=False):
   # num_stars is a float
   star_html = '<div style="'
   if center:
@@ -1466,6 +1551,8 @@ def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label=
     else:
       if not no_empty:
         star_html += '☆'
+  if show_rating:
+    star_html += '&nbsp;({}/{})'.format(num_stars, max_stars)
   star_html += '</div>'
   return star_html
 
@@ -2049,16 +2136,23 @@ def get_dict_value_from_path(dict, path):
   return val
 
 
-def get_ai_summary(content_html, is_text=False, feature='overview', length='medium', lang='same-as-input'):
-  # https://decopy.ai/summarizer/
-  # feature = overview, main-points, faq
-  # length = short, medium, long
-  # lang = same-as-input, English, etc (search languageOptions)
-  if feature not in ['faq', 'main-points', 'overview']:
-    feature = 'overview'
+# Python version of Math.random().toString(36).slice(2);
+# From https://github.com/DanishjeetSingh/base36py/blob/main/base36py/__init__.py
+def _frac_to_base36(fractional_part, precision=8):
+  CHARS = "0123456789abcdefghijklmnopqrstuvwxyz"
+  base36_fraction = []
+  for _ in range(precision):
+    fractional_part *= 36
+    integer_part = int(fractional_part)
+    base36_fraction.append(CHARS[integer_part])
+    fractional_part -= integer_part
+  return ''.join(base36_fraction)
 
+def random_base36_string():
+  return _frac_to_base36(random.random(), 11)
+
+def get_ai_summary(content_html, is_text=False, provider='cloudflare', args={}):
   summary = ''
-
   if is_text:
     content = content_html
   else:
@@ -2069,67 +2163,213 @@ def get_ai_summary(content_html, is_text=False, feature='overview', length='medi
     for el in soup.find_all('p', recursive=False):
       content += el.get_text() + '\r\n\r\n'
 
-  boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+  if provider == 'cloudflare':
+    if 'model' in args:
+      model = args['model']
+    else:
+      # Available models: https://playground.ai.cloudflare.com/api/models
+      # model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+      model = '@cf/google/gemma-3-12b-it'
+
+    headers = {
+      "accept": "*/*",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "cache-control": "no-cache",
+      "content-type": "application/json",
+      "pragma": "no-cache",
+      "priority": "u=1, i"
+    }
+
+    # msg = "Summarize the following:\n\n" + content
+    msg = "Create a bullet list summary of the following:\n\n" + content
+
+    data = {
+      "messages": [
+        {
+          "role": "user",
+          "content": msg,
+          "parts": [
+            {
+              "type": "text",
+              "text": msg
+            }
+          ]
+        }
+      ],
+      "lora": None,
+      "model": model,
+      "max_tokens": 512,
+      "stream": True,
+      "system_message": "You are a helpful assistant",
+      "tools":[]
+    }
+    r = curl_cffi.post('https://playground.ai.cloudflare.com/api/inference', json=data, impersonate="chrome", headers=headers, stream=True, proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('status code {} posting message to https://playground.ai.cloudflare.com/api/inference'.format(r.status_code))
+      return summary
+
+    for line in r.iter_lines():
+      if line:
+        s = line.decode('utf-8')
+        if s.startswith('0:'):
+          summary += s[3:-1]
+        else:
+          logger.warning('unhandled line ' + s)
+    # write_file(summary, './debug/summary.txt')
+    summary = markdown(summary.replace('\\n', '\n'))
+
+  elif provider == 'hf_summarizer':
+    # https://huggingface.co/spaces/amoghsuman/ai-powered-text-summarizer
+    headers = {
+      "accept": "*/*",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "cache-control": "no-cache",
+      "content-type": "application/json",
+      "pragma": "no-cache",
+      "priority": "u=1, i",
+      "x-zerogpu-uuid": "ZmrEKUxNIl2Wz2e6BL8AE"
+    }
+
+    session_hash = random_base36_string()
+    data = {
+      "data": [content],
+      "event_data": None,
+      "fn_index": 2,
+      "trigger_id": 12,
+      "session_hash": session_hash
+    }
+
+    r = curl_cffi.post('https://amoghsuman-ai-powered-text-summarizer.hf.space/gradio_api/queue/join?__theme=system', json=data, impersonate="chrome", headers=headers, proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('status code {} posting message to https://amoghsuman-ai-powered-text-summarizer.hf.space/gradio_api/queue/join?__theme=system'.format(r.status_code))
+      return summary
+
+    headers = {
+      "accept": "text/event-stream",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "cache-control": "no-cache",
+      "content-type": "application/json",
+      "pragma": "no-cache",
+      "priority": "u=1, i",
+      "sec-fetch-storage-access": "active"
+    }
+    r = curl_cffi.get('https://amoghsuman-ai-powered-text-summarizer.hf.space/gradio_api/queue/data?session_hash=' + session_hash, impersonate="chrome", headers=headers, stream=True, proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('status code {} posting message to https://amoghsuman-ai-powered-text-summarizer.hf.space/gradio_api/queue/data?session_hash={}'.format(r.status_code), session_hash)
+      return summary
+
+    for line in r.iter_lines():
+      if line:
+        s = line.decode('utf-8')
+        if s.startswith('data:'):
+          data = json.loads(s[6:])
+          if data['msg'] == 'process_completed':
+            for it in data['output']['data']:
+              summary += it
+    summary = markdown(summary)
+
+  elif provider == 'decopy_ai':
+    # https://decopy.ai/summarizer/
+    if 'feature' in args and args['feature'] in ['faq', 'main-points', 'overview']:
+      feature = args['feature']
+    else:
+      feature = 'main-points'
+
+    if 'length' in args and args['length'] in ['short', 'medium', 'long']:
+      length = args['length']
+    else:
+      length = 'medium'
+
+    if 'lang' in args:
+      lang = args['lang']
+    else:
+      lang = 'same-as-input'
+
+    boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+    headers = {
+      "accept": "*/*",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "content-type": "multipart/form-data; boundary=" + boundary,
+      "priority": "u=1, i",
+      "product-code": "067003",
+      "product-serial": "621da01dbe8455fd917ea80145967fbf"
+    }
+
+    body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"mode\"\r\n\r\nSummary\r\n'
+    body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"feature\"\r\n\r\n' + feature + '\r\n'
+    body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"entertext\"\r\n\r\n' + content + '\r\n'
+    body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n' + lang + '\r\n'
+    body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"length\"\r\n\r\n' + length + '\r\n'
+    body += '--' + boundary + '--\r\n'
+    # print(body)
+
+    r = curl_cffi.post('https://api.decopy.ai/api/decopy/ai-summarizer/create-job', data=body, impersonate="chrome", headers=headers, proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('status error {} getting creating ai summary job'.format(r.status_code))
+      return summary
+    
+    job_json = r.json()
+    if job_json['code'] != 100000:
+      logger.warning('unhandled ai-summarizer code {}, message {}'.format(job_json['code'], job_json['message']['en']))
+      return ''
+
+    headers = {
+      "accept": "text/event-stream",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "cache-control": "no-cache",
+      "priority": "u=1, i"
+    }
+
+    job_url = 'https://api.decopy.ai/api/decopy/ai-summarizer/get-job/' + job_json['result']['job_id']
+    r = curl_cffi.get(job_url, headers=headers, stream=True, proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('status code {} getting job {}'.format(r.status_code, job_json['result']['job_id']))
+      return summary
+
+    for line in r.iter_lines():
+      if line:
+        s = line.decode('utf-8')
+        # print(s)
+        if s.startswith('data:'):
+          i = s.find('{')
+          if i > 0:
+            j = s.rfind('}') + 1
+            data = json.loads(s[i:j])
+            if data['state'] == 100000:
+              summary += data['data']
+    summary = markdown(summary)
+
+  return summary
+
+
+def htmlcss_to_image(html_str, css_str=''):
+  # https://htmlcsstoimage.com/
   headers = {
     "accept": "*/*",
     "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-    "content-type": "multipart/form-data; boundary=" + boundary,
-    "priority": "u=1, i",
-    "product-code": "067003",
-    "product-serial": "621da01dbe8455fd917ea80145967fbf",
-    "sec-ch-ua": "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site"
-  }
-  body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"mode\"\r\n\r\nSummary\r\n'
-  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"feature\"\r\n\r\n' + feature + '\r\n'
-  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"entertext\"\r\n\r\n' + content + '\r\n'
-  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n' + lang + '\r\n'
-  body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"length\"\r\n\r\n' + length + '\r\n'
-  body += '--' + boundary + '--\r\n'
-  # print(body)
-  r = requests.post('https://api.decopy.ai/api/decopy/ai-summarizer/create-job', data=body, headers=headers)
-  if r.status_code != 200:
-    logger.warning('status error {} getting creating ai summary job'.format(r.status_code))
-    return summary
-  
-  job_json = r.json()
-  if job_json['code'] != 100000:
-    logger.warning('unhandled ai-summarizer code {}, message {}'.format(job_json['code'], job_json['message']['en']))
-    return ''
-
-  job_url = 'https://api.decopy.ai/api/decopy/ai-summarizer/get-job/' + job_json['result']['job_id']
-  headers = {
-    "accept": "text/event-stream",
-    "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
     "cache-control": "no-cache",
+    "content-type": "application/json",
+    "pragma": "no-cache",
     "priority": "u=1, i",
-    "sec-ch-ua": "\"Microsoft Edge\";v=\"135\", \"Not-A.Brand\";v=\"8\", \"Chromium\";v=\"135\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "empty",
-    "sec-fetch-mode": "cors",
-    "sec-fetch-site": "same-site"
+    "x-csrf-token": "vADnimjyV_jrmz1GH1O3A31mE2v2O-sgF992adrGO997NYts7hzX1DUxmokjsxhTXcUi_41Yx9cNomDgmMl9Yw"
   }
-  r = requests.get(job_url, headers=headers, stream=True)
+
+  body = {
+    "console_mode": "",
+    "css": css_str,
+    "device_scale": "",
+    "google_fonts": "",
+    "html": html_str,
+    "ms_delay": "",
+    "render_when_ready": "false",
+    "selector": "",
+    "url": "",
+    "viewport_height": "",
+    "viewport_width": ""
+  }
+
+  r = curl_cffi.post('https://htmlcsstoimage.com/demo_run', json=body, impersonate="chrome", headers=headers, proxies=config.proxies)
   if r.status_code != 200:
-    logger.warning('status code {} getting job {}'.format(r.status_code, job_json['result']['job_id']))
-    return summary
-
-  for line in r.iter_lines():
-    if line:
-      s = line.decode('utf-8')
-      # print(s)
-      if s.startswith('data:'):
-        i = s.find('{')
-        if i > 0:
-          j = s.rfind('}') + 1
-          data = json.loads(s[i:j])
-          if data['state'] == 100000:
-            summary += data['data']
-
-  # result is markdown, covert to html
-  return markdown(summary)
+    logger.warning('status code {} posting to https://htmlcsstoimage.com/demo_run'.format(r.status_code))
+    return ''
+  return r.json()['url']

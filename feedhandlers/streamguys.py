@@ -67,7 +67,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['date_published'] = dt.isoformat()
                 item['_timestamp'] = dt.timestamp()
                 item['_display_date'] = utils.format_display_date(dt)
-                display_date = '<div style="font-size:0.8em;">{}</div>'.format(utils.format_display_date(dt, False))
+                display_date = '<div style="font-size:0.8em;">{}</div>'.format(utils.format_display_date(dt, date_only=True))
         except:
             pass
 

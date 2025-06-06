@@ -60,7 +60,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime(int(d[2]), int(d[0]), int(d[1])).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['tags'] = next_data['pageProps']['data']['tags'].copy()
 

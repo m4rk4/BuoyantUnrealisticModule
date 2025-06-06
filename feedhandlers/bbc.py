@@ -11,7 +11,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_next_data(url, site_json):
+def get_next_data(url, site_json, extract_from_page=True):
+    if extract_from_page:
+        page_html = utils.get_url_html(url)
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            logger.warning('unable to find __NEXT_DATA__ in ' + url)
+            return None
+        next_data = json.loads(el.string)
+        return next_data['props']
+
+    # TODO: _next/data path is no longer valid
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     if len(paths) == 0:
@@ -259,6 +270,8 @@ def render_contents(content_blocks, body_intro=False, heading=0):
                 content_html += utils.add_embed(block['model']['href'])
             else:
                 logger.warning('unhandled social content source ' + block['model']['source'])
+        elif block['type'] == 'embed' and block['model']['provider'] == 'flourish-visualisation':
+            content_html += utils.add_embed(block['model']['source'])
         elif block['type'] == 'callout':
             quote = ''
             if block['model'].get('title'):
@@ -446,3 +459,5 @@ def get_feed(url, args, site_json, save_debug=False):
         return rss.get_feed(url, args, site_json, save_debug, get_content)
     else:
         return bbcarticle.get_feed(url, args, site_json, save_debug)
+
+    # TODO: topic feed from https://web-cdn.api.bbci.co.uk/xd/content-collection/topic-page-d54eeb3a-5731-4407-82b8-8aa962eb2ba5?country=us&page=1&size=9&path=%2Fnews%2Ftopics%2Fcg41ylwvgjyt

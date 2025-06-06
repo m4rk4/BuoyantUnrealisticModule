@@ -44,7 +44,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(ep_json['performed_at'].replace('Z', '+00:00'))
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['author'] = {
             "name": ep_json['content']['series_title']
@@ -129,7 +129,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         item['content_html'] = utils.add_audio('', item['image'], item['title'], item['url'], '', '', '', '')
         item['content_html'] += '<h3 style="margin:8px;">Latest episodes:</h3>'
-        item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), False), ep_json['content']['duration'], show_poster=False)
+        item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), date_only=True), ep_json['content']['duration'], show_poster=False)
 
         if 'max' in args:
             n = min(int(args['max']), len(show_json['episodes']['items']))
@@ -142,6 +142,6 @@ def get_content(url, args, site_json, save_debug=False):
             ep_json = utils.get_url_json('https://rss.art19.com/episodes/{}?content_only=true'.format(ep_id), headers=headers)
             if not ep_json:
                 continue
-            item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), False), ep_json['content']['duration'], show_poster=False)
+            item['content_html'] += utils.add_audio(ep_json['content']['media']['mp3']['url'], utils.closest_dict(ep_json['content']['artwork']['episode'], 'height', 640)['url'], ep_json['content']['episode_title'], ep_json['content']['episode_share_url'], '', '', utils.format_display_date(datetime.fromisoformat(ep_json['performed_at']), date_only=True), ep_json['content']['duration'], show_poster=False)
 
     return item

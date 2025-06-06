@@ -160,10 +160,13 @@ def render_block(block, full_header=False, headline_url=''):
         block_html += render_block(block['media'])
 
     elif block['__typename'] == 'DiptychBlock':
-        for key, blk in block.items():
-            if key.startswith('image'):
-                block_html += render_block(blk)
-            elif key not in ['__typename', 'size']:
+        if block.get('imageOne') and block.get('imageTwo'):
+            block_html += '<div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5em; width:100%; align-items:flex-start;">'
+            block_html += '<div style="flex:1; min-width:256px;">' + render_block(block['imageOne']) + '</div>'
+            block_html += '<div style="flex:1; min-width:256px;">' + render_block(block['imageTwo']) + '</div>'
+            block_html += '</div>'
+        for key in block.keys():
+            if key not in ['__typename', 'imageOne', 'imageTwo', 'mobileColumns', 'size']:
                 logger.warning('unhandled DiptychBlock key ' + key)
 
     elif block['__typename'] == 'UnstructuredBlock':
@@ -302,7 +305,11 @@ def render_block(block, full_header=False, headline_url=''):
             # TODO: fix - screenshot doesn't use playwright to render html now
             # embed_url = 'data:text/html;base64,' + base64.b64encode(block['html'].encode()).decode()
             # block_html += utils.add_image('{}/screenshot?url={}&browser=chrome&waitfortime=5000&locator=div.birdkit-body'.format(config.server, quote_plus(embed_url)), link=embed_url)
-            block_html += '<blockquote><b>Unable to display embedded content</b></blockquote>'
+            html_img = utils.htmlcss_to_image(block['html'])
+            if html_img:
+                block_html = utils.add_image(html_img, 'Interactive content may not be displayed properly.')
+            else:
+                block_html += '<blockquote><b>Unable to display embedded content</b></blockquote>'
         elif soup.find('blockquote', class_='tiktok-embed'):
             block_html += utils.add_embed(soup.blockquote['cite'])
         elif block.get('slug') and 'burst-video' in block['slug']:

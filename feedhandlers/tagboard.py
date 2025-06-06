@@ -74,7 +74,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(poll_json['result']['end_time'].replace('Z', '+00:00'))
     diff = dt - datetime.utcnow().replace(tzinfo=timezone.utc)
     if diff.total_seconds() > 0:
-        item['content_html'] += '<div><small>Poll is open until {} &bull; {} votes</small></div></div>'.format(utils.format_display_date(dt, False), poll_json['result']['total'])
+        item['content_html'] += '<div><small>Poll is open until {} &bull; {} votes</small></div></div>'.format(utils.format_display_date(dt, date_only=True), poll_json['result']['total'])
     else:
         item['content_html'] += '<div><small>Poll is closed &bull; {} votes</small></div></div>'.format(poll_json['result']['total'])
     return item

@@ -418,7 +418,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
-        item['content_html'] += '&nbsp;&bull;&nbsp;<small>{}</small>'.format(utils.format_display_date(dt, False))
+        item['content_html'] += '&nbsp;&bull;&nbsp;<small>{}</small>'.format(utils.format_display_date(dt, date_only=True))
 
     item['content_html'] += '</td><td style="width:32px; padding:0 8px 0 8px; text-align:right; vertical-align:middle;"><a href="{}"><img src="https://lf16-tiktok-common.ttwstatic.com/obj/tiktok-web-common-sg/mtact/static/images/logo_144c91a.png?v=2" style="width:100%;"/></a></td></tr>'.format(item['url'])
 

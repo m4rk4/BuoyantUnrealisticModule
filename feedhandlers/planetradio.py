@@ -53,7 +53,7 @@ def get_player_content(url, args, site_json, save_debug):
     dt = datetime.fromisoformat(player_json['starttime']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     # TODO: lookup showid info
     item['author'] = {"name": paths[0].replace('-', ' ').title()}
@@ -140,7 +140,7 @@ def get_podcast(channel_slug, args, site_json, save_debug):
     dt = datetime.fromisoformat(channel['UpdatedAt']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {}
     item['author']['name'] = channel['PodcastChannelTitle']
@@ -171,7 +171,7 @@ def get_podcast(channel_slug, args, site_json, save_debug):
             item['content_html'] += '<tr><td><a href="{}"><img src="{}/static/play_button-48x48.png"/></a></td>'.format(episode['PodcastExtMediaUrl'], config.server)
             duration = utils.calc_duration(episode['PodcastDuration'])
             dt = datetime.fromisoformat(episode['PodcastPublishDate']).replace(tzinfo=timezone.utc)
-            item['content_html'] += '<td><div><a href="{}"><b>{}</b></a></div><div><small>{} &bull; {}</small></div></td></tr>'.format(ep['url'], episode['PodcastTitle'], utils.format_display_date(dt, False), duration)
+            item['content_html'] += '<td><div><a href="{}"><b>{}</b></a></div><div><small>{} &bull; {}</small></div></td></tr>'.format(ep['url'], episode['PodcastTitle'], utils.format_display_date(dt, date_only=True), duration)
         item['content_html'] += '</table>'
     return item
 
@@ -201,7 +201,7 @@ def get_podcast_episode(channel_slug, episode_id, args, site_json, save_debug):
     dt = datetime.fromisoformat(episode['PodcastPublishDate']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
     dt = datetime.fromisoformat(episode['PodcastUpdatedAt']).replace(tzinfo=timezone.utc)
     item['date_modified'] = dt.isoformat()
 

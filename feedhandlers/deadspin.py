@@ -62,7 +62,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = dateutil.parser.parse(re.sub(r' \([^\)]+\)$', '', page_json['article']['createdAt']))
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
     if page_json['article'].get('updatedAt'):
         dt = dateutil.parser.parse(re.sub(r' \([^\)]+\)$', '', page_json['article']['updatedAt']))
         item['date_modified'] = dt.isoformat()

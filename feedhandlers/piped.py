@@ -68,7 +68,7 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 play_url = '{}/video?url={}'.format(config.server, quote_plus('https://www.youtube.com' + it['url']))
                 poster = '{}/image?height=128&url={}&overlay=video'.format(config.server, quote_plus(it['thumbnail']))
-            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp;Uploaded {}</small></div>'.format(it['url'], it['title'], it['uploaderUrl'], it['uploaderName'], duration, utils.format_display_date(dt, False))
+            desc = '<div style="font-size:1.1em; font-weight:bold;"><a href="https://piped.video{}">{}</a></div><div><a href="https://piped.video{}">{}</a></div><div><small>{}&nbsp;&bull;&nbsp;Uploaded {}</small></div>'.format(it['url'], it['title'], it['uploaderUrl'], it['uploaderName'], duration, utils.format_display_date(dt, date_only=True))
             item['content_html'] += '<table><tr><td style="width:128px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td><td style="vertical-align:top;">{}</td></tr></table><div>&nbsp;</div>'.format(play_url, poster, desc)
     else:
         for piped_instance in piped_instances:
@@ -100,7 +100,7 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromisoformat(piped_json['uploadDate'])
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
-        item['_display_date'] = utils.format_display_date(dt, False)
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         item['author'] = {"name": piped_json['uploader']}
 

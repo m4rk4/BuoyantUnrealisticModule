@@ -128,7 +128,7 @@ def get_content(url, args, site_json, save_debug=False):
             poster = '{}/image?url={}&height=128&crop=128,128&overlay=audio'.format(config.server, item['_image'])
             item['content_html'] += '<table><tr><td><a href="{}"><img src="{}" /></a></td>'.format(audio_json['audioSrc'], poster)
             item['content_html'] += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div><div>by {}</div>'.format(audio_json['storyUrl'], audio_json['title'], item['author']['name'])
-            item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), utils.calc_duration(audio_json['duration']))
+            item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, date_only=True), utils.calc_duration(audio_json['duration']))
             item['content_html'] += '</table>'
         if '/embed/' in url:
             return item

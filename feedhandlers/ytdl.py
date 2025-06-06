@@ -30,6 +30,8 @@ def get_content(url, args, site_json, save_debug=False):
             video_id = query['v'][0]
         elif 'shorts' in paths:
             video_id = paths[1]
+        elif 'live' in paths:
+            video_id = paths[1]
         if query.get('list'):
             playlist_id = query['list'][0]
 
@@ -44,14 +46,21 @@ def get_content(url, args, site_json, save_debug=False):
         "extractor_args": {
             "youtube": {
                 "player_client": [
-                    "web_safari"
-                ],
-                "po_token": [
-                    "web_safari.gvs+" + config.youtube_po_token
+                    "mweb"
                 ]
             }
         }
     }
+    if config.bgutil_base_url:
+        ydl_opts['extractor_args']['youtubepot-bgutilhttp'] = {
+            "base_url": [
+                config.bgutil_base_url
+            ]
+        }
+    elif config.youtube_po_token:
+        ydl_opts['extractor_args']['youtube']['po_token'] = [
+            "mweb.gvs+" + config.youtube_po_token
+        ]
 
     if 'player_client' in args:
         ydl_opts["extractor_args"]['youtube']['player_client'] = args['player_client'].split(',')
@@ -61,13 +70,14 @@ def get_content(url, args, site_json, save_debug=False):
         # These are printed to stdout
         try:
             ydl = YoutubeDL(ydl_opts)
-            for key, val in config.youtube_cookies.items():
-                ydl.cookiejar.set_cookie(Cookie(
-                    name=key, value=val, domain='.youtube.com', 
-                    version=0, port=None, path='/', secure=True, expires=None, discard=False,
-                    comment=None, comment_url=None, rest={'HttpOnly': None},
-                    domain_initial_dot=True, port_specified=False, domain_specified=True, path_specified=False
-                ))
+            if config.youtube_cookies:
+                for key, val in config.youtube_cookies.items():
+                    ydl.cookiejar.set_cookie(Cookie(
+                        name=key, value=val, domain='.youtube.com', 
+                        version=0, port=None, path='/', secure=True, expires=None, discard=False,
+                        comment=None, comment_url=None, rest={'HttpOnly': None},
+                        domain_initial_dot=True, port_specified=False, domain_specified=True, path_specified=False
+                    ))
             video_info = ydl.extract_info('https://www.youtube.com/watch?v=' + video_id, download=False)
         except DownloadError as e:
             logger.warning(str(e))
@@ -116,7 +126,6 @@ def get_content(url, args, site_json, save_debug=False):
         if uploader_info:
             thumb = next((it for it in uploader_info['thumbnails'] if it['id'] == 'avatar_uncropped'), None)
             if thumb:
-                # item['author']['avatar'] = thumb['url']
                 item['author']['avatar'] = config.server + '/image?url=' + quote_plus(thumb['url'])
         if 'avatar' not in item['author']:
             page_html = utils.get_url_html(item['author']['url'])
@@ -124,20 +133,18 @@ def get_content(url, args, site_json, save_debug=False):
                 page_soup = BeautifulSoup(page_html, 'lxml')
                 el = page_soup.find('meta', attrs={"property": "og:image"})
                 if el:
-                    # item['author']['avatar'] = el['content']
                     item['author']['avatar'] = config.server + '/image?url=' + quote_plus(el['content'])
         if 'avatar' in item['author']:
-            # heading = '<table style="width:100%; border-collapse:collapse; background:rgb(0,0,0,0.5);"><tr><td style="width:32px; padding:4px 0 0 8px; vertical-align:middle; text-align:center;"><img src="{}" /><td style="padding:4px 0 0 8px; vertical-align:middle;"><a href="{}" style="color:white; text-decoration:none;">{}</a></td></tr></table>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
             heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="{}" style="float:left; width:32px; height:32px; border-radius:50%;"><a href="{}" style="text-decoration:none;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></a></div>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
         else:
-            item['author']['avatar'] = '{}/image?width=32&height=32&mask=ellipse'.format(config.server)
+            item['author']['avatar'] = config.server + '/image?width=32&height=32&mask=ellipse'
             heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><span style="float:left; width:32px; height:32px; background-color:SlateGray; border-radius:50%;"></span><a href="{}" style="text-decoration:none;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></a></div>'.format(item['author']['url'], item['author']['name'])
     else:
+        # "avatar": config.server + '/image?width=32&height=32&mask=ellipse'
         item['author'] = {
             "name": "Private uploader",
-            "avatar": '{}/image?width=32&height=32&mask=ellipse'.format(config.server)
+            "avatar": "data:image/svg+xml;utf8,<svg width='32' height='32' xmlns='http://www.w3.org/2000/svg'><circle r='16' cx='16' cy='16' fill='SlateGray'/></svg>"
         }
-        # heading = '<table style="width:100%; border-collapse:collapse; background:rgb(0,0,0,0.5);"><tr><td style="width:32px; padding:4px 0 0 8px; vertical-align:middle; text-align:center;"><img src="{}" /><td style="padding:4px 0 0 8px; vertical-align:middle;"><span style="color:white;">{}</span></td></tr></table>'.format(item['author']['avatar'], item['author']['name'])
         heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><span style="float:left; width:32px; height:32px; background-color:SlateGray; border-radius:50%;"></span><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></div>'.format(item['author']['name'])
 
     item['tags'] = []
@@ -148,73 +155,38 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['image'] = video_info['thumbnail']
 
-    audio = next((it for it in video_info['formats'] if it['format_id'] == '140'), None)
+    audio = next((it for it in video_info['formats'] if it['format_id'] == '251'), None)
     if audio:
         item['_audio'] = audio['url']
         attachment = {}
         attachment['url'] = item['_audio']
-        attachment['mime_type'] = 'audio/mp4'
+        attachment['mime_type'] = 'audio/ogg'
         item['attachments'] = []
         item['attachments'].append(attachment)
 
-    if 'format' in args:
-        video = next((it for it in video_info['formats'] if it['format_id'] == args['format']), None)
-    else:
-        video = None
-    if not video and 'manifest_url' in video_info:
-        video = video_info
-    else:
-        # Default m3u8 formats:
-        # Format 95 - 1280x720 m3u8
-        # Format 94 - 854x480 m3u8
-        # Format 96 - 1920x1080 m3u8
-        for fmt in ['95', '94', '96']:
-            video = next((it for it in video_info['formats'] if it['format_id'] == fmt), None)
-            if video:
-                break
-    if video:
-        if video['protocol'] == 'm3u8_native':
-            item['_video'] = config.server + '/proxy/' + video['manifest_url']
-            item['_video_type'] = 'application/x-mpegURL'
-        else:
-            item['_video'] = video['url']
-
+    # This is only streamable format
     video = next((it for it in video_info['formats'] if it['format_id'] == '18'), None)
     if video:
-        item['_video_mp4'] = video['url']
-
-    # if video_info.get('url'):
-    #     item['_video'] = video_info['url']
-    #     if item['_video'].endswith('.m3u8'):
-    #         item['_video_type'] = 'application/x-mpegURL'
-    #         m3u8_playlist = utils.get_url_html(video_info['url'], headers=video_info['http_headers'])
-    #         if m3u8_playlist:
-    #             item['_m3u8'] = m3u8_playlist.replace('https://', config.server + '/proxy/https://')
-    #             item['_video'] = config.server + '/proxy/' + item['url']
-    #     elif video_info['video_ext'] == 'mp4':
-    #         item['_video_type'] = 'video/mp4'
-    #     elif video_info['video_ext'] == 'webm':
-    #         item['_video_type'] = 'video/webm'
+        item['_video'] = video['url']
+        item['_video_type'] = 'video/mp4'
 
     if video_info.get('description'):
         item['summary'] = video_info['description']
 
     if '_video' not in item and '_video_mp4' not in item:
-        # TODO: overlay_img and overlay_header
-        if item['author']['name'] == 'Private uploader':
-            poster = config.server + '/image?width=854&height=480&color=204,204,204&overlay=http%3A%2F%2Flocalhost:8080%2Fstatic%2Fyt_private_overlay.webp'
-        else:
-            poster = '{}/image?url={}&width=1000'.format(config.server, quote_plus(item['image']))
+        # https://www.youtube.com/watch?v=wKnOb6Z77ws
         caption = '<b>Video is unavailable:</b> {} | <a href="{}" target="_blank">Watch on YouTube</a>'.format(item['title'], item['url'])
-        item['content_html'] = utils.add_image(poster, caption, link=item['url'], heading=heading)
+        if item['author']['name'] == 'Private uploader':
+            poster = "data:image/svg+xml;utf8,<svg viewBox='0 0 64 36' xmlns='http://www.w3.org/2000/svg'><rect width='64' height='36' fill='rgb(204,204,204)'/></svg>"
+            item['content_html'] = utils.add_image(poster, caption, link=item['url'], overlay=config.warning_overlay, overlay_heading=heading)
+        else:
+            item['content_html'] = utils.add_image(item['image'], caption, link=item['url'], overlay_heading=heading)
     else:
-        # poster = '{}/image?url={}&width=1000&overlay=video'.format(config.server, quote_plus(item['image']))
-        poster = '{}/image?url={}&width=1000'.format(config.server, quote_plus(item['image']))
         caption = '{} | <a href="{}" target="_blank">Watch on YouTube</a>'.format(item['title'], item['url'])
         video_url = config.server + '/video?url=' + quote_plus(item['url'])
         if 'player_client'  in args:
             video_url += '&player_client=' + args['player_client']
-        item['content_html'] = utils.add_image(poster, caption, link=video_url, overlay=config.video_button_overlay, overlay_heading=heading)
+        item['content_html'] = utils.add_image(item['image'], caption, link=video_url, overlay=config.video_button_overlay, overlay_heading=heading)
 
     if playlist_info:
         item['_playlist'] = []
@@ -241,7 +213,7 @@ def get_content(url, args, site_json, save_debug=False):
                     item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(video_info['uploader'])
                 dt_loc = datetime.fromtimestamp(video_info['timestamp'])
                 dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-                item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, False), utils.calc_duration(video_info['duration']))
+                item['content_html'] += '<div style="font-size:0.9em;">{} &bull; {}</div>'.format(utils.format_display_date(dt, date_only=True), utils.calc_duration(video_info['duration']))
                 item['content_html'] += '</div></div>'
             else:
                 item['content_html'] += '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'

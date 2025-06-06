@@ -83,7 +83,7 @@ def get_episode(episode_json, args, site_json, save_debug):
     dt = datetime.fromisoformat(episode_json['createdAt'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
     if episode_json.get('updatedAt'):
         dt = datetime.fromisoformat(episode_json['updatedAt']).replace(tzinfo=timezone.utc)
         item['date_modified'] = dt.isoformat()

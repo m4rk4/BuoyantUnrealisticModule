@@ -137,7 +137,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += utils.add_stars(float(content_json['metainfo']['CriticRating']['value']), star_color='red')
             item['content_html'] += '<ul>'
             if content_json['metainfo'].get('MovieReleaseDate'):
-                item['content_html'] += '<li>Release Date: ' + utils.format_display_date(datetime.fromtimestamp(int(content_json['metainfo']['MovieReleaseDate']['value']) / 1000), False) + '</li>'
+                item['content_html'] += '<li>Release Date: ' + utils.format_display_date(datetime.fromtimestamp(int(content_json['metainfo']['MovieReleaseDate']['value']) / 1000), date_only=True) + '</li>'
             if content_json['metainfo'].get('MovieCast'):
                 item['content_html'] += '<li>Cast: ' + re.sub(r'(\w),(\w)', r'\1, \2', content_json['metainfo']['MovieCast']['value']) + '</li>'
             if content_json['metainfo'].get('MovieDirector'):

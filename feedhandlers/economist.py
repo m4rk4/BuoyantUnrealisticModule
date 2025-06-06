@@ -121,11 +121,17 @@ def get_content(url, args, site_json, save_debug=False):
     item = {}
     if next_json['props']['pageProps'].get('cp2Content'):
         content_json = next_json['props']['pageProps']['cp2Content']
+    elif next_json['props']['pageProps'].get('content'):
+        content_json = next_json['props']['pageProps']['content']
+    else:
+        content_json = None
+
+    if content_json:
         item['id'] = content_json['id']
         item['url'] = next_json['props']['pageProps']['pageUrl']
 
         if '/the-world-this-week/' in item['url']:
-            item['title'] = 'The World this Week: {} ({})'.format(content_json['headline'], utils.format_display_date(datetime.fromisoformat(content_json['datePublished']), False))
+            item['title'] = 'The World this Week: {} ({})'.format(content_json['headline'], utils.format_display_date(datetime.fromisoformat(content_json['datePublished']), date_only=True))
         else:
             item['title'] = content_json['headline']
 
@@ -155,7 +161,7 @@ def get_content(url, args, site_json, save_debug=False):
         if content_json.get('section'):
             item['tags'].append(content_json['section']['name'])
         if content_json.get('tags'):
-            logger.warning('unhandled tags in ' + item['url'])
+            item['tags'] += [x['name'] for x in content_json['tags']]
         if not item.get('tags'):
             del item['tags']
 

@@ -913,7 +913,7 @@ def get_content(url, args, site_json, save_debug=False):
         if dt:
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
         if video_json.get('seriesName'):
             item['author'] = {

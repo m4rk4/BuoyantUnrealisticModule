@@ -99,7 +99,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(episode['pubDate'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['image'] = episode['imageUrl']
 
@@ -111,6 +111,23 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 item['tags'].append(it)
 
+    playlist = ''
+    if playlist_id:
+        item['_playlist'] = []
+        playlist += '<h3>Episodes:</h3>'
+        for episode in episodes[:5]:
+            title = episode['title'].strip()
+            if episode.get('subtitle'):
+                title += ': ' + episode['subtitle'].strip()
+            dt = datetime.fromisoformat(episode['pubDate'])
+            playlist += utils.add_audio_v2(episode['episodeUrlHRef'], episode['imageUrl'], title, 'https://playlist.megaphone.fm/?e=' + episode['uid'], '', '', utils.format_display_date(dt, date_only=True), episode['duration'], show_poster=False, border=False)
+            item['_playlist'].append({
+                "src": episode['episodeUrlHRef'],
+                "name": title,
+                "artist": item['author']['name'],
+                "image": episode['imageUrl']
+            })
+
     if episode_id:
         item['summary'] = episode['summary']
         item['_audio'] = episode['episodeUrlHRef']
@@ -119,46 +136,23 @@ def get_content(url, args, site_json, save_debug=False):
         attachment['mime_type'] = 'audio/mpeg'
         item['attachments'] = []
         item['attachments'].append(attachment)
-        item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], episode['duration'])
         if 'embed' not in args and 'summary' in item:
-            item['content_html'] += item['summary']
+            playlist = item['summary'] + playlist
+        item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], episode['duration'], desc=playlist)
+
     elif playlist_id:
         if podcast_feed:
             if podcast_feed.get('cover_url'):
                 item['image'] = podcast_feed['cover_url']
             if podcast_feed.get('description'):
                 item['summary'] = podcast_feed['description']
-        item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-        item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;"><a href="{0}/playlist?url={1}" target="_blank"><img src="{0}/image?url={2}&width=160&overlay=audio" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), quote_plus(item['image']))
-        item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        if item.get('author'):
-            item['content_html'] += '<div style="margin:4px 0 4px 0;">'
-            if item['author'].get('url'):
-                item['content_html'] += '<a href="{}">{}</a>'.format(item['author']['url'], item['author']['name'])
-            else:
-                item['content_html'] += item['author']['name']
-            item['content_html'] += '</div>'
-        # if item.get('summary'):
-        #     item['content_html'] += '<div style="margin:4px 0 4px 0; font-size:0.8em;">{}</div>'.format(item['summary'])
-        item['content_html'] += '</div></div>'
-        if 'embed' not in args and 'summary' in item:
-            item['content_html'] += item['summary']
 
-    if playlist_id:
-        item['_playlist'] = []
-        item['content_html'] += '<h3>Episodes:</h3>'
-        for episode in episodes[:5]:
-            title = episode['title']
-            if episode.get('subtitle'):
-                title += ': ' + episode['subtitle']
-            dt = datetime.fromisoformat(episode['pubDate'])
-            item['content_html'] += utils.add_audio(episode['episodeUrlHRef'], episode['imageUrl'], title, 'https://playlist.megaphone.fm/?e=' + episode['uid'], '', '', utils.format_display_date(dt, False), episode['duration'], show_poster=False)
-            item['_playlist'].append({
-                "src": episode['episodeUrlHRef'],
-                "name": title,
-                "artist": item['author']['name'],
-                "image": episode['imageUrl']
-            })
+        playlist_url = config.server + '/playlist?url=' + quote_plus(item['url'])
+
+        if 'embed' not in args and 'summary' in item:
+            playlist = '<p>' + item['summary'] + '</p>' + playlist
+
+        item['content_html'] = utils.add_audio_v2(playlist_url, item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', '', audio_type='audio_link', desc=playlist, use_video_js=False)
 
     return item
 

@@ -56,7 +56,7 @@ def add_podcast(podcast_feed, url, args):
     dt = dateutil.parser.parse(podcast_feed['feed']['updated'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['author'] = {
         "name": podcast_feed['feed']['title']
@@ -145,7 +145,7 @@ def add_episode(episode, podcast_feed, url, args):
     dt = dateutil.parser.parse(episode['published'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     if episode.get('tags'):
         item['tags'] = []

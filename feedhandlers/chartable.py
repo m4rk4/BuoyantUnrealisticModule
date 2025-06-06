@@ -92,7 +92,7 @@ def get_content(url, args, site_json, save_debug=False):
                     item['date_published'] = dt.isoformat()
                     item['_timestamp'] = dt.timestamp()
                     item['_display_date'] = utils.format_display_date(dt)
-                item['content_html'] += utils.add_audio(episode['url'], item['image'], episode['title'], '', '', '', utils.format_display_date(dt, False), '', show_poster=False)
+                item['content_html'] += utils.add_audio(episode['url'], item['image'], episode['title'], '', '', '', utils.format_display_date(dt, date_only=True), '', show_poster=False)
                 item['_playlist'].append({
                     "src": episode['url'],
                     "name": episode['title'],

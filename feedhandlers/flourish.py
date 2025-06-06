@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
@@ -13,16 +14,35 @@ def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
     if 'visualisation' in paths or 'story' in paths:
-        if 'embed' not in paths:
-            paths.append('embed')
+        if 'embed' in paths:
+            paths.remove('embed')
         item = {}
-        item['url'] = 'https://flo.uri.sh/{}'.format('/'.join(paths))
-        if 'visualisation' in paths:
-            item['_image'] = '{}/screenshot?url={}&locator=%23fl-layout-wrapper-outer&networkidle=true'.format(config.server, quote_plus(item['url']))
+        item['id'] = '/'.join(paths)
+        item['url'] = 'https://public.flourish.studio/' + item['id']
+        page_html = utils.get_url_html(item['url'])
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('meta', attrs={"property": "og:title"})
+            if el:
+                item['title'] = el['content']
+            else:
+                item['title'] = soup.title.get_text()
+            caption = item['title']
+            el = soup.find('meta', attrs={"property": "og:image"})
+            if el:
+                item['image'] = el['content']
+            el = soup.find('meta', attrs={"property": "og:description"})
+            if el:
+                item['summary'] = el['content']
+                caption += ' | ' + item['summary']
+            item['content_html'] = utils.add_image(item['image'], caption, link=item['url'] + '/embed')
         else:
-            item['_image'] = '{}/screenshot?url={}&locator=body%23story&networkidle=true'.format(config.server, quote_plus(item['url']))
-        caption = '<a href="{}" target="_blank">View on Flourish</a>'.format(item['url'])
-        item['content_html'] = utils.add_image(item['_image'], caption, link=item['url'])
+            if 'visualisation' in paths:
+                item['_image'] = '{}/screenshot?url={}&locator=%23fl-layout-wrapper-outer&networkidle=true'.format(config.server, quote_plus(item['url'] + '/embed'))
+            else:
+                item['_image'] = '{}/screenshot?url={}&locator=body%23story&networkidle=true'.format(config.server, quote_plus(item['url'] + '/embed'))
+            caption = '<a href="{}" target="_blank">View on Flourish</a>'.format(item['url'])
+            item['content_html'] = utils.add_image(item['_image'], caption, link=item['url'])
     else:
         logger.warning('unhandled url ' + url)
         item = None

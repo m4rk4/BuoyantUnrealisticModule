@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link crossorigin="anonymous" href="https://unpkg.com/video.js/dist/video-js.min.css" rel="stylesheet" />
+    </head>
+
+    <body>
+        <h2 id="message" style="text-align:center;"></h2>
+
+        <div id="player1" style="display:none;">
+            <video id="vid1" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="auto" poster="{{ args.poster }}" style="position: absolute; top: 0px; right: 0px; bottom: 0px; left: 0px; width: 100%; height: 100%;" data-setup="{}">
+                <p class="vjs-no-js">To view this video please enable JavaScript, and consider upgrading to a web browser that <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a></p>
+            </video>
+        </div>
+
+        <script crossorigin="anonymous" src="https://unpkg.com/video.js/dist/video.min.js"></script>
+        <script type="module">
+            // This doesn't result in a playable file
+            // There are various issues with CORS and worker.js
+            // By hosting the files locally we can remove the CORS headers in main.py
+            // Download the latest version from:
+            //     https://registry.npmjs.org/@ffmpeg/ffmpeg/
+            //     https://registry.npmjs.org/@ffmpeg/core/
+            //     https://registry.npmjs.org/@ffmpeg/core-mt/
+            //     https://registry.npmjs.org/@ffmpeg/util/
+            //     https://registry.npmjs.org/@ffmpeg/types/
+            import { FFmpeg } from "/static/ffmpeg-wasm/ffmpeg-0.12.15/package/dist/esm/index.js"; 
+            import { fetchFile, toBlobURL } from "/static/ffmpeg-wasm/util-0.12.2/package/dist/esm/index.js";
+            const message = document.getElementById("message");
+            let ffmpeg = null;
+            async function transcode() {
+                if (ffmpeg === null) {
+                    message.innerHTML = "Loading ffmpeg...";
+                    ffmpeg = new FFmpeg();
+                    ffmpeg.on("log", ({ msg }) => {
+                        console.log(msg);
+                    });
+                    ffmpeg.on("progress", ({ progress, time }) => {
+                        message.innerHTML = `Decrypting...<br>${progress * 100} %, time: ${time / 1000000} s`;
+                    });
+                    await ffmpeg.load({
+                        coreURL: await toBlobURL(`/static/ffmpeg-wasm/core-0.12.10/package/dist/esm/ffmpeg-core.js`, 'text/javascript'),
+                        wasmURL: await toBlobURL(`/static/ffmpeg-wasm/core-0.12.10/package/dist/esm/ffmpeg-core.wasm`, 'application/wasm'),
+                        // workerURL: await toBlobURL(`/static/ffmpeg-wasm/core-mt-0.12.10/package/dist/esm/ffmpeg-core.worker.js`, 'text/javascript'),
+                    });
+                }
+                message.innerHTML = "Downloading...<br>{{ args.src | safe}}...";
+                ffmpeg.writeFile("input.mp4", await fetchFile( "{{ args.src | safe}}" ));
+                message.innerHTML = "Decrypting...";
+                await ffmpeg.exec(["-decryption_key", "{{ args.key }}", "-i", "input.mp4", "-c", "copy", "output.mp4"]);
+                message.innerHTML = "Complete.";
+                message.style = "display:none;"
+                const data = ffmpeg.readFile("output.mp4");
+                const player = videojs("vid1");
+                player.src({
+                    type: "{{ args.type }}",
+                    src: URL.createObjectURL(new Blob([data.buffer], { type: "{{ args.type }}" }))
+                });
+                document.getElementById("player1").style = "";
+            };
+            document.addEventListener("DOMContentLoaded", transcode);
+        </script>
+    </body>
+</html>

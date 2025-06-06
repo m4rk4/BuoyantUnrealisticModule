@@ -68,7 +68,7 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.fromisoformat(post_json['sys']['publishedAt'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, False)
+    item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
     item['authors'] = [{"name": x['name']} for x in post_json['authorCollection']['items']]
     if len(item['authors']) > 0:

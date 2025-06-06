@@ -238,7 +238,7 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-quote in ' + item['url'])
 
         elif 'sqs-block-code' in block['class']:
-            if block.find(class_='adsbygoogle'):
+            if block.find(class_='adsbygoogle') or block.find(id=re.compile(r'taboola')):
                 continue
             elif block.find('script', src=re.compile(r'apps.elfsight.com')):
                 continue
@@ -249,6 +249,10 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     item['content_html'] += utils.add_embed(it['src'])
                     continue
+            elif block.find('blockquote', class_='instagram-media'):
+                it = block.find('blockquote', class_='instagram-media')
+                item['content_html'] += utils.add_embed(it['data-instgrm-permalink'])
+                continue
             elif block['data-block-type'] == "23":
                 el = block.find('a')
                 if el:

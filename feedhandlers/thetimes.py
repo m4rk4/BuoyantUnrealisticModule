@@ -333,7 +333,7 @@ def add_opta_rugby_summary(game_id, add_stats=False):
 
     match_detail = game_json['RRML']['@attributes']
     summary = '<table style="width:90%; margin:auto; padding:8px; text-align:center; border:1px solid #444; border-radius:10px;"><colgroup><col width="15%"><col width="20%"><col width="30%"><col width="20%"><col width="15%"></colgroup>'
-    summary += '<tr><td colspan="5"><b>Match Summary</b><br/>{}, {}<br/>{}</td></tr>'.format(utils.format_display_date(datetime.fromisoformat(match_detail['datetime']), False), match_detail['venue'], match_detail['comp_name'])
+    summary += '<tr><td colspan="5"><b>Match Summary</b><br/>{}, {}<br/>{}</td></tr>'.format(utils.format_display_date(datetime.fromisoformat(match_detail['datetime']), date_only=True), match_detail['venue'], match_detail['comp_name'])
     summary += '<tr><td><img src="https://omo.akamai.opta.net/image.php?secure=true&h=omo.akamai.opta.net&sport=rugby&entity=team&description=badges&dimensions=65&id={}" /></td>'.format(match_detail['home_team_id'])
     summary += '<td style="font-size:1.05em; font-weight:bold;">{}</td>'.format(match_detail['home_team'])
     summary += '<td style="font-size:1.5em; font-weight:bold;">{}&nbsp;&ndash;&nbsp;{}</td>'.format(match_detail['home_score'], match_detail['away_score'])

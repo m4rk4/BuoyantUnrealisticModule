@@ -158,7 +158,7 @@ def get_content(url, args, site_json, save_debug=False):
             dt = datetime.fromisoformat(content_json['publishDate'])
             item['date_published'] = dt.isoformat()
             item['_timestamp'] = dt.timestamp()
-            item['_display_date'] = utils.format_display_date(dt, False)
+            item['_display_date'] = utils.format_display_date(dt, date_only=True)
             if not item.get('title'):
                 item['title'] = item['_display_date']
             item['author'] = {
@@ -257,11 +257,11 @@ def get_content(url, args, site_json, save_debug=False):
                     if 'date_published' not in item:
                         item['date_published'] = dt.isoformat()
                         item['_timestamp'] = dt.timestamp()
-                        item['_display_date'] = utils.format_display_date(dt, False)
+                        item['_display_date'] = utils.format_display_date(dt, date_only=True)
                     if episode.get('title'):
                         title = episode['title']
                     else:
-                        title = utils.format_display_date(dt, False)
+                        title = utils.format_display_date(dt, date_only=True)
                     if episode['streamUrl'].get('default'):
                         audio_src = episode['streamUrl']['default']
                         audio_type = 'audio/mpeg'

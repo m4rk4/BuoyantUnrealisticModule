@@ -244,7 +244,7 @@ const trackList = [
 {% for track in tracks %}
   {
     name: "{{ track.name }}",
-    src: "{{ track.src }}",
+    src: "{{ track.src | safe }}",
     artist: "{{ track.artist }}",
     image: "{{ track.image }}",
   },

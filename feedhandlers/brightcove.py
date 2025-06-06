@@ -43,7 +43,7 @@ def get_content(url, args, site_json, save_debug=False):
         video_id = args['data-video-id']
     else:
         # https://players.brightcove.net/1105443290001/19b4b681-5e7c-4b03-b1ff-050f00d0be3e_default/index.html?videoId=6294188220001
-        m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*(videoId|playlistId)=(\d+)', url, flags=re.I)
+        m = re.search(r'https:\/\/players\.brightcove\.net\/(\d+)\/.*(videoId|playlistId)=([^&]+)', url, flags=re.I)
         if not m:
             logger.warning('unsupported brightcove url ' + url)
             return None

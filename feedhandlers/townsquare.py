@@ -120,7 +120,7 @@ def render_content(content, netloc, inc_gallery=False):
                     m = math.floor((int(it['duration']) - 3600*hr)/60)
                     if m > 0:
                         duration += ', {} min'.format(m)
-                content_html += '<tr><td style="vertical-align:middle;"><a href="{}"><img src="{}"/></a></td><td><small>{} &bull; {}</small><br/>{}</td></tr>'.format(it['url'], play_button, utils.format_display_date(dt, False), duration, it['title'])
+                content_html += '<tr><td style="vertical-align:middle;"><a href="{}"><img src="{}"/></a></td><td><small>{} &bull; {}</small><br/>{}</td></tr>'.format(it['url'], play_button, utils.format_display_date(dt, date_only=True), duration, it['title'])
                 if i == 4:
                     break
             content_html += '</table>'

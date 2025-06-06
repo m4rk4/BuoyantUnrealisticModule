@@ -67,7 +67,7 @@ def get_podcast_episode(item):
             duration = re.sub(r'^[0:]*', '', episode['itunes_duration'])
 
             dt = dateutil.parser.parse(episode['published'])
-            display_date = utils.format_display_date(dt, False)
+            display_date = utils.format_display_date(dt, date_only=True)
 
             content_html = '<div>&nbsp;</div><table><tr><td style="width:128px;"><a href="{}"><img src="{}"></a></td>'.format(item['_audio'], poster)
             content_html += '<td style="vertical-align:top;"><div style="font-size:1.1em; font-weight:bold; padding-bottom:8px;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])

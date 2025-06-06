@@ -418,7 +418,8 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         if not authors and ld_people:
             if ld_people:
                 for it in ld_people:
-                    authors.append(it['name'].replace(',', '&#44;'))
+                    if it.get('name'):
+                        authors.append(it['name'].replace(',', '&#44;'))
         if not authors and meta:
             if meta.get('author'):
                 authors.append(meta['author'].replace(',', '&#44;'))
@@ -443,7 +444,7 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
         item['tags'] = []
         if site_json.get('tags'):
             for el in utils.get_soup_elements(site_json['tags'], soup):
-                if el.name == 'a':
+                if el.name == 'a' or ('no_link' in site_json['tags'] and site_json['tags']['no_link'] == True):
                     item['tags'].append(el.get_text().strip())
                 else:
                     for it in el.find_all('a'):
@@ -569,58 +570,71 @@ def get_content(url, args, site_json, save_debug=False, module_format_content=No
             # print(elements)
             el = elements[0]
             if el:
-                it = el.find(class_='jw-video-box')
-                if it:
-                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
-                    lede = True
-                else:
-                    it = el.find(id=re.compile(r'jw-player-'))
-                    if it:
-                        if article_json.get('video') and article_json['video'].get('embedUrl'):
-                            item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
-                            lede = True
-                        elif article_json.get('video') and article_json['video'].get('contentUrl'):
-                            item['content_html'] += utils.add_embed(article_json['video']['contentUrl'])
+                if el.get('class') and 'hearstLumierePlayer' in el['class']:
+                    video_json = utils.get_url_json('https://nitehawk.hearst.io/embeds/' + el['data-player-id'])
+                    if video_json:
+                        source = next((it for it in video_json['media']['transcodings'] if it['preset_name'] == 'apple_m3u8'), None)
+                        if source:
+                            item['content_html'] += utils.add_video(source['full_url'], 'application/x-mpegURL', video_json['media']['cropped_preview_image'], video_json['media']['title'])
                             lede = True
                         else:
-                            it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
-                            if it:
-                                m = re.search(r'"mediaid":"([^"]+)"', it.string)
-                                if m:
-                                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
-                                    lede = True
+                            source = next((it for it in video_json['media']['display_name'] if it['preset_name'] == '480p'), None)
+                            if source:
+                                item['content_html'] += utils.add_video(source['full_url'], 'video/mp4', video_json['media']['cropped_preview_image'], video_json['media']['title'])
+                                lede = True
+                            else:
+                                item['content_html'] += utils.add_video(source[0]['full_url'], 'video/mp4', video_json['media']['cropped_preview_image'], video_json['media']['title'])
+                                lede = True
+                elif el.find(class_='jw-video-box'):
+                    it = el.find(class_='jw-video-box')
+                    item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(it['data-video']))
+                    lede = True
+                elif el.find(id=re.compile(r'jw-player-')):
+                    it = el.find(id=re.compile(r'jw-player-'))
+                    if article_json.get('video') and article_json['video'].get('embedUrl'):
+                        item['content_html'] += utils.add_embed(article_json['video']['embedUrl'])
+                        lede = True
+                    elif article_json.get('video') and article_json['video'].get('contentUrl'):
+                        item['content_html'] += utils.add_embed(article_json['video']['contentUrl'])
+                        lede = True
                     else:
-                        it = el.find(class_='mntl-jwplayer')
-                        if it and it.get('data-bgset'):
-                            m = re.search(r'/media/([^/]+)/', it['data-bgset'])
+                        it = soup.find('script', string=re.compile(r'jwplayer\("{}"\)\.setup\('.format(it['id'])))
+                        if it:
+                            m = re.search(r'"mediaid":"([^"]+)"', it.string)
                             if m:
                                 item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
                                 lede = True
+                elif el.find(class_='mntl-jwplayer'):
+                    it = el.find(class_='mntl-jwplayer')
+                    if it.get('data-bgset'):
+                        m = re.search(r'/media/([^/]+)/', it['data-bgset'])
+                        if m:
+                            item['content_html'] += utils.add_embed('https://cdn.jwplayer.com/v2/media/{}'.format(m.group(1)))
+                            lede = True
+                elif el.find(class_='video-wrapper'):
+                    it = el.find(class_='video-wrapper')
+                    if it.get('data-type') and it['data-type'] == 'youtube':
+                        item['content_html'] += utils.add_embed(it['data-src'])
+                        lede = True
+                elif el.find(class_='js-superdiv'):
+                    it = el.find(class_='js-superdiv')
+                    if it.get('data-video'):
+                        video_json = json.loads(it['data-video'])
+                        if it.img:
+                            poster = it.img['src']
                         else:
-                            it = el.find(class_='video-wrapper')
-                            if it and it.get('data-type') and it['data-type'] == 'youtube':
-                                item['content_html'] += utils.add_embed(it['data-src'])
-                                lede = True
-                            else:
-                                it = el.find(class_='js-superdiv')
-                                if it and it.get('data-video'):
-                                    video_json = json.loads(it['data-video'])
-                                    if it.img:
-                                        poster = it.img['src']
-                                    else:
-                                        poster = ''
-                                    item['content_html'] += utils.add_video(video_json['url'], 'video/mp4', poster, video_json['title'], use_videojs=True)
-                                    lede = True
-                                else:
-                                    if el.name == 'iframe':
-                                        it = el
-                                    else:
-                                        it = el.find('iframe')
-                                    if it:
-                                        item['content_html'] += utils.add_embed(it['src'])
-                                        lede = True
-                                    else:
-                                        logger.warning('unhandled lede video wrapper in ' + item['url'])
+                            poster = ''
+                        item['content_html'] += utils.add_video(video_json['url'], 'video/mp4', poster, video_json['title'], use_videojs=True)
+                        lede = True
+                elif el.find('iframe'):
+                    it = el.find('iframe')
+                    item['content_html'] += utils.add_embed(it['src'])
+                    lede = True
+                elif el.name == 'iframe':
+                    item['content_html'] += utils.add_embed(el['src'])
+                    lede = True
+                else:
+                    logger.warning('unhandled lede video wrapper in ' + item['url'])
 
     if not lede and 'add_lede_video' in args and 'video' in article_json:
         if isinstance(article_json['video'], list):

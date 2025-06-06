@@ -167,7 +167,7 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 author_url = ''
             dt = datetime.fromisoformat(item['date_published'])
-            item['content_html'] += utils.add_audio(item['_audio'], poster, item['title'], item['url'], item['author']['name'], author_url, utils.format_display_date(dt, False), 0)
+            item['content_html'] += utils.add_audio(item['_audio'], poster, item['title'], item['url'], item['author']['name'], author_url, utils.format_display_date(dt, date_only=True), 0)
         else:
             logger.warning('unable to find podcast audio file in ' + item['url'])
 
