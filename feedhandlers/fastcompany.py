@@ -224,9 +224,10 @@ def get_next_json(url, save_debug):
 
     next_json = {}
     x = 0
-    m = re.search(r'^\s*([0-9a-f]{1,2}):(.*)', next_data)
+    m = re.search(r'^\s*([0-9a-f]{1,3}):(.*)', next_data)
     while m:
         key = m.group(1)
+        print(key)
         x += len(key) + 1
         val = m.group(2)
         if val.startswith('I'):
@@ -255,7 +256,7 @@ def get_next_json(url, save_debug):
             x += len(val)
             if next_data[x:].startswith('\n'):
                 x += 1
-            m = re.search(r'^\s*([0-9a-f]{1,2}):(.*)', next_data[x:])
+            m = re.search(r'^\s*([0-9a-f]{1,3}):(.*)', next_data[x:])
         else:
             break
     return next_json

@@ -216,7 +216,10 @@ def get_content(url, args, site_json, save_debug=False):
         if video['format'] == 'm3u8-variant':
             m3u8_json = utils.get_url_json(video['embed_url'])
             if m3u8_json:
-                item['content_html'] = utils.add_video(m3u8_json['master_m3u8'], 'application/x-mpegURL', poster, caption)
+                item['_video'] = m3u8_json['master_m3u8']
+                item['_video_type'] = 'application/x-mpegURL'
             else:
-                item['content_html'] = utils.add_video(video['embed_url'], 'application/x-mpegURL', poster, caption)
+                item['_video'] = video['embed_url']
+                item['_video_type'] = 'application/x-mpegURL'
+            item['content_html'] = utils.add_video(item['_video'], item['_video_type'], poster, caption)
     return item

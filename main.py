@@ -460,11 +460,11 @@ def map():
     if args.get('width'):
         w = int(args['width'])
     else:
-        w = 800
+        w = 960
     if args.get('height'):
         h = int(args['height'])
     else:
-        h = 400
+        h = 720
     map = StaticMap(w, h)
     marker = CircleMarker((lon, lat), 'blue', 18)
     map.add_marker(marker)
@@ -602,12 +602,30 @@ def screenshot():
             "referrer": "https://pikwy.com/"
         }
         try:
-            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30)
+            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
             if r.status_code == 200 and r.json().get('iurl'):
                 return redirect(r.json()['iurl'])
         except Exception as e:
             logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-    elif args.get('provider') and args['provider'] == 'web2pdf':
+            return 'Something went wrong ({})'.format(r.status_code), r.status_code
+    elif args.get('provider') and args['provider'] == 'urlto':
+        api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024&time_allocated=10'.format(quote_plus(args['url']))
+        headers = {
+            "accept": "text/plain, */*; q=0.01",
+            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+            "origin": "https://urltoscreenshot.com/",
+            "priority": "u=1, i",
+            "referrer": "https://urltoscreenshot.com/",
+            "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
+        }
+        try:
+            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
+            if r.status_code == 200:
+                return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
+        except Exception as e:
+            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+            return 'Something went wrong ({})'.format(r.status_code), r.status_code
+    else:
         boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
         body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"url\"\r\n\r\n' + args['url'] + '\r\n'
         body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"pricing\"\r\n\r\nmonthly\r\n'
@@ -627,28 +645,15 @@ def screenshot():
             "x-requested-with": "XMLHttpRequest"
         }
         api_url = 'https://www.web2pdfconvert.com/api/convert/web/to/jpg?storefile=true&filename=' + urlsplit(args['url']).path[1:].replace('/', '-')
-        try:
-            r = curl_cffi.post(api_url, data=body, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
-            if r.status_code == 200:
-                return redirect(r.json()['Files'][0]['Url'])
-        except Exception as e:
-            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-    else:
-        api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024&time_allocated'.format(quote_plus(args['url']))
-        headers = {
-            "accept": "text/plain, */*; q=0.01",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "origin": "https://urltoscreenshot.com/",
-            "priority": "u=1, i",
-            "referrer": "https://urltoscreenshot.com/",
-            "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
-        }
-        try:
-            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30)
-            if r.status_code == 200:
-                return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
-        except Exception as e:
-            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+        r = curl_cffi.post(api_url, data=body, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
+        if r.status_code == 200:
+            return redirect(r.json()['Files'][0]['Url'])
+        else:
+            logger.warning('screenshot error {} getting {}'.format(r.status_code, api_url))
+            return 'Something went wrong ({})'.format(r.status_code), r.status_code
+        # except Exception as e:
+        #     logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
+        #     return 'Something went wrong ({})'.format(r.status_code), r.status_code
 
     # # https://github.com/microsoft/playwright-python/issues/723
     # loop = asyncio.ProactorEventLoop()

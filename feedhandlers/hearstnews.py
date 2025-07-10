@@ -1,6 +1,7 @@
-import base64, json, re, pytz, tldextract
+import base64, json, re, tldextract
+import curl_cffi
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
@@ -122,127 +123,244 @@ def render_content(content, img_width=1200):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    if split_url.netloc.startswith('storystudio'):
-        return wp_posts.get_content(url, args, site_json, save_debug)
-    m = re.search(r'-(\d+)\.php', split_url.path)
-    if not m:
-        logger.warning('unable to determine content id from ' + url)
+    r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code != 200:
+        logger.warning('curl_cffi error HTTPError status code {} getting {}'.format(r.status_code, url))
         return None
-    content_id = m.group(1)
-    api_url = '{}://{}/api/v1/'.format(split_url.scheme, split_url.netloc)
-    if '/slideshow/' in split_url.path:
-        api_url += 'slideshow/'
-    else:
-        api_url += 'article/'
-    api_url += '?id={}&content=full&imageSizes=original'.format(content_id)
-    #print(api_url)
-    headers = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-        "cache-control": "no-cache",
-        "pragma": "no-cache",
-        "priority": "u=0, i",
-        "sec-ch-ua": "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Microsoft Edge\";v=\"126\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1"
-    }
-    hnpde = {
-        "timestamp": int(round(datetime.now().timestamp()*1000, 0)),
-        "f_kb": 0,
-        "ipc_id": [],
-        "cgp": 1
-    }
-    headers['cookie'] = 'hnpde=' + base64.b64encode(json.dumps(hnpde, separators=(',', ':')).encode()).decode()
-    api_json = utils.get_url_json(api_url, headers=headers)
-    if not api_json:
+    page_soup = BeautifulSoup(r.text, 'lxml')
+
+    if not split_url.path.endswith('.php'):
+        page_url = split_url.scheme + '://' + split_url.netloc + split_url.path
+        if page_url.endswith('/'):
+            page_url = page_url[:-1]
+        r = curl_cffi.get(page_url + '/page-data/index/page-data.json', impersonate="chrome", proxies=config.proxies)
+        if r.status_code != 200:
+            logger.warning('curl_cffi error HTTPError status code {} getting {}'.format(r.status_code, page_url))
+            return None
+        page_data = json.loads(r.text)
+        meta_json = page_data['result']['data']['site']['siteMetadata']['PROJECT']
+
+        item = {}
+        item['id'] = meta_json['SLUG']
+        item['url'] = meta_json['CANONICAL_URL']
+        item['title'] = meta_json['TITLE']
+        dt = datetime.fromisoformat(meta_json['ISO_PUBDATE']).astimezone(timezone.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        dt = datetime.fromisoformat(meta_json['ISO_MODDATE']).astimezone(timezone.utc)
+        item['date_modified'] = dt.isoformat()
+        if meta_json.get('AUTHORS'):
+            item['authors'] = [{"name": x['AUTHOR_NAME']} for x in meta_json['AUTHORS']]
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+        item['tags'] = []
+        item['tags'].append(meta_json['HEARST_CATEGORY'])
+        if meta_json.get('KEY_SUBJECTS'):
+            item['tags'] += [x.strip() for x in meta_json['KEY_SUBJECTS'].split(',')]
+        if meta_json.get('IMAGE'):
+            item['image'] = meta_json['IMAGE']
+        if meta_json.get('DESCRIPTION'):
+            item['summary'] = meta_json['DESCRIPTION']
+
+        el = page_soup.find('script', id='gatsby-chunk-mapping')
+        if el:
+            i = el.string.find('chunkMapping=') + 13
+            j = el.string.rfind('};') + 1
+            chunk_map = json.loads(el.string[i:j])
+            if page_data['componentChunkName'] in chunk_map:
+                r = curl_cffi.get(page_url + chunk_map[page_data['componentChunkName']][0], impersonate="chrome", proxies=config.proxies)
+                if r.status_code == 200:
+                    for m in re.findall(r'exports=JSON\.parse\(\'(.*?)\'\)', r.text):
+                        print(m)                        
+        return item
+
+    el = page_soup.find('script', id='__NEXT_DATA__')
+    if not el:
+        logger.warning('unable to find __NEXT_DATA__ in ' + url)
         return None
+    next_data = json.loads(el.string)
     if save_debug:
-        utils.write_file(api_json, './debug/debug.json')
+        utils.write_file(next_data, './debug/debug.json')
 
-    content_json = api_json['result'][content_id]
-
-    if content_json.get('isPaidadContent'):
-        logger.debug('article is Paid Advertising. skipping ' + url)
-        return None
+    meta_json = next_data['props']['pageProps']['page']['meta']
+    article_body = None
+    article_header = None
+    for zone_set in next_data['props']['pageProps']['page']['zoneSets']:
+        for zone in zone_set['zones']:
+            if zone['id'] == 'zoneBody':
+                for widget in zone['widgets']:
+                    if widget['id'] == 'articleBody':
+                        for it in widget['items']:
+                            if it['type'] == 'articleBody':
+                                article_body = it
+            elif zone['id'] == 'heroZone':
+                for widget in zone['widgets']:
+                    if widget['id'] == 'articleHeader':
+                        for it in widget['items']:
+                            if it['type'] == 'articleHeader':
+                                article_header = it
 
     item = {}
-    item['id'] = content_id
-    item['url'] = content_json['url']
-    item['title'] = content_json['title']
+    item['id'] = meta_json['id']
+    item['url'] = meta_json['canonicalUrl']
+    item['title'] = meta_json['title']
 
-    tz = pytz.timezone(api_json['meta']['publishingSiteTimezone'])
-    dt_loc = datetime.fromtimestamp(content_json['publicationDateTimestamp'])
-    dt_utc = tz.localize(dt_loc).astimezone(pytz.utc)
-    item['date_published'] = dt_utc.isoformat()
-    item['_timestamp'] = dt_utc.timestamp()
-    item['_display_date'] = utils.format_display_date(dt_utc)
+    dt = datetime.fromisoformat(meta_json['publicationDate'])
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
+    dt = datetime.fromisoformat(meta_json['lastModifiedDate'])
+    item['date_modified'] = dt.isoformat()
 
-    dt_loc = datetime.fromtimestamp(content_json['lastModifiedDateTimestamp'])
-    dt_utc = tz.localize(dt_loc).astimezone(pytz.utc)
-    item['date_modified'] = dt_utc.isoformat()
+    if article_header and article_header.get('authors'):
+        item['authors'] = [{"name": x['name']} for x in article_header['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+    elif meta_json.get('authorName'):
+        item['author'] = {
+            "name": meta_json['authorName']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    elif meta_json.get('authorTitle'):
+        item['author'] = {
+            "name": meta_json['authorTitle']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
-    authors = []
-    for it in content_json['authors']:
-        if it.get('name'):
-            authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
-    elif 'AP' in content_json['keyNlpOrganization']:
-        item['author'] = {"name": "AP News"}
+    item['tags'] = [x.strip() for x in meta_json['sections'].split(',')]
+    if meta_json.get('newsKeywords'):
+        item['tags'] += [x.strip() for x in meta_json['newsKeywords'].split(',')]
+    if 'tags' in meta_json:
+        if meta_json['tags'].get('keywords'):
+            item['tags'] += [x.strip() for x in meta_json['tags']['keywords'].split(',')]
+        if meta_json['tags'].get('iabTags'):
+            item['tags'] += [x.strip() for x in meta_json['tags']['iabTags'].split(',')]
 
-    item['tags'] = []
-    for key, val in content_json.items():
-        if key.startswith('key') and val:
-            item['tags'] += val
-    if not item.get('tags'):
-        del item['tags']
+    if meta_json.get('openGraphImageUrl'):
+        item['image'] = meta_json['openGraphImageUrl']
 
-    if content_json.get('image'):
-        item['_image'] = content_json['image']['original']['url'].replace('rawImage', '1000x0')
+    if meta_json.get('description'):
+        item['summary'] = meta_json['description']
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     item['content_html'] = ''
-    if content_json.get('abstract'):
-        item['summary'] = content_json['abstract']
-        item['content_html'] += '<p><em>{}</em></p>'.format(re.sub(r'^<p>(.*)</p>$', r'\1', content_json['abstract']))
-
-    if content_json['body'][0]['type'] == 'gallery':
-        item['content_html'] += add_image(content_json['body'][0]['params']['cover'])
-    elif content_json['body'][0]['type'] != 'image' and item.get('_image'):
-        item['content_html'] += utils.add_image(item['_image'])
-
-    if content_json['type'] == 'slideshow':
-        for content in content_json['body']:
-            if content['type'] == 'gallery':
-                for slide in content['params']['slides']:
-                    item['content_html'] += '<h2>{}</h2>'.format(slide['params']['title'])
-                    item['content_html'] += utils.add_image(slide['params']['sizes']['original']['url'].replace('rawImage', '1000x0'), slide['params']['byline'])
-                    item['content_html'] += '<p>{}</p>'.format(slide['params']['caption']['html2'])
+    if article_header:
+        if article_header.get('subtitle'):
+            item['content_html'] += '<p><em>' + article_header['subtitle'] + '</em></p>'
+        if article_header.get('hero'):
+            if article_header['hero']['type'] == 'image':
+                captions = []
+                if article_header['hero']['block']['params']['image'].get('caption') and article_header['hero']['block']['params']['image']['caption'].get('plain'):
+                    captions.append(article_header['hero']['block']['params']['image']['caption']['plain'])
+                if article_header['hero']['block']['params'].get('byline'):
+                    captions.append(article_header['hero']['block']['params']['byline'])
+                item['content_html'] += utils.add_image(article_header['hero']['block']['params']['image']['url'], ' | '.join(captions))
             else:
-                item['content_html'] += render_content(content)
-    else:
-        gallery_html = ''
-        for content in content_json['body']:
-            if content['type'] == 'gallery':
-                gallery_html += render_content(content)
-            elif content['type'] == 'factbox':
-                item['content_html'] += utils.add_blockquote('<h3 style="margin-top:0;">{}</h3>{}'.format(content_json['factbox']['header'], content_json['factbox']['html1']))
-            elif content['type'] == 'relatedStories':
-                item['content_html'] += '<h3 style="margin-bottom:0;">Related stories:</h3><ul style="margin-top:0;">'
-                for it in content_json['relatedStories']['items']:
-                    item['content_html'] += '<li><a href="{}">{}</a></li>'.format(it['url'], it['title'])
-                item['content_html'] += '</ul>'
-            else:
-                item['content_html'] += render_content(content)
-        if gallery_html:
-            item['content_html'] += '<hr/>' + gallery_html
+                logger.warning('unhandled article hero type {} in {}'.format(article_header['hero']['type'], item['url']))
 
-    item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
+    if article_body:
+        for block in article_body['body']:
+            if block['__typename'] == 'TextBlock':
+                if block['params']['html1'].startswith('<figure'):
+                    soup = BeautifulSoup(block['params']['html1'], 'html.parser')
+                    if 'wp-block-image' in soup.figure['class']:
+                        captions = []
+                        el = soup.find(class_='credit')
+                        if el:
+                            captions.append(el.decode_contents())
+                            el.decompose()
+                        if soup.figcaption:
+                            captions.insert(0, soup.figcaption.decode_contents())
+                        item['content_html'] += utils.add_image(soup.img['src'], ' | '.join(captions))
+                    else:
+                        logger.warning('unhandled TextBlock figure in ' + item['url'])
+                        item['content_html'] += block['params']['html1']
+                else:
+                    item['content_html'] += block['params']['html1']
+            elif block['__typename'] == 'ImageBlock':
+                captions = []
+                if block['params']['image'].get('caption') and block['params']['image']['caption'].get('plain'):
+                    captions.append(block['params']['image']['caption']['plain'])
+                if block['params'].get('byline'):
+                    captions.append(block['params']['byline'])
+                item['content_html'] += utils.add_image(block['params']['image']['url'], ' | '.join(captions))
+            elif block['__typename'] == 'GalleryBlock':
+                gallery_images = []
+                for slide in block['params']['slides']:
+                    if slide['type'] == 'image':
+                        img_src = slide['params']['image']['url']
+                        thumb = slide['params']['image']['url'].replace('rawImage', '960x0').replace('.jpg', '.webp')
+                        captions = []
+                        if slide['params']['image'].get('caption') and slide['params']['image']['caption'].get('plain'):
+                            captions.append(slide['params']['image']['caption']['plain'])
+                        if slide['params'].get('byline'):
+                            captions.append(slide['params']['byline'])
+                        gallery_images.append({"src": img_src, "caption": ' | '.join(captions), "thumb": thumb})
+                gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                item['content_html'] += utils.add_image(gallery_images[0]['src'], gallery_images[0]['caption'], link=gallery_url, overlay=config.gallery_button_overlay)
+            elif block['__typename'] == 'EmbedBlock':
+                soup = BeautifulSoup(block['params']['html1'], 'html.parser')
+                if soup.blockquote and 'bluesky-embed' in soup.blockquote['class']:
+                    item['content_html'] += utils.add_embed(soup.blockquote['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('app.bsky.feed.post', 'post'))
+                elif soup.blockquote and 'instagram-media' in soup.blockquote['class']:
+                    item['content_html'] += utils.add_embed(soup.blockquote['data-instgrm-permalink'])
+                elif soup.iframe:
+                    if split_url.netloc in soup.iframe['src'] and '-survey' in soup.iframe['src']:
+                        continue
+                    item['content_html'] += utils.add_embed(soup.iframe['src'])
+                else:
+                    logger.warning('unhandled EmbedBlock in ' + item['url'])
+            elif block['__typename'] == 'FreeformItemBlock' and 'embed' in block['params'] and block['params']['embed'].get('__id') == 'Datawrapper':
+                item['content_html'] += utils.add_embed('https://datawrapper.dwcdn.net/' + block['params']['embed']['__data']['datawrapper_id'] + '/')
+            elif block['__typename'] == 'AdBlock' or (block['__typename'] == 'CardBlock' and re.search(r'^(Best of|More)', block['params']['title'], flags=re.I)):
+                continue
+            else:
+                logger.warning('unhandled block type {} in {}'.format(block['__typename'], item['url']))
+
+    # if content_json.get('abstract'):
+    #     item['summary'] = content_json['abstract']
+    #     item['content_html'] += '<p><em>{}</em></p>'.format(re.sub(r'^<p>(.*)</p>$', r'\1', content_json['abstract']))
+
+    # if content_json['body'][0]['type'] == 'gallery':
+    #     item['content_html'] += add_image(content_json['body'][0]['params']['cover'])
+    # elif content_json['body'][0]['type'] != 'image' and item.get('_image'):
+    #     item['content_html'] += utils.add_image(item['_image'])
+
+    # if content_json['type'] == 'slideshow':
+    #     for content in content_json['body']:
+    #         if content['type'] == 'gallery':
+    #             for slide in content['params']['slides']:
+    #                 item['content_html'] += '<h2>{}</h2>'.format(slide['params']['title'])
+    #                 item['content_html'] += utils.add_image(slide['params']['sizes']['original']['url'].replace('rawImage', '1000x0'), slide['params']['byline'])
+    #                 item['content_html'] += '<p>{}</p>'.format(slide['params']['caption']['html2'])
+    #         else:
+    #             item['content_html'] += render_content(content)
+    # else:
+    #     gallery_html = ''
+    #     for content in content_json['body']:
+    #         if content['type'] == 'gallery':
+    #             gallery_html += render_content(content)
+    #         elif content['type'] == 'factbox':
+    #             item['content_html'] += utils.add_blockquote('<h3 style="margin-top:0;">{}</h3>{}'.format(content_json['factbox']['header'], content_json['factbox']['html1']))
+    #         elif content['type'] == 'relatedStories':
+    #             item['content_html'] += '<h3 style="margin-bottom:0;">Related stories:</h3><ul style="margin-top:0;">'
+    #             for it in content_json['relatedStories']['items']:
+    #                 item['content_html'] += '<li><a href="{}">{}</a></li>'.format(it['url'], it['title'])
+    #             item['content_html'] += '</ul>'
+    #         else:
+    #             item['content_html'] += render_content(content)
+    #     if gallery_html:
+    #         item['content_html'] += '<hr/>' + gallery_html
+
+    # item['content_html'] = re.sub(r'</figure><(figure|table)', r'</figure><br/><\1', item['content_html'])
     return item
 
 

@@ -127,7 +127,7 @@ def get_content(url, args, site_json, save_debug=False):
         tracks_html = ''
         if bc_json.get('tracks'):
             item['_playlist'] = []
-            tracks_html += '<h3>Tracks:</h3>'
+            tracks_html += '<details><summary style="font-weight:bold;">Tracks:</summary>'
             for i, track in enumerate(bc_json['tracks'], 1):
                 title = str(i) + '. <a href="' + track['title_link'] + '" target="_blank">' + track['title'] + '</a>'
                 if track['artist'] != bc_json['artist']:
@@ -146,23 +146,8 @@ def get_content(url, args, site_json, save_debug=False):
                                 break
                 else:
                     tracks_html += utils.add_audio_v2('', '', title, '', '', '', '', utils.calc_duration(track['duration'], True, ':'), show_poster=False, border=False, margin='')
-
+            tracks_html += '</details>'
         item['content_html'] = utils.add_audio_v2(config.server + '/playlist?url=' + quote_plus(item['url']), item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], '', audio_type='audio_link', desc=tracks_html)
-
-        # item['content_html'] = '<div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; margin:8px;">'
-        # item['content_html'] += '<div style="flex:1; min-width:128px; max-width:160px;">'
-        # if item.get('_playlist'):
-        #     item['content_html'] += '<a href="{}/playlist?url={}" target="_blank"><img src="{}/image?url={}&width=160&overlay=audio" style="width:100%;"/></a></div>'.format(config.server, quote_plus(item['url']), config.server, quote_plus(item['image']))
-        # else:
-        #     item['content_html'] += '<a href="{}" target="_blank"><img src="{}" style="width:100%;"/></a></div>'.format(item['url'], item['image'])
-        # item['content_html'] += '<div style="flex:2; min-width:256px;"><div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        # if 'url' in item['author']:
-        #     item['content_html'] += '<div style="margin:4px 0 4px 0;"><a href="{}">{}</a></div>'.format(item['author']['url'], item['author']['name'])
-        # else:
-        #     item['content_html'] += '<div style="margin:4px 0 4px 0;">{}</div>'.format(item['author']['name'])
-        # item['content_html'] += '<div style="margin:4px 0 4px 0;">Released: {}</div>'.format(item['_display_date'])
-        # item['content_html'] += '</div></div>' + tracks_html
-
     return item
 
 

@@ -2,10 +2,10 @@ import json, markdown2, pytz, re
 import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote_plus
 
 import config, utils
-from feedhandlers import semafor
+from feedhandlers import rss, semafor
 
 import logging
 
@@ -88,7 +88,8 @@ def get_content(url, args, site_json, save_debug=False):
         path = split_url.path
     if path.endswith('/'):
         path = path[:-1]
-    api_url = '{}://{}{}/page-data{}/page-data.json'.format(split_url.scheme, split_url.netloc, site_json['page_data_prefix'], path)
+    api_url = split_url.scheme + '://' + split_url.netloc + site_json['page_data_prefix'] + '/page-data' + path + '/page-data.json'
+    # api_url = '{}://{}{}/page-data{}/page-data.json'.format(split_url.scheme, split_url.netloc, site_json['page_data_prefix'], path)
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
@@ -109,15 +110,16 @@ def get_content(url, args, site_json, save_debug=False):
                     site_metadata = sq_json['data']['site']['siteMetadata']
                     break
 
+    page_context = api_json['result']['pageContext']
     item = {}
-    if api_json['result']['pageContext'].get('id'):
-        item['id'] = api_json['result']['pageContext']['id']
+    if page_context.get('id'):
+        item['id'] = page_context['id']
     else:
         item['id'] = api_json['path']
 
-    item['url'] = 'https://{}{}'.format(split_url.netloc, api_json['path'])
+    item['url'] = 'https://' + split_url.netloc + api_json['path']
 
-    if api_json['result']['data'].get('markdownRemark'):
+    if api_json['result'].get('data') and api_json['result']['data'].get('markdownRemark'):
         md_remark = api_json['result']['data']['markdownRemark']
         item['title'] = md_remark['frontmatter']['title']
 
@@ -209,7 +211,7 @@ def get_content(url, args, site_json, save_debug=False):
         #     for content in article_json['images']:
         #         item['content_html'] += add_image(content, site_json)
 
-    elif api_json['result']['data'].get('wpPost'):
+    elif api_json['result'].get('data') and api_json['result']['data'].get('wpPost'):
         # https://www.gatsbyjs.com/blog/
         wp_post = api_json['result']['data']['wpPost']
         item['title'] = wp_post['title']
@@ -257,7 +259,7 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     logger.warning('unhandled flexibleContent block type {} in {}'.format(block['__typename'], item['url']))
 
-    elif api_json['result']['data'].get('story'):
+    elif api_json['result'].get('data') and api_json['result']['data'].get('story'):
         # https://www.rockefellercenter.com/magazine/
         story_data = api_json['result']['data']['story']
         item['title'] = story_data['titleAndSlug']['title']
@@ -283,7 +285,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += semafor.render_block(block)
             item['content_html'] = item['content_html'].replace('https://img.semafor.com', site_json['image_path'])
 
-    elif api_json['result']['data'].get('post'):
+    elif api_json['result'].get('data') and api_json['result']['data'].get('post'):
         # https://thefactbase.com/
         post_json = api_json['result']['data']['post']
         item['title'] = post_json['title']
@@ -322,9 +324,9 @@ def get_content(url, args, site_json, save_debug=False):
         #     item['content_html'] += render_mdx(mdx, 'https://' + split_url.netloc)
         item['content_html'] += render_mdx_layout(post_json['body'], split_url.netloc, save_debug)
 
-    elif api_json['result']['data'].get('mdx'):
+    elif api_json['result'].get('data') and api_json['result']['data'].get('mdx'):
         # https://ericmigi.com/blog/introducing-two-new-pebbleos-watches
-        item['id'] = api_json['result']['pageContext']['id']
+        item['id'] = page_context['id']
         item['url'] = url
         item['title'] = api_json['result']['data']['mdx']['frontmatter']['title']
 
@@ -354,7 +356,7 @@ def get_content(url, args, site_json, save_debug=False):
 
         item['content_html'] = render_mdx_layout(api_json['result']['data']['mdx']['body'], split_url.netloc, save_debug)
 
-    elif api_json['result']['data'].get('essay'):
+    elif api_json['result'].get('data') and api_json['result']['data'].get('essay'):
         # https://publicdomainreview.org/essays/
         essay_data = api_json['result']['data']['essay']['data']
         item['title'] = essay_data['Title']
@@ -416,11 +418,149 @@ def get_content(url, args, site_json, save_debug=False):
             item['content_html'] += '<div>&nbsp;</div><hr/><h3>Notes:</h3>'
             item['content_html'] += '<ol>' + re.sub(r'\[\^\d+\]:(.*?)(\n|$)', r'<li>\1</li>', essay_data['Footnotes']) + '</ol>'
 
-    if api_json['result']['pageContext'].get('category'):
+    elif page_context.get('blocks'):
+        # https://istories.media/en/stories/2025/06/10/telegram-fsb/
+        item['title'] = page_context['header']
+        dt = datetime.fromisoformat(page_context['initially_published_at'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        item['authors'] = [{"name": x['first_name_en'] + ' ' + x['last_name_en']} for x in page_context['authors_list']]
+        if len(item['authors']) > 0:
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }
+        if page_context['meta'].get('og_description'):
+            item['summary'] = page_context['meta']['og_description']
+        if page_context['meta'].get('og_image'):
+            item['image'] = page_context['meta']['og_image']
+        item['content_html'] = ''
+        if page_context.get('lead'):
+            if 'summary' not in item:
+                item['summary'] = page_context['lead']
+            item['content_html'] += '<p><em>' + page_context['lead'] + '</em></p>'
+        if page_context.get('entry_image'):
+            if 'image' not in item:
+                item['image'] = page_context['entry_image'][0]['url_1x']
+            item['content_html'] += utils.add_image(page_context['entry_image'][0]['url_1x'], page_context.get('entry_image_credit'))
+        for block in page_context['blocks']:
+            if block['type'] in ['p', 'h2', 'ul']:
+                item['content_html'] += '<{0}>{1}</{0}>'.format(block['type'], block['data'])
+            elif block['type'] == 'image-embed' or block['type'] == 'two-images-embed':
+                gallery_images = []
+                for image in block['data']['data']['images']:
+                    captions = []
+                    if image.get('caption'):
+                        captions.append(image['caption'])
+                    if image.get('credit'):
+                        captions.append(image['credit'])
+                    img_src = image['imagesList'][0]['url_1x']
+                    thumb = image['imagesList'][-1]['url_1x']
+                    gallery_images.append({"src": img_src, "caption": ' | '.join(captions), "thumb": thumb})
+                if len(gallery_images) == 1:
+                    item['content_html'] += utils.add_image(gallery_images[0]['src'], gallery_images[0]['caption'])
+                else:
+                    gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+                    item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                    for image in gallery_images:
+                        item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(image['thumb'], image['caption'], link=gallery_url) + '</div>'
+                    item['content_html'] += '</div>'
+            elif block['type'] == 'images-with-text-embed':
+                gallery_images = []
+                gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                for i, image in enumerate(block['data']['data']['items']):
+                    img_src = image['image'][0]['url_1x']
+                    thumb = image['image'][-1]['url_1x']
+                    desc = ''
+                    if image.get('creditBlock'):
+                        desc += image['creditBlock']
+                    if image.get('textBlock'):
+                        desc += image['textBlock']
+                    gallery_images.append({"src": img_src, "caption": '', "thumb": thumb, "desc": desc})
+                    gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, '', link=img_src, desc=desc) + '</div>'
+                if i % 2 == 0:
+                    gallery_html += '<div style="flex:1; min-width:360px;">&nbsp;</div>'
+                gallery_html += '</div>'
+                gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+                if block['data']['data'].get('header'):
+                    item['content_html'] += '<h3>{} (<a href="{}" target="_blank">view gallery</a>)</h3>'.format(block['data']['data']['header'], gallery_url)
+                item['content_html'] += gallery_html
+            elif block['type'] == 'video-embed':
+                if block['data']['data']['provider'] == 'youtube':
+                    item['content_html'] += utils.add_embed(block['data']['data']['url'])
+                elif block['data']['data']['provider'] == 'viqeo':
+                    page_html = utils.get_url_html(block['data']['data']['url'])
+                    if page_html:
+                        soup = BeautifulSoup(page_html, 'lxml')
+                        el = soup.find('script', attrs={"type": "text/javascript"}, string=re.compile(r'^window\.DATA ='))
+                        if el:
+                            i = el.string.find('{')
+                            j = el.string.rfind('}') + 1
+                            data_json = json.loads(el.string[i:j])
+                            video = utils.closest_dict(data_json['metadata']['mediaFiles'], 'bitrate', 1500000)
+                            file = next((it for it in data_json['metadata']['mediaFiles'] if it['type'] == 'image/jpeg'), None)
+                            if file:
+                                poster = file['url']
+                            else:
+                                poster = ''
+                            item['content_html'] += utils.add_video(video['url'], video['type'], poster, data_json['metadata']['type'], use_videojs=True)
+                else:
+                    logger.warning('unhandled video-embed provider {} in {}'.format(block['data']['data']['provider'], item['url']))
+            elif block['type'] == 'gif-embed':
+                captions = []
+                if block['data']['data'].get('caption'):
+                    captions.append(block['data']['data']['caption'])
+                if block['data']['data'].get('author'):
+                    captions.append(block['data']['data']['author'])
+                item['content_html'] += utils.add_video(block['data']['data']['videosList'][0]['url'], block['data']['data']['videosList'][0]['content_type'], '', ' | '.join(captions), use_videojs=True)
+            elif block['type'] == 'telegram-embed':
+                item['content_html'] += utils.add_embed(block['data']['data']['url'])
+            elif block['type'] == 'visualization-embed':
+                if block['data']['data']['url'].startswith('https://static.istories.media/iframes/'):
+                    item['content_html'] += utils.add_image(config.server + '/screenshot?url=' + quote_plus(block['data']['data']['url']), link=block['data']['data']['url'])
+                else:
+                    logger.warning('unhandled visualization-embed ' + block['data']['data']['url'])
+            elif block['type'] == 'google-maps-embed':
+                if block['data']['data']['url'].startswith('https://snazzymaps.com/embed/'):
+                    item['content_html'] += utils.add_image(config.server + '/screenshot?url=' + quote_plus(block['data']['data']['url']), link=block['data']['data']['url'])
+                else:
+                    logger.warning('unhandled google-maps-embed ' + block['data']['data']['url'])
+            elif block['type'] == 'quotation-embed':
+                item['content_html'] += utils.add_pullquote(block['data']['data']['header'], block['data']['data'].get('author'))
+            elif block['type'] == 'table-embed':
+                item['content_html'] += '<table style="margin:auto; border-collapse:collapse; border-top:1px solid light-dark(#333,#ccc);">'
+                for i, row in enumerate(block['data']['data']['content']):
+                    item['content_html'] += '<tr>'
+                    for td in row:
+                        if i == 0:
+                            item['content_html'] += '<th style="padding:4px; border-bottom:1px solid light-dark(#333,#ccc);">' + td + '</th>'
+                        else:
+                            item['content_html'] += '<td style="padding:4px; border-bottom:1px solid light-dark(#333,#ccc);">' + td + '</td>'
+                    item['content_html'] += '</tr>'
+                item['content_html'] += '</table>'
+            elif block['type'] == 'text-with-number-embed':
+                item['content_html'] += '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#333, #ccc); border-radius:10px; background-color:#aaa;">'
+                item['content_html'] += '<div style="font-size:3em; font-weight:bold;">' + block['data']['data']['number'] + '</div>'
+                if block['data']['data'].get('header'):
+                    item['content_html'] += '<div style="font-weight:bold;">' + block['data']['data']['header'] + '</div>'
+                item['content_html'] += '<p>' + block['data']['data']['text'] + '</p>'
+                item['content_html'] += '</div>'
+            elif block['type'] == 'drop-down-embed':
+                item['content_html'] += '<details style="padding:0.5em; border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#aaa;"><summary><span style="font-size:1.1em; font-weight:bold;">' + block['data']['data']['header'] + '</span></summary>' + block['data']['data']['block'] + '</details>'
+            elif block['type'] == 'custom-code-embed' and block['data']['data']['code'].startswith('<iframe'):
+                m = re.search(r'src="([^"]+)', block['data']['data']['code'])
+                if m:
+                    item['content_html'] += utils.add_embed(m.group(1))
+            elif block['type'] == 'donate-embed' or block['type'] == 'donation-form-embed':
+                continue
+            else:
+                logger.warning('unhandled block type {} in {}'.format(block['type'], item['url']))
+
+    if page_context.get('category'):
         if not item.get('tags'):
             item['tags'] = []
-        if api_json['result']['pageContext']['category'] not in item['tags']:
-            item['tags'].append(api_json['result']['pageContext']['category'])
+        if page_context['category'] not in item['tags']:
+            item['tags'].append(page_context['category'])
 
     if item.get('content_html'):
         item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', item['content_html'])
@@ -428,6 +568,9 @@ def get_content(url, args, site_json, save_debug=False):
 
 
 def get_feed(url, args, site_json, save_debug=False):
+    if url.endswith('.xml'):
+        return rss.get_feed(url, args, site_json, save_debug, get_content)
+
     split_url = urlsplit(args['url'])
     if len(split_url.path) <= 1:
         path = '/index'

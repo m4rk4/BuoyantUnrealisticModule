@@ -64,14 +64,18 @@ def get_content(url, args, site_json, save_debug=False):
         }
         if ep_json.get('largeLogo'):
             item['_image'] = ep_json['largeLogo']
-        item['_audio'] = utils.find_redirect_url(ep_json['downloadLink'])
+        # item['_audio'] = utils.find_redirect_url(ep_json['downloadLink'])
+        if ep_json.get('resource'):
+            item['_audio'] = ep_json['resource']
+        elif ep_json.get('downloadLink'):
+            item['_audio'] = ep_json['downloadLink']
         attachment = {
             "url": item['_audio'],
             "mime_type": "audio/mpeg"
         }
         item['attachments'] = []
         item['attachments'].append(attachment)
-        item['content_html'] = utils.add_audio(item['_audio'], item.get('_image'), item['title'], item['url'], api_json['setting']['podcastTitle'], api_json['setting']['podcastLink'], item['_display_date'], ep_json['duration'])
+        item['content_html'] = utils.add_audio_v2(item['_audio'], item.get('_image'), item['title'], item['url'], api_json['setting']['podcastTitle'], api_json['setting']['podcastLink'], item['_display_date'], ep_json['duration'])
         return item
 
     page_html = utils.get_url_html(ep_url)

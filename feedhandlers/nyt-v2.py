@@ -39,6 +39,18 @@ def format_text(block):
     return text_html
 
 
+def get_img_src(image_block, width=1200, crop_name='MASTER'):
+    images = next((it for it in image_block['crops'] if ('name' in it and it['name'] == crop_name)), None)
+    if images:
+        image = utils.closest_dict(images['renditions'], 'width', width)
+    else:
+        images = []
+        for it in image_block['crops']:
+            images += it['renditions']
+        image = utils.closest_dict(images, 'width', width)
+    return image['url']
+
+
 def render_block(block, full_header=False, headline_url=''):
     block_html = ''
     if block['__typename'] == 'Dropzone' or block['__typename'] == 'EmailSignupBlock':
@@ -169,6 +181,58 @@ def render_block(block, full_header=False, headline_url=''):
             if key not in ['__typename', 'imageOne', 'imageTwo', 'mobileColumns', 'size']:
                 logger.warning('unhandled DiptychBlock key ' + key)
 
+    elif block['__typename'] == 'CardDeckBlock':
+        block_html += render_block(block['media'])
+
+    elif block['__typename'] == 'CardDeck':
+        gallery_images = []
+        block_html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); grid-auto-rows:200px; grid-gap:2px; grid-auto-flow:dense;">'
+        n = len(block['asset']['cards'])
+        for i, card in enumerate(block['asset']['cards']):
+            if i == 0:
+                block_html += '<div style="grid-column:span 2; grid-row:span 2;">'
+            elif n == 2:
+                block_html += '<div style="grid-row:span 2;">'
+            elif n == 3:
+                block_html += '<div>'
+            elif n == 4:
+                if i == 1:
+                    block_html += '<div style="grid-row:span 2;">'
+                elif i == 2:
+                    block_html += '<div>'
+                else:
+                    block_html += '<div style="grid-column:span 2;">'
+            elif n == 5:
+                if i == 4:
+                    block_html += '<div style="grid-column:span 2;">'
+                else:
+                    block_html += '<div>'
+            else:
+                logger.warning('unhandled CardDeck layout with {} cards'.format(n))
+                block_html += '<div>'
+            if card['assets'][0]['__typename'] == 'Image':
+                img_src = get_img_src(card['assets'][0])
+                thumb = get_img_src(card['assets'][0], 800, 'MEDIUM_SQUARE')
+                captions = []
+                if card['assets'][0].get('caption'):
+                    it = render_block(card['assets'][0]['caption']).strip()
+                    if it:
+                        captions.append(it)
+                if card['assets'][0].get('credit'):
+                    captions.append(card['assets'][0]['credit'])
+                gallery_images.append({"src": img_src, "caption": ' | '.join(captions), "thumb": thumb})
+                block_html += '<a href="{}" target="_blank"><img src="{}" style="width:100%; height:100%; object-fit:cover;"></a>'.format(img_src, thumb)
+            else:
+                logger.warning('unhandled CardDeck asset type ' + card['assets'][0]['__typename'])
+            block_html += '</div>'
+        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        block_html += '</div><div><small><a href="' + gallery_url + '" target="_blank">View gallery</a>'
+        if block['asset'].get('data'):
+            data_json = json.loads(block['asset']['data'])
+            if data_json.get('caption'):
+                block_html += ': ' + data_json['caption']
+        block_html += '</small></div>'
+
     elif block['__typename'] == 'UnstructuredBlock':
         if block.get('mediaRefs'):
             for blk in block['mediaRefs']:
@@ -180,14 +244,7 @@ def render_block(block, full_header=False, headline_url=''):
             logger.warning('unhandled UnstructuredBlock')
 
     elif block['__typename'] == 'Image':
-        images = next((it for it in block['crops'] if ('name' in it and it['name'] == 'MASTER')), None)
-        if images:
-            image = utils.closest_dict(images['renditions'], 'width', 1000)
-        else:
-            images = []
-            for it in block['crops']:
-                images += it['renditions']
-            image = utils.closest_dict(images, 'width', 1000)
+        img_src = get_img_src(block)
         captions = []
         if block.get('caption'):
             it = render_block(block['caption']).strip()
@@ -195,7 +252,7 @@ def render_block(block, full_header=False, headline_url=''):
                 captions.append(it)
         if block.get('credit'):
             captions.append(block['credit'])
-        block_html += utils.add_image(image['url'], ' | '.join(captions))
+        block_html += utils.add_image(img_src, ' | '.join(captions))
 
     elif block['__typename'] == 'VideoBlock':
         block_html += render_block(block['media'])
@@ -412,13 +469,13 @@ def get_content(url, args, site_json, save_debug=False):
     elif split_url.netloc == 'cooking.nytimes.com':
         return get_cooking_content(url, args, site_json, save_debug)
 
-    article_html = utils.get_url_html(url, user_agent='googlebot')
+    article_html = utils.get_url_html('https://' + split_url.netloc + split_url.path + '?smid=', user_agent='twitterbot')
     if not article_html:
         return None
     if save_debug:
         utils.write_file(article_html, './debug/debug.html')
 
-    soup = BeautifulSoup(article_html, 'html.parser')
+    soup = BeautifulSoup(article_html, 'lxml')
 
     article_json = None
     if '/video/' in url:
@@ -429,7 +486,9 @@ def get_content(url, args, site_json, save_debug=False):
         preloaded_data = ''
         el = soup.find('script', string=re.compile(r'window\.__preloadedData'))
         if el:
-            preloaded_data = el.string[25:-1]
+            i = el.string.find('{')
+            j = el.string.rfind('}') + 1
+            preloaded_data = el.string[i:j]
         else:
             m = re.search(r'<script>window\.__preloadedData = (.+);</script>', article_html)
             if m:
@@ -440,6 +499,9 @@ def get_content(url, args, site_json, save_debug=False):
         if save_debug:
             utils.write_file(preloaded_data, './debug/debug.txt')
 
+        preloaded_data = preloaded_data.replace(':undefined', ':""')
+        preloaded_data = re.sub(r'("[^"]+"):(function.*?\})', r'\1:""', preloaded_data)
+        preloaded_json = json.loads(preloaded_data)
         try:
             preloaded_json = json.loads(preloaded_data.replace(':undefined', ':""'))
         except:

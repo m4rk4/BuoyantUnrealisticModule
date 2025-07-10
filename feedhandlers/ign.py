@@ -46,15 +46,15 @@ def get_video_data(slug, video_id=''):
         if not api_data:
             return None
         slug = api_data['data']['videoPlayerProps']['metadata']['slug']
-    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%226ba07ded7512c10289193c935c7b1b63fb26b9baf890bb0b0685cd4f2e5d8e87%22%7D%7D'.format(slug)
+    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22442488483d49c68deb8150175342f3293042ca4d38ec13c6cebb303e06a0654f%22%7D%7D'.format(slug)
     api_data = get_api_data(api_url)
     if not api_data:
         return None
     return api_data['data']['videoBySlug']
 
 
-def get_article_data(slug):
-    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Article&variables=%7B%22slug%22%3A%22{}%22%2C%22region%22%3A%22us%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22157c24c5c5cc427eb440fad7af987ca91b655f6348cb49524f3d7a66de2b5fd6%22%7D%7D'.format(slug)
+def get_article_data(slug, region='us'):
+    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Article&variables=%7B%22slug%22%3A%22{}%22%2C%22region%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%220fad3252dec92d885147b5022de87ad4d67aecfacef7832f7ecd2d20b1d59e8a%22%7D%7D'.format(slug, region)
     api_data = get_api_data(api_url)
     if not api_data:
         return None
@@ -62,7 +62,7 @@ def get_article_data(slug):
 
 
 def get_slideshow_data(slug, cursor=0, count=20):
-    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Slideshow&variables=%7B%22queryBy%22%3A%22slug%22%2C%22value%22%3A%22{}%22%2C%22cursor%22%3A{}%2C%22count%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22a7c3d19c1b8a13cc00cc867594013648bb8be021c9609f481133b5837008f3f0%22%7D%7D'.format(slug, cursor, count)
+    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Slideshow&variables=%7B%22queryBy%22%3A%22slug%22%2C%22value%22%3A%22{}%22%2C%22cursor%22%3A{}%2C%22count%22%3A{}%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%227ade66ce0eda88478162ad81fbc7002c358a87785bb2d13e456b450f82b97b90%22%7D%7D'.format(slug, cursor, count)
     api_data = get_api_data(api_url)
     if not api_data:
         return None
@@ -100,14 +100,17 @@ def get_slideshow_content(url, args, site_json, save_debug):
         dt = get_datetime(content_json['updatedAt'])
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
     if content_json.get('contributors'):
-        authors = []
-        for it in content_json['contributors']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in content_json['contributors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = 'IGN Slideshow'
+        item['author'] = {
+            "name": "IGN Slideshow"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if content_json.get('contentCategory'):
@@ -116,14 +119,20 @@ def get_slideshow_content(url, args, site_json, save_debug):
         for it in content_json['attributes']:
             item['tags'].append(it['attribute']['name'])
 
-    item['_image'] = slideshow_json['slideshowImages']['images'][0]['url'] + '?width=1000'
+    item['image'] = slideshow_json['slideshowImages']['images'][0]['url'] + '?width=1000'
 
     n = 1
     total = slideshow_json['slideshowImages']['pageInfo']['total']
     cursor = slideshow_json['slideshowImages']['pageInfo']['nextCursor']
+    gallery_link = config.server + '/gallery?url=' + quote_plus(item['url'])
+    if 'embed' in args:
+        caption = '<a href="{}">Slideshow: {} ({} images)</a>'.format(item['url'], item['title'], total)
+        item['content_html'] = utils.add_image(item['image'], caption, link=gallery_link, overlay=config.gallery_button_overlay)
+        return item
 
-    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-    gallery_images = []
+    item['content_html'] = '<h3><a href="' + gallery_link + '" target="_blank">View photo gallery</a></h3>'
+    item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+    item['_gallery'] = []
     while n <= total:
         if not slideshow_json:
             slideshow_json = get_slideshow_data(slug, cursor, 20)
@@ -138,19 +147,11 @@ def get_slideshow_content(url, args, site_json, save_debug):
                 caption = image['caption']
             else:
                 caption = ''
-            gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
-            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+            item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
             n += 1
         slideshow_json = None
-    gallery_html += '</div>'
-    gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
-    if 'embed' in args:
-        # link = '{}/content?read&url={}'.format(config.server, quote_plus(item['url']))
-        caption = '<a href="{}">View slideshow: {} ({} images)</a>'.format(item['url'], item['title'], total)
-        item['content_html'] = utils.add_image(item['_image'], caption, link=gallery_url)
-        return item
-    else:
-        item['content_html'] = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
+    item['content_html'] += '</div>'
     return item
 
 
@@ -165,7 +166,7 @@ def get_video_content(url, args, site_json, save_debug=False):
     else:
         slug = url
 
-    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%226ba07ded7512c10289193c935c7b1b63fb26b9baf890bb0b0685cd4f2e5d8e87%22%7D%7D'.format(slug)
+    api_url = 'https://mollusk.apis.ign.com/graphql?operationName=Video&variables=%7B%22slug%22%3A%22{}%22%7D&extensions=%7B%22persistedQuery%22%3A%7B%22version%22%3A1%2C%22sha256Hash%22%3A%22442488483d49c68deb8150175342f3293042ca4d38ec13c6cebb303e06a0654f%22%7D%7D'.format(slug)
     api_data = get_api_data(api_url)
     if not api_data:
         return None
@@ -187,14 +188,17 @@ def get_video_content(url, args, site_json, save_debug=False):
         dt = get_datetime(content_json['updatedAt'])
         item['date_modified'] = dt.isoformat()
 
-    item['author'] = {}
     if content_json.get('contributors'):
-        authors = []
-        for it in content_json['contributors']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in content_json['contributors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = 'IGN Videos'
+        item['author'] = {
+            "name": "IGN Videos"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if content_json.get('contentCategory'):
@@ -203,27 +207,23 @@ def get_video_content(url, args, site_json, save_debug=False):
         for it in content_json['attributes']:
             item['tags'].append(it['attribute']['name'])
 
-    item['_image'] = content_json['feedImage']['url'] + '?width=1000'
+    item['image'] = content_json['feedImage']['url'] + '?width=1000'
 
     caption = '<a href="{}">Watch: {}</a>'.format(item['url'], item['title'])
 
     item['content_html'] = ''
     if content_json.get('subtitle') and 'embed' not in args:
-        item['content_html'] += '<p><em>{}</em></p>'.format(content_json['subtitle'])
+        item['content_html'] += '<p><em>' + content_json['subtitle'] + '</em></p>'
 
-    video = None
-    if video_json.get('assets'):
-        videos = []
-        for it in video_json['assets']:
-            if it['__typename'] == 'VideoAsset' and it.get('height'):
-                videos.append(it)
+    if 'videoMetadata' in video_json and video_json['videoMetadata'].get('m3uUrl'):
+        item['content_html'] += utils.add_video(video_json['videoMetadata']['m3uUrl'], 'application/x-mpegURL', item['image'], caption)
+    elif 'assets' in video_json:
+        videos = [it for it in video_json['assets'] if it['__typename'] == 'VideoAsset' and it.get('height')]
         if videos:
-            video = utils.closest_dict(video_json['assets'], 'height', 480)
-            item['content_html'] += utils.add_video(video['url'], 'video/mp4', item['_image'], caption)
-    if not video and video_json.get('videoMetadata') and video_json['videoMetadata'].get('m3uUrl'):
-        item['content_html'] += utils.add_video(video_json['videoMetadata']['m3uUrl'], 'application/x-mpegURL', item['_image'], caption)
+            video = utils.closest_dict(video_json['assets'], 'height', 540)
+            item['content_html'] += utils.add_video(video['url'], 'video/mp4', item['image'], caption, use_videojs=True)
 
-    if video_json.get('videoMetadata') and video_json['videoMetadata'].get('descriptionHtml'):
+    if 'videoMetadata' in video_json and video_json['videoMetadata'].get('descriptionHtml'):
         item['summary'] = video_json['videoMetadata']['descriptionHtml']
         if 'embed' not in args:
             item['content_html'] += item['summary']
@@ -268,14 +268,17 @@ def get_content(url, args, site_json, save_debug=False):
         if not utils.check_age(item, args):
             return None
 
-    item['author'] = {}
     if content_json.get('contributors'):
-        authors = []
-        for it in content_json['contributors']:
-            authors.append(it['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in content_json['contributors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     else:
-        item['author']['name'] = 'IGN'
+        item['author'] = {
+            "name": "IGN"
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if content_json.get('contentCategory'):
@@ -293,11 +296,11 @@ def get_content(url, args, site_json, save_debug=False):
         if video_item:
             item['content_html'] += video_item['content_html']
     elif content_json.get('headerImageUrl'):
-        item['_image'] = content_json['headerImageUrl'] + '?width=1000'
-        item['content_html'] += utils.add_image(item['_image'])
+        item['image'] = content_json['headerImageUrl'] + '?width=1000'
+        item['content_html'] += utils.add_image(item['image'])
     elif content_json.get('feedImage') and content_json['feedImage']['__typename'] == 'Image':
-        item['_image'] = content_json['feedImage']['url'] + '?width=1000'
-        item['content_html'] += utils.add_image(item['_image'])
+        item['image'] = content_json['feedImage']['url'] + '?width=1000'
+        item['content_html'] += utils.add_image(item['image'])
 
     if article_json.get('review'):
         item['summary'] = article_json['review']['verdict']
@@ -317,52 +320,50 @@ def get_content(url, args, site_json, save_debug=False):
 
     for el in page_soup.find_all('section'):
         if el.get('data-transform'):
-            if re.search(r'commerce-deal|mobile-ad-break|object-feedback|poll', el['data-transform']):
+            if re.search(r'commerce-deal|mobile-ad-break|object-feedback|poll|faceoff', el['data-transform']):
                 el.decompose()
 
             elif el['data-transform'] == 'image-with-caption':
                 el_html = utils.add_image(el['data-image-url'], el['data-image-title'])
-                el.insert_after(BeautifulSoup(el_html, 'html.parser'))
-                el.decompose()
+                el.replace_with(BeautifulSoup(el_html, 'html.parser'))
 
             elif el['data-transform'] == 'slideshow':
                 slideshow_item = get_slideshow_content(el['data-slug'], {"embed": True}, site_json, save_debug)
                 if slideshow_item:
-                    el.insert_after(BeautifulSoup(slideshow_item['content_html'], 'html.parser'))
-                    el.decompose()
+                    el.replace_with(BeautifulSoup(slideshow_item['content_html'], 'html.parser'))
                 else:
                     logger.warning('unable to get slideshow data for ' + el['data-slug'])
 
             elif el['data-transform'] == 'ignvideo':
                 video_item = get_video_content(el['data-slug'], {"embed": True}, site_json, False)
                 if video_item:
-                    el.insert_after(BeautifulSoup(video_item['content_html'], 'html.parser'))
-                    el.decompose()
+                    el.replace_with(BeautifulSoup(video_item['content_html'], 'html.parser'))
                 else:
                     logger.warning('unable to get video data for ' + el['data-slug'])
 
             elif el['data-transform'] == 'quoteBox':
                 el_html = utils.add_pullquote(el.get_text())
-                el.insert_after(BeautifulSoup(el_html, 'html.parser'))
-                el.decompose()
+                el.replace_with(BeautifulSoup(el_html, 'html.parser'))
 
             elif el['data-transform'] == 'divider':
-                el.insert_after(BeautifulSoup('<hr style="width:80%;"/>', 'html.parser'))
-                el.decompose()
+                el_html = '<hr style="width:80%; margin:1em auto;"/>'
+                el.replace_with(BeautifulSoup(el_html, 'html.parser'))
 
             else:
                 logger.warning('unhandled section data-transform={} in {}'.format(el['data-transform'], url))
+        elif el.get('class') and 'article-page' in el['class']:
+            el.unwrap()
 
     for el in page_soup.find_all('a'):
         if re.search(r'\.(gif|jpg|jpeg|png)$', el['href'], flags=re.I):
-            el.insert_after(BeautifulSoup(utils.add_image(el['href'] + '?width=1000'), 'html.parser'))
-            el.decompose()
+            el_html = utils.add_image(el['href'] + '?width=1000')
+            el.replace_with(BeautifulSoup(el_html, 'html.parser'))
 
     for el in page_soup.find_all('blockquote', class_='twitter-tweet'):
         tweet_url = el.find_all('a')[-1]['href']
         if re.search(r'https:\/\/twitter\.com/[^\/]+\/status\/\d+', tweet_url):
-            el.insert_after(BeautifulSoup(utils.add_embed(tweet_url), 'html.parser'))
-            el.decompose()
+            el_html = utils.add_embed(tweet_url)
+            el.replace_with(BeautifulSoup(el_html, 'html.parser'))
 
     # lead = False
     # if content_json.get('headerImageUrl'):
@@ -377,17 +378,18 @@ def get_content(url, args, site_json, save_debug=False):
     #         video = utils.closest_dict(video_json['assets'], 'width', 640)
     #         item['content_html'] += utils.add_video(video['url'], 'video/mp4', poster, caption)
     #         lead = True
-    # if not lead and item.get('_image'):
-    #     item['content_html'] += utils.add_image(item['_image'])
+    # if not lead and item.get('image'):
+    #     item['content_html'] += utils.add_image(item['image'])
 
     verdict = ''
     if article_json.get('review'):
+        item['content_html'] += '<div style="margin-top:1em; padding:1em; border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#aaa;">'
         if article_json['review']['editorsChoice'] == True:
-            editors_choice = '<span style="color:white; background-color:red; padding:0.2em;">EDITOR\'S CHOICE</span><br />'
-        else:
-            editors_choice = ''
-        item['content_html'] += '<br/><div><div style="text-align:center">{}<h1 style="margin:0;">{}</h1>{}</div><p><em>{}</em></p><div style="font-size:0.8em;"><ul>'.format(editors_choice, article_json['review']['score'], article_json['review']['scoreText'].upper(), article_json['review']['scoreSummary'])
-
+            item['content_html'] += '<div style="text-align:center;"><span style="color:white; background-color:red; padding:4px; font-weight:bold;">EDITOR\'S CHOICE</span></div>'
+        item['content_html'] += utils.add_score_gauge(article_json['review']['score'] * 10, str(article_json['review']['score']), margins='8px auto')
+        item['content_html'] += '<div style="text-align:center; font-weight:bold;">' + article_json['review']['scoreText'].upper() + '</div>'
+        item['content_html'] += '<p><em>' + article_json['review']['scoreSummary'] + '</em></p>'
+        item['content_html'] += '<ul style="font-size:0.8em;">'
         if content_json.get('objects'):
             for object in content_json['objects']:
                 if object.get('objectRegions'):
@@ -420,9 +422,9 @@ def get_content(url, args, site_json, save_debug=False):
                                         if it['name'] not in releases[date]:
                                             releases[date].append(it['name'])
                             for key, val in releases.items():
-                                item['content_html'] += '<li>Released {}</li>'.format(key)
+                                item['content_html'] += '<li>Released ' + key
                                 if val:
-                                    item['content_html'] += ' for {}'.format(', '.join(val))
+                                    item['content_html'] += ' for ' + ', '.join(val)
                                 item['content_html'] += '</li>'
 
                 for key, val in object.items():
@@ -434,8 +436,8 @@ def get_content(url, args, site_json, save_debug=False):
                                 #item['tags'].append(it['name'])
                         if attrs:
                             item['content_html'] += '<li>{}: {}</li>'.format(key.capitalize(), ', '.join(attrs))
+        item['content_html'] += '</ul></div>'
 
-        item['content_html'] += '</ul></div></div><hr style="width:80%;"/>'
         verdict = '<h2>Verdict</h2><p>{}</p>'.format(article_json['review']['verdict'])
 
     if verdict:

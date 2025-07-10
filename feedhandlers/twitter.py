@@ -696,7 +696,9 @@ def make_tweet(tweet_json, ref_tweet_url, is_parent=False, is_quoted=False, is_r
     if has_parent:
         logo = ''
     else:
-        logo = '<a href="{}"><img src="https://abs.twimg.com/responsive-web/client-web/icon-ios.77d25eba.png" style="width:100%;"/></a>'.format(ref_tweet_url)
+        # logo = '<a href="{}"><img src="https://abs.twimg.com/responsive-web/client-web/icon-ios.77d25eba.png" style="width:100%;"/></a>'.format(ref_tweet_url)
+        # https://simpleicons.org/?q=twitter
+        logo = '<a href="' + ref_tweet_url + '"><img src="data:image/svg+xml;utf8,<svg role=\'img\' viewBox=\'0 0 24 24\' xmlns=\'http://www.w3.org/2000/svg\'><title>X</title><path d=\'M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z\'/></svg>" style="width:100%;"/></a>'
 
     if is_parent or is_reply:
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(tweet_json['user']['profile_image_url_https']))

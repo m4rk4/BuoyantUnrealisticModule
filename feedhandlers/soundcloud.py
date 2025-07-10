@@ -310,7 +310,7 @@ def get_content(url, args, site_json, save_debug=False):
             if audio_json:
                 item['_audio'] = audio_json['url']
 
-        item['content_html'] = utils.add_audio_v2(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(api_json['duration']) / 1000)
+        item['content_html'] = utils.add_audio_v2(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(api_json['duration']) / 1000, icon_logo=config.icon_soundcloud)
     
         if 'embed' not in args and api_json.get('description'):
             item['content_html'] += '<p>{}</p>'.format(api_json['description'])

@@ -158,6 +158,7 @@ def get_content(url, args, site_json, save_debug=False):
     audio = next((it for it in video_info['formats'] if it['format_id'] == '251'), None)
     if audio:
         item['_audio'] = audio['url']
+        item['_audio_type'] = 'audio/ogg'
         attachment = {}
         attachment['url'] = item['_audio']
         attachment['mime_type'] = 'audio/ogg'

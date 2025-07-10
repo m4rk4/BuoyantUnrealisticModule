@@ -146,7 +146,9 @@ def make_post(post_json, is_parent=False, is_reply=False, is_quoted=False):
     else:
         colspan = 3
         avatar = '{}/image?url={}&width=48&height=48&mask=ellipse'.format(config.server, quote_plus(post_json['author']['avatar']))
-        post_html = '<tr><td style="width:56px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b><br/><small>@{}</small></a></td><td style="width:32px;"><a href="{}"><img src="https://bsky.social/about/images/favicon-32x32.png" style="width:100%;"/></a></td></tr>'.format(author_url, avatar, author_url, author_name, post_json['author']['handle'], post_url)
+        # logo = 'https://bsky.social/about/images/favicon-32x32.png'
+        logo = config.icon_bluesky
+        post_html = '<tr><td style="width:56px;"><a href="{}"><img src="{}" /></a></td><td><a style="text-decoration:none;" href="{}"><b>{}</b><br/><small>@{}</small></a></td><td style="width:32px;"><a href="{}"><img src="{}" style="width:100%;"/></a></td></tr>'.format(author_url, avatar, author_url, author_name, post_json['author']['handle'], post_url, logo)
 
     if post_text:
         post_html += '<tr><td colspan="{}" style="padding:1em 0 1em 0;">'.format(colspan) + post_text + '</td></tr>'

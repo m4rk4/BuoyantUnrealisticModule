@@ -22,6 +22,11 @@ def resize_image(img_src, site_json, width=1200, height=800):
     if site_json and site_json.get('img_path'):
         img_src = img_src.replace(img_path, site_json['img_path'])
         img_path = site_json['img_path']
+    img_path += split_url.path + '?'
+    if query.get('uuid'):
+        img_path += 'uuid=' + query['uuid'][0] + '&'
+    if query.get('type'):
+        img_path += 'type=' + query['type'][0] + '&'
     if site_json and site_json.get('use_webp'):
         # https://lazyadmin.nl/home-network/unifi-controller/
         img_src = re.sub(r'\.(jpe?g|png)(?!\.webp)', r'.\1.webp', img_src)
@@ -29,24 +34,24 @@ def resize_image(img_src, site_json, width=1200, height=800):
         # print(query)
         return img_src
     if query.get('w') or query.get('h') or query.get('fit'):
-        return '{}{}?w={}'.format(img_path, split_url.path, width)
+        return img_path + 'w=' + str(width)
     if query.get('width') or query.get('height'):
-        return '{}{}?width={}'.format(img_path, split_url.path, width)
+        return img_path + 'width=' + str(width)
     if query.get('resize') and (not query.get('crop') or site_json.get('ignore_resize_crop')):
         # print(query['resize'][0])
-        m = re.search(r'([\d+\*])([,:])([\d+\*])', unquote_plus(query['resize'][0]))
+        m = re.search(r'(\d+|\*)(,|:)(\d+|\*)', unquote_plus(query['resize'][0]))
         if m:
             w = m.group(1)
             sep = m.group(2)
             h = m.group(3)
             if w.isnumeric() and h.isnumeric():
                 height = math.floor(int(h) * width / int(w))
-                return '{}{}?resize={}{}{}'.format(img_path, split_url.path, width, sep, height)
+                return img_path + 'resize={}{}{}'.format(width, sep, height)
             elif w.isnumeric():
-                return '{}{}?resize={}{}{}'.format(img_path, split_url.path, width, sep, h)
+                return img_path + 'resize={}{}{}'.format(width, sep, h)
             elif h.isnumeric():
-                return '{}{}?resize={}{}*'.format(img_path, split_url.path, width, sep)
-        return '{}{}?width={}'.format(img_path, split_url.path, width)
+                return img_path + 'resize={}{}*'.format(width, sep)
+        return img_path + 'width=' + str(width)
     if query.get('fit') and not query.get('crop'):
         # print(query['fit'][0])
         m = re.search(r'(\d+),(\d+)', unquote_plus(query['fit'][0]))
@@ -54,7 +59,7 @@ def resize_image(img_src, site_json, width=1200, height=800):
             w = int(m.group(1))
             h = int(m.group(2))
             height = math.floor(h * width / w)
-            return '{}{}?resize={},{}'.format(img_path, split_url.path, width, height)
+            return img_path + 'resize={},{}'.format(width, height)
     if query.get('im') and 'FitAndFill' in query['im'][0]:
         return re.sub(r'FitAndFill=\(\d+,\d+\)', 'FitAndFill({},)'.format(width), img_src)
     if not query and re.search(r';w=\d+;h=\d+', img_src):
@@ -70,6 +75,65 @@ def resize_image(img_src, site_json, width=1200, height=800):
         if utils.url_exists(img_src.replace(m.group(0), m.group(1))):
             return img_src.replace(m.group(0), m.group(1))
     return img_src
+
+
+def get_img_src(el, site_json, width=1200, height=800):
+    if el.name == 'img':
+        img = el
+    elif el.img:
+        img = el.img
+    else:
+        logger.warning('unknown img in ' + str(el))
+        return ''
+
+    if img.get('data-lazy-srcset') and not img['data-lazy-srcset'].startswith('data:image/gif;base64'):
+        return utils.image_from_srcset(img['data-lazy-srcset'], width)
+
+    if img.get('data-lazy-load-srcset') and not img['data-lazy-load-srcset'].startswith('data:image/gif;base64'):
+        return utils.image_from_srcset(img['data-lazy-load-srcset'], width)
+
+    if img.get('data-srcset') and not img['data-srcset'].startswith('data:image/gif;base64'):
+        return utils.image_from_srcset(img['data-srcset'], width)
+
+    if img.get('srcset') and not img['srcset'].startswith('data:image/gif;base64'):
+        return utils.image_from_srcset(img['srcset'], width)
+
+    if img.get('class') and site_json and site_json['module'] == 'wp_posts' and ('args' not in site_json or 'skip_wp_media' not in site_json['args']):
+        m = re.search(r'wp-image-(\d+)', ' '.join(img['class']))
+        if m:
+            media_json = utils.get_url_json(site_json['wpjson_path'] + '/wp/v2/media/' + m.group(1), site_json=site_json)
+            if media_json and media_json['media_type'] == 'image':
+                if media_json.get('media_details') and media_json['media_details'].get('sizes'):
+                    media = utils.closest_dict(list(media_json['media_details']['sizes'].values()), 'width', width)
+                    return media['source_url']
+                else:
+                    return media_json['source_url']
+
+    if img.get('data-dt-lazy-src') and not img['data-dt-lazy-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['data-dt-lazy-src'], site_json, width, height)
+
+    if img.get('data-featured-image-url'):
+        return resize_image(img['data-featured-image-url'], site_json, width, height)
+
+    if img.get('data-orig-file'):
+        return resize_image(img['data-orig-file'], site_json, width, height)
+
+    if img.get('data-lazy-src') and not img['data-lazy-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['data-lazy-src'], site_json, width, height)
+
+    if img.get('data-lazy-load-src') and not img['data-lazy-load-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['data-lazy-load-src'], site_json, width, height)
+
+    if img.get('data-dt-lazy-src') and not img['data-dt-lazy-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['data-dt-lazy-src'], site_json, width, height)
+
+    if img.get('data-src') and not img['data-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['data-src'], site_json, width, height)
+
+    if img.get('nw18-data-src') and not img['nw18-data-src'].startswith('data:image/gif;base64'):
+        return resize_image(img['nw18-data-src'], site_json, width, height)
+
+    return resize_image(img['src'], site_json, width, height)
 
 
 def add_image(el, el_parent, base_url, site_json, caption='', add_caption=True, decompose=True, insert=True, gallery=False, n=0, width=1000):
@@ -591,14 +655,17 @@ def get_authors(wp_post, yoast_json, page_soup, item, args, site_json, meta_json
         return authors
 
     if wp_post:
+        if wp_post.get('author_meta'):
+            authors = [x['name'] for x in wp_post['author_meta']]
+            return authors
+
         if wp_post.get('oht_article_byline'):
             for author in wp_post['oht_article_byline']:
                 authors.append(re.sub(r'^By\s+', '', author, flags=re.I))
             return authors
 
         if wp_post.get('parsely') and wp_post['parsely'].get('meta') and wp_post['parsely']['meta'].get('author'):
-            for author in wp_post['parsely']['meta']['author']:
-                authors.append(author['name'])
+            authors = [x['name'] for x in wp_post['parsely']['meta']['author']]
             return authors
 
         if wp_post.get('parsely') and wp_post['parsely'].get('meta') and wp_post['parsely']['meta'].get('creator'):
@@ -1292,6 +1359,8 @@ def get_post_content(post, args, site_json, page_soup=None, save_debug=False):
             subtitle = post['acf']['dek']
         elif post.get('acf') and post['acf'].get('deck'):
             subtitle = post['acf']['deck']
+        elif post.get('acf') and post['acf'].get('story_highlights'):
+            subtitle = post['acf']['story_highlights']
         elif post.get('meta'):
             if post['meta'].get('sub_title'):
                 subtitle = post['meta']['sub_title']
@@ -1934,6 +2003,83 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
 
     for el in soup.find_all('div', class_=re.compile(r'GutenbergParagraph_gutenbergParagraph_')):
         el.unwrap()
+
+    if site_json.get('gallery'):
+        for tag in site_json['gallery']:
+            galleries = utils.get_soup_elements(tag, soup)
+            for gallery in galleries:
+                new_html = ''
+                images = utils.get_soup_elements(tag['image'], gallery)
+                if images:
+                    gallery_images = []
+                    new_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+                    for image in images:
+                        img_src = get_img_src(image, site_json, 2000)
+                        thumb = get_img_src(image, site_json, 800)
+                        captions = []
+                        if tag['image'].get('credit'):
+                            it = utils.get_soup_elements(tag['image']['credit'], image)
+                            if it:
+                                captions.append(it[0].decode_contents())
+                                it[0].decompose()
+                        if tag['image'].get('caption'):
+                            it = utils.get_soup_elements(tag['image']['caption'], image)
+                            if it:
+                                captions.insert(0, it[0].decode_contents())
+                                it[0].decompose()
+                        caption = ' | '.join(captions)
+                        new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+                        gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                    new_html += '</div>'
+                    captions = []
+                    if tag.get('credit'):
+                        it = utils.get_soup_elements(tag['credit'], gallery)
+                        if it:
+                            captions.append(it[0].decode_contents())
+                            it[0].decompose()
+                    if tag.get('caption'):
+                        it = utils.get_soup_elements(tag['caption'], gallery)
+                        if it:
+                            captions.insert(0, it[0].decode_contents())
+                            it[0].decompose()
+                    if captions:
+                        new_html += '<div><small>' + ' | '.join(captions) + '</small></div>'
+                    if len(images) > 2:
+                        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+                        new_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
+                if new_html:
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    gallery.replace_with(new_el)
+                else:
+                    logger.warning('unhandled gallery ' + str(gallery))
+
+    if site_json.get('images'):
+        for tag in site_json['images']:
+            images = utils.get_soup_elements(tag, soup)
+            if images:
+                new_html = ''
+                for image in images:
+                    img_src = get_img_src(image, site_json)
+                    captions = []
+                    if tag.get('credit'):
+                        it = utils.get_soup_elements(tag['credit'], image)
+                        if it:
+                            captions.append(it[0].decode_contents())
+                            it[0].decompose()
+                    if tag.get('caption'):
+                        it = utils.get_soup_elements(tag['caption'], image)
+                        if it:
+                            captions.insert(0, it[0].decode_contents())
+                            it[0].decompose()
+                    caption = ' | '.join(captions)
+                    it = image.select('a:has(> img)')
+                    if it:
+                        link = it[0]['href']
+                    else:
+                        link = ''
+                    new_html = utils.add_image(img_src, caption, link=link)
+                    new_el = BeautifulSoup(new_html, 'html.parser')
+                    image.replace_with(new_el)
 
     for el in soup.find_all(class_='xe-positives-negatives'):
         # https://www.gamerevolution.com/review/980418-epomaker-galaxy70-review-keyboard-worth-buying
@@ -4893,12 +5039,6 @@ def format_content(content_html, item, site_json=None, module_format_content=Non
             # https://undark.org/2023/02/22/how-an-early-warning-radar-could-prevent-future-pandemics/
             images = el.find_all(class_='cell')
             add_caption = True
-        elif 'photo-layout' in el['class']:
-            # https://news.harvard.edu/gazette/story/2023/05/inspired-by-mother-bacow-decided-he-wasnt-done-being-a-leader/
-            images = el.find_all(class_='photo-layout__image-wrap')
-            if not images:
-                images = el.find_all(class_='photo-layout__image')
-            add_caption = False
         elif 'rslides' in el['class']:
             # https://www.timesofisrael.com/idf-warns-civilians-to-leave-northern-gaza-as-ground-invasion-looms/
             images = el.find_all('li')

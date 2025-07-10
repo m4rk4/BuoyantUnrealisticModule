@@ -1081,7 +1081,7 @@ def format_small_card(image_html, content_html, footer_html='', image_size='160p
   card_html += '</div>'
   return card_html
 
-def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, border=True, desc='', use_video_js=True, margin='2em auto 2em auto', button_overlay=config.audio_button_overlay):
+def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, duration, audio_type='audio/mpeg', show_poster=True, small_poster=False, border=True, desc='', use_video_js=True, margin='2em auto 2em auto', button_overlay=config.audio_button_overlay, icon_logo=''):
   if small_poster == True or (audio_src and not poster) or (audio_src and show_poster == False):
     w = '64px'
     w_overlay = '40px'
@@ -1219,19 +1219,24 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
 
   content_html += '<div style="margin-top:auto; margin-bottom:0.2em; font-size:0.8em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
 
+  date_time = ''
   if date or has_duration:
     # Limit to 1 line, position at bottom
     n += 0.8
     if date:
-      content_html += date
+      date_time += date
     if date and has_duration:
-      content_html += '&nbsp;&bull;&nbsp;'
+      date_time += '&nbsp;&bull;&nbsp;'
     if has_duration:
       if d > 0:
-        content_html += calc_duration(d)
+        date_time += calc_duration(d)
       else:
-        content_html += duration
+        date_time += duration
   
+  if icon_logo:
+    content_html += '<div style="display:flex; align-items:flex-end;"><div style="flex:1;">' + date_time + '</div><div style="padding-right:8px;"><img style="width:32px; height:32px;" src="' + icon_logo + '"></div></div>'
+  else:
+    content_html += date_time
   content_html += '</div>'
 
   if w == '64px':
@@ -1473,19 +1478,26 @@ def add_twitter(tweet_url, tweet_id=''):
     return ''
   return tweet['content_html']
 
-def add_bar(label, value, max_value, show_percent=True, bar_color='#4169E1'):
+def add_score_gauge(val_pct, val_str, margins='1em auto'):
+  # Red to green color scale
+  color = 'hsl({}deg 100 50 / 1);'.format(int(1.3 * val_pct))
+  return '<div style="margin:{}; width:8rem; aspect-ratio:1; line-height:8rem; text-align:center; font-size:3rem; font-weight:bold; border:solid 24px {}; border-radius:50%; mask:linear-gradient(red 0 0) padding-box, conic-gradient(red var(--p, {}%), transparent 0%) border-box;">{}</div>'.format(margins, color, val_pct, val_str)
+
+def add_bar(label, value, max_value, show_percent=True, bar_color='#4169E1', display_value='', line_height='2em'):
   if max_value == 0:
     pct = 0
   else:
     pct = 100 * value / max_value
-  if show_percent:
+  if display_value:
+    val = display_value
+  elif show_percent:
     val = '{:.1f}%'.format(pct)
   else:
     val = value
   pct = int(pct)
   if pct >= 50:
-    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {}%, transparent {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(bar_color, pct, 100 - pct, label, val)
-  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, transparent {}%, {} {}%);"><p><b>{}</b></p><p><b>{}</b></p></div>'.format(100 - pct, bar_color, pct, label, val)
+    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {}%, transparent {}%);"><div style="line-height:{};"><b>{}</b></div><div style="line-height:{};"><b>{}</b></div></div>'.format(bar_color, pct, 100 - pct, line_height, label, line_height, val)
+  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, transparent {}%, {} {}%);"><div style="line-height:{};"><b>{}</b></div><div style="line-height:{};"><b>{}</b></div></div>'.format(100 - pct, bar_color, pct, line_height, label, line_height, val)
 
 def add_barchart(labels, values, title='', caption='', max_value=0, percent=True, border=True, width="75%"):
   color = 'rgb(196, 207, 214)'
@@ -1694,6 +1706,10 @@ def get_ld_json(url):
   return ld_json
 
 def get_soup_elements(tag, soup):
+  if 'recursive' in tag:
+    recursive = tag['recursive']
+  else:
+    recursive = True
   if tag.get('selector'):
     elements = soup.select(tag['selector'])
     if tag.get('parent'):
@@ -1706,25 +1722,25 @@ def get_soup_elements(tag, soup):
       key = list(tag['attrs'].keys())[0]
       val = list(tag['attrs'].values())[0]
       if tag.get('tag'):
-        elements = soup.find_all(tag['tag'], attrs={key: re.compile(val)})
+        elements = soup.find_all(tag['tag'], attrs={key: re.compile(val)}, recursive=recursive)
       else:
-        elements = soup.find_all(attrs={key: re.compile(val)})
+        elements = soup.find_all(attrs={key: re.compile(val)}, recursive=recursive)
     elif tag['regex'] == 'tag':
       if tag.get('attrs'):
-        elements = soup.find_all(re.compile(tag['tag']), attrs=tag['attrs'])
+        elements = soup.find_all(re.compile(tag['tag']), attrs=tag['attrs'], recursive=recursive)
       else:
-        elements = soup.find_all(re.compile(tag['tag']))
+        elements = soup.find_all(re.compile(tag['tag']), recursive=recursive)
     elif tag['regex'] == 'both':
       key = list(tag['attrs'].keys())[0]
       val = list(tag['attrs'].values())[0]
-      elements = soup.find_all(re.compile(tag['tag']), attrs={key: re.compile(val)})
+      elements = soup.find_all(re.compile(tag['tag']), attrs={key: re.compile(val)}, recursive=recursive)
   else:
     if tag.get('tag') and tag.get('attrs'):
-      elements = soup.find_all(tag['tag'], attrs=tag['attrs'])
+      elements = soup.find_all(tag['tag'], attrs=tag['attrs'], recursive=recursive)
     elif tag.get('tag') and not tag.get('attrs'):
-      elements = soup.find_all(tag['tag'])
+      elements = soup.find_all(tag['tag'], recursive=recursive)
     elif not tag.get('tag') and tag.get('attrs'):
-      elements = soup.find_all(attrs=tag['attrs'])
+      elements = soup.find_all(attrs=tag['attrs'], recursive=recursive)
   return elements
 
 def calc_duration(seconds, include_sec=False, time_format=','):

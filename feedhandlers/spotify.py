@@ -6,6 +6,7 @@ from urllib.parse import quote_plus, urlencode, urlsplit
 from ytmusicapi import YTMusic
 
 import config, utils
+from feedhandlers import ytdl
 
 import logging
 
@@ -97,24 +98,6 @@ def get_key(file_id, save_debug=False):
     return key
 
 
-# https://github.com/jdemaeyer/spoqify/blob/master/spoqify/anonymization.py
-def spotify_totp(timestamp):
-    # via https://github.com/kunesj/holo-spotify-stats/blob/ebdcbbb22904946ec518cbf6cac74fec94a01f64/fetch_spotify_stats.py#L129
-    uint8_secret = bytearray([
-        53, 53, 48, 55, 49, 52, 53, 56, 53, 51, 52, 56, 55, 52, 57, 57, 53, 57,
-        50, 50, 52, 56, 54, 51, 48, 51, 50, 57, 51, 52, 55,
-    ])
-    secret = base64.b32encode(bytes(uint8_secret)).decode("ascii")
-    period = 30
-    return pyotp.hotp.HOTP(
-        s=secret,
-        digits=6,
-        digest=hashlib.sha1,
-    ).at(
-        int(timestamp / period),
-    )
-
-
 def get_web_player_js():
     # Find web-player.xxx.js and parse needed parameters
     r = curl_cffi.get('https://open.spotify.com/', impersonate='chrome', proxies=config.proxies)
@@ -142,20 +125,6 @@ def get_tokens(web_player_js=None):
         if not web_player_js:
             return None
 
-    m = re.search(r'buildVer:"([^"]+)', web_player_js)
-    if m:
-        tokens['buildVer'] = m.group(1)
-    else:
-        logger.warning('unable to find spotify buildVer')
-        return None
-
-    m = re.search(r'buildDate:"([^"]+)', web_player_js)
-    if m:
-        tokens['buildDate'] = m.group(1)
-    else:
-        logger.warning('unable to find spotify buildDate')
-        return None
-
     m = re.search(r'clientVersion:"([^"]+)', web_player_js)
     if m:
         tokens['clientVersion'] = m.group(1)
@@ -172,24 +141,34 @@ def get_tokens(web_player_js=None):
 
     tokens['deviceId'] = str(uuid.uuid4())
 
-    client_time = int(time.time() * 1000)
-    server_time = client_time // 1000
-    totp = spotify_totp(client_time / 1000)
+    # https://github.com/jdemaeyer/spoqify/blob/master/spoqify/anonymization.py
+    def _generate_totp(totp_secret):
+        return pyotp.hotp.HOTP(
+            s=totp_secret,
+            digits=6,
+            digest=hashlib.sha1,
+        ).at(
+            int(time.time() / 30),
+        )
+    uint8_secret = bytearray([
+        53, 50, 49, 48, 48, 52, 57, 49, 49, 48, 52, 54, 54, 53, 49, 50, 50, 56, 53,
+        49, 49, 57, 57, 48, 55, 57, 49, 49, 52, 56, 48, 55, 53, 54, 50, 49, 50, 53,
+        53, 49, 56, 49,
+    ])
+    totp_secret = base64.b32encode(bytes(uint8_secret)).decode("ascii")
+    totp_version = 10
+    totp = _generate_totp(totp_secret)
 
     params = {
-        "reason": "init",
-        "productType": "web-player",
-        "totp": totp,
-        "totpServer": totp,
-        "totpVer": 5,
-        "sTime": server_time,
-        "cTime": client_time,
-        "buildVer": tokens['buildVer'],
-        "buildDate": tokens['buildDate']
+        'reason': 'init',
+        'productType': 'web-player',
+        'totp': totp,
+        'totpServer': totp,
+        'totpVer': totp_version,
     }
-    r = curl_cffi.get('https://open.spotify.com/get_access_token?' + urlencode(params), impersonate='chrome', proxies=config.proxies)
+    r = curl_cffi.get('https://open.spotify.com/api/token?' + urlencode(params), impersonate='chrome', proxies=config.proxies)
     if not r or r.status_code != 200:
-        logger.warning('unable to get access token from https://open.spotify.com/get_access_token')
+        logger.warning('unable to get access token from https://open.spotify.com/api/token')
         return None
     tokens['access_token'] = r.json()
 
@@ -294,7 +273,7 @@ def get_embed_content(url, args, site_json, save_debug=False):
                 "name": data_entity['subtitle']
             }
         item['_playlist'] = []
-        tracks_html = ''
+        tracks_html = '<details><summary style="font-weight:bold;">Tracks:</summary>'
         for i, track in enumerate(data_entity['trackList'], 1):
             track_url = 'https://open.spotify.com/track/' + track['uri'].split(':')[-1]
             track_title = str(i) + '. ' + '<a href="' + track_url + '" target="_blank">' + track['title'] + '</a>'
@@ -311,6 +290,7 @@ def get_embed_content(url, args, site_json, save_debug=False):
             else:
                 audio_src = 'https://open.spotify.com/embed/track/' + track['uri'].split(':')[-1]
                 tracks_html += utils.add_audio_v2(audio_src, item['image'], track_title, '', track['subtitle'], '', item.get('_display_date'), utils.calc_duration(track['duration'] / 1000, True, ':'), audio_type='audio_link', show_poster=False, border=False, margin='1em auto 1em auto')
+        tracks_html += '</details>'
         item['content_html'] = utils.add_audio_v2(config.server + '/playlist?url=' + quote_plus(item['url']), item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', '', audio_type='audio_link', desc=tracks_html)
         return item
 
@@ -448,6 +428,8 @@ def get_content(url, args, site_json, save_debug=False):
     web_player_js = get_web_player_js()
     if not web_player_js:
         return get_embed_content(url, args, site_json, save_debug)
+    if save_debug:
+        utils.write_file(web_player_js, './debug/playerjs.txt')
     tokens = get_tokens(web_player_js)
     if not tokens:
         return get_embed_content(url, args, site_json, save_debug)
@@ -523,6 +505,11 @@ def get_content(url, args, site_json, save_debug=False):
         artist.append('<a href="https://open.spotify.com/album/' + album['uri'].split(':')[-1] + '">' + album['name'] + '</a>')
         playback_url = get_ytmusic_audio(track)
         if playback_url:
+            logger.debug('getting audio from ' + playback_url)
+            yt_item = ytdl.get_content(playback_url, {}, {"module": "ytdl"}, False)
+            if yt_item and '_audio' in yt_item:
+                item['_audio'] = yt_item['_audio']
+                item['_audio_type'] = yt_item['_audio_type']
             playback_url = config.server + '/audio?url=' + quote_plus(playback_url)
         else:
             playback_url = 'https://open.spotify.com/embed/track/' + track['uri'].split(':')[-1]
@@ -565,35 +552,50 @@ def get_content(url, args, site_json, save_debug=False):
             artist_url = utils.clean_url(artist['sharingInfo']['shareUrl'])
             item['authors'].append({"name": artist['profile']['name'], "url": artist_url})
             artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
-        artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+        album_artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
         item['author'] = {
             "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
         }
         item['image'] = album['coverArt']['sources'][0]['url']
         item['_playlist'] = []
-        tracks_html = ''
+        tracks_html = '<details><summary style="font-weight:bold;">Tracks:</summary>'
         for it in album['tracksV2']['items']:
             track = it['track']
             track_id = track['uri'].split(':')[-1]
-            artists = []
-            for artist in track['artists']['items']:
-                artist_url = 'https://open.spotify.com/artist/' + artist['uri'].split(':')[-1]
-                artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
-            artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
-            playback_url = get_ytmusic_audio(track)
-            if playback_url:
-                playback_url = config.server + '/audio?url=' + quote_plus(playback_url)
+            track_title = track['name']
+            track_url = 'https://open.spotify.com/track/' + track_id
+            track_title_url = '<a href="{}">{}</a>'.format(track_url, track_title)
+            if 'contentRating' in track and track['contentRating']['label'] == 'EXPLICIT':
+                track_title += ' 🄴'
+                track_title_url += ' 🄴'
+            if item['author']['name'] == re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['profile']['name'] for x in track['artists']['items']])):
+                artist = ''
             else:
-                playback_url = 'https://open.spotify.com/embed/track/' + track['uri'].split(':')[-1]
-            tracks_html += utils.add_audio_v2(playback_url, '', track['name'], 'https://open.spotify.com/track/' + track_id, artist, '', '', -1, 'audio_link', show_poster=False, border=False, margin='1em auto 1em auto')
+                artists = []
+                for artist in track['artists']['items']:
+                    artist_url = 'https://open.spotify.com/artist/' + artist['uri'].split(':')[-1]
+                    artists.append('<a href="{}">{}</a>'.format(artist_url, artist['profile']['name']))
+                artist = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(artists))
+            if 'duration' in track:
+                duration = utils.calc_duration(track['duration']['totalMilliseconds'] / 1000, include_sec=True, time_format=':')
+            else:
+                duration = -1
+            playback_url = config.server + '/audio?url=' + quote_plus(track_url)
+            # playback_url = get_ytmusic_audio(track)
+            # if playback_url:
+            #     playback_url = config.server + '/audio?url=' + quote_plus(playback_url)
+            # else:
+            #     playback_url = 'https://open.spotify.com/embed/track/' + track['uri'].split(':')[-1]
+            tracks_html += utils.add_audio_v2(playback_url, '', track_title_url, '', artist, '', '', duration, 'audio_link', show_poster=False, border=False, margin='1em auto 1em auto')
             item['_playlist'].append({
                 "src": playback_url + '&novideojs',
-                "name": track['name'],
+                "name": track_title,
                 "artist": re.sub(r'<a [^>]+>|</a>', '', artist),
                 "image": item['image']
             })
+        tracks_html += '</details>'
         playback_url = config.server + '/playlist?url=' + quote_plus(item['url'])
-        item['content_html'] = utils.add_audio_v2(playback_url, item['image'], item['title'], item['url'], artist, '', 'Released: ' + item['_display_date'], -1, 'audio_link', desc=tracks_html)
+        item['content_html'] = utils.add_audio_v2(playback_url, item['image'], item['title'], item['url'], album_artist, '', 'Released: ' + item['_display_date'], -1, 'audio_link', desc=tracks_html)
 
     elif content_type == 'playlist':
         m = re.search(r'"fetchPlaylist","query","([^"]+)', web_player_js)
@@ -639,7 +641,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['image'] = playlist['images']['items'][0]['sources'][0]['url']
         item['summary'] = playlist['description']
         item['_playlist'] = []
-        tracks_html = ''
+        tracks_html = '<details><summary style="font-weight:bold;">Tracks:</summary>'
         for it in playlist['content']['items']:
             track = it['itemV2']['data']
             track_id = track['uri'].split(':')[-1]
@@ -660,6 +662,7 @@ def get_content(url, args, site_json, save_debug=False):
                 "artist": re.sub(r'<a [^>]+>|</a>', '', artist),
                 "image": item['image']
             })
+        tracks_html += '</details>'
         playback_url = config.server + '/playlist?url=' + quote_plus(item['url'])
         if '_display_date' in item:
             display_date = 'Updated: ' + item['_display_date']

@@ -318,6 +318,36 @@ def get_post(post_json, args, site_json, save_debug):
             else:
                 logger.warning('unhandled tweet in ' + item['url'])
 
+        for el in soup.find_all(class_='bluesky-wrap'):
+            new_html = ''
+            if el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                new_html = utils.add_embed('https://bsky.app/profile/' + data_json['authorDid'] + '/post/' + data_json['postId'])
+            elif el.iframe:
+                new_html = utils.add_embed(el.iframe['src'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled bluesky-wrap in ' + item['url'])
+
+        for el in soup.find_all(class_='instagram'):
+            new_html = ''
+            it = el.find('a', class_='instagram-image')
+            if it:
+                new_html = utils.add_embed(it['href'])
+            elif el.get('data-attrs'):
+                data_json = json.loads(el['data-attrs'])
+                # TODO: reels?
+                new_html = utils.add_embed('https://www.instagram.com/p/' + data_json['instagram_id'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                el.decompose()
+            else:
+                logger.warning('unhandled instagram embed in ' + item['url'])
+
         for el in soup.find_all('iframe', class_='spotify-wrap'):
             new_html = utils.add_embed(el['src'])
             new_el = BeautifulSoup(new_html, 'html.parser')

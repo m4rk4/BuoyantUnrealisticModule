@@ -139,7 +139,10 @@ def get_content(url, args, site_json, save_debug=False):
             item['tags'] = ld_json['keywords'].copy()
 
         if ld_json.get('image'):
-            item['_image'] = ld_json['image']['url']
+            if isinstance(ld_json['image'], dict):
+                item['_image'] = ld_json['image']['url']
+            elif isinstance(ld_json['image'], list):
+                item['_image'] = ld_json['image'][0]['url']
         elif ld_json.get('thumbnailUrl'):
             item['_image'] = ld_json['thumbnailUrl']
 
@@ -440,6 +443,10 @@ def get_content(url, args, site_json, save_debug=False):
                     new_html = utils.add_embed(it['data-lazy-src'])
                 elif it.get('src'):
                     new_html = utils.add_embed(it['src'])
+            else:
+                it = el.find(attrs={"data-yt-video-token": True})
+                if it:
+                    new_html = utils.add_embed('https://www.youtube.com/watch?v=' + it['data-yt-video-token'])
             if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
