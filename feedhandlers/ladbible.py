@@ -1,7 +1,7 @@
 import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import parse_qs, quote_plus, urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 import config, utils
 from feedhandlers import jwplayer, rss

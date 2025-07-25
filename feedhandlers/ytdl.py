@@ -122,7 +122,11 @@ def get_content(url, args, site_json, save_debug=False):
             item['author']['url'] = video_info['uploader_url']
         elif video_info.get('channel_url'):
             item['author']['url'] = video_info['channel_url']
-        uploader_info = YoutubeDL(ydl_opts).extract_info(item['author']['url'], download=False)
+        try:
+            uploader_info = YoutubeDL(ydl_opts).extract_info(item['author']['url'], download=False)
+        except Exception as e:
+            logger.warning('unexpected error occured getting uploader info for ' + item['author']['url'])
+            uploader_info = None
         if uploader_info:
             thumb = next((it for it in uploader_info['thumbnails'] if it['id'] == 'avatar_uncropped'), None)
             if thumb:

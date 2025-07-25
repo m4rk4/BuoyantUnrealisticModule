@@ -1,4 +1,4 @@
-import json, pytz, re
+import html, json, pytz, re, uuid
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
@@ -24,6 +24,22 @@ def get_initial_state(url):
         logger.warning('unable to find INITIAL_STATE in ' + url)
         return None
     return json.loads(el.string[25:])
+
+
+def add_video(video_soup, player_id_key='regular'):
+    player_id = json.loads(html.unescape(video_soup['data-player-id']))
+    pid = player_id[player_id_key]
+    mmid = ''
+    media_bin = utils.get_url_content('https://vid.thecontentserver.com/pid-' + pid + '/' + video_soup['data-video-id'] + '/5_media.bin')
+    if media_bin:
+        m = re.findall(r'[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}', media_bin.decode('latin1'))
+        if m:
+            mmid = m[-1]
+    if mmid:
+        video_url = 'https://vid.thecontentserver.com/pid-' + pid + '/' + video_soup['data-video-id'] + '/mmid-' + mmid + '/playlist.m3u8'
+        poster = 'https://wsrv.nl/?url=' + quote_plus(video_soup['data-thumbnail'])
+        return utils.add_video(video_url, 'application/x-mpegURL', poster, video_soup.get('data-description'))
+    return ''
 
 
 def add_gallery(url, save_debug=False):
@@ -98,21 +114,22 @@ def get_item(article_json, args, site_json, save_debug):
     item['date_modified'] = dt.isoformat()
 
     if article_json.get('authors'):
-        authors = []
-        for it in article_json['authors']:
-            authors.append(it['name'])
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in article_json['authors']]
     elif article_json.get('byline'):
-        item['author'] = {}
+        item['authors'] = []
         el = BeautifulSoup(article_json['byline'], 'html.parser')
         it = el.find('ng_byline_name')
         if it:
-            item['author']['name'] = it.get_text().strip()
+            item['authors'].append({"name": it.get_text().strip()})
         it = el.find('ng_byline_credit')
         if it:
-            item['author']['name'] += ', {}'.format(it.get_text().strip())
+            item['authors'].append({"name": it.get_text().strip()})        
+    elif article_json.get('photographer'):
+        item['authors'] = [{"name": x.strip()} for x in article_json['photographer'].split(',')]
+    if 'authors' in item and len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     if article_json.get('keywords'):
         item['tags'] = article_json['keywords'].split(', ')
@@ -124,40 +141,65 @@ def get_item(article_json, args, site_json, save_debug):
     elif article_json.get('story_teaser'):
         item['summary'] = article_json['story_teaser']
 
+    if article_json.get('lead_media'):
+        if article_json['lead_media']['asset_type'] == 'picture':
+            item['image'] = article_json['lead_media']['thumbnail']
+        elif article_json['lead_media']['asset_type'] == 'videoIngest':
+            item['image'] = article_json['lead_media']['thumbnail']
+
+    page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
+    if page_html:
+        page_soup = BeautifulSoup(page_html, 'html.parser')
+    else:
+        page_soup = None
+
+    if article_json['asset_type'] == 'videoIngest':
+        if page_soup:
+            video = page_soup.find('video', attrs={"data-video-id": article_json['videoCMSID']})
+            if video:
+                item['content_html'] = add_video(video)
+                return item
+
     item['content_html'] = ''
     if article_json.get('story_teaser'):
         item['content_html'] += '<p><em>{}</em></p>'.format(article_json['story_teaser'])
 
-    soup = None
-    if article_json.get('lead_media'):
-        if article_json['lead_media']['asset_type'] == 'picture':
-            item['_image'] = article_json['lead_media']['thumbnail']
-            captions = []
-            if article_json['lead_media'].get('caption') and article_json['lead_media']['caption'] != '-':
-                captions.append(article_json['lead_media']['caption'])
-            if article_json['lead_media'].get('photographer') and article_json['lead_media']['photographer'] != '-':
-                captions.append(article_json['lead_media']['photographer'])
-            if article_json['lead_media'].get('credit') and article_json['lead_media']['credit'] != '-':
-                captions.append(article_json['lead_media']['credit'])
-            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
-        elif article_json['lead_media']['asset_type'] == 'videoIngest':
-            item['_image'] = article_json['lead_media']['thumbnail']
-            if not soup:
-                page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
-                if page_html:
-                    soup = BeautifulSoup(page_html, 'html.parser')
-            if soup:
-                video = soup.find('video', id=re.compile(r'player-{}'.format(article_json['lead_media']['id'])))
-                if video:
-                    video_args = {
-                        "embed": True,
-                        "data-account": video['data-account'],
-                        "data-key": video['data-key'],
-                        "data-video-id": video['data-video-id']
-                    }
-                    video_item = brightcove.get_content(item['url'], video_args, {}, False)
-                    if video_item:
-                        item['content_html'] += video_item['content_html']
+    lead_html = ''
+    if page_soup:
+        el = page_soup.find(class_='lead-item')
+        if el and 'video' in el['class'] and el.video:
+            lead_html += add_video(el.video)
+            if 'image' not in item:
+                item['image'] = el.video['data-thumbnail']
+    if not lead_html:
+        if article_json.get('lead_media'):
+            if article_json['lead_media']['asset_type'] == 'picture':
+                captions = []
+                if article_json['lead_media'].get('caption') and article_json['lead_media']['caption'] != '-':
+                    captions.append(article_json['lead_media']['caption'])
+                if article_json['lead_media'].get('photographer') and article_json['lead_media']['photographer'] != '-':
+                    captions.append(article_json['lead_media']['photographer'])
+                if article_json['lead_media'].get('credit') and article_json['lead_media']['credit'] != '-':
+                    captions.append(article_json['lead_media']['credit'])
+                lead_html += utils.add_image(article_json['lead_media']['thumbnail'], ' | '.join(captions))
+            elif article_json['lead_media']['asset_type'] == 'videoIngest':
+                if page_soup:
+                    video = page_soup.find('video', attrs={"data-video-id": article_json['lead_media']['id']})
+                    if video:
+                        lead_html += add_video(video)
+                    else:
+                        video = page_soup.find('video', id=re.compile(r'player-{}'.format(article_json['lead_media']['id'])))
+                        if video:
+                            video_args = {
+                                "embed": True,
+                                "data-account": video['data-account'],
+                                "data-key": video['data-key'],
+                                "data-video-id": video['data-video-id']
+                            }
+                            video_item = brightcove.get_content(item['url'], video_args, {}, False)
+                            if video_item:
+                                lead_html += video_item['content_html']
+    item['content_html'] += lead_html
 
     if article_json['asset_type'] == 'gallery':
         item['content_html'] = ''
@@ -169,13 +211,7 @@ def get_item(article_json, args, site_json, save_debug):
         return item
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     item['content_html'] += article_json['content']
@@ -185,10 +221,14 @@ def get_item(article_json, args, site_json, save_debug):
         embeds = None
         asset_html = ''
         asset_url = 'https://publicapi.misitemgr.com/webapi-public/v2/content/{}'.format(asset[1])
+        logger.debug('getting asset ' + asset_url)
         asset_json = utils.get_url_json(asset_url, use_proxy=True, use_curl_cffi=True)
         if not asset_json:
             logger.warning('skipping asset {} in {}'.format(asset[1], item['url']))
             continue
+        elif 'statusCode' in asset_json:
+            logger.warning('statusCode {} getting asset {}'.format(asset_json['statusCode'], item['url']))
+            continue            
         if asset_json['asset_type'] == 'picture':
             if asset_json.get('thumbnail'):
                 img_src = asset_json['thumbnail']
@@ -204,36 +244,37 @@ def get_item(article_json, args, site_json, save_debug):
             asset_html = utils.add_image(img_src, ' | '.join(captions))
 
         elif asset_json['asset_type'] == 'videoIngest':
-            if not soup:
-                page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
-                if page_html:
-                    soup = BeautifulSoup(page_html, 'html.parser')
-            if soup:
-                video = soup.find('video', id=re.compile(r'player-{}'.format(asset_json['id'])))
+            if page_soup:
+                video = page_soup.find('video', attrs={"data-video-id": article_json['lead_media']['id']})
                 if video:
-                    video_args = {
-                        "embed": True,
-                        "data-account": video['data-account'],
-                        "data-key": video['data-key'],
-                        "data-video-id": video['data-video-id']
-                    }
-                    video_item = brightcove.get_content(item['url'], video_args, {}, False)
-                    if video_item:
-                        asset_html = video_item['content_html']
+                    asset_html = add_video(video)
+                else:
+                    video = page_soup.find('video', id=re.compile(r'player-{}'.format(asset_json['id'])))
+                    if video:
+                        video_args = {
+                            "embed": True,
+                            "data-account": video['data-account'],
+                            "data-key": video['data-key'],
+                            "data-video-id": video['data-video-id']
+                        }
+                        video_item = brightcove.get_content(item['url'], video_args, {}, False)
+                        if video_item:
+                            asset_html = video_item['content_html']
 
         elif asset_json['asset_type'] == 'embedInfographic':
+            if asset_json['id'] in ['256658952', '271881142']:
+                # ads, signups, etc
+                continue
             if not embeds:
-                if not soup:
-                    page_html = utils.get_url_html(item['url'], use_proxy=True, use_curl_cffi=True)
-                    if page_html:
-                        soup = BeautifulSoup(page_html, 'html.parser')
-                if soup:
-                    embeds = soup.find_all(class_='embed-infographic')
+                if page_soup:
+                    embeds = page_soup.find_all(class_='embed-infographic')
             if embeds:
                 if embeds[n].iframe:
                     asset_html = utils.add_embed(embeds[n].iframe['src'])
                 elif embeds[n].blockquote and 'tiktok-embed' in embeds[n].blockquote['class']:
                     asset_html = utils.add_embed(embeds[n].blockquote['cite'])
+                elif embeds[n].blockquote and 'instagram-media' in embeds[n].blockquote['class']:
+                    asset_html = utils.add_embed(embeds[n].blockquote['data-instgrm-permalink'])
             n = n + 1
             if 'sign-up' in asset_json['title']:
                 continue

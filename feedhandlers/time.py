@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, quote_plus
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -89,17 +89,23 @@ def get_content(url, args, site_json, save_debug):
     elif post_json.get('primary_image'):
         item['content_html'] += add_image(post_json['primary_image'])
 
-    for block in post_json['body']:
+    dropcap = False
+    for i, block in enumerate(post_json['body']):
         if block['type'] == 'paragraph' or block['type'] == 'heading' :
             if block['format'] == 'html':
                 if block['content'].startswith('<p><strong>Read More'):
                     continue
-                if re.search('dropcap', block['content']):
+                if i == 0 or re.search('dropcap', block['content']):
                     soup = BeautifulSoup(block['content'], 'html.parser')
-                    el = soup.find(class_='dropcap')
-                    if el:
-                        el['style'] = 'float:left; font-size:4em; line-height:0.8em;'
-                        item['content_html'] += str(soup) + '<span style="clear:left;"></span>'
+                    if soup.p:
+                        el = soup.find(class_='dropcap')
+                        if el:
+                            el.unwrap()
+                        soup.p['class'] = 'dropcap'
+                        item['content_html'] += str(soup)
+                        if not dropcap:
+                            item['content_html'] += '<style>' + config.dropcap_style + '</style>'
+                            dropcap = True
                 else:
                     item['content_html'] += block['content']
             else:

@@ -1046,7 +1046,7 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   return fig_html
 
 
-def format_small_card(image_html, content_html, footer_html='', image_size='160px', content_style='', border=True, margin='2em auto 2em auto', align_items='center', image_position='left'):
+def format_small_card(image_html, content_html, footer_html='', image_size='160px', content_style='', border=True, margin='2em auto 2em auto', align_items='center', image_position='left', width_style='width:99%; min-width:324px; max-width:540px;'):
   # assumes a square image
   # min-width = 2*w + 4
   if image_position == 'right':
@@ -1059,11 +1059,13 @@ def format_small_card(image_html, content_html, footer_html='', image_size='160p
   if footer_html:
     template_areas += " 'footer footer'"
 
+  card_html = '<div style="display:grid; grid-template-areas:{}; grid-template-columns:{};'.format(template_areas, template_columns)
+  if width_style:
+    card_html += ' ' + width_style
+  if margin:
+    card_html += ' margin:' + margin + ';'
   if align_items:
-    align = ' align-items:' + align_items + ';'
-  else:
-    align = ''
-  card_html = '<div style="display:grid; grid-template-areas:{}; grid-template-columns:{}; width:99%; min-width:324px; max-width:540px; margin:{};{}'.format(template_areas, template_columns, margin, align)
+    card_html += ' align-items:' + align_items + ';'
   if border:
     card_html += ' border:1px solid light-dark(#333,#ccc); border-radius:10px;'
   card_html += '">'

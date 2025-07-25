@@ -33,6 +33,12 @@ def get_content(url, args, site_json, save_debug=False):
     elif split_url.netloc == 'player.megaphone.fm' and len(paths) == 1:
         episode_id = paths[0]
         api_url = 'https://player.megaphone.fm/playlist/episode/' + episode_id
+    elif split_url.netloc == 'player.megaphone.fm' and len(paths) == 3:
+        episode_id = paths[-1]
+        api_url = 'https://player.megaphone.fm/playlist/episode/' + episode_id
+    elif split_url.netloc == 'traffic.megaphone.fm' and '.mp3' in paths[0]:
+        episode_id = paths[0].replace('.mp3', '')
+        api_url = 'https://player.megaphone.fm/playlist/episode/' + episode_id
     elif split_url.netloc == 'cms.megaphone.fm' and paths[0] == 'channel':
         playlist_id = paths[1]
         query = parse_qs(split_url.query)

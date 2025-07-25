@@ -18,7 +18,7 @@ def get_content(url, args, site_json, save_debug=False):
     soup = BeautifulSoup(page_html, 'lxml')
 
     item = {}
-    if '/video/' in url or '/podcast/' in url:
+    if '/xxxxx-video/' in url or '/xxxxx-podcast/' in url:
         media_src = ''
         el = soup.find('script', string=re.compile('mediaID'))
         if el:
@@ -148,10 +148,14 @@ def get_content(url, args, site_json, save_debug=False):
         }
 
     item['tags'] = []
+    if article_json.get('primary_category'):
+        item['tags'].append(article_json['primary_category'])
+    if article_json.get('subcategory'):
+        item['tags'].append(article_json['subcategory'])
     if article_json.get('categories'):
-        item['tags'] += article_json['categories']
+        item['tags'] += [x for x in article_json['categories'] if x not in item['tags']]
     if article_json.get('tags'):
-        item['tags'] += article_json['tags']
+        item['tags'] += [x for x in article_json['tags'] if x not in item['tags']]
 
     item['content_html'] = ''
     if article_json.get('summary'):
@@ -160,31 +164,39 @@ def get_content(url, args, site_json, save_debug=False):
 
     if article_json.get('image_url'):
         item['image'] = article_json['image_url']
-        caption = ''
-        if article_json.get('image_caption'):
-            if article_json['image_caption'].startswith('<p'):
-                caption += BeautifulSoup(article_json['image_caption'], 'html.parser').p.decode_contents()
-            else:
-                caption += article_json['image_caption']
-        if article_json.get('image_credits'):
-            if caption:
-                if not caption.endswith('.'):
-                    caption += '. '
+        if article_json.get('media_type') and article_json['media_type'] == 'video':
+            item['content_html'] += utils.add_embed(article_json['media_url'])
+        else:
+            caption = ''
+            if article_json.get('image_caption'):
+                if article_json['image_caption'].startswith('<p'):
+                    caption += BeautifulSoup(article_json['image_caption'], 'html.parser').p.decode_contents()
                 else:
-                    caption += ' '
-            caption += 'Credit: '
-            if article_json['image_credits'].startswith('<p'):
-                caption += BeautifulSoup(article_json['image_credits'], 'html.parser').p.decode_contents()
-            else:
-                caption += article_json['image_credits']
-        item['content_html'] += utils.add_image(item['image'], caption)
+                    caption += article_json['image_caption']
+            if article_json.get('image_credits'):
+                if caption:
+                    if not caption.endswith('.'):
+                        caption += '. '
+                    else:
+                        caption += ' '
+                caption += 'Credit: '
+                if article_json['image_credits'].startswith('<p'):
+                    caption += BeautifulSoup(article_json['image_credits'], 'html.parser').p.decode_contents()
+                else:
+                    caption += article_json['image_credits']
+            item['content_html'] += utils.add_image(item['image'], caption)
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
         return item
 
+    if article_json.get('media_type') and article_json['media_type'] == 'podcast':
+        item['content_html'] += utils.add_embed(article_json['media_url'])
+
     for content in article_json['content']:
         if content['type'] == 'paragraph' or content['type'] == 'heading':
+            if re.search(r'^(<b>READ MORE</b>:|\[<i>Read more:)', content['content']):
+                continue
             item['content_html'] += '<{0}>{1}</{0}>'.format(content['tag'], content['content'])
         elif content['type'] == 'image':
             soup = BeautifulSoup(content['content'], 'html.parser')

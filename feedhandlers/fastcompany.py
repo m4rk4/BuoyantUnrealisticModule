@@ -1,6 +1,5 @@
-import json, re
+import curl_cffi, json, re
 from bs4 import BeautifulSoup
-from curl_cffi import requests
 from datetime import datetime
 from urllib.parse import unquote_plus, urlsplit
 
@@ -213,7 +212,7 @@ def get_next_json(url, save_debug):
     headers = {
         "rsc": "1",
     }
-    r = requests.get(url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
+    r = curl_cffi.get(url, headers=headers, impersonate=config.impersonate, proxies=config.proxies)
     if not r or r.status_code != 200:
         logger.warning('unable to get next data from ' + url)
         return None

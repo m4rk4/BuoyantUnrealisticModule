@@ -433,7 +433,10 @@ def gallery():
         module, site_json = utils.get_module(args['url'], handler)
         if not module:
             return 'No content module for this url'
-        content = module.get_content(args['url'], args, site_json, save_debug)
+        args_copy = args.copy()
+        if site_json.get('args'):
+            args_copy.update(site_json['args'])
+        content = module.get_content(args['url'], args_copy, site_json, save_debug)
         if not content.get('_gallery'):
             return 'No gallery sources found for this url'
         images = content['_gallery']

@@ -16,10 +16,15 @@ def get_content(url, args, site_json, save_debug=False):
     if not page_html:
         return None
 
-    m = re.search(r'<script>window\.infographicData=({.*?});</script>', page_html)
-    if not m:
+    page_soup = BeautifulSoup(page_html, 'lxml')
+    el = page_soup.find('script', string=re.compile(r'window\.infographicData'))
+    if not el:
+        logger.warning('unable to find window.infographicData in ' + url)
         return None
-    info_json = json.loads(m.group(1))
+
+    i = el.string.find('{')
+    j = el.string.rfind('}') + 1
+    info_json = json.loads(el.string[i:j])
     if save_debug:
         utils.write_file(info_json, './debug/debug.json')
 

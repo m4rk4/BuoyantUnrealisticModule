@@ -99,7 +99,7 @@ def get_img_src(el, site_json, image_netloc, width=1200, height=800):
     elif img.get('srcset') and not img['srcset'].startswith('data:image/gif;base64'):
         img_src = utils.image_from_srcset(img['srcset'], width)
 
-    elif img.get('class') and site_json and site_json['module'] == 'wp_posts_v2' and ('args' not in site_json or 'skip_wp_media' not in site_json['args']):
+    elif img.get('class') and site_json and site_json['module'] == 'wp_posts_v2' and ('args' not in site_json or 'skip_wp_media' not in site_json['args']) and not 'contenthub.com' in str(img):
         m = re.search(r'wp-image-(\d+)', ' '.join(img['class']))
         if m:
             media_json = utils.get_url_json(site_json['wpjson_path'] + '/wp/v2/media/' + m.group(1), site_json=site_json)
@@ -108,12 +108,17 @@ def get_img_src(el, site_json, image_netloc, width=1200, height=800):
                     img_src = media_json['source_url']
                 elif media_json.get('description') and media_json['description'].get('rendered') and 'srcset' in media_json['description']['rendered']:
                     el = BeautifulSoup(media_json['description']['rendered'], 'html.parser')
-                    img_src = utils.image_from_srcset(el.img['srcset'], width)
-                elif media_json.get('media_details') and media_json['media_details'].get('sizes'):
-                    media = utils.closest_dict(list(media_json['media_details']['sizes'].values()), 'width', width)
-                    img_src = media['source_url']
-                else:
-                    img_src = media_json['source_url']
+                    if el.img:
+                        if el.img.get('data-srcset'):
+                            img_src = utils.image_from_srcset(el.img['data-srcset'], width)
+                        elif el.img.get('srcset'):
+                            img_src = utils.image_from_srcset(el.img['srcset'], width)
+                if not img_src:
+                    if media_json.get('media_details') and media_json['media_details'].get('sizes'):
+                        media = utils.closest_dict(list(media_json['media_details']['sizes'].values()), 'width', width)
+                        img_src = media['source_url']
+                    else:
+                        img_src = media_json['source_url']
 
     if not img_src:
         if img.get('data-dt-lazy-src') and not img['data-dt-lazy-src'].startswith('data:image/gif;base64'):
@@ -160,22 +165,29 @@ def get_img_src(el, site_json, image_netloc, width=1200, height=800):
 
 
 def add_wp_media(link_href, site_json, media_json=None, width=1200, caption_is_desc=False):
+    logger.debug('adding wp media ' + link_href)
     if not media_json:
         if site_json.get('replace_links_path'):
             link_href = link_href.replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1])
         media_json = utils.get_url_json(link_href, site_json=site_json)
         if not media_json:
             return ''
-    if media_json.get('media_details') and media_json['media_details'].get('width') and media_json['media_details']['width'] <= width:
+    img_src = ''
+    if media_json.get('media_details') and media_json['media_details'].get('width') and int(media_json['media_details']['width']) <= width:
         img_src = media_json['source_url']
     elif media_json.get('description') and media_json['description'].get('rendered') and 'srcset' in media_json['description']['rendered']:
         el = BeautifulSoup(media_json['description']['rendered'], 'html.parser')
-        img_src = utils.image_from_srcset(el.img['srcset'], width)
-    elif media_json.get('media_details') and media_json['media_details'].get('sizes'):
-        media = utils.closest_dict(list(media_json['media_details']['sizes'].values()), 'width', width)
-        img_src = media['source_url']
-    else:
-        img_src = media_json['source_url']
+        if el.img:
+            if el.img.get('data-srcset'):
+                img_src = utils.image_from_srcset(el.img['data-srcset'], width)
+            elif el.img.get('srcset'):
+                img_src = utils.image_from_srcset(el.img['srcset'], width)
+    if not img_src:
+        if media_json.get('media_details') and media_json['media_details'].get('sizes'):
+            media = utils.closest_dict(list(media_json['media_details']['sizes'].values()), 'width', width)
+            img_src = media['source_url']
+        else:
+            img_src = media_json['source_url']
     if img_src.startswith('//'):
         img_src += 'https:' + img_src
     if img_src.startswith('/'):
@@ -191,7 +203,15 @@ def add_wp_media(link_href, site_json, media_json=None, width=1200, caption_is_d
         if caption_is_desc:
             desc = media_json['caption']['rendered']
         else:
-            captions.append(re.sub(r'^<p>|</p>$', '', media_json['caption']['rendered'].strip()))
+            caption = BeautifulSoup(media_json['caption']['rendered'], 'html.parser')
+            for el in caption.find_all('p', class_=['attachment', 'read-more']):
+                el.decompose()
+            if caption.p:
+                captions.append(caption.p.decode_contents())
+            elif caption.get_text().strip():
+                caption = caption.get_text().strip()
+                if caption != 'excerpt':
+                    captions.append(caption.get_text().strip())
     if media_json.get('meta') and media_json['meta'].get('credit'):
         captions.append(media_json['meta']['credit'])
     elif media_json.get('meta') and media_json['meta'].get('_image_credit'):
@@ -305,9 +325,15 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
         if not posts_path:
             if 'default' in site_json['posts_path']:
                 posts_path = site_json['posts_path']['default']
-            else:
-                logger.warning('unknown posts_path for ' + url)
-                return None
+            elif page_soup:
+                for key, val in site_json['posts_path'].items():
+                    el = page_soup.find(class_=key)
+                    if el:
+                        posts_path = val
+                        break
+    if not posts_path:
+        logger.warning('unknown posts_path for ' + url)
+        return None
 
     wpjson_path = ''
     if isinstance(site_json['wpjson_path'], str):
@@ -321,7 +347,7 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                 wpjson_path = val
                 break
         if not wpjson_path:
-            if 'default' in wpjson_path:
+            if 'default' in site_json['wpjson_path']:
                 wpjson_path = site_json['wpjson_path']['default']
             else:
                 logger.warning('unknown wpjson_path for ' + url)
@@ -352,7 +378,7 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
         if m:
             for it in m:
                 # Check for date
-                if (len(it) == 4 and int(it[:4]) <= datetime.now().year) or (len(it) == 8 and int(it[:4]) <= datetime.now().year and int(it[4:6]) <= 12 and int(it[6:8]) <= 31):
+                if (len(it) == 4 and int(it[:4]) <= datetime.now().year + 1) or (len(it) == 8 and int(it[:4]) <= datetime.now().year and int(it[4:6]) <= 12 and int(it[6:8]) <= 31):
                     continue
                 elif split_url.netloc == 'www.thedailymash.co.uk':
                     post_id = it[8:]
@@ -406,7 +432,9 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
         #         yoast_schema_graph = el_json['@graph']
         # else:
         for el in page_soup.find_all('script', attrs={"type": "application/ld+json"}):
-            el_json = json.loads(el.string)
+            def fix_review_body(matchobj):
+                return re.sub(r'\n', '', matchobj.group(0))
+            el_json = json.loads(re.sub(r'"reviewBody":"([^"]+)"', fix_review_body, el.string))
             if isinstance(el_json, dict):
                 if el_json.get('@graph'):
                     yoast_schema_graph += el_json['@graph']
@@ -628,6 +656,7 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
         item['author'] = {
             "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
         }
+
     item['tags'] = []
     if 'tags' in site_json:
         if isinstance(site_json['tags'], list):
@@ -695,6 +724,10 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
             for el in utils.get_soup_elements(site_json['subtitle'], page_soup):
                 subtitle = el.get_text().strip()
                 break
+    if 'meta' in post_data['post'] and 'multi_title' in post_data['post']['meta']:
+        multi_title = json.loads(post_data['post']['meta']['multi_title'])
+        if 'titles' in multi_title and 'headline' in multi_title['titles'] and 'additional' in multi_title['titles']['headline'] and multi_title['titles']['headline']['additional'].get('headline_subheadline'):
+            subtitle = multi_title['titles']['headline']['additional']['headline_subheadline']
     if subtitle and not subtitle.endswith('[&hellip;]'):
         item['content_html'] += '<p><em>' + subtitle + '</em></p>'
 
@@ -724,6 +757,18 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
             if el:
                 lede_html += utils.add_embed(el[0]['data-lazy-src'])
 
+    elif (split_url.netloc == 'cyberscoop.com' or split_url.netloc == 'defensescoop.com' or split_url.netloc == 'edscoop.com' or split_url.netloc == 'fedscoop.com' or split_url.netloc == 'statescoop.com'):
+        if post_data['post']['type'] == 'podcast':
+            page_soup = get_page_soup(item['url'], site_json)
+            if page_soup:
+                el = page_soup.select('article.single-podcast div.single-podcast__player > iframe')
+                if el:
+                    lede_html += utils.add_embed(el[0]['src'])
+                    item['image'] = post_data['post']['parsely']['meta']['image']['url']
+        elif post_data['post']['type'] == 'video':
+            lede_html = 'SKIP'
+            item['image'] = post_data['post']['parsely']['meta']['image']['url']
+
     elif split_url.netloc == 'www.stereogum.com':
         if 'hero' in post_data['post']['acf'] and post_data['post']['acf']['hero'].get('image'):
             lede_html = utils.add_image(post_data['post']['acf']['hero']['image'], post_data['post']['acf']['hero'].get('caption'))
@@ -733,6 +778,17 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
             lede_html = utils.add_image(post_data['post']['acf']['post_hero']['image'], post_data['post']['acf']['post_hero'].get('caption'))
             if 'image' not in item:
                 item['image'] = post_data['post']['acf']['post_hero']['image']
+
+    elif split_url.netloc == 'www.mediaplaynews.com':
+        el = page_soup.select('div.entry-content > div.embed-container > iframe')
+        if el:
+            lede_html = utils.add_embed(el[0]['src'])
+            item['image'] = post_data['post']['yoast_head_json']['og_image'][0]['url']
+
+    elif split_url.netloc == 'latenighter.com':
+        el = page_soup.select('div.entry-content > div.single-featured-image iframe')
+        if el:
+            lede_html = utils.add_embed(el[0]['src'])
 
     if not lede_html and 'meta' in post_data['post'] and 'nbc_page_title' in post_data['post']['meta'] and post_data['post']['meta'].get('lede_video_id'):
         el = page_soup.find('figure', class_='article-featured-media video-lead')
@@ -754,6 +810,25 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                     lede_html = add_nbc_video(data_props['videos'][0]['videoContentId'], wpjson_path)
         if not lede_html:
             lede_html = add_nbc_video(post_data['post']['meta']['lede_video_id'], wpjson_path)
+
+    if not lede_html and post_data['post'].get('custom_gallery'):
+        item['_gallery'] = []
+        for it in post_data['post']['custom_gallery']:
+            if it.get('caption'):
+                caption = re.sub(r'^<p>|</p>$', '', it['caption'].strip())
+            elif it['image'].get('caption'):
+                caption = re.sub(r'^<p>|</p>$', '', it['image']['caption'].strip())
+            else:
+                caption = ''
+            item['_gallery'].append({"src": it['image']['url'], "caption": caption, "thumb": it['image']['sizes']['medium_large']})
+            if it['image'].get('description'):
+                item['_gallery'][-1]['desc'] = it['image']['description']
+        gallery_url = config.server + '/gallery?url=' + quote_plus(item['url'])
+        caption = '<a href="' + gallery_url + '" target="_blank">View gallery</a>'
+        lede_html = utils.add_image(post_data['post']['custom_gallery'][0]['image']['sizes']['large'], caption, link=gallery_url, overlay=config.gallery_button_overlay)
+        args['skip_lede_img'] = False
+        if 'image' not in item:
+            item['image'] = post_data['post']['custom_gallery'][0]['image']['sizes']['large']
 
     if not lede_html and 'lead_media' in post_data['post']:
         if post_data['post']['lead_media']['type'] == 'video' and 'lakana/anvplayer' in post_data['post']['lead_media']['raw']:
@@ -840,12 +915,12 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                 m = re.search(r'src="([^"]+)', lede_html)
                 item['image'] = m.group(1)
 
-    if not lede_html and 'jetpack_featured_media_url' in post_data['post']:
+    if not lede_html and post_data['post'].get('jetpack_featured_media_url'):
         lede_html = utils.add_image(post_data['post']['jetpack_featured_media_url'])
         if 'image' not in item:
             item['image'] = post_data['post']['jetpack_featured_media_url']
 
-    if lede_html and lede_html != 'SKIP' and 'skip_lede_img' not in args:
+    if lede_html and lede_html != 'SKIP' and ('skip_lede_img' not in args or args['skip_lede_img'] == False):
         item['content_html'] += lede_html
 
     if 'embed' in args:
@@ -1118,6 +1193,21 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
 
     elif split_url.netloc == 'secretlosangeles.com':
         item['content_html'] = re.sub(r'\[trackLink[^\]]*link_url="([^"]+)"[^\]]*\](.*?)\[/trackLink\]', r'<a href="\1">\2</a>', item['content_html'])
+
+    if site_json.get('text_encode'):
+        def encode_item(item, enc):
+            if isinstance(item, str):
+                # print(item)
+                item = item.encode(enc, 'replace').decode('utf-8', 'replace')
+            elif isinstance(item, list):
+                for i, it in enumerate(item):
+                    item[i] = encode_item(it, enc)
+            elif isinstance(item, dict):
+                for key, val in item.items():
+                    item[key] = encode_item(val, enc)
+            return item
+        encode_item(item, site_json['text_encode'])
+
     return item
 
 
@@ -1130,7 +1220,7 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
     soup = BeautifulSoup(content_html, 'html.parser')
 
     # remove comments
-    for el in soup.find_all(text=lambda text: isinstance(text, Comment)):
+    for el in soup.find_all(string=lambda text: isinstance(text, Comment)):
         el.extract()
 
     if site_json:
@@ -1188,9 +1278,9 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                 new_html = ''
                 images = utils.get_soup_elements(tag['image'], gallery)
                 if images:
+                    n = len(images)
                     gallery_images = []
-                    new_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-                    for image in images:
+                    for i, image in enumerate(images):
                         img_src = get_img_src(image, site_json, base_url, 2000)
                         if not img_src:
                             continue
@@ -1207,9 +1297,31 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                                 captions.insert(0, it[0].decode_contents())
                                 it[0].decompose()
                         caption = ' | '.join(captions)
-                        new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src) + '</div>'
+                        if image.name == 'a':
+                            link = image['href']
+                        elif image.a:
+                            link = image.a['href']
+                        else:
+                            link = img_src                            
+                        if n > 1:
+                            if i == 0:
+                                if n % 2 == 1:
+                                    # start with full width image if odd number of images
+                                    new_html += utils.add_image(thumb, caption, link=link)
+                                else:
+                                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;">'
+                                    new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=link) + '</div>'
+                            elif i == 1:
+                                if n % 2 == 1:
+                                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">'
+                                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=link) + '</div>'
+                            else:
+                                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=link) + '</div>'
+                        else:
+                            new_html += utils.add_image(thumb, caption, link=link)
                         gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
-                    new_html += '</div>'
+                    if n > 1:
+                        new_html += '</div>'
                     captions = []
                     if tag.get('credit'):
                         it = utils.get_soup_elements(tag['credit'], gallery)
@@ -1223,7 +1335,7 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                             it[0].decompose()
                     if captions:
                         new_html += '<div><small>' + ' | '.join(captions) + '</small></div>'
-                    if len(images) > 2:
+                    if n > 2 and ('show_gallery_link' not in tag or tag['show_gallery_link'] == True):
                         gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
                         new_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
                 if new_html:
@@ -1248,11 +1360,31 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                             captions.append(it[0].decode_contents())
                             it[0].decompose()
                     if tag.get('caption'):
-                        it = utils.get_soup_elements(tag['caption'], image)
-                        if it and it[0].get_text().strip():
-                            captions.insert(0, it[0].decode_contents())
-                            it[0].decompose()
+                        if 'text' in tag['caption'] and tag['caption']['text'] == True:
+                            if image.get_text().strip():
+                                captions.insert(0, image.get_text().strip())
+                        else:
+                            it = utils.get_soup_elements(tag['caption'], image)
+                            if it and it[0].get_text().strip():
+                                captions.insert(0, it[0].decode_contents())
+                                it[0].decompose()
+                    if not captions and image.img and image.img.get('data-image-meta'):
+                        try:
+                            image_meta = json.loads(html.unescape(image.img['data-image-meta']))
+                            if image_meta.get('caption'):
+                                captions.append(image_meta['caption'])
+                            if image_meta.get('credit'):
+                                captions.append(image_meta['credit'])
+                            elif image_meta.get('copyright'):
+                                captions.append(image_meta['copyright'])
+                        except:
+                            pass
                     caption = ' | '.join(captions)
+                    desc = ''
+                    if tag.get('desc'):
+                        it = utils.get_soup_elements(tag['desc'], image)
+                        if it and it[0].get_text().strip():
+                            desc = it.decode_contents()
                     if image.name == 'a':
                         link = image['href']
                     else:
@@ -1263,7 +1395,7 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                             link = image['href']
                         else:
                             link = ''
-                    new_html = utils.add_image(img_src, caption, link=link)
+                    new_html = utils.add_image(img_src, caption, link=link, desc=desc)
                     new_el = BeautifulSoup(new_html, 'html.parser')
                     if 'unwrap_figure' in tag:
                         new_el.figure.unwrap()
@@ -1322,7 +1454,34 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                                     new_html += '<img src="' + img_src + '" style="width:100% max-width:160px;">'
                             new_html += '</div>'
                         new_el = BeautifulSoup(new_html, 'html.parser')
+                        extra.replace_with(new_el)                   
+                    elif extra.get('id') and extra['id'] == 'review-body':
+                        new_html = '<div style="border:1px solid light-dark(#333,#ccc); border-radius:10px; padding:1em; margin:1em 0;">'
+                        el = extra.find('img', class_='review-logo')
+                        if el:
+                            new_html += '<div style="text-align:center;"><img src="' + el['src'] + '" width="160"></div>'
+                        el = extra.find(class_='starRating')
+                        if el:
+                            m = re.search(r'rating:\s*(\d+)', el['style'])
+                            if m:
+                                new_html += utils.add_stars(int(m.group(1)))
+                        new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin:1em 0;">'
+                        el = extra.select('h3#pros + ul')
+                        if el:
+                            el[0].attrs = {}
+                            new_html += '<div style="flex:1; min-width:240px; color:ForestGreen;"><div style="font-weight:bold;">Pros</div>' + str(el[0]).replace('<ul>', '<ul style=\'list-style-type:"✓&nbsp;"\'>') + '</div>'
+                        el = extra.select('h3#cons + ul')
+                        if el:
+                            el[0].attrs = {}
+                            new_html += '<div style="flex:1; min-width:240px; color:FireBrick;"><div style="font-weight:bold;">Cons</div>' + str(el[0]).replace('<ul>', '<ul style=\'list-style-type:"✗&nbsp;"\'>') + '</div>'
+                        new_html += '</div>'
+                        el = extra.select('h3#our-verdict + p')
+                        if el:
+                            new_html += '<div style="font-weight:bold;">Our Verdict</div>' + str(el[0])
+                        new_html += '</div>'
+                        new_el = BeautifulSoup(new_html, 'html.parser')
                         extra.replace_with(new_el)
+
                     elif extra.get('id') and extra['id'] == 'review':
                         new_html = ''
                         el = extra.select('div.review-total-box > div')
@@ -1349,188 +1508,387 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                             new_html += utils.add_button(el['href'], el.string)
                         new_el = BeautifulSoup(new_html, 'html.parser')
                         extra.replace_with(new_el)
-                    elif extra.get('class') and 'bgr-product-review-block' in extra['class']:
-                        new_html = ''
-                        el = extra.select('div.bgr-product-review-info h3')
-                        if el:
-                            new_html += '<h3 style="margin-bottom:0;">' + el[0].get_text().strip() + '</h3>'
-                        el = extra.select('div.bgr-product-review-info p')
-                        if el:
-                            new_html += '<div>' + el[0].decode_contents() + '</div>'
-                        el = extra.select('div.bgr-product-review-info div.bgr-product-review-stars > span.sr-only')
-                        if el:
-                            m = re.search(r'\d', el[0].get_text())
-                            if m:
-                                new_html += utils.add_stars(int(m.group(0)))
-                        if extra.find(class_='bgr-product-review-pros-cons'):
-                            for el in extra.select('ul > li'):
-                                el.attrs = {}
-                                if el.svg:
-                                    el.svg.decompose()
-                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; padding:8px; margin:1em 0; border:1px solid light-dark(#333,#ccc); border-radius:10px;">'
-                            new_html += '<div style="flex:1; min-width:240px; color:ForestGreen;"><div style="text-align:center; font-weight:bold;">Pros</div>'
-                            el = extra.find('ul', class_='pros')
+                    elif extra.get('class'):
+                        if 'bgr-product-review-block' in extra['class']:
+                            new_html = ''
+                            el = extra.select('div.bgr-product-review-info h3')
                             if el:
-                                new_html += str(el).replace('<ul>', '<ul style=\'list-style-type:"✓&nbsp;"\'>')
-                            new_html += '</div>'
-                            new_html += '<div style="flex:1; min-width:240px; color:FireBrick;"><div style="text-align:center; font-weight:bold;">Cons</div>'
-                            el = extra.find('ul', class_='cons')
+                                new_html += '<h3 style="margin-bottom:0;">' + el[0].get_text().strip() + '</h3>'
+                            el = extra.select('div.bgr-product-review-info p')
                             if el:
-                                new_html += str(el).replace('<ul>', '<ul style=\'list-style-type:"✗&nbsp;"\'>')
-                            new_html += '</div></div>'
-                        if extra.find(class_='bgr-product-review-vendors'):
-                            for el in extra.select('div.bgr-product-review-vendors > table tr:has(td > a.see-it)'):
-                                caption = ''
-                                it = el.find('td', class_='sale-price')
-                                if it:
-                                    caption += it.get_text().strip()
-                                else:
-                                    it = el.find('td', class_='vendor-product-info')
+                                new_html += '<div>' + el[0].decode_contents() + '</div>'
+                            el = extra.select('div.bgr-product-review-info div.bgr-product-review-stars > span.sr-only')
+                            if el:
+                                m = re.search(r'\d', el[0].get_text())
+                                if m:
+                                    new_html += utils.add_stars(int(m.group(0)))
+                            if extra.find(class_='bgr-product-review-pros-cons'):
+                                for el in extra.select('ul > li'):
+                                    el.attrs = {}
+                                    if el.svg:
+                                        el.svg.decompose()
+                                new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; padding:8px; margin:1em 0; border:1px solid light-dark(#333,#ccc); border-radius:10px;">'
+                                new_html += '<div style="flex:1; min-width:240px; color:ForestGreen;"><div style="text-align:center; font-weight:bold;">Pros</div>'
+                                el = extra.find('ul', class_='pros')
+                                if el:
+                                    new_html += str(el).replace('<ul>', '<ul style=\'list-style-type:"✓&nbsp;"\'>')
+                                new_html += '</div>'
+                                new_html += '<div style="flex:1; min-width:240px; color:FireBrick;"><div style="text-align:center; font-weight:bold;">Cons</div>'
+                                el = extra.find('ul', class_='cons')
+                                if el:
+                                    new_html += str(el).replace('<ul>', '<ul style=\'list-style-type:"✗&nbsp;"\'>')
+                                new_html += '</div></div>'
+                            if extra.find(class_='bgr-product-review-vendors'):
+                                for el in extra.select('div.bgr-product-review-vendors > table tr:has(td > a.see-it)'):
+                                    caption = ''
+                                    it = el.find('td', class_='sale-price')
                                     if it:
                                         caption += it.get_text().strip()
-                                it = el.find('span', class_='vendor-name')
-                                if it:
-                                    caption += ' at ' + it.get_text().strip()
-                                else:
-                                    it = el.find('img', class_='vendor-logo')
+                                    else:
+                                        it = el.find('td', class_='vendor-product-info')
+                                        if it:
+                                            caption += it.get_text().strip()
+                                    it = el.find('span', class_='vendor-name')
                                     if it:
-                                        caption += ' at ' + it['alt'].replace('logo', '').replace('-', ' ').strip().title()
-                                it = el.find('a', class_='see-it')
-                                new_html += utils.add_button(it['href'], caption)
-                        new_el = BeautifulSoup(new_html, 'html.parser')
-                        extra.replace_with(new_el)
-                    elif extra.get('class') and 'abr-post-review' in extra['class']:
-                        # https://www.nintendo-insider.com/mario-kart-world-review/
-                        el = extra.find(class_='abr-review-text')
-                        if el:
-                            el.attrs = {}
-                            el.name = 'h1'
-                            el['style'] = 'text-align:center;'
-                            for it in el.find_all('span'):
-                                it.unwrap()
-                            extra.insert_after(el)
-                            extra.decompose()
-                    elif extra.get('class') and 'tdb_single_review_overall' in extra['class']:
-                        # https://www.nme.com/reviews/film-reviews/echo-valley-review-sydney-sweeney-julianne-moore-apple-tv-3869048
-                        n = len(extra.find_all('i', class_='td-icon-star'))
-                        new_el = BeautifulSoup(utils.add_stars(n), 'html.parser')
-                        extra.replace_with(new_el)           
-                    elif extra.get('class') and 'review-summary' in extra['class']:
-                        # https://www.the-ambient.com/reviews/reolink-duo-3-wifi-review/
-                        el = extra.find('div', class_='star-rating')
-                        if el:
-                            n = len(el.select('div.full-stars > i.fa-star')) + 0.5 * len(el.select('div.full-stars > i.fa-star-half'))
-                            new_el = BeautifulSoup(utils.add_stars(n), 'html.parser')
-                            el.replace_with(new_el)
-                        extra.name = 'div'
-                        extra.attrs = {}
-                        extra['style'] = 'margin:1em 0; padding:0 1em 1em 1em; background-color:#e5e7eb; border-radius:10px;'
-                    elif extra.get('class') and 'review-wu-content' in extra['class']:
-                        # https://gadgetsandwearables.com/2025/06/27/xiaomi-smart-band-10-review/
-                        new_html = ''
-                        el = extra.find(class_='review-wu-grade-content')
-                        if el and el.span and el.span.string.replace('.', '').isnumeric():
-                            n = int(el.span.string.replace('.', ''))
-                            # new_html += '<div style="margin:1em auto; width:8rem; aspect-ratio:1; line-height:8rem; text-align:center; font-size:3rem; font-weight:bold; border:solid 24px #8DC153; border-radius:50%; mask:linear-gradient(red 0 0) padding-box, conic-gradient(red var(--p, {}%), transparent 0%) border-box;">{}</div>'.format(n, el.span.string)
-                            new_html += utils.add_score_gauge(n, el.span.string)
-                        el = extra.find(class_='review-wu-bars')
-                        if el:
-                            for it in el.find_all(class_='rev-option'):
-                                new_html += utils.add_bar(it.h3.get_text().strip(), int(it['data-value']), 100, False)
-                        new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
-                        for it in extra.find_all(class_=['pros', 'cons']):
-                            new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
-                            if it.h2:
-                                new_html += '<div style="font-weight:bold;">' + it.h2.get_text().strip() + '</div>'
-                            if it.ul:
-                                if 'pros' in it['class']:
-                                    new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
-                                elif 'cons' in it['class']:
-                                    new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
-                            new_html += '</div>'
-                        new_html += '</div>'
-                        new_el = BeautifulSoup(new_html, 'html.parser')
-                        extra.replace_with(new_el)
-                    elif extra.get('class') and 'review-rating-container' in extra['class']:
-                        # https://wccftech.com/review/gamesir-supernova-controller-review-aesthetics-optimal-wireless-experience-in-one-package/
-                        new_html = ''
-                        el = extra.select('div.rating-box > span')
-                        if el and el[0].string.replace('.', '').isnumeric():
-                            n = int(el[0].string.replace('.', ''))
-                            new_html += utils.add_score_gauge(n, el[0].string)
+                                        caption += ' at ' + it.get_text().strip()
+                                    else:
+                                        it = el.find('img', class_='vendor-logo')
+                                        if it:
+                                            caption += ' at ' + it['alt'].replace('logo', '').replace('-', ' ').strip().title()
+                                    it = el.find('a', class_='see-it')
+                                    new_html += utils.add_button(it['href'], caption)
                             new_el = BeautifulSoup(new_html, 'html.parser')
                             extra.replace_with(new_el)
-                    elif extra.get('class') and 'review-verdict' in extra['class']:
-                        # https://wccftech.com/review/gamesir-supernova-controller-review-aesthetics-optimal-wireless-experience-in-one-package/
-                        new_html = ''
-                        for el in extra.find_all('p', recursive=False):
-                            new_html += '<p style="font-style:italic;">' + el.decode_contents() + '</p>'
-                        if extra.find(class_='review-pros-cons'):
-                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
-                            for el in extra.select('div.review-pros-cons > ul'):
-                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
-                                if el.h6:
-                                    caption = el.h6.get_text().strip()
-                                    new_html += '<div style="font-weight:bold;">' + caption + '</div>'
-                                    el.h6.decompose()
-                                    if caption.lower() == 'pros':
-                                        new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + el.decode_contents() + '</ul>'
-                                    elif caption.lower() == 'cons':
-                                        new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + el.decode_contents() + '</ul>'
+                        elif 'abr-post-review' in extra['class']:
+                            # https://www.nintendo-insider.com/mario-kart-world-review/
+                            el = extra.find(class_='abr-review-text')
+                            if el:
+                                el.attrs = {}
+                                el.name = 'h1'
+                                el['style'] = 'text-align:center;'
+                                for it in el.find_all('span'):
+                                    it.unwrap()
+                                extra.insert_after(el)
+                                extra.decompose()
+                        elif 'tdb_single_review_overall' in extra['class']:
+                            # https://www.nme.com/reviews/film-reviews/echo-valley-review-sydney-sweeney-julianne-moore-apple-tv-3869048
+                            n = len(extra.find_all('i', class_='td-icon-star'))
+                            new_el = BeautifulSoup(utils.add_stars(n), 'html.parser')
+                            extra.replace_with(new_el)           
+                        elif 'review-box' in extra['class']:
+                            new_html = '<div style="border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#e5e7eb; padding:0 1em;">'
+                            el = extra.find('p', class_='text-2xl')
+                            if el:
+                                new_html += '<h3>' + el.string + '</h3>'
+                            el = extra.find('p', class_='text-lg')
+                            if el:
+                                el.attrs = {}
+                                new_html += str(el)
+                            n = 0.0
+                            for el in extra.find_all(class_='fas'):
+                                if 'fa-star-half-alt' in el['class']:
+                                    n += 0.5
+                                elif 'fa-star' in el['class']:
+                                    n += 1.0
                                 else:
-                                    new_html += str(el)
+                                    el.decompose()
+                            if n > 0:
+                                new_html += utils.add_stars(n)
+                            el = extra.select('p:-soup-contains("Pros") + ul')
+                            if el:
+                                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;"><div style="font-weight:bold;">Pros</div>'
+                                for it in el[0].find_all('li'):
+                                    it.attrs = {}
+                                new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + el[0].decode_contents() + '</ul></div>'
+                                el = extra.select('p:-soup-contains("Cons") + ul')
+                                if el:
+                                    new_html += '<div style="margin:1em 0; flex:1; min-width:256px;"><div style="font-weight:bold;">Cons</div>'
+                                    for it in el[0].find_all('li'):
+                                        it.attrs = {}
+                                    new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + el[0].decode_contents() + '</ul></div>'
                                 new_html += '</div>'
                             new_html += '</div>'
-                        new_el = BeautifulSoup(new_html, 'html.parser')
-                        extra.replace_with(new_el)
-                    elif extra.get('class') and 'wp-block-group' in extra['class'] and extra.find(class_='ratingBlock'):
-                        new_html = ''
-                        el = extra.select('div.ratingColumnOne > h3.wp-block-heading')
-                        if el:
-                            new_html += '<h3 style="text-align:center;">' + el[0].string + '</h3>'
-                        el = extra.select('div.ratingColumnOne > h4.wp-block-heading')
-                        if el:
-                            new_html += '<div style="font-weight:bold; text-align:center;">' + el[0].string + '</div>'
-                        el = extra.find(attrs={"itemprop": "ratingValue"})
-                        if el:
-                            new_html += utils.add_stars(float(el['content']))
-                        el = extra.find(class_='edChoice')
-                        if el and el.img:
-                            new_html += '<div style="text-align:center;"><img src="' + el.img['src'] + '" style="width:160px;"></div>'
-                        el = extra.find(class_='pullQuote')
-                        if el:
-                            new_html += '<p style="text-align:center;">' + el.decode_contents() + '</p>'
-                        if extra.find(class_='proCon'):
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'review-summary' in extra['class']:
+                            # https://www.the-ambient.com/reviews/reolink-duo-3-wifi-review/
+                            el = extra.find('div', class_='star-rating')
+                            if el:
+                                n = len(el.select('div.full-stars > i.fa-star')) + 0.5 * len(el.select('div.full-stars > i.fa-star-half'))
+                                new_el = BeautifulSoup(utils.add_stars(n), 'html.parser')
+                                el.replace_with(new_el)
+                            extra.name = 'div'
+                            extra.attrs = {}
+                            extra['style'] = 'margin:1em 0; padding:0 1em 1em 1em; background-color:#e5e7eb; border-radius:10px;'
+                        elif 'review-wu-content' in extra['class']:
+                            # https://gadgetsandwearables.com/2025/06/27/xiaomi-smart-band-10-review/
+                            new_html = ''
+                            el = extra.find(class_='review-wu-grade-content')
+                            if el and el.span and el.span.string.replace('.', '').isnumeric():
+                                n = int(el.span.string.replace('.', ''))
+                                # new_html += '<div style="margin:1em auto; width:8rem; aspect-ratio:1; line-height:8rem; text-align:center; font-size:3rem; font-weight:bold; border:solid 24px #8DC153; border-radius:50%; mask:linear-gradient(red 0 0) padding-box, conic-gradient(red var(--p, {}%), transparent 0%) border-box;">{}</div>'.format(n, el.span.string)
+                                new_html += utils.add_score_gauge(n, el.span.string)
+                            el = extra.find(class_='review-wu-bars')
+                            if el:
+                                for it in el.find_all(class_='rev-option'):
+                                    new_html += utils.add_bar(it.h3.get_text().strip(), int(it['data-value']), 100, False)
                             new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
-                            for el in extra.select('div.proCon > div.wp-block-column'):
+                            for it in extra.find_all(class_=['pros', 'cons']):
                                 new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
-                                if el.h4:
-                                    caption = el.h4.get_text().strip()
-                                    new_html += '<div style="font-weight:bold;">' + caption + '</div>'
-                                    if caption.lower() == 'pros':
-                                        new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + el.ul.decode_contents() + '</ul>'
-                                    elif caption.lower() == 'cons':
-                                        new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + el.ul.decode_contents() + '</ul>'
-                                else:
-                                    new_html += str(el)
+                                if it.h2:
+                                    new_html += '<div style="font-weight:bold;">' + it.h2.get_text().strip() + '</div>'
+                                if it.ul:
+                                    if 'pros' in it['class']:
+                                        new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
+                                    elif 'cons' in it['class']:
+                                        new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
                                 new_html += '</div>'
                             new_html += '</div>'
-                        new_el = BeautifulSoup(new_html, 'html.parser')
-                        extra.replace_with(new_el)
-                    elif extra.get('class') and 'wp-block-jetpack-videopress' in extra['class'] and extra.iframe:
-                        video_id = list(filter(None, urlsplit(extra.iframe['src']).path.split('/')))[-1]
-                        video_json = utils.get_url_json('https://public-api.wordpress.com/rest/v1.1/videos/' + video_id)
-                        if video_json:
-                            if video_json.get('description'):
-                                caption = video_json['description']
-                            else:
-                                caption = ''
-                            if video_json.get('adaptive_streaming'):
-                                new_html = utils.add_video(video_json['adaptive_streaming'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)
-                            elif '.mp4' in video_json['original']:
-                                new_html = utils.add_video(video_json['original'], 'video/mp4', video_json['poster'], caption, use_videojs=True)
-                            else:
-                                new_html = utils.add_video(video_json['original'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'review-rating-container' in extra['class']:
+                            # https://wccftech.com/review/gamesir-supernova-controller-review-aesthetics-optimal-wireless-experience-in-one-package/
+                            new_html = ''
+                            el = extra.select('div.rating-box > span')
+                            if el and el[0].string.replace('.', '').isnumeric():
+                                n = int(el[0].string.replace('.', ''))
+                                new_html += utils.add_score_gauge(n, el[0].string)
+                                new_el = BeautifulSoup(new_html, 'html.parser')
+                                extra.replace_with(new_el)
+                        elif 'review-verdict' in extra['class']:
+                            # https://wccftech.com/review/gamesir-supernova-controller-review-aesthetics-optimal-wireless-experience-in-one-package/
+                            new_html = ''
+                            for el in extra.find_all('p', recursive=False):
+                                new_html += '<p style="font-style:italic;">' + el.decode_contents() + '</p>'
+                            if extra.find(class_='review-pros-cons'):
+                                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                                for el in extra.select('div.review-pros-cons > ul'):
+                                    new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
+                                    if el.h6:
+                                        caption = el.h6.get_text().strip()
+                                        new_html += '<div style="font-weight:bold;">' + caption + '</div>'
+                                        el.h6.decompose()
+                                        if caption.lower() == 'pros':
+                                            new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + el.decode_contents() + '</ul>'
+                                        elif caption.lower() == 'cons':
+                                            new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + el.decode_contents() + '</ul>'
+                                    else:
+                                        new_html += str(el)
+                                    new_html += '</div>'
+                                new_html += '</div>'
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'single-score' in extra['class']:
+                            # https://thespool.net
+                            el = extra.find(class_='single-score-number')
+                            if el and el.string.replace('.', '').isnumeric():
+                                n = int(el.string.replace('.', ''))
+                                new_html = utils.add_score_gauge(n, el.string)
+                                new_el = BeautifulSoup(new_html, 'html.parser')
+                                extra.replace_with(new_el)
+                        elif 'summary-panel' in extra['class']:
+                            # https://thespool.net
+                            new_html = '<ul>'
+                            for el in extra.find_all(class_='summary-panel-single'):
+                                new_html += '<li>'
+                                if el.span:
+                                    new_html += '<strong>' + el.span.string + '</strong>: '
+                                    el.span.decompose()
+                                for it in el.find_all('a'):
+                                    if it['href'].startswith('/'):
+                                        it['href'] = base_url + it['href']
+                                    new_html += str(it) + ', '
+                                    it.decompose()
+                                if el.get_text():
+                                    new_html += el.decode_contents()
+                                if new_html.strip().endswith(','):
+                                    new_html = new_html.strip()[:-1]
+                                new_html += '</li>'
+                            new_html = new_html.replace('<li></li>', '') + '</ul>'
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'wppr-review-container' in extra['class']:
+                            # https://techaeris.com
+                            new_html = ''
+                            img_src = ''
+                            el = soup.find('img', src=re.compile(r'Editors-Choice|Highly-rated|Top-Pick', flags=re.I))
+                            if el:
+                                img_src = el['src']
+                                it = el.find_parent(class_='wp-block-image')
+                                if it:
+                                    it.decompose()
+                            n = -1
+                            el = extra.select('div.review-wu-grade img')
+                            if el:
+                                m = re.search(r'ratings-(\d+)', el[0]['src'])
+                                if m:
+                                    n = int(m.group(1))
+                            if n > 0 and img_src:
+                                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; align-items:center; justify-content:center; ">'
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;"><div style="text-align:center;"><img src="' + img_src + '" style="width:200px;"></div></div>'
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">' + utils.add_score_gauge(n, str(n / 10)) + '</div>'
+                                new_html += '</div>'
+                            elif n > 0:
+                                new_html += utils.add_score_gauge(n, str(n / 10))
+                            elif img_src:
+                                new_html += '<div style="text-align:center;"><img src="' + img_src + '" style="width:200px;"></div>'
+                            for el in extra.select('div.review-wu-bars > div.rev-option'):
+                                new_html += utils.add_bar(el.h3.get_text().strip(), int(el['data-value'])/10, 10, False)
+                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                            for it in extra.find_all(class_=['pros', 'cons']):
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
+                                if it.h2:
+                                    new_html += '<div style="font-weight:bold;">' + it.h2.get_text().strip() + '</div>'
+                                if it.ul:
+                                    if 'pros' in it['class']:
+                                        new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
+                                    elif 'cons' in it['class']:
+                                        new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + it.ul.decode_contents() + '</ul>'
+                                new_html += '</div>'
+                            new_html += '</div>'
+                            for el in extra.select('div.affiliate-button > a'):
+                                new_html += utils.add_button(el['href'], el.get_text().strip())
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'xe-positives-negatives' in extra['class']:
+                            new_html = ''
+                            el = extra.find('h2')
+                            if el:
+                                new_html += str(el)
+                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em; align-items:center; justify-content:center;">'
+                            el = extra.find('ul', class_='xe-review-reports__list')
+                            if el:
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;"><ul>'
+                                for li in el.find_all('li'):
+                                    it = li.find(class_='xe-review-reports__icon')
+                                    if it:
+                                        if 'icon-1' in it['class']:
+                                            new_html += '<li style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>'
+                                        elif 'icon-2' in it['class']:
+                                            new_html += '<li style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>'
+                                        elif 'icon-3' in it['class']:
+                                            new_html += '<li style=\'list-style-type:"—&nbsp;"\'>'
+                                        else:
+                                            new_html += '<li>'
+                                        it.decompose()
+                                        new_html += li.decode_contents() + '</li>'
+                                    else:
+                                        new_html += '<li>' + li.decode_contents() + '</li>'
+                                new_html += '</ul></div>'
+                            el = extra.find(class_='xe-review-reports__rating')
+                            if el:
+                                if el.get_text().strip().isnumeric():
+                                    n = int(el.get_text().strip())
+                                    new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">' + utils.add_score_gauge(10 * n, n) + '</div>'
+                            new_html += '</div>'
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'wp-block-gamurs-review-summary' in extra['class']:
+                            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em; align-items:center; justify-content:center; border:1px solid light-dark(#333,#ccc); border-radius:10px;  background-color:#e5e7eb; padding:0 1em; margin-top:1em;">'
+                            el = extra.find(class_='wp-block-gamurs-review-summary__number-rating')
+                            if el:
+                                n = int(el.get_text().strip())
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">' + utils.add_score_gauge(10 * n, n) + '</div>'
+                            el = extra.find(class_='wp-block-gamurs-review-summary__text')
+                            if el:
+                                new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">' + el.decode_contents() + '</div>'
+                            new_html += '</div>'
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'wp-block-group' in extra['class'] and extra.find(class_='ratingBlock'):
+                            new_html = ''
+                            el = extra.select('div.ratingColumnOne > h3.wp-block-heading')
+                            if el:
+                                new_html += '<h3 style="text-align:center;">' + el[0].string + '</h3>'
+                            el = extra.select('div.ratingColumnOne > h4.wp-block-heading')
+                            if el:
+                                new_html += '<div style="font-weight:bold; text-align:center;">' + el[0].string + '</div>'
+                            el = extra.find(attrs={"itemprop": "ratingValue"})
+                            if el:
+                                new_html += utils.add_stars(float(el['content']))
+                            el = extra.find(class_='edChoice')
+                            if el and el.img:
+                                new_html += '<div style="text-align:center;"><img src="' + el.img['src'] + '" style="width:160px;"></div>'
+                            el = extra.find(class_='pullQuote')
+                            if el:
+                                new_html += '<p style="text-align:center;">' + el.decode_contents() + '</p>'
+                            if extra.find(class_='proCon'):
+                                new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
+                                for el in extra.select('div.proCon > div.wp-block-column'):
+                                    new_html += '<div style="margin:1em 0; flex:1; min-width:256px;">'
+                                    if el.h4:
+                                        caption = el.h4.get_text().strip()
+                                        new_html += '<div style="font-weight:bold;">' + caption + '</div>'
+                                        if caption.lower() == 'pros':
+                                            new_html += '<ul style=\'color:ForestGreen; list-style-type:"✓&nbsp;"\'>' + el.ul.decode_contents() + '</ul>'
+                                        elif caption.lower() == 'cons':
+                                            new_html += '<ul style=\'color:FireBrick; list-style-type:"✗&nbsp;"\'>' + el.ul.decode_contents() + '</ul>'
+                                    else:
+                                        new_html += str(el)
+                                    new_html += '</div>'
+                                new_html += '</div>'
+                            new_el = BeautifulSoup(new_html, 'html.parser')
+                            extra.replace_with(new_el)
+                        elif 'wp-block-jetpack-videopress' in extra['class'] and extra.iframe:
+                            video_id = list(filter(None, urlsplit(extra.iframe['src']).path.split('/')))[-1]
+                            video_json = utils.get_url_json('https://public-api.wordpress.com/rest/v1.1/videos/' + video_id)
+                            if video_json:
+                                if video_json.get('description'):
+                                    caption = video_json['description']
+                                else:
+                                    caption = ''
+                                if video_json.get('adaptive_streaming'):
+                                    new_html = utils.add_video(video_json['adaptive_streaming'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)
+                                elif '.mp4' in video_json['original']:
+                                    new_html = utils.add_video(video_json['original'], 'video/mp4', video_json['poster'], caption, use_videojs=True)
+                                else:
+                                    new_html = utils.add_video(video_json['original'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)
+                                new_el = BeautifulSoup(new_html, 'html.parser')
+                                extra.replace_with(new_el)
+                        elif 'mj-slides' in extra['class']:
+                            image = extra.find('figure', class_='scroll__graphic')
+                            if image:
+                                img_src = get_img_src(image, site_json, base_url)
+                                captions = []
+                                el = extra.find_next_sibling()
+                                if el and el.get('class') and 'wp-caption-text' in el['class']:
+                                    it = el.find(class_='media-caption')
+                                    if it and it.get_text().strip():
+                                        captions.append(it.decode_contents())
+                                    it = el.find(class_='media-credit')
+                                    if it and it.get_text().strip():
+                                        captions.append(it.decode_contents())
+                                    el.decompose()
+                                desc = ''
+                                for it in extra.find_all(class_='slide'):
+                                    if 'invisible' not in it['class']:
+                                        desc += '<p style="width:80%; margin-left:auto; margin-right:auto; text-align:center; font-weight:bold;">' + it.get_text() + '</p>'
+                                new_html = utils.add_image(img_src, ' | '.join(captions), desc=desc)
+                                new_el = BeautifulSoup(new_html, 'html.parser')
+                                extra.replace_with(new_el)
+                        elif 'affiliate__item' in extra['class']:
+                            # https://www.wineenthusiast.com/ratings/best-hefeweizen-beer/
+                            new_html = '<div style="display:flex; flex-wrap:wrap; gap:1em;"><div style="flex:1; min-width:256px;">'
+                            el = extra.find(class_='affiliate__img')
+                            if el:
+                                if el.a:
+                                    new_html += '<a href="' + el.a['href'] + '">'
+                                img_src = get_img_src(el, site_json, base_url)
+                                new_html += '<img src="' + img_src + '" style="width:100%;"/>'
+                                if el.a:
+                                    new_html += '</a>'
+                            new_html += '</div><div style="flex:1; min-width:256px;">'
+                            el = extra.find(class_='affiliate__name')
+                            if el:
+                                new_html += '<div style="font-size:1.1em; font-weight:bold;"><a href="' + el['href'] + '">' + el.get_text() + '</a></div>'
+                            el = extra.find(class_='affiliate__desc')
+                            if el:
+                                new_html += el.decode_contents()
+                            new_html += '</div></div>'
+                            el = extra.find(class_='affiliate__button')
+                            if el:
+                                new_html += utils.add_button(el['href'], el.get_text())
                             new_el = BeautifulSoup(new_html, 'html.parser')
                             extra.replace_with(new_el)
 
@@ -1551,7 +1909,8 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                 if i % 2 == 0:
                     it['style'] += ' background-color:#e5e7eb;'
             for it in el.find_all(['td', 'th']):
-                it.attrs = {}
+                # it.attrs = {}
+                it.attrs = {key: value for key, value in it.attrs.items() if key in {"colspan", "rowspan"}}
                 it['style'] = 'padding:8px;'
             continue
         elif el.name == 'blockquote':
@@ -1574,14 +1933,32 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                 links = el.find_all('a')
                 if links:
                     new_html = utils.add_embed(links[-1]['href'])
+            elif 'tiktok-embed' in el['class']:
+                new_html += utils.add_embed(el['cite'])
             elif 'bluesky-embed' in el['class']:
                 new_html += utils.add_embed(el['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('app.bsky.feed.post', 'post'))
+            elif 'reddit-embed-bq' in el['class']:
+                links = el.find_all('a')
+                if links:
+                    new_html = utils.add_embed(links[0]['href'])
             elif 'wp-block-quote' in el['class']:
                 el.attrs = {}
                 el['style'] = config.blockquote_style
                 continue
             else:
                 logger.warning('unhandled blockquote class {} in {}'.format(el['class'], url))
+        elif el.name == 'pre':
+            el.attrs = {}
+            el['style'] = 'padding:0.5em; white-space:pre; overflow-x:scroll; background-color:#e5e7eb;'
+            continue
+        elif el.name == 'video':
+            it = el.find('source')
+            if it:
+                new_html = utils.add_video(it['src'], it['type'], el.get('poster'), el.get('title'))
+        elif el.name == 'audio':
+            it = el.find('source')
+            if it:
+                new_html = utils.add_audio_v2(it['src'], '', 'Listen', '', '', '', '', '', it['type'], show_poster=False, border=False, margin='')
         elif el.name == 'div' and el.get('data-react-component') and el['data-react-component'] == 'VideoPlaylist' and el.get('data-props'):
             data_props = json.loads(el['data-props'])
             if data_props['videos'][0].get('isLivestream') and data_props['videos'][0]['isLivestream'] == '1':
@@ -1593,7 +1970,25 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
             else:
                 new_html = add_nbc_video(data_props['videos'][0]['videoContentId'], wpjson_path)
         elif el.get('class'):
-            if 'wp-block-embed' in el['class']:
+            if 'wp-block-image' in el['class']:
+                img_src = get_img_src(el, site_json, base_url)
+                if img_src:
+                    captions = []
+                    it = el.find('cite')
+                    if it:
+                        if it.get_text().strip():
+                            captions.append(it.decode_contents())
+                        it.decompose()
+                    it = el.find('figcaption')
+                    if it and it.get_text().strip():
+                        captions.insert(0, it.decode_contents())
+                    it = el.select('a:has(> img)')
+                    if it:
+                        link = it[0]['href']
+                    else:
+                        link = ''
+                    new_html = utils.add_image(img_src, ' | '.join(captions), link=link)
+            elif 'wp-block-embed' in el['class']:
                 if 'wp-block-embed-youtube' in el['class']:
                     it = el.find('iframe')
                     if it:
@@ -1615,6 +2010,9 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                     elif el.find(attrs={"videoid": True}):
                         it = el.find(attrs={"data-videoid": True})
                         new_html = utils.add_embed('https://www.youtube.com/watch?v=' + it['videoid'])
+                    elif el.find(attrs={"data-plyr-embed-id": True}):
+                        it = el.find(attrs={"data-plyr-embed-id": True})
+                        new_html = utils.add_embed('https://www.youtube.com/watch?v=' + it['data-plyr-embed-id'])
                 elif 'wp-block-embed-twitter' in el['class']:
                     link = el.find_all('a')
                     if link:
@@ -1655,6 +2053,8 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                             new_html = utils.add_embed(it['data-src'])
                         else:
                             new_html = utils.add_embed(it['src'])
+            elif 'youtube' in el['class'] and el.get('data-embed'):
+                new_html = utils.add_embed('https://www.youtube.com/watch?v=' + el['data-embed'])
             elif 'jetpack-video-wrapper' in el['class'] and el.iframe:
                 new_html = utils.add_embed(el.iframe['src'])
             elif 'video-player' in el['class']:
@@ -1679,20 +2079,25 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                         new_html = utils.add_video(video_json['original'], 'video/mp4', video_json['poster'], caption, use_videojs=True)
                     else:
                         new_html = utils.add_video(video_json['original'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)    
+            elif 'infogram-embed' in el['class'] and el.get('data-id'):
+                new_html = utils.add_embed('https://e.infogram.com/' + el['data-id'] + '?src=embed')
             elif 'ns-block-custom-html' in el['class'] and el.iframe:
                 new_html = utils.add_embed(el.iframe['src'])
-            elif 'wp-block-pullquote' in el['class']:
+            elif 'wp-block-pullquote' in el['class'] or 'pull-quote' in el['class']:
                 it = el.find('cite')
                 if it:
                     cite = it.decode_contents()
                     it.decompose()
                 else:
                     cite = ''
-                new_html = utils.add_pullquote(el.blockquote.decode_contents(), cite)
+                if el.blockquote:
+                    new_html = utils.add_pullquote(el.blockquote.decode_contents(), cite)
+                else:
+                    new_html = utils.add_pullquote(el.decode_contents(), cite)
             elif 'wp-block-buttons' in el['class'] or 'wp-block-button' in el['class']:
                 for it in el.find_all('a', class_='wp-block-button__link'):
                     new_html += utils.add_button(it['href'], it.get_text().strip())
-            elif 'button' in el['class'] and el.name == 'a':
+            elif ('button' in el['class'] or 'comp-button' in el['class']) and el.name == 'a':
                 new_html += utils.add_button(el['href'], el.get_text().strip())
             elif 'wp-block-prc-block-subtitle' in el['class']:
                 new_html = '<p><em>' + el.get_text().strip() + '</em></p>'
@@ -1861,8 +2266,55 @@ def format_content(content_html, url, args, site_json=None, page_soup=None, wpjs
                 if it:
                     new_html += it.decode_contents()
                 new_html += '</div>'
+            elif 'qabox-outer' in el['class']:
+                # https://shinesparkers.net/interviews/jacobo-luengo/
+                it = el.select('div.qabox-header > div.qabox-q > div.qabox-prompt')
+                if it:
+                    new_html += '<div><strong>' + it[0].decode_contents() + '</strong></div>'
+                it = el.select('div.qabox-header > div.qabox-q > div.qabox-text')
+                if it:
+                    new_html += '<div style="margin-left:2em;">'
+                    if it[0].p:
+                        new_html += it[0].decode_contents()
+                    else:
+                        new_html += '<p>' + it[0].decode_contents() + '</p>'
+                    new_html += '</div>'
+                it = el.select('div.qabox-body > div.qabox-q > div.qabox-prompt')
+                if it:
+                    new_html += '<div><strong>' + it[0].decode_contents() + '</strong></div>'
+                it = el.select('div.qabox-body > div.qabox-q > div.qabox-text')
+                if it:
+                    new_html += '<div style="margin-left:2em;">'
+                    if it[0].p:
+                        new_html += it[0].decode_contents()
+                    else:
+                        new_html += '<p>' + it[0].decode_contents() + '</p>'
+                    new_html += '</div>'
+            elif 'podigee-podcast-player' in el['class']:
+                # https://federalnewsnetwork.com/federal-newscast/2025/07/ice-is-offering-up-to-50000-signing-bonus-for-retired-employees-to-return-to-the-job/
+                it = soup.find('script', string=re.compile(r'{}'.format(el['data-configuration'])))
+                if it:
+                    i = it.string.find('{')
+                    j = it.string.rfind('}') + 1
+                    player_config = json.loads(it.string[i:j])
+                    new_html = utils.add_audio_v2(player_config['episode']['media']['mp3'], player_config['episode']['coverUrl'], player_config['episode']['title'], '', '', '', '', '', small_poster=True)
+            elif 'has-drop-cap' in el['class']:
+                # handle below
+                continue
             else:
                 logger.warning('unhandled element class ' + str(el['class']))
+        elif el.get('id'):
+            if el['id'].startswith('rumble_'):
+                video_id = el['id'].replace('rumble_', '')
+                it = soup.find('script', string=re.compile(r'rumble\.com/embedJS'))
+                if it:
+                    m = re.search(r'src="([^"]+)', it.string)
+                    rumble_js = utils.get_url_html(m.group(1) + '.' + video_id)
+                    if rumble_js:
+                        m = re.search(r'f\["([^"]+)"]=(\{.*?\});if\(', rumble_js)
+                        if m and m.group(1) == video_id:
+                            rumble_json = json.loads(m.group(2).replace(',loaded:u()', ''))
+                            new_html = utils.add_video(rumble_json['u']['hls']['url'], 'application/x-mpegURL', rumble_json['i'], rumble_json['title'])
 
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')
