@@ -49,7 +49,7 @@ def format_content(soup, item, site_json):
                     tld = tldextract.extract(offer_url)
                     # new_html += '<div style="text-align:center; margin:1em;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
                     text = '${} AT {}'.format(offer_price, tld.domain.upper())
-                    new_html += utils.add_button(offer_url, text, '#cc311e')
+                    new_html += utils.add_button(offer_url, text, button_color='#cc311e')
                 else:
                     new_html += '<div style="display:flex; flex-wrap:wrap; gap:1em;">'
                     for offer in offer_json['data']['offers']:
@@ -58,7 +58,7 @@ def format_content(soup, item, site_json):
                         tld = tldextract.extract(offer_url)
                         # new_html += '<div style="flex:1; min-width:256px; margin:1em; text-align:center;"><span style="padding:0.4em; font-weight:bold; background-color:#cc311e;"><a href="{}" style="color:white;">${} AT {} &#10138;</a></span></div>'.format(offer_url, offer_price, tld.domain.upper())
                         text = '${} AT {}'.format(offer_price, tld.domain.upper())
-                        new_html += utils.add_button(offer_url, text, '#cc311e')
+                        new_html += utils.add_button(offer_url, text, button_color='#cc311e')
                     new_html += '</div>'
         if new_html:
             new_el = BeautifulSoup(new_html, 'html.parser')

@@ -5,7 +5,7 @@ from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss, wp_posts
+from feedhandlers import rss, wp_posts_v2
 
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def get_content(url, args, site_json, save_debug=False):
     if '/magazine/' in url:
-        return wp_posts.get_content(url, args, site_json, save_debug)
+        return wp_posts_v2.get_content(url, args, site_json, save_debug)
 
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))

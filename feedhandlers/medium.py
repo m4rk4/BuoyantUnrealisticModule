@@ -64,7 +64,7 @@ def get_freedium_content(url):
     return content
 
 
-def get_post_page_query(url, variables, headers):
+def get_post_page_query(url, variables, headers, site_json):
     split_url = urlsplit(url)
     graphql_url = split_url.scheme + '://' + split_url.netloc + '/_/graphql'
     graphql_data = [
@@ -75,14 +75,17 @@ def get_post_page_query(url, variables, headers):
         }
     ]
     headers['graphql-operation'] = 'PostPageQuery'
-    r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, proxies=config.proxies)
+    if 'use_verify' in site_json and site_json['use_verify'] == True:
+        r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, verify=config.verify_path)
+    else:
+        r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, proxies=config.proxies)
     if not r or r.status_code != 200:
         logger.warning('unable to get PostPageQuery data ' + graphql_url)
         return None
     return r.json()
 
 
-def get_post_content_query(url, variables, headers):
+def get_post_content_query(url, variables, headers, site_json):
     split_url = urlsplit(url)
     graphql_url = split_url.scheme + '://' + split_url.netloc + '/_/graphql'
     graphql_data = [
@@ -93,7 +96,10 @@ def get_post_content_query(url, variables, headers):
         }
     ]
     headers['graphql-operation'] = 'PostViewerEdgeContentQuery'
-    r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, proxies=config.proxies)
+    if 'use_verify' in site_json and site_json['use_verify'] == True:
+        r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, verify=config.verify_path)
+    else:
+        r = curl_cffi.post(graphql_url, json=graphql_data, impersonate='chrome', headers=headers, proxies=config.proxies)
     if not r or r.status_code != 200:
         logger.warning('unable to get PostViewerEdgeContentQuery data ' + graphql_url)
         return None
@@ -243,7 +249,10 @@ def get_content(url, args, site_json, save_debug=False):
     paths = list(filter(None, split_url.path.split('/')))
     post_id = split_url.path.split('-')[-1]
 
-    r = curl_cffi.get(url, impersonate='chrome', proxies=config.proxies)
+    if 'use_verify' in site_json and site_json['use_verify'] == True:
+        r = curl_cffi.get(url, impersonate='chrome', verify=config.verify_path)
+    else:
+        r = curl_cffi.get(url, impersonate='chrome', proxies=config.proxies)
     if r and r.status_code == 200:
         m = re.search(r'window\.__BUILD_ID__="([^"]+)"', r.text)
         if m:
@@ -273,7 +282,7 @@ def get_content(url, args, site_json, save_debug=False):
         },
         "includeShouldFollowPost": False
     }
-    page_query = get_post_page_query(url, variables, headers)
+    page_query = get_post_page_query(url, variables, headers, site_json)
     if not page_query:
         return None
     if save_debug:

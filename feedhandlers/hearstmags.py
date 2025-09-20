@@ -138,7 +138,7 @@ def add_product(product, outer_table=True):
         else:
             price += ' at ' + retailer['retailer_name']
         # product_html += '<div style="width:fit-content; padding:4px; background-color:#59E7ED;"><a href="{}" style="text-decoration:none; color:black;">{}</a></div>'.format(retailer['url'], price)
-        product_html += utils.add_button(retailer['url'], price, '#59E7ED', center=False)
+        product_html += utils.add_button(retailer['url'], price, button_color='#59E7ED', center=False)
 
     product_html += '</div></div>'
     # product_html += '</td></tr>'

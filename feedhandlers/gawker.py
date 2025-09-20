@@ -219,7 +219,7 @@ def render_content(content):
 
     elif content['type'] == 'CommerceLink':
         # content_html += '<p><a href="{}">{}</a></p>'.format(content['url'], content['text'])
-        content_html += utils.add_button(content['url'], content['text'], 'rgb(143, 8, 94)')
+        content_html += utils.add_button(content['url'], content['text'], button_color='rgb(143, 8, 94)')
 
     elif content['type'] == 'ContainerBreak':
         content_html += '<!-- ContainerBreak -->'

@@ -41,7 +41,7 @@ def get_content(url, args, site_json, save_debug=False):
             if api_json.get('description'):
                 item['summary'] = api_json['description']
                 item['content_html'] += '<p style="text-align:center; color:{}">{}</p>'.format(api_json['config']['text_color'], item['summary'])
-            item['content_html'] += utils.add_button(item['url'], api_json['button_text'], api_json['config']['button_color'], api_json['config']['button_text_color'])
+            item['content_html'] += utils.add_button(item['url'], api_json['button_text'], button_color=api_json['config']['button_color'], text_color=api_json['config']['button_text_color'])
             item['content_html'] += '</div>'
             return item
 

@@ -57,7 +57,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['summary'] = ep_json['formatted_summary']
 
-    item['content_html'] = utils.add_audio(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], ep_json['duration'])
+    item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], ep_json['duration'])
     if 'embed' not in args and ep_json.get('description'):
         item['content_html'] += '<p>' + ep_json['description'] + '</p>'
     return item

@@ -1,6 +1,8 @@
-import av, curl_cffi, math, re
+import asyncio, av, curl_cffi, math, re
 from io import BytesIO
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
+from playwright.async_api import Playwright, async_playwright
+from urllib.parse import quote_plus
 
 import config, utils
 
@@ -193,6 +195,105 @@ def add_overlay(im, overlay, args):
         return False
     return True
 
+
+# Make sure playwright browsers are installed
+#   playwright install
+# Or from script:
+# import install_playwright
+# from playwright.sync_api import sync_playwright
+# with sync_playwright() as p:
+#     install_playwright.install(p.webkit)
+#     install_playwright.install(p.chromium)
+#     install_playwright.install(p.firefox)
+#
+# async_playwright in Flask example: https://stackoverflow.com/questions/47841985/make-a-python-asyncio-call-from-a-flask-route
+async def get_screenshot(url, args):
+    async with async_playwright() as playwright:
+        # Device emulation: https://playwright.dev/python/docs/emulation
+        # https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json
+        if 'device' in args and args['device'] in playwright.devices:
+            device = playwright.devices[args['device']]
+            browser_name = device['default_browser_type']
+        elif 'browser' in args:
+            device = None
+            browser_name = args['browser']
+        else:
+            device = None
+            # browser_name = 'chromium'
+            browser_name = 'edge'
+
+        if browser_name == 'chromium' or browser_name == 'chrome':
+            engine = playwright.chromium
+            if not device:
+                device = playwright.devices['Desktop Chrome']
+        elif browser_name == 'webkit' or browser_name == 'safari':
+            engine = playwright.webkit
+            if not device:
+                device = playwright.devices['Desktop Safari']
+        elif browser_name == 'firefox':
+            engine = playwright.firefox
+            if not device:
+                device = playwright.devices['Desktop Firefox']
+        elif browser_name == 'edge':
+            engine = playwright.chromium
+            if not device:
+                device = playwright.devices['Desktop Edge']
+        else:
+            engine = playwright.chromium
+            if not device:
+                device = playwright.devices['Desktop Chrome']
+
+        if 'headed' in args:
+            headless = False
+        else:
+            headless = True
+
+        if browser_name == 'edge':
+            browser = await engine.launch(channel="msedge", headless=headless)
+        else:
+            browser = await engine.launch(headless=headless)
+        if device:
+            context = await browser.new_context(**device)
+            page = await context.new_page()
+        else:
+            context = None
+            page = await browser.new_page()
+
+        if 'wait_until' in args:
+            await page.goto(url, wait_until=args['wait_until'])
+        else:
+            await page.goto(url)
+
+        if 'waitfor' in args:
+            await page.wait_for_selector(args['waitfor'])
+
+        if 'waitfortime' in args:
+            # time in ms
+            await page.wait_for_timeout(int(args['waitfortime']))
+
+        await page.keyboard.press('Escape')
+
+        if 'locator' in args:
+            ss = await page.locator(args['locator']).screenshot()
+        else:
+            ss = await page.screenshot()
+
+        if not ss:
+            if device:
+                await context.close()
+            await browser.close()
+            return None
+
+        im_io = BytesIO()
+        im_io.write(ss)
+        im_io.seek(0)
+
+        if context:
+            await context.close()
+        await browser.close()
+    return im_io
+
+
 def read_image(img_src):
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
@@ -231,112 +332,93 @@ def read_image(img_src):
         # im = Image.open(im_io)
     return im_io
 
-def get_image(args):
-    im = None
-    im_io = None
+
+def get_image(args, im=None, im_io=None):
+    img_args = args.copy()
     save = False
     resized = False
     mimetype = ''
 
-    if not 'url' in args:
-        w = -1
-        h = -1
-        if args.get('width'):
-            w = int(args['width'])
-        if args.get('height'):
-            h = int(args['height'])
-        if w > 0 and h < 0:
-            h = w
-        elif w < 0 and h > 0:
-            w = h
-        if w > 0 and h > 0:
-            color = 'SlateGray'
-            if args.get('color'):
-                if args['color'].count(',') == 0:
-                    color = args['color']
-                else:
-                    r, g, b = args['color'].split(',')
-                    color = (int(r), int(g), int(b))
-            if color == 'none':
-                im = Image.new('RGBA', (w, h), color=(0, 0, 0, 0))
-                mimetype = 'image/png'
-            else:
-                im = Image.new('RGB', (w, h), color=color)
-                mimetype = 'image/jpg'
-        else:
-            return None, 'No url given'
-
-    proxy = False
-    container = None
-    if not im:
-        try:
-            #clean_url = utils.clean_url(args['url'])
-            container = av.open(args['url'])
-            if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
-                stream = container.streams.video[0]
-                for frame in container.decode(stream):
-                    if frame.width > frame.height:
-                        w = 1280
-                        h = int(frame.height * w / frame.width)
+    if im_io:
+        im = Image.open(im_io)
+    elif not im:
+        if 'url' in img_args:
+            container = None
+            img_src = img_args['url']
+            while img_src:
+                try:
+                    container = av.open(img_src)
+                    if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
+                        stream = container.streams.video[0]
+                        for frame in container.decode(stream):
+                            if frame.width > frame.height:
+                                w = 1280
+                                h = int(frame.height * w / frame.width)
+                            else:
+                                h = 800
+                                w = int(frame.width * h / frame.height)
+                            im = frame.reformat(width=w, height=h).to_image()
+                            # im = frame.to_image()
+                            break
+                        save = True
+                    elif re.search(r'image|jpeg|png|webp', container.format.name):
+                        im_io = read_image(img_args['url'])
+                        if im_io:
+                            im = Image.open(im_io)
+                            mimetype = im.get_format_mimetype()
+                    img_src = ''
+                except av.HTTPForbiddenError:
+                    if '/proxy/' not in img_src:
+                        img_src = config.server + '/proxy/' + img_args['url']
                     else:
-                        h = 800
-                        w = int(frame.width * h / frame.height)
-                    im = frame.reformat(width=w, height=h).to_image()
-                    # im = frame.to_image()
-                    break
-                save = True
-            elif re.search(r'image|jpeg|png|webp', container.format.name):
-                im_io = read_image(args['url'])
-                if im_io:
-                    im = Image.open(im_io)
-                    mimetype = im.get_format_mimetype()
-        except av.HTTPForbiddenError:
-            proxy = True
-        except Exception as e:
-            logger.warning('image exception: ' + str(e))
-            im = None
-
-    if not im and proxy:
-        try:
-            container = av.open(config.server + '/proxy/' + args['url'])
-            if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
-                stream = container.streams.video[0]
-                for frame in container.decode(stream):
-                    if frame.width > frame.height:
-                        w = 1280
-                        h = int(frame.height * w / frame.width)
-                    else:
-                        h = 800
-                        w = int(frame.width * h / frame.height)
-                    im = frame.reformat(width=w, height=h).to_image()
-                    # im = frame.to_image()
-                    break
-                save = True
-            elif re.search(r'image|jpeg|png|webp', container.format.name):
-                im_io = read_image(args['url'])
-                if im_io:
-                    im = Image.open(im_io)
-                    mimetype = im.get_format_mimetype()
-        except Exception as e:
-            logger.warning('image exception: ' + str(e))
-            im = None
-
-    if container:
-        container.close()
+                        img_src = ''
+                except av.error.InvalidDataError:
+                    if re.search(r'\.(mp4|m4a|mov|mpeg|webm)', img_args['url']):
+                        loop = asyncio.ProactorEventLoop()
+                        asyncio.set_event_loop(loop)
+                        im_io = loop.run_until_complete(get_screenshot(img_args['url'], img_args))
+                        if im_io:
+                            im = Image.open(im_io)
+                            img_args['cropbbox'] = '0'
+                    img_src = ''
+                except Exception as e:
+                    logger.warning('image exception: ' + str(e))
+                    img_src = ''
+                if container:
+                    container.close()
 
     if not im:
-        if re.search(r'mp4|m4a|mov|mpeg|webm', args['url']):
+        if 'url' in img_args and re.search(r'\.(mp4|m4a|mov|mpeg|webm)', img_args['url']):
             im = Image.new('RGB', (1280, 720), color='SlateGray')
             mimetype = 'image/jpg'
         else:
-            try:
-                im_io = read_image(args['url'])
-                if im_io:
-                    im = Image.open(im_io)
-                    mimetype = im.get_format_mimetype()
-            except Exception as e:
-                logger.warning('image exception: ' + str(e))
-                im = None
+            if 'width' in img_args:
+                w = int(img_args['width'])
+            else:
+                w = -1
+            if 'height' in img_args:
+                h = int(img_args['height'])
+            else:
+                h = -1
+            if w > 0 and h < 0:
+                h = w
+            elif w < 0 and h > 0:
+                w = h
+            if w > 0 and h > 0:
+                if 'color' in img_args:
+                    if img_args['color'].count(',') == 0:
+                        color = img_args['color']
+                    else:
+                        r, g, b = img_args['color'].split(',')
+                        color = (int(r), int(g), int(b))
+                else:
+                    color = 'SlateGray'
+                if color == 'none':
+                    im = Image.new('RGBA', (w, h), color=(0, 0, 0, 0))
+                    mimetype = 'image/png'
+                else:
+                    im = Image.new('RGB', (w, h), color=color)
+                    mimetype = 'image/jpg'
 
     if not im:
         return None, 'Something went wrong :('
@@ -345,7 +427,7 @@ def get_image(args):
         im = im.convert('RGBA')
 
     # Do operations in the order of the args
-    for arg, val in args.items():
+    for arg, val in img_args.items():
         if arg == 'letterbox':
             try:
                 b = tuple(map(int, args['letterbox'][1:-1].split(',')))
@@ -379,20 +461,20 @@ def get_image(args):
                 resized = True
                 save = True
         elif (arg == 'height' or arg == 'width' or arg == 'scale') and resized == False:
-            im = resize(im, args.get('width'), args.get('height'), args.get('scale'))
+            im = resize(im, img_args.get('width'), img_args.get('height'), img_args.get('scale'))
             resized = True
             save = True
 
         elif arg == 'crop':
-            im = crop(im, args['crop'].split(','))
+            im = crop(im, img_args['crop'].split(','))
             save = True
 
         elif arg == 'cropbbox':
-            im = crop_bbox(im, args['cropbbox'])
+            im = crop_bbox(im, img_args['cropbbox'])
             save = True
 
         elif arg == 'overlay':
-            if add_overlay(im, val, args):
+            if add_overlay(im, val, img_args):
                 save = True
 
         elif arg == 'mask':
@@ -401,14 +483,14 @@ def get_image(args):
                 save = True
 
         elif arg == 'border':
-            if args.get('color'):
-                if args['color'].startswith('#'):
-                    color = ImageColor.getcolor(args['color'], 'RGB')
+            if img_args.get('color'):
+                if img_args['color'].startswith('#'):
+                    color = ImageColor.getcolor(img_args['color'], 'RGB')
                 else:
                     try:
-                        color = tuple(map(int, args['color'][1:-1].split(',')))
+                        color = tuple(map(int, img_args['color'][1:-1].split(',')))
                     except:
-                        logger.warning('invalid color ' + args['color'])
+                        logger.warning('invalid color ' + img_args['color'])
                         color = (0, 0, 0, 0)
             else:
                 color = (0, 0, 0, 0)

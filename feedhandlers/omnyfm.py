@@ -1,8 +1,8 @@
 import re
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -131,17 +131,26 @@ def get_content(url, args, site_json, save_debug=False):
         }
         if playlist_json.get('Categories'):
             item['tags'] = playlist_json['Categories'].copy()
-        item['_image'] = playlist_json['ArtworkUrl']
-        item['content_html'] = utils.add_audio('', item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], '', '', desc=playlist_json.get('DescriptionHtml'))
+        item['image'] = playlist_json['ArtworkUrl']
+        item['summary'] = playlist_json['Description']
+        playlist = ''
         if 'embed' not in args:
-            n = 1000
-        else:
-            n = 5
-        item['content_html'] += '<h3 style="margin:8px;">Clips:</h3>'
-        for i, clip in enumerate(next_json['pageProps']['playlistPage']['Clips']):
-            if i == n:
-                break
-            item['content_html'] += utils.add_audio(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(datetime.fromisoformat(clip['PublishedUtc']), date_only=True), clip['DurationSeconds'], show_poster=False)
+            playlist += '<p>' + item['summary'] + '</p>' + playlist
+        playlist += '<details><summary style="font-weight:bold;">Episodes:</summary>'
+        item['_playlist'] = []
+        for clip in next_json['pageProps']['playlistPage']['Clips']:
+            item['_playlist'].append({
+                "src": clip['AudioUrl'],
+                "name": clip['Title'],
+                "artist": item['author']['name'],
+                "image": clip['ImageUrl']
+            })
+            dt = datetime.fromisoformat(clip['PublishedUtc'])
+            playlist += utils.add_audio_v2(clip['AudioUrl'], clip['ImageUrl'], clip['Title'], clip['PublishedUrl'], '', '', utils.format_display_date(dt, date_only=True), clip['DurationSeconds'], show_poster=False, border=False)
+        playlist += '</details>'
+        playlist_url = config.server + '/playlist?url=' + quote_plus(item['url'])
+        item['content_html'] = utils.add_audio_v2(playlist_url, item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', '', audio_type='audio_link', desc=playlist, use_video_js=False)
+
     return item
 
 

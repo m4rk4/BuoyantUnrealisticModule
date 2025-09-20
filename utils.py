@@ -758,6 +758,8 @@ def image_from_srcset(srcset, target):
 
 def clean_url(url):
   split_url = urlsplit(url)
+  if split_url.path.endswith('/'):
+    return '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path[:-1])
   return '{}://{}{}'.format(split_url.scheme, split_url.netloc, split_url.path)
 
 def init_jsonfeed(args):
@@ -958,13 +960,11 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
-  fig_html = '<figure style="'
+def add_image(img_src, caption='', width=None, height=None, link='', img_style='margin:0 auto;', fig_style='margin:1em 0; padding:0;', object_fit='contain', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
+  fig_html = '<figure'
   if fig_style:
-    fig_html += fig_style
-  else:
-    fig_html += 'margin:0; padding:0;'
-  fig_html += '">'
+    fig_html += ' style="' + fig_style + '"'
+  fig_html += '>'
 
   if heading:
     fig_html += heading
@@ -980,23 +980,25 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   if link:
     fig_html += '<a href="{}" target="_blank">'.format(link)
 
-  style = 'display:block; margin-left:auto; margin-right:auto;'
-  if width:
-    if width != '0':
-      style += ' width:{};'.format(width)
+  style = 'display:block;'
+  if img_style:
+    style += ' ' + img_style
+  if object_fit:
+    style += ' object-fit:' + object_fit + ';'
+  if width and width != '0':
+    style += ' width:{};'.format(width)
   elif not re.search(r'width:\s?\d+', img_style):
     style += ' width:100%;'
     #fig_html += ' width:100%;'
-  if height:
-    if height != '0':
-      style += ' height:{};'.format(height)
+  if height and height != '0':
+    style += ' height:{};'.format(height)
   else:
-    style += ' height:100%; max-height:800px; object-fit:contain;'
+    style += ' height:100%; max-height:800px;'
   if img_style:
     style += ' ' + img_style
 
   if fallback_img:
-    fig_html += '<object data="{}" '.format(fallback_img)
+    fig_html += '<object data="' + fallback_img + '" '
     if '.jpg' in fallback_img or '.jpeg' in fallback_img:
       fig_html += 'type="image/jpeg"'
     elif '.png' in fallback_img:
@@ -1007,9 +1009,9 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
       fig_html += 'type="image/gif"'
     else:
       fig_html += 'type="image/jpeg"'
-    fig_html += ' style="{}">'.format(style)
+    fig_html += ' style="' + style + '">'
 
-  fig_html += '<img src="{}" loading="lazy" style="{}"/>'.format(img_src, style)
+  fig_html += '<img src="' + img_src + '" loading="lazy" style="' + style + '"/>'
 
   if fallback_img:
     fig_html += '</object>'
@@ -1344,7 +1346,18 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
   audio_html += '</div></div>'
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='', fig_style='', heading='', desc='', use_videojs=False, use_proxy=False):
+def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='margin:0 auto;', fig_style='margin:1em 0; padding:0;', heading='', desc='', use_videojs=False, use_proxy=False):
+  if not video_type:
+    if '.mp4' in video_url:
+      video_type = 'video/mp4'
+    elif '.webm' in video_url:
+      video_type = 'video/webm'
+    elif '.m3u8' in video_url:
+      video_type = 'application/x-mpegURL'
+    else:
+      logger.warning('unknown video url type ' + video_url)
+      video_type = 'application/x-mpegURL'
+
   video_type = video_type.lower()
 
   if use_proxy:
@@ -1392,7 +1405,7 @@ def add_video(video_url, video_type, poster='', caption='', width='', height='',
       if height:
         poster += '&height=' + str(height)
     # poster += '&overlay=video'
-  elif video_type == 'video/mp4':
+  elif video_type == 'video/mp4' or video_type == 'video/webm':
     poster = config.server + '/image?url=' + quote_plus(video_url)
     if width:
       poster += '&width=' + str(width)
@@ -1480,12 +1493,12 @@ def add_twitter(tweet_url, tweet_id=''):
     return ''
   return tweet['content_html']
 
-def add_score_gauge(val_pct, val_str, margins='1em auto'):
+def add_score_gauge(val_pct, val_str, margin='1em auto'):
   # Red to green color scale
   color = 'hsl({}deg 100 50 / 1);'.format(int(1.3 * val_pct))
-  return '<div style="margin:{}; width:8rem; aspect-ratio:1; line-height:8rem; text-align:center; font-size:3rem; font-weight:bold; border:solid 24px {}; border-radius:50%; mask:linear-gradient(red 0 0) padding-box, conic-gradient(red var(--p, {}%), transparent 0%) border-box;">{}</div>'.format(margins, color, val_pct, val_str)
+  return '<div style="margin:{}; width:8rem; aspect-ratio:1; line-height:8rem; text-align:center; font-size:3rem; font-weight:bold; border:solid 24px {}; border-radius:50%; mask:linear-gradient(red 0 0) padding-box, conic-gradient(red var(--p, {}%), transparent 0%) border-box;">{}</div>'.format(margin, color, val_pct, val_str)
 
-def add_bar(label, value, max_value, show_percent=True, bar_color='#4169E1', display_value='', line_height='2em'):
+def add_bar(label, value, max_value, show_percent=True, sublabel='', display_value='', bar_color='SkyBlue', font_color=''):
   if max_value == 0:
     pct = 0
   else:
@@ -1497,9 +1510,19 @@ def add_bar(label, value, max_value, show_percent=True, bar_color='#4169E1', dis
   else:
     val = value
   pct = int(pct)
+  bar_html = '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; align-items:center; padding-left:8px; padding-right:8px; margin-bottom:8px; '
+  if font_color:
+    bar_html += 'color:' + font_color + '; '
   if pct >= 50:
-    return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to right, {} {}%, transparent {}%);"><div style="line-height:{};"><b>{}</b></div><div style="line-height:{};"><b>{}</b></div></div>'.format(bar_color, pct, 100 - pct, line_height, label, line_height, val)
-  return '<div style="border:1px solid black; border-radius:10px; display:flex; justify-content:space-between; padding-left:8px; padding-right:8px; margin-bottom:8px; background:linear-gradient(to left, transparent {}%, {} {}%);"><div style="line-height:{};"><b>{}</b></div><div style="line-height:{};"><b>{}</b></div></div>'.format(100 - pct, bar_color, pct, line_height, label, line_height, val)
+    bar_html += 'background:linear-gradient(to right, {} {}%, transparent {}%);">'.format(bar_color, pct, 100 - pct)
+  else:
+    bar_html += 'background:linear-gradient(to left, transparent {}%, {} {}%);">'.format(100 - pct, bar_color, pct)
+  bar_html += '<div style="padding:4px 0;"><b>' + label + '</b>'
+  if sublabel:
+    bar_html += '<br/><small>' + sublabel + '</small>'
+  bar_html += '</div>'
+  bar_html += '<div style="padding:4px 0;"><b>' + str(val) + '</b></div></div>'
+  return bar_html
 
 def add_barchart(labels, values, title='', caption='', max_value=0, percent=True, border=True, width="75%"):
   color = 'rgb(196, 207, 214)'
@@ -1537,14 +1560,19 @@ def add_barchart(labels, values, title='', caption='', max_value=0, percent=True
   graph_html += '</div>'
   return graph_html
 
-def add_button(link, text, button_color='light-dark(#555, #ccc)', text_color='light-dark(white,black)', center=True, border=True, border_color="black", font_size='1em'):
+def add_button(link, text, img_src='', button_color='light-dark(#555, #ccc)', text_color='light-dark(white,black)', center=True, border=True, border_color="black", font_size='1em'):
   style = 'display:inline-block; min-width:180px; text-align:center; padding:0.5em; background-color:{}; color:{}; font-size:{}; border-radius:10px;'.format(button_color, text_color, font_size)
   if border:
     style += ' border:1px solid {};'.format(border_color)
   button = '<div style="margin:0.5em;'
   if center:
     button += ' text-align:center;'
-  button += '"><a href="{}" style="text-decoration:none;" target="_blank"><span style="{}">{}</span></a></div>'.format(link, style, text)
+  button += '"><a href="' + link + '" style="text-decoration:none;" target="_blank">'
+  if text:
+    button += '<span style="' + style + '">' + text + '</span>'
+  elif img_src:
+    button += '<img style="' + style + '" src="' + img_src + '">'
+  button += '</a></div>'
   return button
 
 def add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False, center=True, show_rating=False):
@@ -1619,6 +1647,9 @@ def add_embed(url, args={}, save_debug=False):
     content = module.get_content(embed_url, embed_args, site_json, save_debug)
     if content:
       return content['content_html']
+
+  if 'eliteprospects.com/iframe_player_stats.php' in embed_url:
+    return add_image(config.server + '/screenshot?wait_until=domcontentloaded&waitfortime=5000&locator=body+%3E+p&url=' + quote_plus(embed_url), link=embed_url)
 
   page_html = get_url_html(embed_url)
   if page_html:

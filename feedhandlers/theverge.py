@@ -99,13 +99,18 @@ def get_next_data(url):
 def render_body_component(component):
     content_html = ''
     if component['__typename'] == 'EntryBodyParagraph' or component['__typename'] == 'CoreParagraphBlockType':
-        if component.get('dropcap') == True:
-            if component['contents']['html'][0] == '<':
-                content_html += re.sub(r'^(<[^>]+>)(\w)(.*)', r'<p>\1<span style="float:left; font-size:4em; line-height:0.8em;">\2</span>\3</p><span style="clear:left;"></span>', component['contents']['html'])
-            else:
-                content_html += '<p><span style="float:left; font-size:4em; line-height:0.8em;">{}</span>{}</p><span style="clear:left;"></span>'.format(component['contents']['html'][0], component['contents']['html'][1:])
-        else:
-            content_html += '<p>{}</p>'.format(component['contents']['html'])
+        content_html = '<p'
+        if component.get('dropcap') and component['dropcap'] == True:
+            content_html += ' class="dropcap"'
+        content_html += '>'
+        if component.get('contents'):
+            content_html += component['contents']['html']
+        elif component.get('tempContents'):
+            # if len(component['tempContents']) > 1:
+            #     logger.warning('unhandled CoreParagraphBlockType tempContents')
+            # content_html += component['tempContents'][0]['html']
+            content_html += '<br>'.join([x['html'] for x in component['tempContents']])
+        content_html += '</p>'
 
     elif component['__typename'] == 'EntryBodyHeading' or component['__typename'] == 'CoreHeadingBlockType':
         content_html += '<h{0}>{1}</h{0}>'.format(component['level'], component['contents']['html'])
@@ -113,9 +118,9 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyList' or component['__typename'] == 'CoreListBlockType':
         for it in component['items']:
             if it.get('line'):
-                content_html += '<li>{}</li>'.format(it['line']['html'])
+                content_html += '<li>' + it['line']['html'] + '</li>'
             elif it.get('contents'):
-                content_html += '<li>{}</li>'.format(it['contents']['html'])
+                content_html += '<li>' + it['contents']['html'] + '</li>'
         if component.get('ordered'):
             content_html = '<ol>' + content_html + '</ol>'
         else:
@@ -235,8 +240,17 @@ def render_body_component(component):
     elif component['__typename'] == 'EntryBodyBlockquote':
         quote = ''
         for it in component['paragraphs']:
-            quote += '<p>{}</p>'.format(it['contents']['html'])
-        content_html = utils.add_blockquote(quote)
+            quote += '<p>' + it['contents']['html'] + '</p>'
+        content_html = utils.add_blockquote(quote, False)
+
+    elif component['__typename'] == 'CoreQuoteBlockType':
+        quote = ''
+        for it in component['children']:
+            quote += render_body_component(it)
+        if component.get('citation') and component['citation'].get('html') and component['citation']['html'].strip():
+            content_html = utils.add_pullquote(quote, component['citation']['html'])
+        else:
+            content_html = utils.add_blockquote(quote, False)
 
     elif component['__typename'] == 'EntryBodyPullquote':
         content_html += utils.add_pullquote(component['quote']['html'])
@@ -533,6 +547,9 @@ def get_item(entry_json, args, site_json, save_debug):
     elif entry_json.get('blocks'):
         for component in entry_json['blocks']:
             item['content_html'] += render_body_component(component)
+
+    if re.search(r'<p class="dropcap">', item['content_html']):
+        item['content_html'] += '<style>' + config.dropcap_style + '</style>'
 
     item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item

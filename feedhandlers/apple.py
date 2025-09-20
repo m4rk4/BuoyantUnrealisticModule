@@ -362,7 +362,7 @@ def get_podcast(url, args, site_json, save_debug):
         n_max = min(n_max, len(show['relationships']['episodes']['data']))
 
         item['_playlist'] = []
-        card_footer += '<h3>Episodes:</h3>'
+        card_footer += '<details><summary style="font-weight:bold;">Episodes:</summary>'
         for i, ep in enumerate(show['relationships']['episodes']['data']):
             episode = get_podcast_episode(ep)
             if episode['_timestamp'] > item['_timestamp']:
@@ -379,6 +379,7 @@ def get_podcast(url, args, site_json, save_debug):
                 card_footer += utils.add_audio_v2(episode['_audio'], episode['image'], episode['title'], episode['url'], '', '', episode['_display_date'], episode['_duration'], show_poster=False, border=False)
         if n_max < len(show['relationships']['episodes']['data']):
             card_footer += '<div><a href="{}">View more episodes</a></div>'.format(item['url'])
+        card_footer += '</details>'
         item['content_html'] = utils.format_small_card(card_image, card_content, card_footer)
     return item
 

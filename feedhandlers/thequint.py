@@ -24,9 +24,12 @@ def get_content(url, args, site_json, save_debug=False):
         return None
 
     static_page = json.loads(el.string)
+    if save_debug:
+        utils.write_file(static_page, './debug/static_page.json')
     story_json = static_page['qt']['data']['story']
     if save_debug:
         utils.write_file(story_json, './debug/debug.json')
+    cdn_image = 'https://' + static_page['qt']['config']['cdn-image'] + '/'
 
     item = {}
     item['id'] = story_json['id']
@@ -41,24 +44,36 @@ def get_content(url, args, site_json, save_debug=False):
         dt = datetime.fromtimestamp(story_json['updated-at'] / 1000).replace(tzinfo=timezone.utc)
         item['date_modified'] = dt.isoformat()
 
-    authors = []
-    for it in story_json['authors']:
-        authors.append(it['name'])
-    item['author'] = {}
-    item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    item['authors'] = [{"name": x['name']} for x in story_json['authors']]
+    item['author'] = {
+        "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+    }
 
+    item['tags'] = []
     if story_json.get('tags'):
-        item['tags'] = []
-        for it in story_json['tags']:
-            item['tags'].append(it['name'])
+        item['tags'] += [x['name'] for x in story_json['tags']]
+    if 'seo' in story_json and story_json['seo'].get('meta-keywords'):
+        item['tags'] += story_json['seo']['meta-keywords']
+    if len(item['tags']) > 0:
+        # Remove duplicates (case-insensitive)
+        item['tags'] = list(dict.fromkeys([it.casefold() for it in item['tags']]))
+    else:
+        del item['tags']
 
     item['content_html'] = ''
+    if 'seo' in story_json and story_json['seo'].get('meta-description'):
+        item['summary'] = story_json['seo']['meta-description']
     if story_json.get('summary'):
-        item['summary'] = story_json['summary']
         item['content_html'] += '<p><em>' + story_json['summary'] + '</em></p>'
+        if 'summary' not in item:
+            item['summary'] = story_json['summary']
+    elif story_json.get('subheadline'):
+        item['content_html'] += '<p><em>' + story_json['subheadline'] + '</em></p>'
+        if 'summary' not in item:
+            item['summary'] = story_json['subheadline']
 
     if story_json.get('hero-image-s3-key'):
-        item['_image'] = 'https://images.thequint.com/' + quote_plus(story_json['hero-image-s3-key']) + '?auto=format%2Ccompress&fmt=webp&width=720'
+        item['_image'] = cdn_image + quote_plus(story_json['hero-image-s3-key']) + '?auto=format%2Ccompress&fmt=webp&width=720'
         if story_json['story-template'] != 'video':
             captions = []
             if story_json.get('hero-image-caption'):
@@ -87,6 +102,8 @@ def get_content(url, args, site_json, save_debug=False):
                 elif element['subtype'] == 'q-and-a':
                     item['content_html'] += '<div style="font-size:1.1em; font-weight:bold;">' + re.sub(r'</?p>', '', element['metadata']['question']) + '</div>'
                     item['content_html'] += '<div style="margin-left:10px; padding-left:10px;">' + element['metadata']['answer'] + '</div>'
+                elif element['subtype'] == 'blockquote':
+                    item['content_html'] += utils.add_pullquote(element['metadata']['content'], element['metadata'].get('attribution'))
                 elif element['subtype'] == 'also-read':
                     pass
                 else:
@@ -94,7 +111,7 @@ def get_content(url, args, site_json, save_debug=False):
             elif element['type'] == 'title':
                 item['content_html'] += '<h2>' + element['text'] + '</h2>'
             elif element['type'] == 'image':
-                img_src = 'https://images.thequint.com/' + quote_plus(element['image-s3-key']) + '?auto=format%2Ccompress&fmt=webp&width=720'
+                img_src = cdn_image + quote_plus(element['image-s3-key']) + '?auto=format%2Ccompress&fmt=webp&width=720'
                 captions = []
                 if element.get('image-caption'):
                     m = re.search(r'<p>(.*?)</p>', element['image-caption'])
@@ -116,7 +133,9 @@ def get_content(url, args, site_json, save_debug=False):
                     embed_js = base64.b64decode(element['embed-js']).decode('utf-8')
                     if embed_js.startswith('<iframe'):
                         m = re.search(r'src="([^"]+)"', embed_js)
-                        item['content_html'] += utils.add_embed(m.group(1))
+                        # Skip Listen to article powered by Trinity Audio
+                        if 'trinitymedia.ai' not in m.group(1):
+                            item['content_html'] += utils.add_embed(m.group(1))
                     else:
                         logger.warning('unhandled jsembed embed-js {} in {}'.format(embed_js, item['url']))
                 elif element['subtype'] == 'tweet':

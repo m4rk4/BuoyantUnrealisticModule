@@ -235,6 +235,7 @@ def get_content(url, args, site_json, save_debug=False):
         if it:
             item['content_html'] += '<h2>{}</h2>'.format(it.get_text().strip())
 
+    has_dropcap_style = False
     body = soup.find(id='article-body')
     if body:
         if save_debug:
@@ -250,21 +251,32 @@ def get_content(url, args, site_json, save_debug=False):
         for el in body.find_all(text=lambda text: isinstance(text, Comment)):
             el.extract()
 
-        for el in body.find_all(class_=re.compile('ad-even|ad-odd|ad-zone|affiliate-sponsored|article-jumplink|article-table-contents')):
-            el.decompose()
-
         for el in body.find_all(id='article-waypoint'):
             el.decompose()
 
-        for el in body.find_all(class_='mobile-only'):
-            # Usually duplicate section
+        for el in body.find_all(class_=re.compile('\bad-|affiliate|jumplink|sidenav|sponsored|table-contents')):
             el.decompose()
 
         for el in body.find_all(class_=re.compile('next-single|related-single')):
             if el.parent and el.parent.name == 'p':
                 el.parent.decompose()
 
+        for el in body.find_all(class_=['mobile-only', 'w-directory-warning']):
+            el.decompose()
+
         for el in body.find_all(class_=re.compile(r'content-block-(large|regular)')):
+            el.unwrap()
+
+        for el in body.find_all('section', class_='emaki-custom-dropcap'):
+            it = el.find('p')
+            it['class'] = 'dropcap'
+            if has_dropcap_style == False:
+                new_html = '<style>' + config.dropcap_style + '</style>'
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.insert_after(new_el)
+                has_dropcap_style = True
+            for it in el.find_all('div', class_='dropcap'):
+                it.unwrap()
             el.unwrap()
 
         for el in body.find_all('blockquote', class_=False):
@@ -492,7 +504,7 @@ def get_content(url, args, site_json, save_debug=False):
                     for link in it.find_all('a'):
                         # print(link['href'])
                         # new_html += '<div style="margin-top:0.8em; margin-bottom:0.8em; text-align:center;"><a href="{}"><span style="display:inline-block; min-width:8em; color:white; background-color:#e01a4f; padding:0.5em;">{}</span></a></div>'.format(utils.get_redirect_url(link['href']), link.get_text().strip())
-                        new_html += utils.add_button(utils.get_redirect_url(link['href']), link.get_text().strip(), '#e01a4f', 'white')
+                        new_html += utils.add_button(utils.get_redirect_url(link['href']), link.get_text().strip(), button_color='#e01a4f', text_color='white')
                 new_html += '</div></div><div>&nbsp;</div>'
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.replace_with(new_el)

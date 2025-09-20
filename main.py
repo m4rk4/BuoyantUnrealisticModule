@@ -7,7 +7,6 @@ import logging, logging.handlers
 from flask import Flask, jsonify, make_response, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
 from io import BytesIO
-from playwright.async_api import Playwright, async_playwright
 from staticmap import StaticMap, CircleMarker
 from urllib.parse import quote, quote_plus, urlsplit
 
@@ -481,87 +480,21 @@ def map():
     return send_file(im_io, mimetype='image/png')
 
 
-# Make sure playwright browsers are installed
-#   playwright install
-# Or from script:
-# import install_playwright
-# from playwright.sync_api import sync_playwright
-# with sync_playwright() as p:
-#     install_playwright.install(p.webkit)
-#     install_playwright.install(p.chromium)
-#     install_playwright.install(p.firefox)
-#
-# async_playwright in Flask example: https://stackoverflow.com/questions/47841985/make-a-python-asyncio-call-from-a-flask-route
-async def get_screenshot(url, args):
-    async with async_playwright() as playwright:
-        # Device emulation: https://playwright.dev/python/docs/emulation
-        # https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json
-        if 'device' in args and args['device'] in playwright.devices:
-            device = playwright.devices[args['device']]
-            browser_name = device['default_browser_type']
-        elif 'browser' in args:
-            device = None
-            browser_name = args['browser']
-        else:
-            device = None
-            browser_name = 'chromium'
-
-        if browser_name == 'chromium' or browser_name == 'chrome':
-            engine = playwright.chromium
-            if not device:
-                device = playwright.devices['Desktop Chrome']
-        elif browser_name == 'webkit' or browser_name == 'safari':
-            engine = playwright.webkit
-            if not device:
-                device = playwright.devices['Desktop Safari']
-        elif browser_name == 'firefox':
-            engine = playwright.firefox
-            if not device:
-                device = playwright.devices['Desktop Firefox']
-        else:
-            engine = playwright.chromium
-            if not device:
-                device = playwright.devices['Desktop Chrome']
-
-        browser = await engine.launch()
-        context = await browser.new_context(**device)
-        page = await context.new_page()
-
-        if 'networkidle' in args:
-            await page.goto(url, wait_until="networkidle")
-        else:
-            await page.goto(url)
-
-        if 'waitfor' in args:
-            await page.wait_for_selector(args['waitfor'])
-
-        if 'waitfortime' in args:
-            await page.wait_for_timeout(int(args['waitfortime']))
-
-        if 'locator' in args:
-            ss = await page.locator(args['locator']).screenshot()
-        else:
-            ss = await page.screenshot()
-
-        if not ss:
-            await context.close()
-            await browser.close()
-            return None
-
-        im_io = BytesIO()
-        im_io.write(ss)
-        im_io.seek(0)
-
-        await context.close()
-        await browser.close()
-    return im_io
-
-
 @app.route('/screenshot')
 def screenshot():
     args = request.args
-    if not args.get('url'):
+    if 'url' not in args:
         return 'No url specified'
+
+    # # https://github.com/microsoft/playwright-python/issues/723
+    loop = asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(loop)
+    im_io = loop.run_until_complete(image_utils.get_screenshot(args['url'], args))
+    mimetype = 'image/png'
+    if im_io and len(args) > 1:
+        im_io, mimetype = image_utils.get_image(args, im_io=im_io)
+    if im_io:
+        return send_file(im_io, mimetype=mimetype)
 
     if args.get('provider') and args['provider'] == 'thumbio':
         # https://www.thum.io/documentation/api/url
@@ -658,13 +591,6 @@ def screenshot():
         #     logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
         #     return 'Something went wrong ({})'.format(r.status_code), r.status_code
 
-    # # https://github.com/microsoft/playwright-python/issues/723
-    # loop = asyncio.ProactorEventLoop()
-    # asyncio.set_event_loop(loop)
-    # ss_io = loop.run_until_complete(get_screenshot(args['url'], args))
-    # if not ss_io:
-    #     return 'Something went wrong'
-    # return send_file(ss_io, mimetype='image/png')
 
 
 @app.route('/send_src')

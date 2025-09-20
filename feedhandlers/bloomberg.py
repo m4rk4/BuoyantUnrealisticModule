@@ -440,15 +440,35 @@ def get_item(story_json, args, site_json, save_debug):
 
     item['author'] = {}
     if story_json.get('authors'):
-        authors = []
-        for author in story_json['authors']:
-            authors.append(author['name'])
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+        item['authors'] = [{"name": x['name']} for x in story_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
     elif story_json.get('byline'):
-        item['author']['name'] = story_json['byline']
+        item['author'] = {
+            "name": story_json['byline']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
+    item['tags'] = []
+    if story_json.get('categories'):
+        item['tags'] += story_json['categories'].copy()
+    if story_json.get('label'):
+        item['tags'].append(story_json['label'])
+    if story_json.get('collections') and story_json['collections'].get('recordId'):
+        item['tags'].append(story_json['collections']['record']['title'])
+    if story_json.get('tags'):
+        item['tags'] += [x['name'] for x in story_json['tags']]
     if story_json.get('mostRelevantTags'):
-        item['tags'] = story_json['mostRelevantTags'].copy()
+        item['tags'] += story_json['mostRelevantTags'].copy()
+    if len(item['tags']) > 0:
+        # Remove duplicate tags - case insensitive
+        # https://stackoverflow.com/questions/24983172/how-to-eliminate-duplicate-list-entries-in-python-while-preserving-case-sensitiv
+        wordset = set(item['tags'])
+        item['tags'] = [it for it in wordset if it.istitle() or it.title() not in wordset]
+    else:
+        del item['tags']
 
     if story_json.get('teaserBody'):
         item['summary'] = story_json['teaserBody']
@@ -471,13 +491,18 @@ def get_item(story_json, args, site_json, save_debug):
 
     if story_json.get('dek'):
         item['content_html'] += story_json['dek']
-    elif item.get('summary'):
-        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
+    # elif item.get('summary'):
+    #     item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
 
-    if story_json.get('abstract'):
+    if story_json.get('aiSummary') and story_json['aiSummary'].get('text'):
+        item['content_html'] += '<h3 style="margin-bottom:0;">Takeaways by Bloomberg AI</h3><ul>'
+        for it in story_json['aiSummary']['text']:
+            item['content_html'] += '<li>' + it + '</li>'
+        item['content_html'] += '</ul>'
+    elif story_json.get('abstract'):
         item['content_html'] += '<ul>'
         for it in story_json['abstract']:
-            item['content_html'] += '<li>{}</li>'.format(it)
+            item['content_html'] += '<li>' + it + '</li>'
         item['content_html'] += '</ul>'
 
     if isinstance(story_json['body'], str):
@@ -546,18 +571,7 @@ def get_item(story_json, args, site_json, save_debug):
         item['content_html'] += lede
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(urlsplit(item['url']).netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        if story_json.get('abstract'):
-            item['content_html'] += '<ul style="font-size:0.9em;">'
-            for it in story_json['abstract']:
-                item['content_html'] += '<li>{}</li>'.format(it)
-            item['content_html'] += '</ul>'
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
     if body:
@@ -690,9 +704,11 @@ def get_item(story_json, args, site_json, save_debug):
                 item['content_html'] += format_content(content, story_json.get('imageAttachments'))
 
     if story_json.get('footnotes') and story_json['footnotes'].get('content'):
-        item['content_html'] += '<hr/>'
+        footnotes = ''
         for content in story_json['footnotes']['content']:
-            item['content_html'] += format_content(content, story_json.get('imageAttachments'))
+            footnotes += format_content(content, story_json.get('imageAttachments'))
+        if footnotes:
+            item['content_html'] += '<hr/>' + footnotes
 
     return item
 

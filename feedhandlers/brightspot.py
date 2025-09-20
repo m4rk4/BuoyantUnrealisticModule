@@ -137,6 +137,8 @@ def render_content(content, skip_promos=True):
             elif content.get('item'):
                 for it in content['item']:
                     content_html += render_content(it, skip_promos)
+        elif '/htmlmodule/InlineHtmlModuleEnhancement.hbs' in content['_template']:
+            content_html += content['rawHtml']
         elif '/module/ModuleType.hbs' in content['_template']:
             for it in content['content']:
                 content_html += render_content(it, skip_promos)
@@ -538,7 +540,7 @@ def render_content(content, skip_promos=True):
         elif content['_template'] == '/customEmbed/EarlyElements.hbs' or content['_template'] == '/customEmbed/CustomEmbedModule.hbs':
             if not re.search(r'OUTBRAIN|Report a typo|ubscribe to', content['html'], flags=re.I):
                 logger.warning('unknown customEmbed content')
-        elif '/ad/' in content['_template'] or 'AdModule' in content['_template'] or '/taboola/' in content['_template'] or '/nativo/NativoModule.hbs' in content['_template'] or '/relatedlist/RelatedList.hbs' in content['_template'] or '/form/Form.hbs' in content['_template'] or '/promo/PromoRichTextElement.hbs' in content['_template'] or '/newsletter/NewsletterModule.hbs' in content['_template'] or '/newsletter/NewsletterSignUpModule.hbs' in content['_template'] or '/packagelistmodule/PackageListModule.hbs' in content['_template']:
+        elif '/ad/' in content['_template'] or 'AdModule' in content['_template'] or 'HtmlAdEmbed' in content['_template'] or '/taboola/' in content['_template'] or '/nativo/NativoModule.hbs' in content['_template'] or '/relatedlist/RelatedList.hbs' in content['_template'] or '/form/Form.hbs' in content['_template'] or '/promo/PromoRichTextElement.hbs' in content['_template'] or '/newsletter/NewsletterModule.hbs' in content['_template'] or '/newsletter/NewsletterSignUpModule.hbs' in content['_template'] or '/packagelistmodule/PackageListModule.hbs' in content['_template']:
             pass
         else:
             logger.warning('unhandled content template ' + content['_template'])

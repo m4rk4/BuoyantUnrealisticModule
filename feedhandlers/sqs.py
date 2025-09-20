@@ -238,7 +238,7 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-quote in ' + item['url'])
 
         elif 'sqs-block-code' in block['class']:
-            if block.find(class_='adsbygoogle') or block.find(id=re.compile(r'taboola')):
+            if block.find(class_='adsbygoogle') or block.find(id=re.compile(r'taboola')) or block.find(class_='sidebar-widget-cta-container'):
                 continue
             elif block.find('script', src=re.compile(r'apps.elfsight.com')):
                 continue

@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
-import utils
+import config, utils
 from feedhandlers import rss
 
 import logging
@@ -47,39 +47,83 @@ def get_img_src(fig_html):
 
 
 def get_field_data(data, api_path, caption='', video_poster=''):
+    field_html = ''
     if data['id'] == 'missing':
         return ''
     field_json = get_api_json(api_path, data['type'], data['id'])
     if field_json:
         #utils.write_file(field_json, './debug/field.json')
-        if field_json['data']['type'] == 'media--image':
+        if field_json['data']['type'] == 'brightcove_video--brightcove_video':
+            player = get_field_data(field_json['data']['relationships']['player']['data'], api_path)
+            poster = get_field_data(field_json['data']['relationships']['poster']['data'], api_path)
+            m = re.search(r'v1_static_(\d+)', poster)
+            if m:
+                field_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(m.group(1), player, field_json['data']['attributes']['video_id']))
+            else:
+                logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
+
+        elif field_json['data']['type'] == 'brightcove_player--brightcove_player':
+            field_html = field_json['data']['attributes']['player_id']
+
+        elif field_json['data']['type'] == 'file--file':
+            if field_json['data']['attributes']['uri']['url'].startswith('/'):
+                field_html = 'https://' + urlsplit(api_path).netloc + field_json['data']['attributes']['uri']['url']
+            else:
+                field_html = field_json['data']['attributes']['uri']['url']
+
+        elif field_json['data']['type'] == 'media--audio':
+            author = ''
+            author_url = ''
+            if field_json['data']['relationships'].get('field_programid') and field_json['data']['relationships']['field_programid'].get('data'):
+                api_json = get_api_json(api_path, field_json['data']['relationships']['field_programid']['data']['type'], field_json['data']['relationships']['field_programid']['data']['id'])
+                if api_json:
+                    author = api_json['data']['attributes']['name']
+                    author_url = 'https://' + urlsplit(api_path).netloc + api_json['data']['attributes']['path']['alias']
+            dt = datetime.fromisoformat(field_json['data']['attributes']['created'])
+            field_html = utils.add_audio_v2(field_json['data']['attributes']['field_audio_url'], field_json['data']['attributes']['field_imageuri'], field_json['data']['attributes']['name'], field_json['data']['attributes']['field_embedurl'], author, author_url, utils.format_display_date(dt, True), field_json['data']['attributes']['field_durationseconds'])
+
+        elif field_json['data']['type'] == 'media--brightcove_video':
+            field_html = get_field_data(field_json['data']['relationships']['field_media_brightcove_video']['data'], api_path)
+
+        elif field_json['data']['type'] == 'media--image':
             captions = []
             if caption:
                 captions.append(caption)
-            if field_json['data']['attributes'].get('field_caption'):
-                if isinstance(field_json['data']['attributes']['field_caption'], str):
-                    captions.append(field_json['data']['attributes']['field_caption'])
-                elif isinstance(field_json['data']['attributes']['field_caption'], dict):
-                    captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', field_json['data']['attributes']['field_caption']['value'].strip()))
-            if field_json['data']['attributes'].get('field_credit'):
-                captions.append(field_json['data']['attributes']['field_credit'])
-            if field_json['data']['attributes'].get('field_attribution'):
-                captions.append(field_json['data']['attributes']['field_attribution'])
-            if field_json['data']['attributes'].get('field_source'):
-                if field_json['data']['attributes']['field_source'] not in captions:
-                    captions.append(field_json['data']['attributes']['field_source'])
-            if field_json['data']['attributes'].get('field_image_source'):
-                if field_json['data']['attributes']['field_image_source'] not in captions:
-                    captions.append(field_json['data']['attributes']['field_image_source'])
+            elif field_json['data']['attributes'].get('field_description') and not field_json['data']['attributes'].get('field_caption'):
+                captions.append(field_json['data']['attributes']['field_description']['value'])
+            else:
+                if field_json['data']['attributes'].get('field_caption'):
+                    if isinstance(field_json['data']['attributes']['field_caption'], str):
+                        captions.append(field_json['data']['attributes']['field_caption'])
+                    elif isinstance(field_json['data']['attributes']['field_caption'], dict):
+                        captions.append(re.sub(r'^<p>(.*)</p>$', r'\1', field_json['data']['attributes']['field_caption']['value'].strip()))
+                if field_json['data']['attributes'].get('field_credit'):
+                    captions.append(field_json['data']['attributes']['field_credit'])
+                if field_json['data']['attributes'].get('field_attribution'):
+                    captions.append(field_json['data']['attributes']['field_attribution'])
+                if field_json['data']['attributes'].get('field_source'):
+                    if field_json['data']['attributes']['field_source'] not in captions:
+                        captions.append(field_json['data']['attributes']['field_source'])
+                if field_json['data']['attributes'].get('field_image_source'):
+                    if field_json['data']['attributes']['field_image_source'] not in captions:
+                        captions.append(field_json['data']['attributes']['field_image_source'])
+            img_src = ''
+            link = ''
             if field_json['data']['relationships'].get('field_media_image'):
-                img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_path)
+                if field_json['data']['relationships']['field_media_image']['data'].get('meta') and field_json['data']['relationships']['field_media_image']['data']['meta'].get('derivatives') and 'cloudinary_media_original' in field_json['data']['relationships']['field_media_image']['data']['meta']['derivatives']:
+                    link = field_json['data']['relationships']['field_media_image']['data']['meta']['derivatives']['cloudinary_media_original']['url']
+                    x = link.split('/')
+                    x.insert(6, 'c_fill,g_auto,w_1000')
+                    img_src = '/'.join(x)
+                else:
+                    img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_path)
             elif field_json['data']['relationships'].get('image'):
                 img_src = get_field_data(field_json['data']['relationships']['image']['data'], api_path)
             elif field_json['data']['relationships'].get('field_image'):
                 img_src = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path)
             else:
                 logger.warning('unknown image source for {} {}'.format(field_json['data']['type'], field_json['data']['id']))
-            return utils.add_image(img_src, ' | '.join(captions))
+            field_html = utils.add_image(img_src, ' | '.join(captions), link=link)
 
         elif field_json['data']['type'] == 'media--mpx_video':
             #utils.write_file(field_json, './debug/video.json')
@@ -104,45 +148,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                             if el:
                                 video_poster = el['content']
                     caption = field_json['data']['attributes']['field_seo_headline']
-                    return utils.add_video(video_src, video_type, video_poster, caption)
-
-        elif field_json['data']['type'] == 'media--twitter':
-            return utils.add_embed(field_json['data']['attributes']['field_media_twitter_1'])
-
-        elif field_json['data']['type'] == 'media--instagram':
-            return utils.add_embed(field_json['data']['attributes']['field_media_instagram'])
-
-        elif field_json['data']['type'] == 'media--brightcove_video':
-            return get_field_data(field_json['data']['relationships']['field_media_brightcove_video']['data'], api_path)
-
-        elif field_json['data']['type'] == 'brightcove_video--brightcove_video':
-            player = get_field_data(field_json['data']['relationships']['player']['data'], api_path)
-            poster = get_field_data(field_json['data']['relationships']['poster']['data'], api_path)
-            m = re.search(r'v1_static_(\d+)', poster)
-            if m:
-                return utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(m.group(1), player, field_json['data']['attributes']['video_id']))
-            else:
-                logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
-
-        elif field_json['data']['type'] == 'brightcove_player--brightcove_player':
-            return field_json['data']['attributes']['player_id']
-
-        elif field_json['data']['type'] == 'file--file':
-            if field_json['data']['attributes']['uri']['url'].startswith('/'):
-                netloc = urlsplit(api_path).netloc
-                file_url = 'https://{}{}'.format(netloc, field_json['data']['attributes']['uri']['url'])
-            else:
-                file_url = field_json['data']['attributes']['uri']['url']
-            return file_url
-
-        elif field_json['data']['type'] == 'paragraph--p_text':
-            return field_json['data']['attributes']['field_p_text_text']['processed']
-
-        elif field_json['data']['type'] == 'paragraph--p_media':
-            media_html = ''
-            for data in field_json['data']['relationships']['field_p_media_upload']['data']:
-                media_html += get_field_data(data, api_path)
-            return media_html
+                    field_html = utils.add_video(video_src, video_type, video_poster, caption)
 
         elif field_json['data']['type'] == 'media--p_image':
             if field_json['data']['relationships']['field_p_media_img']['data']['meta'].get('title'):
@@ -150,11 +156,111 @@ def get_field_data(data, api_path, caption='', video_poster=''):
             else:
                 caption = ''
             img_src = get_field_data(field_json['data']['relationships']['field_p_media_img']['data'], api_path)
-            return utils.add_image(img_src, caption)
+            field_html = utils.add_image(img_src, caption)
+
+        elif (field_json['data']['type'] == 'media--facebook' or field_json['data']['type'] == 'media--instagram' or field_json['data']['type'] == 'media--tiktok' or field_json['data']['type'] == 'media--tweet') and field_json['data']['attributes'].get('embed_code'):
+            field_html = utils.add_embed(field_json['data']['attributes']['embed_code'])
+
+        elif field_json['data']['type'] == 'media--instagram':
+            field_html = utils.add_embed(field_json['data']['attributes']['field_media_instagram'])
+
+        elif field_json['data']['type'] == 'media--twitter':
+            field_html = utils.add_embed(field_json['data']['attributes']['field_media_twitter_1'])
+
+        elif field_json['data']['type'] == 'media--video':
+            if field_json['data']['relationships'].get('field_image') and field_json['data']['relationships']['field_image'].get('data'):
+                img_src = ''
+                image_html = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path, caption, video_poster)
+                if image_html:
+                    m = re.search(r'src="([^"]+)', image_html)
+                    if m:
+                        img_src = m.group(1)
+                if not img_src and field_json['data']['attributes'].get('field_thumbnail_url'):
+                    img_src = field_json['data']['attributes']['field_thumbnail_url']
+                if field_json['data']['attributes'].get('field_video_url_hls'):
+                    field_html = utils.add_video(field_json['data']['attributes']['field_video_url_hls'], 'application/x-mpegURL', img_src, field_json['data']['attributes'].get('name'))
+                elif field_json['data']['attributes'].get('field_video_url_dash'):
+                    field_html = utils.add_video(field_json['data']['attributes']['field_video_url_dash'], 'application/dash+xml', img_src, field_json['data']['attributes'].get('name'))
+                elif field_json['data']['attributes'].get('field_video_url_mp4'):
+                    field_html = utils.add_video(field_json['data']['attributes']['field_video_url_mp4'], 'video/mp4', img_src, field_json['data']['attributes'].get('name'), use_videojs=True)
+                # elif field_json['data']['attributes'].get('field_brightcove_id'):
+                    # TODO: need player_id from web page
+                    # field_html = utils.add_embed('https://players.brightcove.net/' + field_json['data']['attributes']['field_account_id'] + '/' + player_id + '_default/index.html?videoId=' + field_json['data']['attributes']['field_brightcove_id'])
+                # elif field_json['data']['attributes'].get('field_youtube_syndication'):
+                    # TODO
+                else:
+                    logger.warning('unhandled media-video source ' + field_json['links']['_self']['href'])
+
+        elif field_json['data']['type'] == 'media--youtube':
+            field_html = utils.add_embed(field_json['data']['attributes']['field_media_video_embed_field'])
+
+        elif field_json['data']['type'] == 'paragraph--context_snippet':
+            field_html = '<div style="border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#e5e7eb; padding:0 1em; margin:1em 0;">'
+            if field_json['data']['attributes'].get('field_title'):
+                field_html += '<h3>' + field_json['data']['attributes']['field_title'] + '</h3>'
+            if field_json['data']['attributes'].get('field_body'):
+                soup = BeautifulSoup(field_json['data']['attributes']['field_body']['processed'], 'html.parser')
+                for el in soup.find_all('span', attrs=False):
+                    el.unwrap()
+                field_html += str(soup)
+            field_html += '</div>'
+
+        elif field_json['data']['type'] == 'paragraph--gallery':
+            field_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;">'
+            for field_data in field_json['data']['relationships']['field_media_items']['data']:
+                field_html += '<div style="flex:1; min-width:360px;">' + get_field_data(field_data, api_path, caption, video_poster) + '</div>'
+            field_html += '</div>'
+            # utils.write_file(field_html, './debug/field.html')
+            if len(field_json['data']['relationships']['field_media_items']['data']) > 2:
+                gallery_images = []
+                soup = BeautifulSoup(field_html, 'html.parser')
+                for el in soup.find_all('figure'):
+                    thumb = el.img['src']
+                    if el.a:
+                        img_src = el.a['href']
+                    else:
+                        img_src = thumb
+                    if el.figcaption:
+                        caption = el.figcaption.decode_contents()
+                    else:
+                        caption = ''
+                    gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+                field_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + field_html
+
+        elif field_json['data']['type'] == 'paragraph--from_library':
+            field_html = get_field_data(field_json['data']['relationships']['field_reusable_paragraph']['data'], api_path, caption, video_poster)
+
+        elif field_json['data']['type'] == 'paragraph--image':
+            for field_data in field_json['data']['relationships']['field_image']['data']:
+                field_html += get_field_data(field_data, api_path, caption, video_poster)
+
+        elif field_json['data']['type'] == 'paragraph--p_text':
+            field_html = field_json['data']['attributes']['field_p_text_text']['processed']
+
+        elif field_json['data']['type'] == 'paragraph--p_media':
+            for field_data in field_json['data']['relationships']['field_p_media_upload']['data']:
+                field_html += get_field_data(field_data, api_path, caption, video_poster)
+
+        elif field_json['data']['type'] == 'paragraph--quote':
+            field_html = utils.add_pullquote(field_json['data']['attributes']['field_quote'], field_json['data']['attributes']['field_source'])
+
+        elif field_json['data']['type'] == 'paragraph--referenced_card':
+            # usually "also read" or related articles
+            pass
+
+        elif field_json['data']['type'] == 'paragraph--social_media':
+            field_html = get_field_data(field_json['data']['relationships']['field_social_media']['data'], api_path, caption, video_poster)
+
+        elif field_json['data']['type'] == 'paragraph--text':
+            field_html = field_json['data']['attributes']['field_body']['processed']
+
+        elif field_json['data']['type'] == 'paragraphs_library_item--paragraphs_library_item':
+            field_html = get_field_data(field_json['data']['relationships']['paragraphs']['data'], api_path, caption, video_poster)
 
         else:
             logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
-    return ''
+    return field_html
 
 
 def get_drupal_settings(url):
@@ -170,13 +276,24 @@ def get_drupal_settings(url):
 
 
 def get_content(url, args, site_json, save_debug=False):
+    # print(site_json)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if site_json['api_path'].startswith('/'):
+        api_path = split_url.scheme + '://' + split_url.netloc + site_json['api_path']
+    else:
+        api_path = site_json['api_path']
+
+    global api_links
+    if not api_links:
+        api_json = utils.get_url_json(api_path)
+        if api_json:
+            api_links = api_json['links']
+
     drupal_settings = None
     page_type = ''
     node_id = ''
     uuid = ''
-
-    split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path[1:].split('/')))
     if site_json.get('translate_path'):
         translate_url = '{}?path={}'.format(site_json['translate_path'], quote_plus(split_url.path))
         translate_json = utils.get_url_json(translate_url)
@@ -189,33 +306,56 @@ def get_content(url, args, site_json, save_debug=False):
         page_html = utils.get_url_html(url)
         if not page_html:
             return None
+        if save_debug:
+            utils.write_file(page_html, './debug/debug.html')
         soup = BeautifulSoup(page_html, 'lxml')
         el = soup.find('script', attrs={"data-drupal-selector": "drupal-settings-json"})
         if el:
             drupal_settings = json.loads(el.string)
             if save_debug:
                 utils.write_file(drupal_settings, './debug/drupal.json')
-            try:
-                uuid = drupal_settings['adobeLaunchData']['data']['metainfo']['uuid']
-            except:
+            if drupal_settings.get('nodetype'):
+                page_type = 'node--' + drupal_settings['nodetype']
+                if page_type not in api_links:
+                    page_type = ''
+            if drupal_settings.get('path') and drupal_settings['path'].get('currentPath'):
                 node_id = drupal_settings['path']['currentPath'].split('/')[-1]
-
+            if drupal_settings.get('uuid'):
+                uuid = drupal_settings['uuid']
+            elif drupal_settings.get('adobeLaunchData'):
+                try:
+                    uuid = drupal_settings['adobeLaunchData']['data']['metainfo']['uuid']
+                except:
+                    uuid = ''
+        if not page_type:
+            for el in soup.find_all(['body', 'article'], class_=re.compile(r'^node-')):
+                for el_class in el['class']:
+                    if el_class.startswith('node-'):
+                        if el_class in api_links:
+                            page_type = el_class
+                        else:
+                            page_type = 'node--' + re.sub(r'^node--?', '', el_class).replace('-', '_').replace('type_', '')
+                            if page_type not in api_links:
+                                if page_type.endswith('_content'):
+                                    page_type = re.sub(r'_content$', '', page_type)
+                                    if page_type not in api_links:
+                                        page_type = ''
+                    if page_type:
+                        if not node_id:
+                            m = re.search(r'-node-(\d+)', ' '.join(el['class']))
+                            if m:
+                                node_id = m.group(1)
+                        break
+        if not page_type and 'article' in paths:
+            page_type = 'node--article'
+        if node_id and not uuid:
+            el = soup.find(attrs={"data-nid": node_id})
+            if el and el.get('data-uuid'):
+                uuid = el['data-uuid']
         if not uuid:
             el = soup.find('node-article-full', attrs={"uuid": True})
             if el:
                 uuid = el['uuid']
-
-        el = soup.find('body')
-        if el and el.get('class'):
-            m = re.search(r'node--?type-([^\s]+)', ' '.join(el['class']))
-            if m:
-                page_type = 'node--' + m.group(1).replace('-', '_')
-            if not node_id:
-                m = re.search(r'-node-(\d+)', ' '.join(el['class']))
-                if m:
-                    node_id = m.group(1)
-        if not page_type and '/article/' in url:
-            page_type = 'node--article'
 
     if site_json.get('default_page_type'):
         page_type = site_json['default_page_type']
@@ -224,20 +364,14 @@ def get_content(url, args, site_json, save_debug=False):
         logger.warning('unknown page type for ' + url)
         return None
 
-    global api_links
-    if not api_links:
-        api_json = utils.get_url_json(site_json['api_path'])
-        if api_json:
-            api_links = api_json['links']
-
     if uuid:
-        api_json = get_api_json(site_json['api_path'], page_type, uuid, '')
+        api_json = get_api_json(api_path, page_type, uuid, '')
     elif node_id:
         if 'nid_path' in site_json:
             filters = 'filter[nid-filter][condition][path]={}&filter[nid-filter][condition][value]={}'.format(site_json['nid_path'], node_id)
         else:
             filters = 'filter[nid-filter][condition][path]=drupal_internal__nid&filter[nid-filter][condition][value]={}'.format(node_id)
-        api_json = get_api_json(site_json['api_path'], page_type, '', filters)
+        api_json = get_api_json(api_path, page_type, '', filters)
     else:
         logger.warning('unknown uuid or node id for ' + url)
         return None
@@ -253,10 +387,10 @@ def get_content(url, args, site_json, save_debug=False):
             (page_json['attributes'].get('legacy_id') and page_json['attributes']['legacy_id'] != int(node_id))):
         logger.warning('jsonapi filter returned the wrong article for ' + url)
         return None
-    return get_item(page_json, drupal_settings, url, args, site_json, save_debug)
+    return get_item(page_json, api_path, drupal_settings, url, args, site_json, save_debug)
 
 
-def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
+def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_debug):
     if save_debug:
         utils.write_file(page_json, './debug/debug.json')
 
@@ -267,11 +401,11 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         item['url'] = next((it['attributes']['href'] for it in page_json['attributes']['metatag_normalized'] if (it['tag'] == 'link' and it['attributes']['rel'] == 'canonical')), None)
     if not item.get('url'):
         if page_json['attributes'].get('path'):
-            item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, page_json['attributes']['path']['alias'])
+            item['url'] = 'https://{}{}'.format(urlsplit(api_path).netloc, page_json['attributes']['path']['alias'])
         elif page_json['attributes'].get('rel_alt_links'):
             m = re.search(r'/{}([^"]+)'.format(drupal_settings['path']['pathPrefix']), page_json['attributes']['rel_alt_links'][0])
             if m:
-                item['url'] = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, m.group(0))
+                item['url'] = 'https://{}{}'.format(urlsplit(api_path).netloc, m.group(0))
     if not item.get('url'):
         item['url'] = url
 
@@ -303,7 +437,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
     if page_json['relationships'].get('field_author') and page_json['relationships']['field_author'].get('data'):
         if isinstance(page_json['relationships']['field_author']['data'], list):
             for data in page_json['relationships']['field_author']['data']:
-                api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+                api_json = get_api_json(api_path, data['type'], data['id'])
                 if api_json:
                     if api_json['data']['attributes'].get('title'):
                         authors.append(api_json['data']['attributes']['title'])
@@ -313,7 +447,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                         logger.warning('unknown field_author data attributes')
         else:
             data = page_json['relationships']['field_author']['data']
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 if api_json['data']['attributes'].get('title'):
                     authors.append(api_json['data']['attributes']['title'])
@@ -324,32 +458,32 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
     elif page_json['relationships'].get('field_article_author') and page_json['relationships']['field_article_author'].get('data'):
         if isinstance(page_json['relationships']['field_article_author']['data'], list):
             for data in page_json['relationships']['field_article_author']['data']:
-                api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+                api_json = get_api_json(api_path, data['type'], data['id'])
                 if api_json:
                     authors.append(api_json['data']['attributes']['title'])
         else:
             data = page_json['relationships']['field_article_author']['data']
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('field_authors') and page_json['relationships']['field_authors'].get('data'):
         for data in page_json['relationships']['field_authors']['data']:
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('author_profile') and page_json['relationships']['author_profile'].get('data'):
         for data in page_json['relationships']['author_profile']['data']:
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 authors.append(api_json['data']['attributes']['title'])
     elif page_json['relationships'].get('author') and page_json['relationships']['author'].get('data'):
         data = page_json['relationships']['author']['data']
-        api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+        api_json = get_api_json(api_path, data['type'], data['id'])
         if api_json:
             authors.append(api_json['data']['attributes']['name'])
     elif page_json['relationships'].get('field_jornalist') and page_json['relationships']['field_jornalist'].get('data'):
         for data in page_json['relationships']['field_jornalist']['data']:
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 if api_json['data']['attributes'].get('name'):
                     authors.append(api_json['data']['attributes']['name'])
@@ -357,12 +491,14 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                     logger.warning('unknown field_jornalist data attributes')
     elif page_json['relationships'].get('field_opinion_writer_node') and page_json['relationships']['field_opinion_writer_node'].get('data'):
         for data in page_json['relationships']['field_opinion_writer_node']['data']:
-            api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+            api_json = get_api_json(api_path, data['type'], data['id'])
             if api_json:
                 if api_json['data']['attributes'].get('name'):
                     authors.append(api_json['data']['attributes']['name'])
                 else:
                     logger.warning('unknown field_opinion_writer_node data attributes')
+    elif page_json['attributes'].get('field_source'):
+        authors.append(page_json['attributes']['field_source'])
     item['author'] = {}
     if authors:
         item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
@@ -377,19 +513,30 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             if isinstance(val['data'], list):
                 for data in val['data']:
                     if data['type'].startswith('taxonomy_term') or data['type'] == 'topic':
-                        api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+                        api_json = get_api_json(api_path, data['type'], data['id'])
                         if api_json:
                             if api_json['data']['attributes']['name'] not in item['tags']:
                                 item['tags'].append(api_json['data']['attributes']['name'])
             else:
                 data = val['data']
                 if data['type'].startswith('taxonomy_term'):
-                    api_json = get_api_json(site_json['api_path'], data['type'], data['id'])
+                    api_json = get_api_json(api_path, data['type'], data['id'])
                     if api_json:
                         if api_json['data']['attributes']['name'] not in item['tags']:
                             item['tags'].append(api_json['data']['attributes']['name'])
     if not item.get('tags'):
         del item['tags']
+
+    item['content_html'] = ''
+    if page_json['attributes'].get('subtitle'):
+        item['content_html'] += '<p><em>' + page_json['attributes']['subtitle'] + '</em></p>'
+    elif page_json['attributes'].get('field_brief'):
+        item['summary'] = page_json['attributes']['field_brief']['value']
+        item['content_html'] += '<p><em>' + item['summary'] + '</em></p>'
+    elif page_json['attributes'].get('field_blog_entry_subtitle'):
+        item['content_html'] += '<p><em>' + page_json['attributes']['field_blog_entry_subtitle'] + '</em></p>'
+    elif page_json['attributes'].get('field_introduction'):
+        item['content_html'] += '<p><em>' + page_json['attributes']['field_introduction'] + '</em></p>'
 
     lede_html = ''
     if page_json['attributes'].get('field_caption'):
@@ -397,35 +544,43 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
     else:
         caption = ''
     if page_json['relationships'].get('field_lede_image') and page_json['relationships']['field_lede_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_article_hero_image') and page_json['relationships']['field_article_hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_main_hero_image') and page_json['relationships']['field_main_hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
+    elif page_json['relationships'].get('field_hero_media') and page_json['relationships']['field_hero_media'].get('data'):
+        data_html = get_field_data(page_json['relationships']['field_hero_media']['data'], api_path, caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html += data_html
+    elif page_json['relationships'].get('field_hero_video') and page_json['relationships']['field_hero_video'].get('data'):
+        data_html = get_field_data(page_json['relationships']['field_hero_video']['data'], api_path, caption=caption)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html += data_html
     elif page_json['relationships'].get('hero_image') and page_json['relationships']['hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['hero_image']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['hero_image']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_media') and page_json['relationships']['field_media'].get('data') and page_json['relationships']['field_media']['data']['type'] == 'media--image':
-        data_html = get_field_data(page_json['relationships']['field_media']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_image') and page_json['relationships']['field_image'].get('data'):
         if isinstance(page_json['relationships']['field_image']['data'], list):
             data = page_json['relationships']['field_image']['data'][0]
         else:
             data = page_json['relationships']['field_image']['data']
-        data_html = get_field_data(data, site_json['api_path'], caption=caption)
+        data_html = get_field_data(data, api_path, caption=caption)
         if data['type'] == 'file--file':
             if not caption and data.get('meta') and data['meta'].get('title'):
                 caption = data['meta']['title']
@@ -433,13 +588,13 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             data_html = utils.add_image(data_html, caption)
         else:
             item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_new_photo') and page_json['relationships']['field_new_photo'].get('data'):
         if isinstance(page_json['relationships']['field_new_photo']['data'], list):
             data = page_json['relationships']['field_new_photo']['data'][0]
         else:
             data = page_json['relationships']['field_new_photo']['data']
-        data_html = get_field_data(data, site_json['api_path'], caption=caption)
+        data_html = get_field_data(data, api_path, caption=caption)
         if data['type'] == 'file--file':
             if not caption and data.get('meta') and data['meta'].get('title'):
                 caption = data['meta']['title']
@@ -447,12 +602,12 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             data_html = utils.add_image(data_html, caption)
         else:
             item['_image'], caption = get_img_src(data_html)
-        lede_html = data_html
+        lede_html += data_html
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
     elif page_json['relationships'].get('teaser_image') and page_json['relationships']['teaser_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['teaser_image']['data'], site_json['api_path'], caption=caption)
+        data_html = get_field_data(page_json['relationships']['teaser_image']['data'], api_path, caption=caption)
         item['_image'], caption = get_img_src(data_html)
 
     if page_json['attributes'].get('field_video_pid'):
@@ -481,17 +636,36 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                 if el:
                     caption = el['content']
         if video_src:
-            lede_html = utils.add_video(video_src, video_type, poster, caption)
+            lede_html += utils.add_video(video_src, video_type, poster, caption)
 
-    item['content_html'] = ''
     if page_json['type'] == 'node--gallery':
         item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
         for it in page_json['relationships']['field_gallery_items']['data']:
-            item['content_html'] += get_field_data(it, site_json['api_path'])
+            item['content_html'] += get_field_data(it, api_path)
+
+    elif page_json['type'] == 'node--audio' and page_json['relationships'].get('field_related_audio'):
+        item['content_html'] = lede_html + get_field_data(page_json['relationships']['field_related_audio']['data'], api_path)
+        if page_json['attributes'].get('field_brief'):
+            if page_json['attributes']['field_brief']['value'].startswith('<p'):
+                item['content_html'] += page_json['attributes']['field_brief']['value']
+            else:
+                item['content_html'] += '<p>' + page_json['attributes']['field_brief']['value'] + '</p>'
+
+    elif page_json['type'] == 'node--video':
+        item['content_html'] = lede_html
+        if page_json['attributes'].get('field_brief'):
+            if page_json['attributes']['field_brief']['value'].startswith('<p'):
+                item['content_html'] += page_json['attributes']['field_brief']['value']
+            else:
+                item['content_html'] += '<p>' + page_json['attributes']['field_brief']['value'] + '</p>'
+        if page_json['relationships'].get('field_programme') and page_json['relationships']['field_programme'].get('data'):
+            api_json = get_api_json(api_path, page_json['relationships']['field_programme']['data']['type'], page_json['relationships']['field_programme']['data']['id'])
+            if api_json:
+                item['content_html'] += '<hr style="margin:1em 0;"><h3>About the show:</h3><h4>' + api_json['data']['attributes']['name'] + '</h4>' + api_json['data']['attributes']['field_description']['processed']
 
     elif page_json['type'] == 'node--video_page':
         if page_json['relationships'].get('field_mpx_video') and page_json['relationships']['field_mpx_video'].get('data'):
-            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], site_json['api_path'])
+            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], api_path)
             item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
 
     elif page_json['type'] == 'node--cars_car':
@@ -522,13 +696,13 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             for i, data in enumerate(page_json['relationships']['field_carousel_media']['data']):
                 if i == 0:
                     if data['type'] != 'media--image':
-                        lede_html = get_field_data(data, site_json['api_path'])
+                        lede_html = get_field_data(data, api_path)
                     else:
-                        item['content_html'] += get_field_data(data, site_json['api_path'])
+                        item['content_html'] += get_field_data(data, api_path)
                 else:
-                    item['content_html'] += get_field_data(data, site_json['api_path'])
+                    item['content_html'] += get_field_data(data, api_path)
         if not lede_html:
-            data = get_field_data(page_json['relationships']['field_image']['data'], site_json['api_path'])
+            data = get_field_data(page_json['relationships']['field_image']['data'], api_path)
             if data.startswith('http'):
                 lede_html += utils.add_image(data)
             else:
@@ -547,13 +721,10 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
         item['content_html'] = lede_html + '<hr/>' + item['content_html']
 
     elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--opinion' or page_json['type'] == 'node--cars_road_test':
-        if page_json['attributes'].get('field_introduction'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_introduction'])
-
         if page_json['relationships'].get('field_mpx_video_lede') and page_json['relationships']['field_mpx_video_lede'].get('data'):
             if lede_html:
                 poster, caption = get_img_src(lede_html)
-            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], site_json['api_path'], video_poster=poster)
+            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], api_path, video_poster=poster)
         if lede_html:
             item['content_html'] += lede_html
 
@@ -564,7 +735,10 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             body_html = page_json['attributes']['field_article_body'][0]['processed']
         elif page_json['relationships'].get('field_paragraphs'):
             for data in page_json['relationships']['field_paragraphs']['data']:
-                body_html += get_field_data(data, site_json['api_path'])
+                body_html += get_field_data(data, api_path)
+        elif page_json['relationships'].get('field_content'):
+            for data in page_json['relationships']['field_content']['data']:
+                body_html += get_field_data(data, api_path)
         else:
             logger.warning('unknown body content in ' + item['url'])
         if body_html:
@@ -576,13 +750,13 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                     it = el.find(class_=re.compile(r'media--type-'))
                     if it:
                         if 'media--type-image' in it['class']:
-                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, site_json['api_path'])
+                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_path)
                         elif 'media--type-twitter' in it['class']:
-                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, site_json['api_path'])
+                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_path)
                         elif 'media--type-instagram' in it['class']:
-                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, site_json['api_path'])
+                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_path)
                 elif el['data-embed-button'] == 'mpx_video_embed':
-                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, site_json['api_path'])
+                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_path)
                 elif el['data-embed-button'] == 'teaser_embed':
                     el.decompose()
                     continue
@@ -607,7 +781,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                     if it:
                         src = it['src']
                         if src.startswith('/'):
-                            src = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, src)
+                            src = 'https://{}{}'.format(urlsplit(api_path).netloc, src)
                         it = el.find(class_='field--name-field-media-caption')
                         if it:
                             caption = it.p.decode_contents()
@@ -689,7 +863,7 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
                     if el_json.get('component') and el_json['component'] == 'InlineGallery':
                         for it in el_json['props']['media']:
                             if it['image']['src'].startswith('/'):
-                                src = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, it['image']['src'])
+                                src = 'https://{}{}'.format(urlsplit(api_path).netloc, it['image']['src'])
                             else:
                                 src = it['image']['src']
                             new_html += utils.add_image(src)
@@ -710,17 +884,10 @@ def get_item(page_json, drupal_settings, url, args, site_json, save_debug):
             if page_json['relationships'].get('field_carousel_media') and page_json['relationships']['field_carousel_media'].get('data'):
                 item['content_html'] += '<hr/><h2><u>GALLERY</u></h2>'
                 for data in page_json['relationships']['field_carousel_media']['data']:
-                    item['content_html'] += get_field_data(data, site_json['api_path'])
-
-    elif page_json['type'] == 'article':
-        # https://www.psychologytoday.com/us/articles/202309/inside-the-mind-of-a-hero
-        if page_json['attributes'].get('subtitle'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['subtitle'])
+                    item['content_html'] += get_field_data(data, api_path)
 
     elif page_json['type'] == 'blog_entry':
         # https://www.psychologytoday.com/us/blog/psych-unseen/202309/antipsychotic-therapy-since-the-1950s-little-has-changed
-        if page_json['attributes'].get('field_blog_entry_subtitle'):
-            item['content_html'] += '<p><em>{}</em></p>'.format(page_json['attributes']['field_blog_entry_subtitle'])
         if page_json['attributes'].get('field_key_points'):
             item['content_html'] += '<h4>Key points</h4><ul>'
             for it in page_json['attributes']['field_key_points']:
@@ -746,16 +913,21 @@ def get_feed(url, args, site_json, save_debug=False):
     feed_items = []
     feed = utils.init_jsonfeed(args)
 
-    if site_json['api_path'].startswith(url):
-        api_json = utils.get_url_json(site_json['api_path'] + 'node/article?sort=-created')
+    if site_json['api_path'].startswith('/'):
+        api_path = split_url.scheme + '://' + split_url.netloc + site_json['api_path']
+    else:
+        api_path = site_json['api_path']
+
+    if api_path.startswith(url):
+        api_json = utils.get_url_json(api_path + 'node/article?sort=-created')
         if save_debug:
             utils.write_file(api_json, './debug/feed.json')
         if api_json:
             for article in api_json['data']:
-                article_url = 'https://{}{}'.format(urlsplit(site_json['api_path']).netloc, article['attributes']['path']['alias'])
+                article_url = 'https://{}{}'.format(urlsplit(api_path).netloc, article['attributes']['path']['alias'])
                 if save_debug:
                     logger.debug('getting content for ' + article_url)
-                item = get_item(article, None, article_url, args, site_json, save_debug)
+                item = get_item(article, api_path, None, article_url, args, site_json, save_debug)
                 if item:
                     if utils.filter_item(item, args) == True:
                         feed_items.append(item)

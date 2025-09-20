@@ -1,4 +1,4 @@
-import pytz, re
+import json, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from http.cookiejar import Cookie
@@ -34,6 +34,39 @@ def get_content(url, args, site_json, save_debug=False):
             video_id = paths[1]
         if query.get('list'):
             playlist_id = query['list'][0]
+
+    if 'embed' in args:
+        page_html = utils.get_url_html('https://www.youtube-nocookie.com/embed/' + video_id)
+        if page_html:
+            m = re.search(r'ytcfg\.set\((.*?)\);window\.ytcfg', page_html)
+            if m:
+                ytcfg = json.loads(m.group(1))
+                if save_debug:
+                    utils.write_file(ytcfg, './debug/ytcfg.json')
+                player_res = json.loads(ytcfg['PLAYER_VARS']['embedded_player_response'])
+                if save_debug:
+                    utils.write_file(player_res, './debug/player.json')
+                item = {}
+                item['id'] = video_id
+                item['url'] = 'https://www.youtube.com/watch?v=' + video_id
+                if player_res['previewPlayabilityStatus']['status'] == 'OK':
+                    item['title'] = player_res['embedPreview']['thumbnailPreviewRenderer']['title']['runs'][0]['text']
+                    item['image'] = player_res['embedPreview']['thumbnailPreviewRenderer']['defaultThumbnail']['thumbnails'][-1]['url']
+                    item['author'] = {
+                        "name": player_res['embedPreview']['thumbnailPreviewRenderer']['videoDetails']['embeddedPlayerOverlayVideoDetailsRenderer']['expandedRenderer']['embeddedPlayerOverlayVideoDetailsExpandedRenderer']['title']['runs'][0]['text'],
+                        "url": "https://www.youtube.com" + player_res['embedPreview']['thumbnailPreviewRenderer']['videoDetails']['embeddedPlayerOverlayVideoDetailsRenderer']['channelThumbnailEndpoint']['channelThumbnailEndpoint']['urlEndpoint']['urlEndpoint']['url'],
+                        "avatar": player_res['embedPreview']['thumbnailPreviewRenderer']['videoDetails']['embeddedPlayerOverlayVideoDetailsRenderer']['channelThumbnail']['thumbnails'][-1]['url']
+                    }
+                    heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="{}" style="float:left; width:32px; height:32px; border-radius:50%;"><a href="{}" style="text-decoration:none;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">{}</span></a></div>'.format(item['author']['avatar'], item['author']['url'], item['author']['name'])
+                    caption = item['title'] + ' | <a href="' + item['url'] + '" target="_blank">Watch on YouTube</a>'
+                    # video_url = 'https://www.youtube-nocookie.com/embed/' + video_id
+                    video_url = config.server + '/video?url=' + quote_plus(item['url'])
+                    item['content_html'] = utils.add_image(item['image'], caption, link=video_url, overlay=config.video_button_overlay, overlay_heading=heading)
+                else:
+                    item['image'] = 'https://i.ytimg.com/vi/' + video_id + '/maxresdefault.jpg'
+                    caption = '<strong>' + player_res['previewPlayabilityStatus']['reason'] + '</strong> | <a href="' + item['url'] + '" target="_blank">Watch on YouTube</a>'
+                    item['content_html'] = utils.add_image(item['image'], caption, link=item['url'], overlay=config.warning_overlay)
+                return item
 
     # By default, the only combined video+audio format is 360p
     # player_client = mediaconnect has higher quality combined video+audio formats in m3u8 playlist

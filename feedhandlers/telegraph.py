@@ -597,7 +597,7 @@ def get_content(url, args, site_json, save_debug=False):
                 if it and not link:
                     link = it.find_previous_sibling('a')
                 if link:
-                    new_html += utils.add_button(link['href'], link.get_text(), 'black')
+                    new_html += utils.add_button(link['href'], link.get_text(), button_color='black', text_color='white')
                     if it:
                         new_html += '<div style="font-size:0.6em; text-align:center;">' + it.decode_contents() + '</div>'
 

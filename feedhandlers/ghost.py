@@ -1,4 +1,4 @@
-import html, re, tldextract
+import html, json, re, tldextract
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -72,22 +72,29 @@ def get_item(post_json, args, site_json, save_debug):
 
     if post_json.get('feature_image'):
         item['image'] = post_json['feature_image']
+        if 'image_proxy' in site_json and site_json['image_proxy'] == True:
+            img_src = 'https://wsrv.nl/?url=' + quote_plus(item['image'])
+        else:
+            img_src = item['image']
         if not soup:
-            item['content_html'] += utils.add_image(item['image'], post_json.get('feature_image_caption'))
+            item['content_html'] += utils.add_image(img_src, post_json.get('feature_image_caption'))
         else:
             el = soup.find()
             if el.name == 'figure' or (el.name == 'div' and el.find('iframe')):
                 pass
             else:
-                item['content_html'] += utils.add_image(item['image'], post_json.get('feature_image_caption'))
+                item['content_html'] += utils.add_image(img_src, post_json.get('feature_image_caption'))
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
         return item
 
     if soup:
+        for el in soup.find_all('span', attrs={"style": "white-space: pre-wrap;"}):
+            el.unwrap()
+
         for el in soup.find_all('blockquote'):
-            if not (el.get('class') and ('twitter-tweet' in el['class'] or 'instagram-media' in el['class'] or 'tiktok-embed' in el['class'])):
+            if not (el.get('class') and ('twitter-tweet' in el['class'] or 'instagram-media' in el['class'] or 'tiktok-embed' in el['class'] or 'bluesky-embed' in el['class'])):
                 new_html = utils.add_blockquote(el.decode_contents(), False)
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
@@ -112,6 +119,8 @@ def get_item(post_json, args, site_json, save_debug):
                         img_src = utils.image_from_srcset(it['srcset'], 1000)
                     else:
                         img_src = it['src']
+                    if 'image_proxy' in site_json and site_json['image_proxy'] == True:
+                        img_src = 'https://wsrv.nl/?url=' + quote_plus(img_src)
                     new_html = utils.add_image(img_src, caption)
                 else:
                     it = el.find('iframe')
@@ -121,25 +130,44 @@ def get_item(post_json, args, site_json, save_debug):
                         else:
                             new_html = utils.add_embed(it['src'])
             elif 'kg-gallery-card' in el['class']:
+                it = el.find('figcaption')
+                if it:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                gallery_images = []
                 new_html = ''
                 images = el.find_all(class_='kg-gallery-image')
-                n = len(images) - 1
-                for i, it in enumerate(images):
-                    img = it.find('img')
-                    if img:
-                        if img.get('srcset'):
-                            img_src = utils.image_from_srcset(img['srcset'], 1000)
-                        else:
-                            img_src = img['src']
-                    if i < n:
-                        new_html += utils.add_image(img_src)
+                n = len(images)
+                for i, image in enumerate(images):
+                    if not image.img:
+                        logger.warning('kg-gallery-image without img')
+                        continue
+                    if image.img.get('srcset'):
+                        img_src = utils.image_from_srcset(image.img['srcset'], 2400)
+                        thumb = utils.image_from_srcset(image.img['srcset'], 800)
                     else:
-                        figcap = el.find('figcaption')
-                        if figcap:
-                            caption = figcap.decode_contents()
+                        img_src = image.img['src']
+                        thumb = image.img['src']
+                    if 'image_proxy' in site_json and site_json['image_proxy'] == True:
+                        img_src = 'https://wsrv.nl/?url=' + quote_plus(img_src)
+                        thumb = 'https://wsrv.nl/?url=' + quote_plus(thumb)
+                    gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb})
+                    if i == 0:
+                        if n % 2 == 1:
+                            # start with full width image if odd number of images
+                            new_html += utils.add_image(img_src, link=img_src)
                         else:
-                            caption = ''
-                        new_html += utils.add_image(img_src, caption)
+                            new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;">'
+                            new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src) + '</div>'
+                    else:
+                        new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src) + '</div>'
+                if n > 1:
+                    new_html += '</div>'
+                    gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+                    new_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
+                if caption:
+                    new_html += '<div><small>' + caption + '</small></div>'
             elif 'kg-video-card' in el['class']:
                 it = el.find('video')
                 if it:
@@ -150,7 +178,7 @@ def get_item(post_json, args, site_json, save_debug):
                             poster = m.group(1)
                     figcap = el.find('figcaption')
                     if figcap:
-                        caption = figcap.decode_contents()
+                        caption = re.sub(r'^<p>|</p>$', '', figcap.decode_contents().strip())
                     else:
                         caption = ''
                     new_html = utils.add_video(it['src'], 'video/mp4', poster, caption)
@@ -158,6 +186,9 @@ def get_item(post_json, args, site_json, save_debug):
                 if el.find(class_='twitter-tweet'):
                     links = el.find_all('a')
                     new_html = utils.add_embed(links[-1]['href'])
+                elif el.find(class_='bluesky-embed'):
+                    it = el.find(class_='bluesky-embed')
+                    new_html = utils.add_embed(it['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('app.bsky.feed.post', 'post'))
                 else:
                     it = el.find('iframe')
                     if it:
@@ -253,7 +284,10 @@ def get_item(post_json, args, site_json, save_debug):
                 it = el.find(class_='kg-btn')
                 if it:
                     if it.name == 'a':
-                        new_html += utils.add_button(it['href'], it.decode_contents(), '#5928ED', 'white')
+                        if '#share' in it['href']:
+                            el.decompose()
+                            continue
+                        new_html += utils.add_button(it['href'], it.decode_contents(), button_color='#5928ED', text_color='white')
                     else:
                         it['style'] = 'color:white;'
                         new_html += '<div style="text-align:center;"><div style="display:inline-block; padding:1em; background-color:#5928ED; text-align:center;">{}</div></div>'.format(str(it))
@@ -271,7 +305,7 @@ def get_item(post_json, args, site_json, save_debug):
                     if it:
                         new_html += '<div>{}</div>'.format(it.get_text())
                     new_html += '</td></tr></table>'
-            elif 'kg-signup-card' in el['class']:
+            elif 'kg-signup-card' in el['class'] or 'kg-cta-card' in el['class']:
                 el.decompose()
                 continue
             elif el.find(class_='activity-card'):
@@ -295,8 +329,10 @@ def get_item(post_json, args, site_json, save_debug):
                     new_html = utils.add_embed(it['data-instgrm-permalink'])
             elif el.find('blockquote', class_='tiktok-embed'):
                 it = el.find('blockquote', class_='tiktok-embed')
-                if it:
-                    new_html = utils.add_embed(it['cite'])
+                new_html = utils.add_embed(it['cite'])
+            elif el.find(class_='flourish-embed'):
+                it = el.find(class_='flourish-embed')
+                new_html = utils.add_embed('https://public.flourish.studio/' + it['data-src'])
             elif el.find('iframe'):
                 it = el.find('iframe')
                 if it['src'].startswith('https://www.kapwing.com/e/'):
