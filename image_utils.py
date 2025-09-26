@@ -1,7 +1,7 @@
 import asyncio, av, curl_cffi, math, re
 from io import BytesIO
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
-from playwright.async_api import Playwright, async_playwright
+from playwright.async_api import async_playwright
 from urllib.parse import quote_plus
 
 import config, utils
@@ -219,8 +219,7 @@ async def get_screenshot(url, args):
             browser_name = args['browser']
         else:
             device = None
-            # browser_name = 'chromium'
-            browser_name = 'edge'
+            browser_name = config.default_browser
 
         if browser_name == 'chromium' or browser_name == 'chrome':
             engine = playwright.chromium

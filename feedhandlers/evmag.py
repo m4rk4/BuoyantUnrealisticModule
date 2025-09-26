@@ -1,7 +1,6 @@
-import curl_cffi, json, re
+import curl_cffi
 from bs4 import BeautifulSoup
 from datetime import datetime
-import dateutil.parser
 from dateutil import tz
 
 from urllib.parse import quote_plus, urlencode, urlsplit

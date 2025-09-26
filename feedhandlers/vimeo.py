@@ -89,14 +89,14 @@ def get_content(url, args, site_json, save_debug):
         item['_video'] = video['url']
         caption = '{} | <a href="{}">Watch on Vimeo</a>'.format(item['title'], player_url)
         if args and args.get('embed'):
-            video_src = '{}/video?url={}'.format(config.server, quote_plus(item['url']))
-            poster = '{}/image?url={}&width=1080&overlay=video'.format(config.server, quote_plus(item['image']))
-            item['content_html'] = utils.add_image(poster, caption, link=video_src)
+            video_src = config.server + '/video?url=' + quote_plus(item['url'])
+            # poster = config.server + '/image?url=' + quote_plus(item['image']) + '&width=1080&overlay=video'
+            item['content_html'] = utils.add_image(item['image'], caption, link=video_src, overlay=config.video_button_overlay)
         else:
-            item['content_html'] = utils.add_video(video['url'], video_type, item['image'], caption)
+            item['content_html'] = utils.add_video(video['url'], video_type, item['image'], caption, use_videojs=True)
     else:
-        poster = '{}/image?url={}&overlay=video'.format(config.server, quote_plus(item['image']))
-        item['content_html'] = utils.add_image(poster, 'Live event: {}'.format(item['title']), link=item['url'])
+        # poster = config.server + '/image?url=' + quote_plus(item['image']) + '&overlay=video'
+        item['content_html'] = utils.add_image(item['image'], 'Live event: ' + item['title'], link=item['url'], overlay=config.video_button_overlay)
     return item
 
 

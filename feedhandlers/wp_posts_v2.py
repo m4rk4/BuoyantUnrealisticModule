@@ -284,6 +284,158 @@ def add_nbc_video(video_id, wpjson_path):
     return ''
 
 
+def add_gallery(gallery, tag, site_json, base_url, wp_media_url):
+    gallery_html = ''
+    images = utils.get_soup_elements(tag['image'], gallery)
+    if images:
+        gallery_images = []
+        data_image = []
+        for image in images:
+            if image.get('data-image'):
+                if image['data-image'] in data_image:
+                    continue
+                else:
+                    data_image.append(image['data-image'])
+
+            captions = []
+            if tag['image'].get('credit'):
+                it = utils.get_soup_elements(tag['image']['credit'], image)
+                if it and it[0].decode_contents().strip():
+                    captions.append(it[0].decode_contents().strip())
+                    it[0].decompose()
+            if tag['image'].get('caption'):
+                it = utils.get_soup_elements(tag['image']['caption'], image)
+                if it and it[0].decode_contents().strip():
+                    if it[0].name == 'script':
+                        el = BeautifulSoup(it[0].string, 'html.parser')
+                        caption = el.find(class_='caption')
+                        if caption:
+                            captions.insert(0, caption.decode_contents().strip())
+                        else:
+                            captions.insert(0, el.decode_contents().strip())
+                    else:
+                        captions.insert(0, it[0].decode_contents().strip())
+                    it[0].decompose()
+            caption = ' | '.join(captions)
+
+            if image.name == 'a':
+                link = image['href']
+            else:
+                el = image.find('a')
+                if el:
+                    link = el['href']
+                else:
+                    link = ''
+
+            if image.name == 'video':
+                el = image.find('source')
+                if el:
+                    img_src = el['src']
+                elif image.get('src'):
+                    img_src = image['src']
+                if image.get('poster'):
+                    thumb = image['poster']
+                else:
+                    thumb = config.server + '/image?url=' + quote_plus(img_src)
+                if not link:
+                    link = img_src
+                gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb, "link": link, "mp4": img_src})
+            else:
+                img_src = get_img_src(image, site_json, base_url, wp_media_url, 2000)
+                if not img_src:
+                    continue
+                thumb = get_img_src(image, site_json, base_url, wp_media_url, 800)
+                if not link:
+                    link = img_src
+                gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb, "link": link})
+        n = len(gallery_images)
+        captions = []
+        if tag.get('credit'):
+            it = utils.get_soup_elements(tag['credit'], gallery)
+            if it and it[0].decode_contents().strip():
+                captions.append(it[0].decode_contents().strip())
+                it[0].decompose()
+        if tag.get('caption'):
+            it = utils.get_soup_elements(tag['caption'], gallery)
+            if it and it[0].decode_contents().strip():
+                captions.insert(0, it[0].decode_contents().strip())
+                it[0].decompose()
+        caption = ' | '.join(captions)
+        if caption:
+            # Find duplicate captions
+            s = re.sub(r'\W', '', caption).lower()
+            x = []
+            for i, image in enumerate(gallery_images):
+                if image['caption']:
+                    if re.sub(r'\W', '', image['caption']).lower() == s:
+                        x.append(i)
+            if len(x) > 0:
+                if len(x) == n and n > 1:
+                    for image in gallery_images:
+                        image['caption'] = ''
+                else:
+                    caption = ''
+        if n == 1:
+            if gallery_images[0]['caption']:
+                caption = gallery_images[0]['caption']
+            if 'mp4' in gallery_images[0]:
+                gallery_html += utils.add_video(gallery_images[0]['mp4'], 'video/mp4', gallery_images[0]['thumb'], gallery_images[0]['caption'])
+            else:
+                gallery_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_images[0]['link'])
+            caption = ''
+        else:
+            for i, image in enumerate(gallery_images):
+                if i == 0:
+                    if n % 2 == 1:
+                        # start with full width image if odd number of images
+                        if 'mp4' in image:
+                            gallery_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:1em 0 8px 0; padding:0;')
+                            del image['mp4']
+                        else:
+                            gallery_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:1em 0 8px 0; padding:0;')
+                    else:
+                        gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;"><div style="flex:1; min-width:360px;">'
+                        if 'mp4' in image:
+                            gallery_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
+                            del image['mp4']
+                        else:
+                            gallery_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
+                        gallery_html += '</div>'
+                elif i == 1:
+                    if n % 2 == 1:
+                        gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">'
+                    gallery_html += '<div style="flex:1; min-width:360px;">'
+                    if 'mp4' in image:
+                        gallery_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
+                        del image['mp4']
+                    else:
+                        gallery_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
+                    gallery_html += '</div>'
+                else:
+                    gallery_html += '<div style="flex:1; min-width:360px;">'
+                    if 'mp4' in image:
+                        gallery_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
+                        del image['mp4']
+                    else:
+                        gallery_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
+                    gallery_html += '</div>'
+                del image['link']
+            gallery_html += '</div>'
+        if caption:
+            gallery_html += '<div style="font-size:smaller; margin:4px 0 1em 0;">' + caption + '</div>'
+        if n > 2 and ('show_gallery_link' not in tag or tag['show_gallery_link'] == True):
+            gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+            if 'show_gallery_poster' in tag and tag['show_gallery_poster'] == True:
+                if caption:
+                    caption = '<a href="' + gallery_url + '" target="_blank">View gallery</a>: ' + caption
+                else:
+                    caption = '<a href="' + gallery_url + '" target="_blank">View gallery</a>: ' + gallery_images[0]['caption']
+                gallery_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_url, overlay=config.gallery_button_overlay)
+            else:
+                gallery_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
+    return gallery_html
+
+
 def format_table(table):
     table.attrs = {}
     table['style'] = 'width:100%; margin:1em 0; border-collapse:collapse; border:1px solid light-dark(#333,#ccc);'
@@ -300,58 +452,85 @@ def format_table(table):
         td['style'] = 'padding:8px;'
 
 
-def format_block(block):
+def format_block(block, site_json, base_url):
     block_html = ''
-    if block['name'] == 'core/paragraph':
+    if block.get('name'):
+        block_name = block['name']
+    elif block.get('blockName'):
+        block_name = block['blockName']
+    else:
+        logger.warning('unknown block name ' + str(block))
+        return block_html
+    if block.get('attributes'):
+        block_attrs = block['attributes']
+    elif block.get('attrs'):
+        block_attrs = block['attrs']
+    else:
+        block_attrs = {}
+    if block_name == 'core/paragraph':
         block_html += '<p'
-        if 'dropCap' in block['attributes'] and block['attributes']['dropCap'] == True:
+        if 'dropCap' in block_attrs and block_attrs['dropCap'] == True:
             block_html += ' class="drop-cap"'
-        if 'fontSize' in block['attributes']:
-            block_html += ' style="font-size:' + block['attributes']['fontSize'] + ';"'
-        block_html += '>' + block['attributes']['content'] + '</p>'
-    elif block['name'] == 'core/heading':
-        block_html += '<h{0}>{1}</h{0}>'.format(block['attributes']['level'], block['attributes']['content'])
-    elif block['name'] == 'core/image':
+        if 'fontSize' in block_attrs:
+            block_html += ' style="font-size:' + block_attrs['fontSize'] + ';"'
+        block_html += '>' + block_attrs['content'] + '</p>'
+    elif block_name == 'core/heading':
+        block_html += '<h{0}>{1}</h{0}>'.format(block_attrs['level'], block_attrs['content'])
+    elif block_name == 'core/image':
         captions = []
-        if block['attributes'].get('caption'):
-            captions.append(block['attributes']['caption'])
-        if block['attributes'].get('credit'):
-            captions.append(block['attributes']['credit'])
-        if 'align' in block['attributes'] and block['attributes']['align'] == 'left':
-            block_html += utils.add_image(block['attributes']['url'], ' | '.join(captions), width=block['attributes']['width'], height=block['attributes']['height'], img_style='float:left; margin-right:8px;')
-        elif 'align' in block['attributes'] and block['attributes']['align'] == 'right':
-            block_html += utils.add_image(block['attributes']['url'], ' | '.join(captions), img_style='float:right; margin-left:8px; height:{}px; width:{}px;'.format(block['attributes']['height'], block['attributes']['width']))
+        if block_attrs.get('caption'):
+            captions.append(block_attrs['caption'])
+        if block_attrs.get('credit'):
+            captions.append(block_attrs['credit'])
+        if block_attrs.get('url'):
+            img_src = block_attrs['url']
+        elif 'image' in block_attrs and 'original' in block_attrs['image']:
+            img_src = block_attrs['image']['original']
+        elif 'innerContent' in block:
+            soup = BeautifulSoup(block['innerContent'], 'html.parser')
+            img_src = get_img_src(soup, site_json, base_url, '', 2000)
+            if not captions:
+                el = soup.find('figcaption')
+                if el and el.get_text().strip():
+                    captions.append(el.decode_contents().strip())
         else:
-            block_html += utils.add_image(block['attributes']['url'], ' | '.join(captions))
-    elif block['name'] == 'core/embed':
-        block_html += utils.add_embed(block['attributes']['url'])
-    elif block['name'] == 'core/html' and block['attributes']['content'].startswith('<iframe'):
-        m = re.search(r'src="([^"]+)', block['attributes']['content'])
+            logger.warning('unknown img src for core/image ' + str(block))
+            img_src = ''
+        if 'align' in block_attrs and block_attrs['align'] == 'left':
+            block_html += utils.add_image(img_src, ' | '.join(captions), width=block_attrs['width'], height=block_attrs['height'], img_style='float:left; margin-right:8px;')
+        elif 'align' in block_attrs and block_attrs['align'] == 'right':
+            block_html += utils.add_image(img_src, ' | '.join(captions), img_style='float:right; margin-left:8px; height:{}px; width:{}px;'.format(block_attrs['height'], block_attrs['width']))
+        else:
+            block_html += utils.add_image(img_src, ' | '.join(captions))
+    elif block_name == 'core/embed':
+        block_html += utils.add_embed(block_attrs['url'])
+    elif block_name == 'core/html' and block_attrs['content'].startswith('<iframe'):
+        m = re.search(r'src="([^"]+)', block_attrs['content'])
         block_html += utils.add_embed(m.group(1))
-    elif block['name'] == 'core/list':
-        if 'ordered' in block['attributes'] and block['attributes'] == True:
+    elif block_name == 'core/list':
+        if 'ordered' in block_attrs and block_attrs == True:
             tag = 'ol'
         else:
             tag = 'ul'
         block_html += '<' + tag + '>'
         for blk in block['innerBlocks']:
-            block_html += format_block(blk)
+            block_html += format_block(blk, site_json, base_url)
         block_html += '</' + tag + '>'
-    elif block['name'] == 'core/list-item':    
-        block_html += '<li>' + block['attributes']['content'] + '</li>'
-    elif block['name'] == 'core/columns':
+    elif block_name == 'core/list-item':    
+        block_html += '<li>' + block_attrs['content'] + '</li>'
+    elif block_name == 'core/columns':
         block_html += '<div style="display:flex; flex-wrap:wrap; margin:1em 0; gap:8px;">'
         for blk in block['innerBlocks']:
-            block_html += format_block(blk)
+            block_html += format_block(blk, site_json, base_url)
         block_html += '</div>'
-    elif block['name'] == 'core/column':
+    elif block_name == 'core/column':
         block_html += '<div style="flex:1; min-width:360px;">'
         for blk in block['innerBlocks']:
-            block_html += format_block(blk)
+            block_html += format_block(blk, site_json, base_url)
         block_html += '</div>'
-    elif block['name'] == 'core/table':
+    elif block_name == 'core/table':
         block_html += '<table>'
-        for row in block['attributes']['body']:
+        for row in block_attrs['body']:
             block_html += '<tr>'
             for cell in row['cells']:
                 block_html += '<' + cell['tag']
@@ -364,17 +543,20 @@ def format_block(block):
                 block_html += '>' + cell['content'] + '</' + cell['tag'] + '>'
             block_html += '</tr>'
         block_html += '</table>'
-    elif block['name'] == 'core/spacer':
+    elif block_name == 'core/spacer':
         block_html += '<div style="height:'
-        if 'height' in block['attributes']:
-            block_html += block['attributes']['height']
+        if 'height' in block_attrs:
+            block_html += block_attrs['height']
         else:
             block_html += '1em'
         block_html += ';"></div>'
-    elif block['name'] == 'pym-shortcode/pym' or block['name'] == 'cpr/ad-unit' or block['name'] == 'denverite/ad':
+    elif block_name == 'tidal-blocks/header':
+        if 'preamble' in block_attrs:
+            block_html += '<p><em>' + block_attrs['preamble'] + '</em></p>'
+    elif block_name == 'pym-shortcode/pym' or block_name == 'cpr/ad-unit' or block_name == 'denverite/ad':
         pass
     else:
-        logger.warning('unhandled content block name ' + block['name'])
+        logger.warning('unhandled content block name ' + block_name)
     return block_html
 
 
@@ -885,6 +1067,19 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                     author = link_json['title']['rendered']
             if author:
                 authors.append(author.replace(',', '&#44;'))
+    if not authors and 'wp:term' in post_data['post']['_links']:
+        for link in  post_data['post']['_links']['wp:term']:
+            if not 'taxonomy' in link or link['taxonomy'] != 'author':
+                continue
+            if site_json.get('replace_links_path'):
+                link_href = link['href'].replace(site_json['replace_links_path'][0], site_json['replace_links_path'][1])
+            else:
+                link_href = link['href']
+            if 'skip_wp_term' not in args:
+                link_json = utils.get_url_json(link_href, site_json=site_json)
+                if link_json:
+                    for author in link_json:
+                        authors.append(author['name'].replace(',', '&#44;'))
     if not authors:
         if 'yoast_head_json' in post_data['post'] and 'author' in post_data['post']['yoast_head_json']:
             authors.append(post_data['post']['yoast_head_json']['author'].replace(',', '&#44;'))
@@ -1469,7 +1664,7 @@ def get_content(url, args, site_json, save_debug=False, page_soup=None):
                 if i < n - 1:
                     if re.search(r'/pym|/ad', post_data['post']['content']['blocks'][i + 1]['name']):
                         continue
-            content_html += format_block(block)
+            content_html += format_block(block, site_json, base_url)
 
     if page_soup and 'add_content' in site_json:
         for it in site_json['add_content']:
@@ -1725,154 +1920,7 @@ def format_content(content_html, url, args, site_json=None, post_data=None, page
         for tag in site_json['gallery']:
             galleries = utils.get_soup_elements(tag, soup)
             for gallery in galleries:
-                new_html = ''
-                images = utils.get_soup_elements(tag['image'], gallery)
-                if images:
-                    gallery_images = []
-                    data_image = []
-                    for image in images:
-                        if image.get('data-image'):
-                            if image['data-image'] in data_image:
-                                continue
-                            else:
-                                data_image.append(image['data-image'])
-
-                        captions = []
-                        if tag['image'].get('credit'):
-                            it = utils.get_soup_elements(tag['image']['credit'], image)
-                            if it and it[0].decode_contents().strip():
-                                captions.append(it[0].decode_contents().strip())
-                                it[0].decompose()
-                        if tag['image'].get('caption'):
-                            it = utils.get_soup_elements(tag['image']['caption'], image)
-                            if it and it[0].decode_contents().strip():
-                                if it[0].name == 'script':
-                                    el = BeautifulSoup(it[0].string, 'html.parser')
-                                    caption = el.find(class_='caption')
-                                    if caption:
-                                        captions.insert(0, caption.decode_contents().strip())
-                                    else:
-                                        captions.insert(0, el.decode_contents().strip())
-                                else:
-                                    captions.insert(0, it[0].decode_contents().strip())
-                                it[0].decompose()
-                        caption = ' | '.join(captions)
-
-                        if image.name == 'a':
-                            link = image['href']
-                        else:
-                            el = image.find('a')
-                            if el:
-                                link = el['href']
-                            else:
-                                link = ''
-
-                        if image.name == 'video':
-                            el = image.find('source')
-                            if el:
-                                img_src = el['src']
-                            elif image.get('src'):
-                                img_src = image['src']
-                            if image.get('poster'):
-                                thumb = image['poster']
-                            else:
-                                thumb = config.server + '/image?url=' + quote_plus(img_src)
-                            if not link:
-                                link = img_src
-                            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb, "link": link, "mp4": img_src})
-                        else:
-                            img_src = get_img_src(image, site_json, base_url, wp_media_url, 2000)
-                            if not img_src:
-                                continue
-                            thumb = get_img_src(image, site_json, base_url, wp_media_url, 800)
-                            if not link:
-                                link = img_src
-                            gallery_images.append({"src": img_src, "caption": caption, "thumb": thumb, "link": link})
-                    n = len(gallery_images)
-                    captions = []
-                    if tag.get('credit'):
-                        it = utils.get_soup_elements(tag['credit'], gallery)
-                        if it and it[0].decode_contents().strip():
-                            captions.append(it[0].decode_contents().strip())
-                            it[0].decompose()
-                    if tag.get('caption'):
-                        it = utils.get_soup_elements(tag['caption'], gallery)
-                        if it and it[0].decode_contents().strip():
-                            captions.insert(0, it[0].decode_contents().strip())
-                            it[0].decompose()
-                    caption = ' | '.join(captions)
-                    if caption:
-                        # Find duplicate captions
-                        s = re.sub(r'\W', '', caption).lower()
-                        x = []
-                        for i, image in enumerate(gallery_images):
-                            if image['caption']:
-                                if re.sub(r'\W', '', image['caption']).lower() == s:
-                                    x.append(i)
-                        if len(x) > 0:
-                            if len(x) == n and n > 1:
-                                for image in gallery_images:
-                                    image['caption'] = ''
-                            else:
-                                caption = ''
-                    if n == 1:
-                        if gallery_images[0]['caption']:
-                            caption = gallery_images[0]['caption']
-                        if 'mp4' in gallery_images[0]:
-                            new_html += utils.add_video(gallery_images[0]['mp4'], 'video/mp4', gallery_images[0]['thumb'], gallery_images[0]['caption'])
-                        else:
-                            new_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_images[0]['link'])
-                        caption = ''
-                    else:
-                        for i, image in enumerate(gallery_images):
-                            if i == 0:
-                                if n % 2 == 1:
-                                    # start with full width image if odd number of images
-                                    if 'mp4' in image:
-                                        new_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:1em 0 8px 0; padding:0;')
-                                        del image['mp4']
-                                    else:
-                                        new_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:1em 0 8px 0; padding:0;')
-                                else:
-                                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;"><div style="flex:1; min-width:360px;">'
-                                    if 'mp4' in image:
-                                        new_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
-                                        del image['mp4']
-                                    else:
-                                        new_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
-                                    new_html += '</div>'
-                            elif i == 1:
-                                if n % 2 == 1:
-                                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">'
-                                new_html += '<div style="flex:1; min-width:360px;">'
-                                if 'mp4' in image:
-                                    new_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
-                                    del image['mp4']
-                                else:
-                                    new_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
-                                new_html += '</div>'
-                            else:
-                                new_html += '<div style="flex:1; min-width:360px;">'
-                                if 'mp4' in image:
-                                    new_html += utils.add_video(image['mp4'], 'video/mp4', image['thumb'], image['caption'], fig_style='margin:0; padding:0;')
-                                    del image['mp4']
-                                else:
-                                    new_html += utils.add_image(image['thumb'], image['caption'], link=image['link'], fig_style='margin:0; padding:0;')
-                                new_html += '</div>'
-                            del image['link']
-                        new_html += '</div>'
-                    if caption:
-                        new_html += '<div style="font-size:smaller; margin:4px 0 1em 0;">' + caption + '</div>'
-                    if n > 2 and ('show_gallery_link' not in tag or tag['show_gallery_link'] == True):
-                        gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
-                        if 'show_gallery_poster' in tag and tag['show_gallery_poster'] == True:
-                            if caption:
-                                caption = '<a href="' + gallery_url + '" target="_blank">View gallery</a>: ' + caption
-                            else:
-                                caption = '<a href="' + gallery_url + '" target="_blank">View gallery</a>: ' + gallery_images[0]['caption']
-                            new_html = utils.add_image(gallery_images[0]['src'], caption, link=gallery_url, overlay=config.gallery_button_overlay)
-                        else:
-                            new_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + new_html
+                new_html = add_gallery(gallery, tag, site_json, base_url, wp_media_url)
                 if new_html:
                     new_el = BeautifulSoup(new_html, 'html.parser')
                     gallery.replace_with(new_el)
@@ -3261,6 +3309,23 @@ def format_content(content_html, url, args, site_json=None, post_data=None, page
                     else:
                         link = ''
                     new_html = utils.add_image(img_src, ' | '.join(captions), link=link)
+            elif 'wp-block-gallery' in el['class'] and el.name == 'figure':
+                tag = {
+                    "attrs": {
+                        "class": "wp-block-gallery"
+                    },
+                    "image": {
+                        "attrs": {
+                            "class": "wp-block-image"
+                        },
+                        "caption": {
+                            "tag": "figcaption"
+                        },
+                        "tag": "figure"
+                    },
+                    "tag": "figure"
+                }
+                new_html += add_gallery(el, tag, site_json, base_url, wp_media_url)
             elif 'wp-block-embed' in el['class']:
                 if 'wp-block-embed-youtube' in el['class']:
                     it = el.find('iframe')
@@ -3365,6 +3430,12 @@ def format_content(content_html, url, args, site_json=None, post_data=None, page
                         new_html = utils.add_video(video_json['original'], 'video/mp4', video_json['poster'], caption, use_videojs=True)
                     else:
                         new_html = utils.add_video(video_json['original'], 'application/x-mpegURL', video_json['poster'], caption, use_videojs=True)
+            elif 'wp-block-jw-player-video' in el['class'] and el.get('data-wp-block'):
+                video_json = json.loads(el['data-wp-block'])
+                if video_json.get('embed_url'):
+                    new_html += utils.add_embed(video_json['embed_url'])
+                elif video_json.get('videoSrc'):
+                    new_html += utils.add_video(video_json['videoSrc'], 'video/mp4' if '.mp4' in video_json['videoSrc'] else 'application/x-mpegURL', 'https://assets-jpcust.jwpsrv.com/thumbs/' + video_json['platform_id'] + '-720.jpg', video_json.get('video_title'), use_videojs=True)
             elif 'video-player' in el['class']:
                 it = el.find('video', class_='video-js')
                 if it and it.get('data-opts'):
@@ -3373,9 +3444,6 @@ def format_content(content_html, url, args, site_json=None, post_data=None, page
                         new_html += utils.add_video(data_props['plugins']['sources']['iOSRenditions'][-1]['url'], 'application/x-mpegURL', data_props['poster'], data_props['title'])
                     elif data_props['plugins']['sources'].get('renditions'):
                         new_html += utils.add_video(data_props['plugins']['sources']['renditions'][0]['url'], 'video/mp4', data_props['poster'], data_props['title'])
-            elif 'wp-block-jetpack-videopress' in el['class'] and el.iframe:
-                video_id = list(filter(None, urlsplit(el.iframe['src']).path.split('/')))[-1]
-                video_json = utils.get_url_json('https://public-api.wordpress.com/rest/v1.1/videos/' + video_id)
                 if video_json:
                     if video_json.get('description'):
                         caption = video_json['description']

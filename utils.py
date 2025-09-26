@@ -1,5 +1,5 @@
 from __future__ import unicode_literals
-import basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, secrets, string, time, tldextract
+import asyncio, basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, secrets, string, time, tldextract
 import curl_cffi, requests
 from browserforge.headers import HeaderGenerator
 from bs4 import BeautifulSoup
@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from duckduckgo_search import DDGS
 from markdown2 import markdown
 from PIL import ImageFile
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 from urllib.parse import parse_qs, quote, quote_plus, urlsplit
@@ -345,30 +345,99 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     #r = None
   return r
 
-def get_browser_request(url, get_json=False, save_screenshot=False):
-  with sync_playwright() as playwright:
-    webkit = playwright.webkit
-    dev = playwright.devices['iPhone 13']
-    browser = webkit.launch()
-    context = browser.new_context(**dev)
-    page = context.new_page()
-    try:
-      r = page.goto(url)
-      if get_json:
-        content = r.json()
+async def async_get_browser_content(url, browser_name, headless, args):
+  async with async_playwright() as playwright:
+    # Device emulation: https://playwright.dev/python/docs/emulation
+    # https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json
+    if browser_name == 'chromium' or browser_name == 'chrome':
+      engine = playwright.chromium
+      device = playwright.devices['Desktop Chrome']
+    elif browser_name == 'webkit' or browser_name == 'safari':
+      engine = playwright.webkit
+      device = playwright.devices['Desktop Safari']
+    elif browser_name == 'firefox':
+      engine = playwright.firefox
+      device = playwright.devices['Desktop Firefox']
+    elif browser_name == 'edge':
+      engine = playwright.chromium
+      device = playwright.devices['Desktop Edge']
+    else:
+      engine = playwright.chromium
+      device = playwright.devices['Desktop Chrome']
+
+    if browser_name == 'edge':
+        browser = await engine.launch(channel="msedge", headless=headless)
+    else:
+        browser = await engine.launch(headless=headless)
+
+    context = await browser.new_context(**device)
+    page = await context.new_page()
+
+    if 'wait_until' in args:
+        await page.goto(url, wait_until=args['wait_until'])
+    else:
+        await page.goto(url)
+
+    if 'waitfor' in args:
+        await page.wait_for_selector(args['waitfor'])
+
+    if 'waitfortime' in args:
+        # time in ms
+        await page.wait_for_timeout(int(args['waitfortime']))
+
+    content = await page.content()
+  
+    await context.close()
+    await browser.close()
+  return content
+
+def get_browser_content(url, browser_name=config.default_browser, headless=True, args={}):
+  loop = asyncio.ProactorEventLoop()
+  asyncio.set_event_loop(loop)
+  content = loop.run_until_complete(async_get_browser_content(url, browser_name, headless, args))
+  return content
+
+def get_flaresolverr_content(url):
+    data = {
+      "cmd": "request.get",
+      "url": url,
+      "maxTimeout": 60000,
+    }
+    r = requests.post(config.flaresolverr_server, headers={"Content-Type": "application/json"}, json=data)
+    write_file(r.text, './debug/flaresolverr.txt')
+    if not r:
+      return None
+    r_json = r.json()
+    if r.status_code == 200:
+      if r_json['status'] == 'ok':
+        return r_json['solution']['response']
       else:
-        content = r.text()
-      if save_screenshot:
-        page.screenshot(path="./debug/screenshot.png")
-    except PlaywrightTimeoutError:
-      logger.warning('timeout error getting ' + url)
-      content = None
-    browser.close()
-    return content
+        logger.warning('flaresolverr status {} for {}'.format(r_json['status'], url))
+    else:
+      logger.warning('flaresolverr requests status code {} for {}'.format(r.status_code, url))
+      return None
 
 def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=True, use_browser=False, site_json=None):
-  if use_browser or (site_json and site_json.get('use_browser')):
-    return get_browser_request(url, get_json=True)
+  if use_browser or (site_json and 'use_browser' in site_json and site_json['use_browser'] == True):
+    content = get_browser_content(url)
+    write_file(content, './debug/browser.txt')
+    try:
+      return json.loads(content)
+    except:
+      logger.warning('error converting content to json for ' + url)
+      return None
+  elif site_json and 'use_flaresolverr' in site_json and site_json['use_flaresolverr'] == True:
+    content = get_flaresolverr_content(url)
+    if content:
+      if content.startswith('{') or content.startswith('['):
+        return json.loads(content)
+      elif content.startswith('<html'):
+        soup = BeautifulSoup(content, 'lxml')
+        el = soup.find('pre')
+        if el:
+          return json.loads(soup.find('pre').string)
+    logger.warning('unhandled flaresolverr content for ' + url)
+    return None
   if site_json:
     if 'user_agent' in site_json:
       user_agent = site_json['user_agent']
@@ -392,7 +461,7 @@ def get_url_json(url, user_agent='desktop', headers=None, retries=3, allow_redir
 
 def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_certifi=True, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
-    return get_browser_request(url)
+    return get_browser_content(url)
   if site_json:
     if 'user_agent' in site_json:
       user_agent = site_json['user_agent']
@@ -409,7 +478,7 @@ def get_url_html(url, user_agent='desktop', headers=None, retries=3, allow_redir
 
 def get_url_content(url, user_agent='googlebot', headers=None, retries=3, allow_redirects=True, use_proxy=False, use_curl_cffi=False, use_browser=False, site_json=None):
   if use_browser or (site_json and site_json.get('use_browser')):
-    return get_browser_request(url)
+    return get_browser_content(url)
 
   r = get_request(url, user_agent, headers, retries, allow_redirects, use_proxy, use_curl_cffi)
   if r != None and (r.status_code == 200 or r.status_code == 402):

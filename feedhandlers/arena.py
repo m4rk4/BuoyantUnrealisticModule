@@ -1,17 +1,302 @@
 import html, json, re
 import curl_cffi
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import rss
+from feedhandlers import rss, wp_posts_v2
 
 import logging
 logger = logging.getLogger(__name__)
 
 
+def resize_img_src(img_src, width=1200):
+    split_url = urlsplit(img_src)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+    if paths[0] == '.image':
+        return 'https://' + split_url.netloc + '/.image/w_' + str(width) + ',q_auto:good,c_limit/' + paths[-2] + '/' + paths[-1]
+
+
+def get_next_data(url, save_debug):
+    split_url = urlsplit(url)
+    state_tree = [
+        "",
+        {
+            "children": [
+                "(rest)",
+                {
+                    "children":[
+                        [
+                            "path",
+                            split_url.path[1:],
+                            "c"
+                        ],
+                        {
+                            "children": [
+                                "__PAGE__",
+                                {},
+                                split_url.path,
+                                "refresh"
+                            ]
+                        },
+                        None,
+                        "refetch"
+                    ]
+                }
+            ]
+        }
+    ]
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "cache-control": "no-cache",
+        "next-router-state-tree": quote_plus(json.dumps(state_tree, separators=(',', ':'))),
+        "pragma": "no-cache",
+        "priority": "u=1, i",
+        "rsc": "1",
+        "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Microsoft Edge\";v=\"140\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "same-origin"
+    }
+    return utils.get_url_html(url, headers=headers)
+
+
+def get_next_json(url, save_debug):
+    next_data = get_next_data(url, save_debug)
+    if not next_data:
+        return None
+    if save_debug:
+        utils.write_file(next_data, './debug/next.txt')
+
+    next_json = {}
+    x = 0
+    m = re.search(r'^\s*([0-9a-f]{1,2}):(.*)', next_data)
+    while m:
+        key = m.group(1)
+        x += len(key) + 1
+        val = m.group(2)
+        if val.startswith('I'):
+            val = val[1:]
+            x += 1
+        elif val.startswith('HL'):
+            val = val[2:]
+            x += 2
+        elif val.startswith('T'):
+            t = re.search(r'T([0-9a-f]+),(.*)', val)
+            if t:
+                n = int(t.group(1), 16)
+                x += len(t.group(1)) + 2
+                val = next_data[x:x + n]
+                # print(n, val)
+                # if not val.isascii():
+                #     i = n
+                #     n = 0
+                #     for c in val:
+                #         n += 1
+                #         i -= len(c.encode('utf-8'))
+                #         if i == 0:
+                #             break
+                #     val = next_data[x:x + n]
+                #     print(n, val)
+        if val:
+            # print(key, val)
+            if (val.startswith('{') and val.endswith('}')) or (val.startswith('[') and val.endswith(']')):
+                next_json[key] = json.loads(val)
+            elif val.startswith('"') and val.endswith('"'):
+                next_json[key] = val[1:-1]
+            else:
+                next_json[key] = val
+            x += len(val)
+            if next_data[x:].startswith('\n'):
+                x += 1
+            m = re.search(r'^\s*([0-9a-f]{1,2}):(.*)', next_data[x:])
+        else:
+            break
+    return next_json
+
+
 def get_content(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+
+    next_json = get_next_json(url + '?_rsc=' + site_json['rsc'], save_debug)
+    if not next_json:
+        return None
+    if save_debug:
+        utils.write_file(next_json, './debug/next.json')
+
+    post_json = None
+    def find_post(child):
+        nonlocal post_json
+        if not isinstance(child, list):
+            return
+        if isinstance(child[0], str) and child[0] == '$':
+            if child[3].get('post'):
+                post_json = child[3]['post']
+            elif child[3].get('data-testid') and child[3]['data-testid'] == 'ad-container':
+                return
+            elif child[3].get('children'):
+                iter_children(child[3]['children'])
+        else:
+            iter_children(child)
+    def iter_children(children):
+        nonlocal post_json
+        if isinstance(children, list):
+            if isinstance(children[0], str) and children[0] == '$':
+                find_post(children)
+            else:
+                for child in children:
+                    find_post(child)
+                    if post_json:
+                        break
+    iter_children(next_json['2'])
+    if not post_json:
+        logger.warning('unable to find post')
+        return None
+    if save_debug:
+        utils.write_file(post_json, './debug/debug.json')
+
+    item = {}
+    item['id'] = post_json['id']
+    item['url'] = post_json['link']
+    item['title'] = post_json['title']['rendered']
+
+    dt = datetime.fromisoformat(post_json['date_gmt']).replace(tzinfo=timezone.utc)
+    item['date_published'] = dt.isoformat()
+    item['_timestamp'] = dt.timestamp()
+    item['_display_date'] = utils.format_display_date(dt)
+    if post_json.get('modified_gmt'):
+        dt = datetime.fromisoformat(post_json['modified_gmt']).replace(tzinfo=timezone.utc)
+        item['date_modified'] = dt.isoformat()
+
+    if post_json.get('authors'):
+        item['authors'] = [{"name": x['name']} for x in post_json['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
+
+    item['tags'] = []
+    if post_json.get('categories'):
+        item['tags'] += [x['name'] for x in post_json['categories']]
+    if post_json.get('tags'):
+        item['tags'] += [x['name'] for x in post_json['tags']]
+
+    if post_json['meta'].get('meta_description'):
+        item['summary'] = post_json['meta']['meta_description']
+
+    item['content_html'] = ''
+    if post_json.get('excerpt') and post_json['excerpt'].get('rendered'):
+        item['content_html'] += '<p><em>' + post_json['excerpt']['rendered'] + '</em></p>'
+
+    if post_json.get('featured_media'):
+        if post_json['featured_media']['source_url'].startswith('/'):
+            item['image'] = 'https://' + split_url.netloc + post_json['featured_media']['source_url']
+        else:
+            item['image'] = post_json['featured_media']['source_url']
+        if post_json['featured_media'].get('caption') and post_json['featured_media']['caption'].get('rendered'):
+            caption = re.sub(r'^<p>|</p>$', '', post_json['featured_media']['caption']['rendered'].strip())
+        elif post_json['meta'].get('featured_image_caption'):
+            caption = post_json['meta']['featured_image_caption']
+        else:
+            caption = ''
+        item['content_html'] += utils.add_image(item['image'], caption)
+
+    if post_json.get('content') and post_json['content'].get('rendered'):
+        m = re.search(r'^\$([a-f0-9]+)', post_json['content']['rendered'])
+        if m:
+            content_html = next_json[m.group(1)]
+        else:
+            content_html = post_json['content']['rendered']
+        site_copy = site_json.copy()
+        site_copy['decompose'] = [
+            {
+                "attrs": {
+                    "data-smart-slot": True
+                }
+            },
+            {
+                "attrs": {
+                    "class": [
+                        "rufous-sandbox",
+                        "variation-content-card",
+                        "wp-block-the-arena-group-toc"
+                    ]
+                }
+            },
+            {
+                "selector": "iframe[src*=\"platform.twitter.com/widgets/widget_iframe\"]"
+            },
+            {
+                "selector": "p:has(> strong:-soup-contains(\"Related:\"))"
+            },
+            {
+                "selector": "p:has(> strong:-soup-contains(\"Up Next:\"))"
+            },
+            {
+                "selector": "p:has(> strong > a[href*=\"/newsletters\"])"
+            },
+            {
+                "selector": "p:has(> strong > strong > a[href*=\"/newsletters\"])"
+            }
+        ]
+        site_copy['rename'] = [
+            {
+                "old": {
+                    "attrs": {
+                        "data-wp-block": "{\"dropCap\":true}"
+                    },
+                    "tag": "p"
+                },
+                "new": {
+                    "attrs": {
+                        "class": "dropcap"
+                    }
+                }
+            }
+        ]
+        site_copy['clear_attrs'] = [
+            {
+                "attrs": {
+                    "data-wp-block": "{\"dropCap\":false}"
+                },
+                "tag": "p"
+            },
+            {
+                "attrs": {
+                    "class": [
+                        "wp-block-heading",
+                        "wp-block-list"
+                    ]
+                }
+            },
+            {
+                "attrs": {
+                    "data-wp-block-name": "core/list-item"
+                }
+            }
+        ]
+        # unwrap twice because a case where they were nested
+        site_copy['unwrap'] = [
+            {
+                "selector": "div.wp-block-group:has(> .wp-block-embed)"
+            },
+            {
+                "selector": "div.wp-block-group:has(> .wp-block-embed)"
+            }
+
+        ]
+        item['content_html'] += wp_posts_v2.format_content(content_html, item['url'], args, site_json=site_copy)
+
+    if save_debug:
+        return item
+
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path[1:].split('/')))
+
     headers = {
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
         "accept-language": "en-US,en;q=0.9",

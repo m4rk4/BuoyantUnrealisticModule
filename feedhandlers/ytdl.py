@@ -36,7 +36,7 @@ def get_content(url, args, site_json, save_debug=False):
             playlist_id = query['list'][0]
 
     if 'embed' in args:
-        page_html = utils.get_url_html('https://www.youtube-nocookie.com/embed/' + video_id)
+        page_html = utils.get_url_html('https://www.youtube-nocookie.com/embed/' + video_id, user_agent='googlebot-video')
         if page_html:
             m = re.search(r'ytcfg\.set\((.*?)\);window\.ytcfg', page_html)
             if m:
