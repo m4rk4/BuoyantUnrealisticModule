@@ -1,4 +1,4 @@
-import asyncio, av, curl_cffi, math, re
+import asyncio, av, cloudscraper, curl_cffi, math, re
 from io import BytesIO
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
 from playwright.async_api import async_playwright
@@ -251,12 +251,18 @@ async def get_screenshot(url, args):
             browser = await engine.launch(channel="msedge", headless=headless)
         else:
             browser = await engine.launch(headless=headless)
+
         if device:
             context = await browser.new_context(**device)
             page = await context.new_page()
         else:
             context = None
             page = await browser.new_page()
+
+        if 'viewport' in args:
+            m = re.search(r'(\d+),(\d+)', args['viewport'])
+            if m:
+                await page.set_viewport_size({"width": int(m.group(1)), "height": int(m.group(2))})
 
         if 'wait_until' in args:
             await page.goto(url, wait_until=args['wait_until'])
@@ -312,6 +318,11 @@ def read_image(img_src):
     if 'preview.redd.it' in img_src:
         # headers['accept'] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
         r = curl_cffi.get(img_src, impersonate="chrome", headers={"accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"}, proxies=config.proxies)
+    elif 'truthsocial.com' in img_src:
+        print(img_src)
+        # scraper = cloudscraper.create_scraper()
+        # r = scraper.get(img_src)
+        r = curl_cffi.get(img_src, impersonate="chrome")
     else:
         r = curl_cffi.get(img_src, impersonate="chrome", proxies=config.proxies)
     if r.status_code != 200:
@@ -345,46 +356,55 @@ def get_image(args, im=None, im_io=None):
             container = None
             img_src = img_args['url']
             while img_src:
+                container = None
                 try:
                     container = av.open(img_src)
-                    if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
-                        stream = container.streams.video[0]
-                        for frame in container.decode(stream):
-                            if frame.width > frame.height:
-                                w = 1280
-                                h = int(frame.height * w / frame.width)
-                            else:
-                                h = 800
-                                w = int(frame.width * h / frame.height)
-                            im = frame.reformat(width=w, height=h).to_image()
-                            # im = frame.to_image()
-                            break
-                        save = True
-                    elif re.search(r'image|jpeg|png|webp', container.format.name):
-                        im_io = read_image(img_args['url'])
-                        if im_io:
-                            im = Image.open(im_io)
-                            mimetype = im.get_format_mimetype()
-                    img_src = ''
-                except av.HTTPForbiddenError:
-                    if '/proxy/' not in img_src:
-                        img_src = config.server + '/proxy/' + img_args['url']
-                    else:
-                        img_src = ''
                 except av.error.InvalidDataError:
-                    if re.search(r'\.(mp4|m4a|mov|mpeg|webm)', img_args['url']):
-                        loop = asyncio.ProactorEventLoop()
-                        asyncio.set_event_loop(loop)
-                        im_io = loop.run_until_complete(get_screenshot(img_args['url'], img_args))
-                        if im_io:
-                            im = Image.open(im_io)
-                            img_args['cropbbox'] = '0'
-                    img_src = ''
-                except Exception as e:
-                    logger.warning('image exception: ' + str(e))
-                    img_src = ''
+                    im_io = read_image(img_src)
+                    if im_io:
+                        container = av.open(im_io)
                 if container:
-                    container.close()
+                    try:
+                        if re.search(r'dash|hls|mp4|m4a|mov|mpeg|webm', container.format.name):
+                            stream = container.streams.video[0]
+                            stream.codec_context.skip_frame = "NONKEY"
+                            for frame in container.decode(stream):
+                                if frame.width > frame.height:
+                                    w = 1280
+                                    h = int(frame.height * w / frame.width)
+                                else:
+                                    h = 800
+                                    w = int(frame.width * h / frame.height)
+                                im = frame.reformat(width=w, height=h).to_image()
+                                # im = frame.to_image()
+                                break
+                            save = True
+                        elif re.search(r'image|jpeg|png|webp', container.format.name):
+                            if not im_io:
+                                im_io = read_image(img_src)
+                            if im_io:
+                                im = Image.open(im_io)
+                                mimetype = im.get_format_mimetype()
+                        img_src = ''
+                    except av.HTTPForbiddenError:
+                        if '/proxy/' not in img_src:
+                            img_src = config.server + '/proxy/' + img_args['url']
+                        else:
+                            img_src = ''
+                    except av.error.InvalidDataError:
+                        if re.search(r'\.(mp4|m4a|mov|mpeg|webm)', img_args['url']):
+                            loop = asyncio.ProactorEventLoop()
+                            asyncio.set_event_loop(loop)
+                            im_io = loop.run_until_complete(get_screenshot(img_args['url'], img_args))
+                            if im_io:
+                                im = Image.open(im_io)
+                                img_args['cropbbox'] = '0'
+                        img_src = ''
+                    except Exception as e:
+                        logger.warning('image exception: ' + str(e))
+                        img_src = ''
+                    if container:
+                        container.close()
 
     if not im:
         if 'url' in img_args and re.search(r'\.(mp4|m4a|mov|mpeg|webm)', img_args['url']):

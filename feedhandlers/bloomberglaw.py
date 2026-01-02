@@ -1,10 +1,10 @@
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import quote_plus, urlsplit
 
 import utils
-from feedhandlers import rss
+from feedhandlers import bloomberg, rss
 
 import logging
 
@@ -20,10 +20,178 @@ def get_content(url, args, site_json, save_debug=False):
             "variables": {
                 "channelUrl": paths[0],
                 "url": paths[1]
-            },
-            "query": "query getArticle($channelUrl: String!, $url: String!) {\n  article: articleByUrl(channelUrl: $channelUrl, url: $url) {\n    ...ArticleContent\n    authorized\n    free\n    body\n    noIndex\n    __typename\n  }\n}\n\nfragment ArticleContent on Article {\n  id\n  headline\n  type\n  authorized\n  postedDate\n  byline\n  snapshot\n  url\n  contactUs\n  revisionNumber\n  canonicalUrl\n  summary\n  guestSpeaker\n  storyTag\n  imageLede {\n    id\n    url(dimensions: TOP_IMAGE)\n    alternateText\n    caption\n    credit\n    __typename\n  }\n  currentRevision {\n    id\n    note\n    date\n    __typename\n  }\n  reporters {\n    id\n    name\n    position\n    email\n    twitter\n    avatar {\n      imageUrl(dimensions: AUTHOR_IMAGE)\n      __typename\n    }\n    __typename\n  }\n  contributors {\n    id\n    name\n    position\n    email\n    avatar {\n      imageUrl(dimensions: AUTHOR_IMAGE)\n      __typename\n    }\n    __typename\n  }\n  relatedArticles {\n    id\n    headline\n    postedDate\n    url\n    channel {\n      id\n      url\n      __typename\n    }\n    __typename\n  }\n  relatedDocuments {\n    __typename\n    ... on ExternalLink {\n      id\n      text\n      target\n      url\n      documentType\n      __typename\n    }\n  }\n  topics {\n    __typename\n    id\n    name\n  }\n  companies {\n    __typename\n    id\n    name\n  }\n  lawFirms {\n    __typename\n    id\n    name\n  }\n  channel {\n    id\n    name\n    url\n    productCode\n    __typename\n  }\n  channels {\n    id\n    brand {\n      id\n      brandCode\n      __typename\n    }\n    derivedChannels {\n      id\n      productCode\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n"
+            }
         }
     ]
+    data[0]['query'] = '''
+query getArticle($channelUrl: String!, $url: String!) {
+  article: articleByUrl(channelUrl: $channelUrl, url: $url) {
+    ...ArticleContent
+    free
+    body
+    bodyJson
+    noIndex
+    terminalSuid
+    __typename
+  }
+}
+
+fragment ArticleContent on Article {
+  __typename
+  id
+  headline
+  subHeadline
+  type
+  authorized
+  postedDate
+  updatedDate
+  byline
+  snapshot
+  url
+  contactUs
+  revisionNumber
+  canonicalUrl
+  blpCanonicalUrl
+  summary
+  guestSpeaker
+  storyTag
+  storyPresentationStyle
+  socialMediaPost
+  terminalSuids
+  ledeGraphic {
+    __typename
+    id
+    externalId
+    provider {
+      __typename
+      displayName
+    }
+  }
+  imageLede {
+    __typename
+    id
+    ARTICLE_LEDE: url(dimensions: ARTICLE_LEDE)
+    alternateText
+    caption
+    credit
+  }
+  currentRevision {
+    __typename
+    id
+    note
+    date
+  }
+  reporters {
+    __typename
+    id
+    name
+    attributedRole
+    position
+    email
+    twitter
+    avatar {
+      __typename
+      imageUrl(dimensions: AUTHOR_IMAGE)
+    }
+    reporter {
+      authorProfile {
+        blpBioId
+        __typename
+      }
+      __typename
+    }
+  }
+  contributors {
+    __typename
+    id
+    name
+    position
+    email
+    avatar {
+      __typename
+      imageUrl(dimensions: AUTHOR_IMAGE)
+    }
+    contributor {
+      __typename
+      id
+      contributorType
+      authorProfile {
+        blpBioId
+        __typename
+      }
+    }
+  }
+  relatedArticles {
+    __typename
+    id
+    headline
+    postedDate
+    url
+    channel {
+      __typename
+      id
+      url
+    }
+  }
+  relatedDocuments {
+    __typename
+    ... on ExternalLink {
+      id
+      __typename
+      text
+      target
+      url
+      documentType
+    }
+  }
+  topics {
+    __typename
+    id
+    name
+  }
+  companies {
+    __typename
+    id
+    name
+  }
+  lawFirms {
+    __typename
+    id
+    name
+  }
+  channel {
+    __typename
+    id
+    name
+    url
+    productCode
+    brand {
+      id
+      name
+      __typename
+    }
+  }
+  channels {
+    __typename
+    id
+    brand {
+      id
+      name
+      brandCode
+      __typename
+    }
+    derivedChannels {
+      __typename
+      id
+      productCode
+      brand {
+        brandCode
+        __typename
+      }
+    }
+  }
+}
+'''
     gql_json = utils.post_url('https://bwrite-api.bna.com/graphql', json_data=data)
     if not gql_json:
         return None
@@ -31,44 +199,77 @@ def get_content(url, args, site_json, save_debug=False):
         utils.write_file(gql_json, './debug/debug.json')
 
     article_json = gql_json[0]['data']['article']
+    if article_json['authorized'] == False:
+        search_json = bloomberg.get_bb_url('https://www.bloomberg.com/nemo-next/api/search/query?query=' + quote_plus(article_json['headline']), get_json=True)
+        if search_json:
+            title = re.sub(r'\W', '', article_json['headline']).lower()
+            for it in search_json['results']:
+                if re.sub(r'\W', '', it['headline']).lower() in title:
+                    return bloomberg.get_content(it['url'], args, site_json, save_debug)
+
     item = {}
     item['id'] = article_json['id']
     item['url'] = article_json['canonicalUrl']
     item['title'] = article_json['headline']
 
-    dt = datetime.fromisoformat(article_json['postedDate'].replace('Z', '+00:00'))
+    dt = datetime.fromisoformat(article_json['postedDate'])
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
 
-    authors = []
-    for it in article_json['reporters']:
-        authors.append(it['name'])
-    if authors:
-        item['author'] = {}
-        item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors))
+    if article_json.get('reporters'):
+        item['authors'] = [{"name": x['name']} for x in article_json['reporters']]
+    elif article_json.get('contributors'):
+        item['authors'] = [{"name": x['name']} for x in article_json['contributors']]
+    if len(item['authors']) > 0:
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+        }
 
     item['tags'] = []
-    for it in article_json['topics']:
-        item['tags'].append(it['name'])
+    if article_json.get('channel'):
+        item['tags'].append(article_json['channel']['name'])
+    if article_json.get('topics'):
+        item['tags'] += [x['name'] for x in article_json['topics']]
+    if article_json.get('companies'):
+        item['tags'] += [x['name'] for x in article_json['companies']]
+    if article_json.get('lawFirms'):
+        item['tags'] += [x['name'] for x in article_json['lawFirms']]
 
     if article_json.get('summary'):
-        item['summary'] = article_json['summary']
+        item['summary'] = BeautifulSoup(article_json['summary'], 'html.parser').get_text(strip=True)
 
     item['content_html'] = ''
+    if article_json.get('subHeadline'):
+        item['content_html'] += '<p><em>' + article_json['subHeadline'] + '</em></p>'
     if article_json.get('snapshot'):
         item['content_html'] += article_json['snapshot']
 
     if article_json.get('imageLede'):
-        item['_image'] = article_json['imageLede']['url']
-        captions = []
-        if article_json['imageLede'].get('caption'):
-            captions.append(article_json['imageLede']['caption'])
-        if article_json['imageLede'].get('credit'):
-            captions.append(article_json['imageLede']['credit'])
-        item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        if 'url' in article_json['imageLede']:
+            item['image'] = article_json['imageLede']['url']
+        elif 'ARTICLE_LEDE' in article_json['imageLede']:
+            item['image'] = article_json['imageLede']['ARTICLE_LEDE']
+        if 'image' in item:
+            captions = []
+            if article_json['imageLede'].get('caption'):
+                captions.append(article_json['imageLede']['caption'])
+            if article_json['imageLede'].get('credit'):
+                captions.append(article_json['imageLede']['credit'])
+            item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
+        else:
+            logger.warning('unhandled imageLede in ' + item['url'])
+
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
 
     soup = BeautifulSoup(article_json['body'], 'html.parser')
+    if soup.contents[0].name == 'div':
+        soup.contents[0].unwrap()
+    for el in soup.find_all('bw-company'):
+        el.unwrap()
+
     for el in soup.find_all(class_='embedded-image'):
         img = el.find('img')
         if img:
@@ -85,6 +286,12 @@ def get_content(url, args, site_json, save_debug=False):
             el.decompose()
 
     item['content_html'] += str(soup)
+
+    if article_json.get('currentRevision'):
+        item['content_html'] += '<p><small>(' + article_json['currentRevision']['note'] + ')</small></p>'
+
+    if article_json['authorized'] == False:
+        item['content_html'] += '<h3 style="text-align:center; color:red;">A subscription is required for the full content</h3>'
 
     if article_json.get('relatedDocuments'):
         item['content_html'] += '<hr/><h3>Documents</h3><ul>'

@@ -1,4 +1,4 @@
-import base64, json, jwt, re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote_plus, urlsplit
@@ -212,7 +212,7 @@ def get_post(post_json, args, site_json, save_debug):
             el.decompose()
 
         for el in soup.find_all(class_=['captioned-image-container', 'image-link']):
-            if el.name == None:
+            if el.name == None or el.name == '':
                 continue
             it = el.find('img')
             if not it:
@@ -241,6 +241,7 @@ def get_post(post_json, args, site_json, save_debug):
                 el.decompose()
             else:
                 logger.warning('unhandled captioned-image-container in ' + item['url'])
+                print(el)
 
         for el in soup.find_all(class_='image-gallery-embed'):
             new_html = ''

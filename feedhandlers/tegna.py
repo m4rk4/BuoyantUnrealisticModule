@@ -125,6 +125,9 @@ def get_content(url, args, site_json, save_debug=False):
 
             for el in article_body.children:
                 if el.name == 'div':
+                    if el.get('style') == 'display:flex; flex-wrap:wrap; gap:8px; margin:1em 0;':
+                        continue
+
                     if not el.get('class'):
                         el.decompose()
 
@@ -161,7 +164,8 @@ def get_content(url, args, site_json, save_debug=False):
 
                     elif 'article__section_type_gallery' in el['class']:
                         it = el.find(class_='gallery')
-                        new_html = '<h3>{}</h3>'.format(it['data-title'])
+                        new_html = '<h3>' + it['data-title'] + '</h3>'
+                        new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin:1em 0;">'
                         for it in el.find_all(class_='gallery__slide'):
                             captions = []
                             if it.get('data-caption'):
@@ -169,20 +173,22 @@ def get_content(url, args, site_json, save_debug=False):
                             if it.get('data-credit'):
                                 captions.append(it['data-credit'])
                             img_src = ''
-                            img = it.find(class_='lazy-image__image')
+                            img = it.find(class_=['lazy-image__image'])
                             if img:
-                                img_src = utils.image_from_srcset(img['data-srcset'], 1000)
+                                img_src = utils.image_from_srcset(img['data-srcset'], 1920)
+                                thumb = utils.image_from_srcset(img['data-srcset'], 750)
                             else:
-                                img = it.find('img')
+                                img = it.find('img', class_='gallery__image')
                                 if img:
-                                    img_src = utils.image_from_srcset(img['srcset'], 1000)
+                                    img_src = utils.image_from_srcset(img['srcset'], 1920)
+                                    thumb = utils.image_from_srcset(img['srcset'], 750)
                             if img_src:
-                                new_html += utils.add_image(img_src, ' | '.join(captions))
+                                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, ' | '.join(captions), link=img_src, fig_style="margin:0; padding:0;") + '</div>'
                             else:
                                 logger.warning('unhandled gallery slide image in ' + item['url'])
+                        new_html += '</div>'
                         new_el = BeautifulSoup(new_html, 'html.parser')
-                        el.insert_after(new_el)
-                        el.decompose()
+                        el.replace_with(new_el)
 
                     elif 'article__section_type_embed' in el['class']:
                         new_html = ''

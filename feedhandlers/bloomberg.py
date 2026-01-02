@@ -234,7 +234,7 @@ def format_content(content, images):
             content_html += utils.add_embed(content['href'])
         else:
             logger.warning('unhandled embed content')
-    elif content['type'] == 'quote':
+    elif content['type'] == 'blockquote' or content['type'] == 'quote':
         # Blockquote or pullquote?
         quote = ''
         for c in content['content']:

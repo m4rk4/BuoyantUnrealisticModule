@@ -62,14 +62,13 @@ def get_content(url, args, site_json, save_debug=False):
     dt = datetime.utcnow().replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = '{}. {}, {}'.format(dt.strftime('%b'), dt.day, dt.year)
-
+    item['_display_date'] = utils.format_display_date(dt, True)
 
     item['author'] = {"name": episode['owner']['displayName']}
     item['tags'] = episode['featuringArtistList'].copy()
     item['_image'] = 'https://thumbnailer.mixcloud.com/unsafe/128x128/' + episode['picture']['urlRoot']
     item['_audio'] = decode_stream_url(episode['streamInfo']['hlsUrl'])
-    play_url = '{}/videojs?src={}'.format(config.server, quote_plus(item['_audio']))
+    play_url = config.server + '/videojs?src=' + quote_plus(item['_audio'])
 
     item['_duration'] = calculate_duration(episode['audioLength'])
 

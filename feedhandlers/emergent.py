@@ -1,7 +1,7 @@
-import json, pytz, re
+import json, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from urllib.parse import quote_plus, urlsplit
+from urllib.parse import urlsplit
 
 import config, utils
 from feedhandlers import rss, wp_posts_v2
@@ -11,15 +11,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def resize_image(img_src, width=1200):
-    split_url = urlsplit(img_src)
-    paths = list(filter(None, split_url.path.split('/')))
-    return 'https://images.deadspin.com/tr:w-{}/{}'.format(width, paths[-1])
-
-
 def get_next_data(url, site_json):
     split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path.split('/')))
+    paths = list(filter(None, split_url.path.strip('/').split('/')))
     if len(paths) == 0:
         path = '/index'
     else:
@@ -46,7 +40,19 @@ def get_next_data(url, site_json):
 
 
 def get_content(url, args, site_json, save_debug=False):
-    next_data = get_next_data(url, site_json)
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.strip('/').split('/')))
+    wp_post = utils.get_url_json(site_json['wpjson_path'] + site_json['posts_path'] + '?slug=' + paths[-1])
+    if not wp_post:
+        return None
+    if save_debug:
+        utils.write_file(wp_post[0], './debug/debug.json')
+
+    return get_item(wp_post[0], args, site_json, save_debug)
+
+
+def get_item(wp_post, args, site_json, save_debug):
+    next_data = get_next_data(wp_post['link'], site_json)
     if not next_data:
         return None
     if save_debug:
@@ -54,24 +60,17 @@ def get_content(url, args, site_json, save_debug=False):
     page_props = next_data['pageProps']
     page_post = page_props['post']
 
-    split_url = urlsplit(url)
-    paths = list(filter(None, split_url.path.split('/')))
-    wp_post = utils.get_url_json(site_json['wpjson_path'] + site_json['posts_path'] + '?slug=' + paths[-1])
-    if wp_post:
-        post_json = wp_post[0]
-        if save_debug:
-            utils.write_file(next_data, './debug/debug.json')
-
     item = {}
-    item['id'] = post_json['id']
-    item['url'] = 'https://' + split_url.netloc + split_url.path
+    item['id'] = wp_post['id']
+    item['url'] = wp_post['link']
+    item['title'] = wp_post['title']['rendered']
 
-    dt = datetime.fromisoformat(post_json['date_gmt']).replace(tzinfo=timezone.utc)
+    dt = datetime.fromisoformat(wp_post['date_gmt']).replace(tzinfo=timezone.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    if post_json.get('modified_gmt'):
-        dt = datetime.fromisoformat(post_json['modified_gmt']).replace(tzinfo=timezone.utc)
+    if wp_post.get('modified_gmt'):
+        dt = datetime.fromisoformat(wp_post['modified_gmt']).replace(tzinfo=timezone.utc)
         item['date_modified'] = dt.isoformat()
         if page_post.get('revisions') and page_post['revisions'].get('nodes'):
             revision = None
@@ -84,15 +83,13 @@ def get_content(url, args, site_json, save_debug=False):
             if revision:
                 page_post = revision
 
-    item['title'] = post_json['title']['rendered']
-
     item['authors'] = []
     caption = ''
     for it in page_post['acfBylines']['bylines']:
         if it['bylineTitle'].startswith('Above'):
             caption = it['bylineName']
         elif it['bylineTitle'].startswith('Written'):
-            item['authors'].append({"name": it['bylineName'].strip()})
+            item['authors'].insert(0, {"name": it['bylineName'].strip()})
         elif it['bylineTitle'].startswith('Photos'):
             item['authors'].append({"name": it['bylineName'].strip() + " (photos)"})
         else:
@@ -118,17 +115,102 @@ def get_content(url, args, site_json, save_debug=False):
         item['image'] = page_post['featuredImage']['node']['sourceUrl']
         item['content_html'] += utils.add_image(item['image'], caption)
 
-    site_copy = site_json.copy()
-    site_copy['clear_attrs'] = [
-        {
-            "attrs": {
-                "class": [
-                    "wp-block-heading",
-                    "wp-block-list"
-                ]
+    emergent_site = site_json.copy()
+    emergent_site.update({
+        "clear_attrs": [
+            {
+                "attrs": {
+                    "class": [
+                        "wp-block-heading",
+                        "wp-block-list"
+                    ]
+                }
             }
-        }
-    ]
+        ],
+        "images": [
+            {
+                "attrs": {
+                    "class": "wp-block-media-text__media"
+                },
+                "tag": "figure"
+            }
+        ],
+        "rename": [
+            {
+                "old": {
+                    "attrs": {
+                        "class": "wp-block-media-text__content"
+                    }
+                },
+                "new": {
+                    "attrs": {
+                        "style": "flex:1; min-width:256px;"
+                    }
+                }
+            },
+            {
+                "old": {
+                    "attrs": {
+                        "class": "wp-block-media-text"
+                    }
+                },
+                "new": {
+                    "attrs": {
+                        "style": "display:flex; flex-wrap:wrap; gap:1em;"
+                    }
+                }
+            }
+        ],
+        "wrap": [
+            {
+                "attrs": {
+                    "class": "wp-block-media-text__media"
+                },
+                "tag": "figure",
+                "new": {
+                    "attrs": {
+                        "style": "flex:1; min-width:256px;"
+                    },
+                    "tag": "div"
+                }
+            }
+        ]
+    })
 
-    item['content_html'] += wp_posts_v2.format_content(page_post['content'], item['url'], args, site_json=site_copy)
+    item['content_html'] += wp_posts_v2.format_content(page_post['content'], item['url'], args, site_json=emergent_site)
     return item
+
+
+def get_feed(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.strip('/').split('/')))
+
+    wp_posts = None
+    if len(paths) == 0:
+        wp_posts =  utils.get_url_json(site_json['wpjson_path'] + site_json['posts_path'])
+    elif 'category' in paths:
+        next_data = get_next_data(url, site_json)
+        if next_data:
+            wp_posts =  utils.get_url_json(site_json['wpjson_path'] + site_json['posts_path'] + '?categories=' + str(next_data['pageProps']['category']['databaseId']))
+
+    if not wp_posts:
+        return None
+    if save_debug:
+        utils.write_file(next_data, './debug/feed.json')
+
+    n = 0
+    items = []
+    for post in wp_posts:
+        if save_debug:
+            logger.debug('getting content for ' + post['link'])
+        item = get_item(post, args, site_json, save_debug)
+        if item:
+            if utils.filter_item(item, args) == True:
+                items.append(item)
+                n += 1
+                if 'max' in args and n == int(args['max']):
+                    break
+
+    feed = utils.init_jsonfeed(args)
+    feed['items'] = sorted(items, key=lambda i: i['_timestamp'], reverse=True)
+    return feed

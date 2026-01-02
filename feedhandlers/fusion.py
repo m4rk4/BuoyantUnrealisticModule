@@ -93,7 +93,7 @@ def resize_image(image_item, site_json, width=1280):
         else:
             logger.warning('fullSizeResizeUrl image without auth ' + image_item['_id'])
             img_src = image_item['url']
-    elif image_item.get('auth'):
+    elif site_json.get('resizer_url') and image_item.get('auth'):
         auth = list(image_item['auth'].values())[0]
         img_src = site_json['resizer_url'] + site_json['resizer_path'] + quote_plus(image_item['url']) + '?auth=' + auth + '&width=' + str(width) + '&quality=80&smart=true'
     elif image_item.get('resized_obj'):
@@ -123,13 +123,25 @@ def resize_image(image_item, site_json, width=1280):
             images.append(image)
         image = utils.closest_dict(images, 'width', width)
         img_src = image['url']
+    elif image_item.get('url') and isinstance(image_item['url'], dict) and image_item['url'].get('original'):
+        images = []
+        for key, val in image_item['url'].items():
+            image = {
+                "width": val['width'],
+                "url": val['url']
+            }
+            images.append(image)
+        image = utils.closest_dict(images, 'width', width)
+        img_src = image['url']
     if not img_src:
         img_src = image_item['url']
     return img_src
 
 
 def process_content_element(element, url, site_json, save_debug):
-    # print(element)
+    if save_debug and '_id' in element:
+        logger.debug(element['_id'])
+
     split_url = urlsplit(url)
     element_html = ''
     if element['type'] == 'text' or element['type'] == 'paragraph':
@@ -244,6 +256,8 @@ def process_content_element(element, url, site_json, save_debug):
                 logger.warning('unhandled custom_embed inline_audio')
         elif element['subtype'] == 'video' and element['embed']['config'].get('contentUrl') and 'jwplayer' in element['embed']['config']['contentUrl']:
             element_html += utils.add_embed(element['embed']['config']['contentUrl'])
+        elif element['subtype'] == 'video_custom' and element['embed']['config'].get('video') and element['embed']['config']['video'].get('embedUrl'):
+            element_html += utils.add_embed(element['embed']['config']['video']['embedUrl'])
         elif element['subtype'] == 'videoplayer' and element['embed']['config'].get('videoCode'):
             if element['embed']['config']['videoCode'].startswith('http'):
                 element_html += utils.add_embed(element['embed']['config']['videoCode'])
@@ -448,6 +462,12 @@ def process_content_element(element, url, site_json, save_debug):
                 if it.strip():
                     element_html += '<li>' + it + '</li>'
             element_html += '</ul>'
+        elif element['subtype'] == 'factbox':
+            # https://www.beveragedaily.com/Article/2025/12/04/pfas-in-the-beverage-industry-creating-an-action-plan/
+            element_html += '<div style="border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:light-dark(#ccc,#333); padding:1em; margin:1em 0;">'
+            if element['embed']['config'].get('heading'):
+                element_html += '<div style="font-weight:bold;">' + element['embed']['config']['heading'] + '</div>'
+            element_html += unquote_plus(element['embed']['config']['content']) + '</div>'
         elif re.search(r'iframe', element['subtype'], flags=re.I):
             embed_html = base64.b64decode(element['embed']['config']['base64HTML']).decode('utf-8')
             m = re.search(r'src="([^"]+)"', embed_html)
@@ -512,7 +532,7 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'oembed_response':
         if element.get('subtype'):
-            if element['subtype'] == 'instagram' or element['subtype'] == 'spotify' or element['subtype'] == 'twitter' or element['subtype'] == 'youtube' or element['subtype'] == 'facebook-post':
+            if element['subtype'] in ['facebook-post', 'instagram', 'spotify', 'twitter', 'vimeo', 'youtube']:
                 if element.get('referent'):
                     element_html += utils.add_embed(element['referent']['id'])
                 elif element.get('raw_oembed'):
@@ -591,7 +611,7 @@ def process_content_element(element, url, site_json, save_debug):
                         captions.append(element['credits']['by'][0]['byline'])
                 elif element['credits'].get('affiliation'):
                     captions.append(
-                        re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation']]))
+                        re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation'] if x.get('name')]))
                     )
         caption = ' | '.join(captions)
         #if element.get('subtitle') and element['subtitle'].strip():
@@ -601,13 +621,13 @@ def process_content_element(element, url, site_json, save_debug):
 
     elif element['type'] == 'gallery':
         img_src = resize_image(element['content_elements'][0], site_json)
-        link = '{}://{}'.format(split_url.scheme, split_url.netloc)
+        link = split_url.scheme + '://' + split_url.netloc
         if element.get('canonical_url'):
             link += element['canonical_url']
         elif element.get('slug'):
             link += element['slug']
-        caption = '<strong>Gallery:</strong> <a href="{}">{}</a>'.format(link, element['headlines']['basic'])
-        link = '{}/content?read&url={}'.format(config.server, quote_plus(link))
+        caption = '<strong>Gallery:</strong> <a href="' + link + '" target="_blank">' + element['headlines']['basic'] + '</a>'
+        link = config.server + '/content?read&url=' + quote_plus(link)
         if img_src:
             element_html += utils.add_image(img_src, caption, link=link, overlay=config.gallery_button_overlay)
 
@@ -684,6 +704,9 @@ def process_content_element(element, url, site_json, save_debug):
         links = BeautifulSoup(element['html'], 'html.parser').find_all('a')
         element_html += utils.add_embed(links[-1]['href'])
 
+    elif element['type'] == 'numeric_rating' and element['units'] == 'stars':
+        element_html += utils.add_stars(element['numeric_rating'], element['max'])
+
     elif element['type'] == 'reference':
         # print(element)
         if element.get('referent') and element['referent'].get('id'):
@@ -759,7 +782,7 @@ def process_content_element(element, url, site_json, save_debug):
         else:
             logger.warning('unhandled link_list subtype ' + element['subtype'])
 
-    elif element['type'] == 'interstitial_link':
+    elif element['type'] == 'ad' or element['type'] == 'interstitial_link' or element['type'] == 'selligentTarget' or (element['type'] == 'smartPlayerTarget' and element['target'] == 'digitekaSmartPlayer'):
         pass
 
     else:
@@ -818,6 +841,8 @@ def get_content_html(content, url, args, site_json, save_debug):
 
     if content.get('subheadlines') and content['subheadlines'].get('basic'):
         content_html += '<p><em>' + content['subheadlines']['basic'] + '</em></p>'
+    elif content.get('subheadline'):
+        content_html += '<p><em>' + content['subheadline'] + '</em></p>'
     elif 'args' in site_json and 'add_subtitle' in site_json['args'] and content.get('description') and content['description'].get('basic'):
         content_html += '<p><em>' + content['description']['basic'] + '</em></p>'
 
@@ -831,19 +856,25 @@ def get_content_html(content, url, args, site_json, save_debug):
         content_html += '</ul>'
 
     lead_image = None
+    if content.get('promo_items'):
+        promo_items = content['promo_items']
+    elif content.get('promoItems'):
+        promo_items = content['promoItems']
+    else:
+        promo_items = None
     if content.get('multimedia_main'):
         lead_image = content['multimedia_main']
-    elif content.get('promo_items'):
-        if content['promo_items'].get('video'):
-            content_html += process_content_element(content['promo_items']['video'], url, site_json, save_debug)
-        elif content['promo_items'].get('youtube'):
-            content_html += utils.add_embed(content['promo_items']['youtube']['content'])
-        elif content['promo_items'].get('lead_art') and content['promo_items']['lead_art'].get('subtype') != 'syncbak-graph-livestream':
-            lead_image = content['promo_items']['lead_art']
-        elif content['promo_items'].get('basic'):
-            lead_image = content['promo_items']['basic']
-        elif content['promo_items'].get('images'):
-            lead_image = content['promo_items']['images'][0]
+    elif promo_items:
+        if promo_items.get('video'):
+            content_html += process_content_element(promo_items['video'], url, site_json, save_debug)
+        elif promo_items.get('youtube'):
+            content_html += utils.add_embed(promo_items['youtube']['content'])
+        elif promo_items.get('lead_art') and promo_items['lead_art'].get('subtype') != 'syncbak-graph-livestream':
+            lead_image = promo_items['lead_art']
+        elif promo_items.get('basic'):
+            lead_image = promo_items['basic']
+        elif promo_items.get('images'):
+            lead_image = promo_items['images'][0]
     elif content.get('customVideo'):
         content_html += process_content_element(content['customVideo'], url, site_json, save_debug)
     if lead_image and lead_image.get('_id') and content.get('content_elements'):
@@ -862,8 +893,14 @@ def get_content_html(content, url, args, site_json, save_debug):
             content_html += process_content_element(lead_image, url, site_json, save_debug)
 
     if content.get('content_elements'):
+        elements = content['content_elements']
+    elif content.get('story_elements'):
+        elements = content['story_elements']
+    else:
+        elements = None
+    if elements:
         skip_next = False
-        for n, element in enumerate(content['content_elements']):
+        for n, element in enumerate(elements):
             if skip_next:
                 skip_next = False
                 continue
@@ -950,8 +987,11 @@ def get_item(content, url, args, site_json, save_debug):
         item['id'] = url
 
     item['url'] = url
+
     if content.get('headlines'):
         item['title'] = content['headlines']['basic']
+    elif content.get('headline'):
+        item['title'] = content['headline']
     elif content.get('title'):
         item['title'] = content['title']
 
@@ -964,13 +1004,15 @@ def get_item(content, url, args, site_json, save_debug):
         date = content['display_date']
     elif content.get('displayDate'):
         date = content['displayDate']
+    elif content.get('dates') and content['dates'].get('published'):
+        date = content['dates']['published']['original']
     if date:
         dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
     else:
-        logger.warning('no publish date found in ' + item['url'])
+        logger.warning('no date published found in ' + item['url'])
 
     date = ''
     if content.get('last_updated_date'):
@@ -981,11 +1023,13 @@ def get_item(content, url, args, site_json, save_debug):
         date = content['updated_time']
     elif content.get('display_date'):
         date = content['display_date']
+    elif content.get('dates') and content['dates'].get('updated'):
+        date = content['dates']['updated']['original']
     if date:
         dt = datetime.fromisoformat(re.sub(r'(\.\d+)?Z$', '+00:00', date))
         item['date_modified'] = dt.isoformat()
     else:
-        logger.warning('no updated date found in ' + item['url'])
+        logger.warning('no date updated found in ' + item['url'])
 
     # Check age
     if 'age' in args:
@@ -995,13 +1039,15 @@ def get_item(content, url, args, site_json, save_debug):
     authors = []
     if content.get('credits') and content['credits'].get('by'):
         for author in content['credits']['by']:
-            if author['type'] == 'author':
+            if 'type' in author and author['type'] == 'author':
                 if author.get('additional_properties') and author['additional_properties'].get('original') and author['additional_properties']['original'].get('byline'):
                     authors.append(author['additional_properties']['original']['byline'])
                 elif author.get('name'):
                     authors.append(author['name'])
                 elif author.get('org'):
                     authors.append(author['org'])
+            elif 'name' in author:
+                authors.append(author['name'])
     if content.get('credits') and content['credits'].get('host_talent'):
         if content['credits'].get('host_talent'):
             for author in content['credits']['host_talent']:
@@ -1048,21 +1094,29 @@ def get_item(content, url, args, site_json, save_debug):
             if val.get('website_section') and val['website_section'].get('name'):
                 if val['website_section']['name'] not in tags:
                     tags.append(val['website_section']['name'])
+    if content.get('meta') and content['meta'].get('seoKeywords'):
+        tags += content['meta']['seoKeywords'].copy()
     if tags:
         item['tags'] = list(set(tags))
 
     if content.get('promo_items'):
-        if content['promo_items'].get('basic') and not content['promo_items']['basic'].get('type'):
-            item['_image'] = resize_image(content['promo_items']['basic'], site_json)
-        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'image':
-            item['_image'] = resize_image(content['promo_items']['basic'], site_json)
-        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'gallery':
-            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
-        elif content['promo_items'].get('basic') and content['promo_items']['basic']['type'] == 'video':
-            item['_image'] = resize_image(content['promo_items']['basic']['promo_items']['basic'], site_json)
-        elif content['promo_items'].get('images'):
-            if content['promo_items']['images'][0] != None:
-                item['_image'] = resize_image(content['promo_items']['images'][0], site_json)
+        promo_items = content['promo_items']
+    elif content.get('promoItems'):
+        promo_items = content['promoItems']
+    else:
+        promo_items = None
+    if promo_items:
+        if promo_items.get('basic') and not promo_items['basic'].get('type'):
+            item['_image'] = resize_image(promo_items['basic'], site_json)
+        elif promo_items.get('basic') and promo_items['basic']['type'] == 'image':
+            item['_image'] = resize_image(promo_items['basic'], site_json)
+        elif promo_items.get('basic') and promo_items['basic']['type'] == 'gallery':
+            item['_image'] = resize_image(promo_items['basic']['promo_items']['basic'], site_json)
+        elif promo_items.get('basic') and promo_items['basic']['type'] == 'video':
+            item['_image'] = resize_image(promo_items['basic']['promo_items']['basic'], site_json)
+        elif promo_items.get('images'):
+            if promo_items['images'][0] != None:
+                item['_image'] = resize_image(promo_items['images'][0], site_json)
     elif content.get('content_elements'):
         if content['content_elements'][0]['type'] == 'image':
             item['_image'] = resize_image(content['content_elements'][0], site_json)
@@ -1079,6 +1133,8 @@ def get_item(content, url, args, site_json, save_debug):
             item['summary'] = content['description']
         elif isinstance(content['description'], dict):
             item['summary'] = content['description']['basic']
+    elif content.get('meta') and content['meta'].get('description'):
+        item['summary'] = content['meta']['description']
     elif content.get('subheadlines') and content['subheadlines'].get('basic'):
         item['summary'] = content['subheadlines']['basic']
 
@@ -1132,11 +1188,14 @@ def get_content(url, args, site_json, save_debug=False):
     if not url.startswith('http'):
         return None
     split_url = urlsplit(url)
-    if split_url.path.endswith('/'):
-        path = split_url.path[:-1]
+    path = split_url.path.strip('/')
+    paths = path.split('/')
+    path = '/' + path
+    slug = paths[-1]
+    if split_url.netloc == 'www.lalibre.be':
+        slug_id = slug.split('-')[-1]
     else:
-        path = split_url.path
-    paths = list(filter(None, split_url.path[1:].split('/')))
+        slug_id = ''
 
     if split_url.netloc == 'gray.video-player.arcpublishing.com':
         params = parse_qs(split_url.query)
@@ -1162,21 +1221,22 @@ def get_content(url, args, site_json, save_debug=False):
 
     for n in range(2):
         if split_url.netloc == 'www.washingtonpost.com' and '_story.html' in split_url.path:
-            query = re.sub(r'\s', '', json.dumps(site_json['story']['query'])).replace('PATH', path)
-            query = query.replace('"ALL_PATHS"', json.dumps({"all": paths}).replace(' ', ''))
-            api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], site_json['story']['source'], quote_plus(query), site_json['deployment'], site_json['arc_site'])
+            query = json.dumps(site_json['story']['query'], separators=(',', ':')).replace('PATH', path)
+            query = query.replace('"ALL_PATHS"', json.dumps({"all": paths}, separators=(',', ':')))
+            api_url = site_json['api_url'] + site_json['story']['source'] + '}?query=' + quote_plus(query) + '&d=' + str(site_json['deployment']) + '&_website=' + site_json['arc_site']
         else:
             if 'galleries' in paths and 'gallery' in site_json:
                 # https://www.cleveland.com/galleries/MWY2D3UWRRC6HMDMV6KQWI6ACM/
-                query = re.sub(r'\s', '', json.dumps(site_json['gallery']['query'])).replace('PATH', path).replace('ID', paths[-1])
-                api_url = '{}{}'.format(site_json['api_url'], site_json['gallery']['source'])
+                query = json.dumps(site_json['gallery']['query'], separators=(',', ':'))
+                api_url = site_json['api_url'] + site_json['gallery']['source']
             else:
-                query = re.sub(r'\s', '', json.dumps(site_json['content']['query'])).replace('PATH', path)
-                api_url = '{}{}'.format(site_json['api_url'], site_json['content']['source'])
+                query = json.dumps(site_json['content']['query'], separators=(',', ":"))
+                api_url = site_json['api_url'] + site_json['content']['source']
+            query = query.replace('PATH', path).replace('SLUG_ID', slug_id).replace('SLUG', slug)
             # if re.search(r'ajc\.com|daytondailynews\.com|springfieldnewssun\.com', split_url.netloc):
-            if '"ID"' in query:
-                query = query.replace('ID', paths[-1])
-            api_url += '?query={}&d={}&_website={}'.format(quote_plus(query), site_json['deployment'], site_json['arc_site'])
+            # if '"ID"' in query:
+            #     query = query.replace('ID', paths[-1])
+            api_url += '?query=' + quote_plus(query) + '&d=' + str(site_json['deployment']) + '&_website=' + site_json['arc_site']
         if save_debug:
             logger.debug('getting content from ' + api_url)
         api_json = utils.get_url_json(api_url, site_json=site_json)
@@ -1211,11 +1271,14 @@ def get_content(url, args, site_json, save_debug=False):
 
 def get_feed(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    if split_url.path.endswith('/'):
-        path = split_url.path[:-1]
+    path = split_url.path.strip('/')
+    paths = path.split('/')
+    path = '/' + path
+    slug = paths[-1]
+    if split_url.netloc == 'www.lalibre.be':
+        slug_id = slug.split('-')[-1]
     else:
-        path = split_url.path
-    paths = list(filter(None, path.split('/')))
+        slug_id = ''
 
     # https://www.baltimoresun.com/rss/
     # https://www.baltimoresun.com/arcio/rss/
@@ -1227,9 +1290,10 @@ def get_feed(url, args, site_json, save_debug=False):
     for n in range(2):
         if len(paths) == 0:
             source = site_json['homepage_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(site_json['homepage_feed']['query']))
-        elif re.search(r'about|author|auteur|autor|people|staff|team', paths[0]) or (len(paths) > 1 and (paths[1].lower() == 'author' or paths[1].lower() == 'people')):
+            query = json.dumps(site_json['homepage_feed']['query'], separators=(',', ':'))
+        elif re.search(r'about|author|auteur|autor|journaliste|people|staff|team', paths[0]) or (len(paths) > 1 and (paths[1].lower() == 'author' or paths[1].lower() == 'people')):
             author = ''
+            author_id = ''
             if split_url.netloc == 'www.dlnews.com':
                 authors_json = utils.get_url_json('https://api.dlnews.com/authors')
                 if authors_json:
@@ -1259,19 +1323,29 @@ def get_feed(url, args, site_json, save_debug=False):
                     logger.warning('unhandled author url ' + args['url'])
                     return None
             if author:
+                if 'author' in site_json:
+                    source = site_json['author']['source']
+                    query = json.dumps(site_json['author']['query'], separators=(',', ':')).replace('AUTHOR', author).replace('SLUG_ID', slug_id).replace('SLUG', slug).replace('PATH', path).replace('%20', ' ')
+                    api_url = site_json['api_url'] + source + '?query=' + quote_plus(query) + '&d=' + str(site_json['deployment']) + '&_website=' + site_json['arc_site']
+                    author_json = utils.get_url_json(api_url)
+                    if author_json:
+                        author_id = author_json['authors'][0]['_id']
                 source = site_json['author_feed']['source']
-                query = re.sub(r'\s', '', json.dumps(site_json['author_feed']['query'])).replace('AUTHOR', author).replace('PATH', path).replace('%20', ' ')
+                query = json.dumps(site_json['author_feed']['query'], separators=(',', ':')).replace('AUTHOR_ID', author_id).replace('AUTHOR', author)
         elif paths[0] == 'tags' or paths[0] == 'tag' or paths[0] == 'topics' or (paths[0] == 'topic' and 'thebaltimorebanner' not in split_url.netloc):
             tag = paths[1]
             source = site_json['tag_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(site_json['tag_feed']['query'])).replace('TAG', tag).replace('PATH', path).replace('%20', ' ')
+            query = json.dumps(site_json['tag_feed']['query'], separators=(',', ':')).replace('TAG', tag)
+
         elif split_url.netloc == 'www.reuters.com' and split_url.path.startswith('/markets/companies/'):
             tag = paths[-1]
             source = site_json['stock_symbol_feed']['source']
-            query = re.sub(r'\s', '', json.dumps(site_json['stock_symbol_feed']['query'])).replace('SYMBOL', tag).replace('PATH', path).replace('%20', ' ')
+            query = json.dumps(site_json['stock_symbol_feed']['query'], separators=(',', ':')).replace('SYMBOL', tag)
+
         elif split_url.netloc == 'www.thedailybeast.com' and split_url.path.startswith('/cheat-sheet'):
             source = site_json['cheat-sheet']['source']
-            query = re.sub(r'\s', '', json.dumps(site_json['cheat-sheet']['query']))
+            query = json.dumps(site_json['cheat-sheet']['query'], separators=(',', ':'))
+
         else:
             if site_json.get('section_feed'):
                 source = site_json['section_feed']['source']
@@ -1298,13 +1372,14 @@ def get_feed(url, args, site_json, save_debug=False):
                         for it in site_json['section_feed']['section_replace']:
                             section = section.replace(it[0], it[1])
                     section_path = path.replace('/section', '')
-                    query = re.sub(r'\s', '', json.dumps(site_json['section_feed']['query'])).replace('SECTIONPATH', section_path).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
+                    query = json.dumps(site_json['section_feed']['query'], separators=(',', ':')).replace('SECTIONPATH', section_path).replace('SECTION', section)
             elif site_json.get('sections') and site_json['sections'].get(paths[-1]):
                 section = paths[-1]
                 source = site_json['sections'][section]['source']
-                query = re.sub(r'\s', '', json.dumps(site_json['sections'][section]['query'])).replace('SECTION', section).replace('PATH', path).replace('%20', ' ')
+                query = json.dumps(site_json['sections'][section]['query'], separators=(',', ':')).replace('SECTION', section)
 
-        api_url = '{}{}?query={}&d={}&_website={}'.format(site_json['api_url'], source, quote_plus(query), site_json['deployment'], site_json['arc_site'])
+        query = query.replace('SLUG_ID', slug_id).replace('SLUG', slug).replace('PATH', path).replace('%20', ' ')
+        api_url = site_json['api_url'] + source + '?query=' + quote_plus(query) + '&d=' + str(site_json['deployment']) + '&_website=' + site_json['arc_site']
         if save_debug:
             logger.debug('getting feed from ' + api_url)
 
@@ -1342,6 +1417,11 @@ def get_feed(url, args, site_json, save_debug=False):
             content_elements = feed_content['latest']
         elif feed_content.get('items'):
             content_elements = feed_content['items']
+
+        if feed_content.get('meta') and feed_content['meta'].get('title'):
+            feed_title = feed_content['meta']['title']
+        elif feed_content.get('taxonomy') and feed_content['taxonomy'].get('currentSection'):
+            feed_title = feed_content['taxonomy']['currentSection']['name']
     else:
         content_elements = feed_content
 
@@ -1349,16 +1429,18 @@ def get_feed(url, args, site_json, save_debug=False):
     items = []
     for content in content_elements:
         if content.get('canonical_url'):
-            url = content['canonical_url']
+            content_url = content['canonical_url']
+        elif content.get('canonicalUrl'):
+            content_url = content['canonicalUrl']
         elif content.get('website_url'):
-            url = content['website_url']
+            content_url = content['website_url']
         elif content.get('url'):
-            url = content['url']
+            content_url = content['url']
         elif content.get('websites') and content['websites'].get(site_json['arc_site']) and content['websites'][site_json['arc_site']].get('website_url'):
-            url = content['websites'][site_json['arc_site']]['website_url']
+            content_url = content['websites'][site_json['arc_site']]['website_url']
 
-        if url.startswith('/'):
-            url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, url)
+        if content_url.startswith('/'):
+            content_url = split_url.scheme + '://' + split_url.netloc + content_url
 
         # Check age
         if args.get('age'):
@@ -1373,19 +1455,19 @@ def get_feed(url, args, site_json, save_debug=False):
             item['_timestamp'] = dt.timestamp()
             if not utils.check_age(item, args):
                 if save_debug:
-                    logger.debug('skipping old article ' + url)
+                    logger.debug('skipping old article ' + content_url)
                 continue
         if save_debug:
-            logger.debug('getting content from ' + url)
+            logger.debug('getting content from ' + content_url)
 
         if not content.get('type'):
-            item = get_content(url, args, site_json, save_debug)
+            item = get_content(content_url, args, site_json, save_debug)
         elif content.get('content_elements') and (content['content_elements'][0].get('content') or content['content_elements'][0]['type'] == 'image' or content['content_elements'][0]['type'] == 'video'):
-            item = get_item(content, url, args, site_json, save_debug)
+            item = get_item(content, content_url, args, site_json, save_debug)
         elif content.get('type') and content['type'] == 'video' and content.get('streams'):
-            item = get_item(content, url, args, site_json, save_debug)
+            item = get_item(content, content_url, args, site_json, save_debug)
         else:
-            item = get_content(url, args, site_json, save_debug)
+            item = get_content(content_url, args, site_json, save_debug)
 
         if item:
             if utils.filter_item(item, args) == True:
@@ -1394,6 +1476,7 @@ def get_feed(url, args, site_json, save_debug=False):
                 if 'max' in args:
                     if n == int(args['max']):
                         break
+
     feed = utils.init_jsonfeed(args)
     if feed_title:
         feed['title'] = feed_title

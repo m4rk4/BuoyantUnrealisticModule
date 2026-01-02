@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 def resize_image(img_src, width=1000):
     split_url = urlsplit(img_src)
-    query = parse_qs(split_url.query)
-    if query.get('id'):
-        return '{}://{}{}?id={}&width={}'.format(split_url.scheme, split_url.netloc, split_url.path, query['id'][0], width)
+    params = parse_qs(split_url.query)
+    if params.get('id'):
+        return split_url.scheme + '://' + split_url.netloc + split_url.path + 'id=' + params['id'][0] + '&width=' + str(width)
     else:
-        return '{}://{}{}?width={}'.format(split_url.scheme, split_url.netloc, split_url.path, width)
+        return split_url.scheme + '://' + split_url.netloc + split_url.path + '?width=' + str(width)
 
 
 def render_content(content):
@@ -388,6 +388,73 @@ def render_content(content):
     return content_html
 
 
+def format_shortcodes(content_html, shortcodes, shortcodes_params, in_gallery=False):
+    for key, val in shortcodes.items():
+        if key.startswith('[rebelmouse-image'):
+            img_src = ''
+            m = re.search(r'data-rm-shortcode-id="([^"]+)', val)
+            if m and m.group(1) in shortcodes_params:
+                params = shortcodes_params[m.group(1)]
+                crop_info = json.loads(unquote_plus(params['crop_info']))
+                images = []
+                for k, v in crop_info['thumbnails'].items():
+                    if k.endswith('x'):
+                        images.append({"src": v, "width": int(k.strip('x'))})
+                if images:
+                    img_src = utils.closest_dict(images, 'width', 1000)['src']
+                else:
+                    img_src = crop_info['image']
+                captions = []
+                if params.get('caption'):
+                    captions.append(params['caption'])
+                if params.get('photo_credit'):
+                    captions.append(params['photo_credit'])
+            else:
+                m = re.search(r'crop_info="([^"]+)', val)
+                if m:
+                    crop_info = json.loads(unquote_plus(m.group(1)))
+                    images = []
+                    for k, v in crop_info['thumbnails'].items():
+                        if k.endswith('x'):
+                            images.append({"src": v, "width": int(k.strip('x'))})
+                    if images:
+                        img_src = utils.closest_dict(images, 'width', 1000)['src']
+                    else:
+                        img_src = crop_info['image']
+                    captions = []
+                    m = re.search(r'caption="([^"]+)', val)
+                    if m:
+                        captions.append(m.group(1))
+                    m = re.search(r'photo_credit="([^"]+)', val)
+                    if m:
+                        captions.append(m.group(1))
+            if img_src:
+                if in_gallery:
+                    new_html = utils.add_image(img_src, ' | '.join(captions), fig_style="margin:0; padding:0;")
+                else:
+                    new_html = utils.add_image(img_src, ' | '.join(captions))
+                content_html = content_html.replace(key, new_html)
+            else:
+                logger.warning('unhandled rebelmouse-image shortcode ' + val)
+        elif key.startswith('[youtube'):
+            m = re.search(r'src="([^"]+)', val)
+            new_html = utils.add_embed(m.group(1))
+            content_html = content_html.replace(key, new_html)
+        elif key.startswith('[twitter_embed'):
+            m = re.search(r'https://twitter\.com/[^\s]+', key)
+            new_html = utils.add_embed(m.group(0))
+            content_html = content_html.replace(key, new_html)
+        elif key.startswith('[instagram'):
+            m = re.search(r'https://www\.instagram\.com/[^\s]+', key)
+            new_html = utils.add_embed(m.group(0))
+            content_html = content_html.replace(key, new_html)
+        elif key.startswith('[shortcode-InText-Newsletter'):
+            content_html = content_html.replace(key, '')
+        else:
+            content_html = content_html.replace(key, val)
+    return content_html
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     article_html = utils.get_url_html(url)
@@ -401,12 +468,16 @@ def get_content(url, args, site_json, save_debug=False):
         s = s[:-1]
     n = s.find('{')
     bootstrap_data = json.loads(s[n:])
-    if bootstrap_data.get('fullBootstrapUrl'):
+    if save_debug:
+        utils.write_file(bootstrap_data, './debug/bootstrap.json')
+    if 'bootstrap_path' in site_json:
+        bootstrap_path = site_json['bootstrap_path'].replace('SITE_ID', str(bootstrap_data['site']['id'])).replace('RESOURCE_ID', bootstrap_data['resourceId']).replace('PATH_PARAMS', quote_plus(json.dumps(bootstrap_data['pathParams'], separators=(',', ':')))).replace('PAGE_PATH', quote_plus(bootstrap_data['path'])).replace('POST_ID', str(bootstrap_data['post']['id']))
+    elif bootstrap_data.get('fullBootstrapUrl'):
         bootstrap_path = bootstrap_data['fullBootstrapUrl'].replace('\\u0026', '&')
     else:
-        bootstrap_path = '/res/bootstrap/data.js?site_id={}&resource_id={}&path_params={}&warehouse10x=1&override_device=desktop&post_id={}'.format(bootstrap_data['site']['id'], bootstrap_data['resourceId'], quote_plus(json.dumps(bootstrap_data['pathParams'])), bootstrap_data['post']['id'])
-    bootstrap_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, bootstrap_path)
-    #print(bootstrap_url)
+        bootstrap_path = '/res/bootstrap/data.js?site_id=' + bootstrap_data['site']['id'] + '&resource_id=' + bootstrap_data['resourceId'] + '&path_params=' + quote_plus(json.dumps(bootstrap_data['pathParams'], separators=(',', ':'))) + '&warehouse10x=1&override_device=desktop&post_id=' + bootstrap_data['post']['id']
+    bootstrap_url = split_url.scheme + '://' + split_url.netloc + bootstrap_path
+    print(bootstrap_url)
     bootstrap_json = utils.get_url_json(bootstrap_url)
 
     post_json = bootstrap_json['post']
@@ -457,10 +528,6 @@ def get_content(url, args, site_json, save_debug=False):
     elif post_json.get('description'):
         item['summary'] = post_json['description']
 
-    content_json = json.loads(post_json['structurized_content'])
-    if save_debug:
-        utils.write_file(content_json, './debug/content.json')
-
     item['content_html'] = ''
 
     if post_json.get('subheadline'):
@@ -472,11 +539,18 @@ def get_content(url, args, site_json, save_debug=False):
     elif post_json.get('teaser_image_info'):
         image_info = post_json['teaser_image_info']
     if image_info:
+        images = []
         for key, val in image_info.items():
-            if key == 'origin':
-                continue
-            break
-        item['_image'] = resize_image(val)
+            if key.endswith('x'):
+                images.append({"src": val, "width": int(key.strip('x'))})
+        if images:
+            item['image'] = utils.closest_dict(images, 'width', 1000)['src']
+        elif 'origin' in image_info:
+            item['image'] = image_info['origin']
+        elif post_json.get('image_id'):
+            item['image'] = 'https://assets.rbl.ms/' + str(post_json['image_id']) + '/origin.png'
+        elif post_json.get('image_thumb'):
+            item['image'] = post_json['image_thumb']
 
     if post_json.get('video'):
         if post_json.get('video_provider') and post_json['video_provider'] == 'youtube':
@@ -492,7 +566,7 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += utils.add_embed(query['video_url'][0], embed_args)
             else:
                 logger.warning('unhandled video {} in {}'.format(post_json['video'], item['url']))
-    else:
+    elif 'image' in item:
         captions = []
         if post_json.get('photo_caption'):
             m = re.search('^<p>(.+?)</p>$', post_json['photo_caption'])
@@ -506,25 +580,120 @@ def get_content(url, args, site_json, save_debug=False):
                 captions.append(m.group(1))
             else:
                 captions.append(post_json['photo_credit'])
-
-        if item.get('_image'):
-            item['content_html'] += utils.add_image(item['_image'], ' | '.join(captions))
+        item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
         return item
 
-    for child in content_json['children']:
-        item['content_html'] += render_content(child)
+    if post_json.get('structurized_content'):
+        content_json = json.loads(post_json['structurized_content'])
+        if save_debug:
+            utils.write_file(content_json, './debug/content.json')
+        for child in content_json['children']:
+            item['content_html'] += render_content(child)
+        body = None
+    elif post_json.get('listicle') and post_json['listicle'].get('items'):
+        if post_json.get('description_before_listicle_filter'):
+            body = BeautifulSoup(post_json['description_before_listicle_filter'], 'html.parser')
+        else:
+            body = BeautifulSoup(post_json['body'], 'html.parser')
+        el = body.find('listicle')
+        if el:
+            new_html = ''
+            for it in post_json['listicle']['items_order']:
+                listicle = post_json['listicle']['items'][it[0]]
+                if listicle.get('headline'):
+                    new_html += '<h3>' + listicle['headline'] + '</h3>'
+                if len(it) == 1:                
+                    if listicle.get('media'):
+                        if listicle.get('media_shortcodes'):
+                            new_html += format_shortcodes(listicle['media'], listicle['media_shortcodes'], listicle['media_shortcodes_params'])
+                        else:
+                            new_html += listicle['media']
+                    if listicle.get('body'):
+                        new_html += listicle['body']
+                else:
+                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin:1em 0;">'
+                    for i in it:
+                        new_html += '<div style="flex:1; min-width:360px;">'
+                        listicle = post_json['listicle']['items'][i]
+                        if listicle.get('media'):
+                            if listicle.get('media_shortcodes'):
+                                new_html += format_shortcodes(listicle['media'], listicle['media_shortcodes'], listicle['media_shortcodes_params'], in_gallery=True)
+                            else:
+                                new_html += listicle['media']
+                        new_html += '</div>'
+                    new_html += '</div>'
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+    elif post_json.get('body'):
+        body = BeautifulSoup(post_json['body'], 'html.parser')
+
+    if body:
+        if save_debug:
+            utils.write_file(str(body), './debug/debug.html')
+        has_dropcap = False
+        for el in body.find_all(class_='horizontal-rule'):
+            el.name = 'hr'
+            el.attrs = {}
+            el['style'] = 'margin:1em 0;'
+        for el in body.find_all('p', class_='pull-quote'):
+            new_html = utils.add_pullquote(el.decode_contents())
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        for el in body.find_all('blockquote', recursive=False):
+            if not el.get('class'):
+                el['style'] = config.blockquote_style
+                continue
+            elif 'twitter-tweet' in el['class']:
+                links = el.find_all('a')
+                new_html = utils.add_embed(links[-1]['href'])
+            elif 'tiktok-embed' in el['class']:
+                new_html = utils.add_embed(el['cite'])
+            if new_html:
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled blockquote class ' + str(el['class']))
+        for el in body.find_all('p', class_='drop-caps'):
+            el['class'] = ['dropcap']
+            if has_dropcap == False:
+                item['content_html'] += '<style>' + config.dropcap_style + '</style>'
+                has_dropcap = True
+        for el in body.find_all(class_='shortcode-media'):
+            for it in el.find_all(class_='image-media'):
+                it.decompose()
+            el.unwrap()
+        for el in body.select('p:has(> a > img)'):
+            if split_url.netloc not in el.img['src'] and 'assets.rbl.ms' not in el.img['src']:
+                new_html = utils.add_image(el.img['src'], link=el.a['href'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+        for el in body.find_all(class_=['rm-embed', 'rm-shortcode']):
+            it = el.find('iframe')
+            if it:
+                new_html = utils.add_embed(it['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled {} in {}'.format(el['class'], item['url']))
+        for el in body.find_all('center', recursive=False):
+            el.unwrap()
+        for el in body.find_all('iframe', recursive=False):
+            new_html = utils.add_embed(el['src'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        item['content_html'] += str(body)
 
     if post_json.get('original_url'):
         item['content_html'] += '<p><a href="{}">Read more at {}</a></p>'.format(post_json['original_url'], post_json['original_domain'])
 
     if post_json.get('shortcodes'):
-        for key, val in post_json['shortcodes'].items():
-            item['content_html'] = item['content_html'].replace(key, val)
+        item['content_html'] = format_shortcodes(item['content_html'], post_json['shortcodes'], post_json['shortcodes_params'])
+    elif post_json.get('media_shortcodes'):
+        item['content_html'] = format_shortcodes(item['content_html'], post_json['media_shortcodes'], post_json['media_shortcodes_params'])
 
-    #item['content_html'] = post_json['body']
     return item
 
 

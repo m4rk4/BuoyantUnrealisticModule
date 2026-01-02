@@ -17,6 +17,11 @@
                 display: flex;
                 height: 110px;
             }
+            @media (prefers-color-scheme: dark) {
+                summary::before {
+                    filter: invert(1);
+                }
+            }
             summary::before {
                 flex-shrink: 0;
                 content: '';
@@ -34,7 +39,7 @@
             }
             summary > div > a {
                 text-decoration: none;
-                font-size: 1.2em;
+                font-size: larger;
                 font-weight: bold;
                 color: color-mix(in srgb, CanvasText, Canvas 15%);
                 overflow: hidden;
@@ -44,6 +49,7 @@
                 -webkit-box-orient: vertical;
             }
             summary > div > p {
+                font-size:smaller;
                 margin: 8px 0 0 0;
                 overflow: hidden;
                 display: -webkit-box;
@@ -68,7 +74,7 @@
         </style>
 		<title>{{ title }}</title>
 	</head>
-	<body style="max-width:800px; font-size:18px;">
+	<body style="max-width:800px; font-size:larger;">
         <h2><a href="{{ link }}" target="_blank">{{ title }}</a></h2>
 {% for item in items %}
         <details name="article" style="margin:1em 0;">

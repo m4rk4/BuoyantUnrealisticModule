@@ -49,7 +49,7 @@ def get_item_info(sc_json):
         item['tags'].append(sc_json['genre'])
 
     if sc_json.get('artwork_url'):
-        item['_image'] = sc_json['artwork_url'].replace('-large', '-t500x500')
+        item['image'] = sc_json['artwork_url'].replace('-large', '-t500x500')
     return item
 
 
@@ -69,8 +69,8 @@ def get_track_content(track_id, client_id, secret_token, save_debug):
     if not item:
         return None
 
-    if item.get('_image'):
-        poster = '{}/image?width=100&overlay=audio&url={}'.format(config.server, item['_image'])
+    if item.get('image'):
+        poster = '{}/image?width=100&overlay=audio&url={}'.format(config.server, item['image'])
     else:
         poster = '{}/image?width=100&height=100&color=grey&overlay=audio'.format(config.server)
     audio_url = '/audio?url=' + quote_plus(item['url'])
@@ -116,8 +116,8 @@ def get_playlist_content(playlist_id, client_id, secret_token, save_debug):
         return None
 
     item['content_html'] = '<center><table style="width:480px; border:1px solid black; border-radius:10px; border-spacing: 0;">'
-    if item.get('_image'):
-        item['content_html'] += '<tr><td colspan="2" style="padding:0 0 1em 0; margin:0;"><img style="display:block; width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" src="{}"></td></tr>'.format(item['_image'])
+    if item.get('image'):
+        item['content_html'] += '<tr><td colspan="2" style="padding:0 0 1em 0; margin:0;"><img style="display:block; width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" src="{}"></td></tr>'.format(item['image'])
         img_border = ''
     else:
         img_border = ' border-top-left-radius: 10px;'
@@ -213,35 +213,46 @@ def get_content(url, args, site_json, save_debug=False):
         query = parse_qs(split_url.query)
         api_url = query['url'][0]
     else:
-        page_html = utils.get_url_html(url)
-        soup = BeautifulSoup(page_html, 'html.parser')
-        el = soup.find('meta', attrs={"property": "twitter:player"})
-        if el:
-            split_url = urlsplit(el['content'])
-            query = parse_qs(split_url.query)
-            api_url = query['url'][0]
-        else:
-            el = soup.find('meta', attrs={"itemprop": "embedUrl"})
-            if el:
-                embed_url = el['content']
-                split_url = urlsplit(el['content'])
+        oembed_json = utils.get_url_json('https://soundcloud.com/oembed?url=' + quote_plus(url) + '&format=json')
+        if oembed_json:
+            m = re.search(r'src="([^"]+)', oembed_json['html'])
+            if m:
+                split_url = urlsplit(m.group(1))
                 query = parse_qs(split_url.query)
                 api_url = query['url'][0]
-            else:
-                el = soup.find('link', href=re.compile(r'^(android|ios)-app:'))
-                if el:
-                    m = re.search(r'soundcloud/(\w+):(\d+)', el['href'])
-                    if m:
-                        if m.group(1) == 'sounds':
-                            api_url = 'https://api.soundcloud.com/tracks/{}'.format(m.group(2))
-                        else:
-                            api_url = 'https://api.soundcloud.com/{}/{}'.format(m.group(1), m.group(2))
+        
+        # page_html = utils.get_url_html(url)
+        # if not page_html:
+        #     return None
+        # soup = BeautifulSoup(page_html, 'html.parser')
+        # el = soup.find('meta', attrs={"property": "twitter:player"})
+        # if el:
+        #     split_url = urlsplit(el['content'])
+        #     query = parse_qs(split_url.query)
+        #     api_url = query['url'][0]
+        # else:
+        #     el = soup.find('meta', attrs={"itemprop": "embedUrl"})
+        #     if el:
+        #         embed_url = el['content']
+        #         split_url = urlsplit(el['content'])
+        #         query = parse_qs(split_url.query)
+        #         api_url = query['url'][0]
+        #     else:
+        #         el = soup.find('link', href=re.compile(r'^(android|ios)-app:'))
+        #         if el:
+        #             m = re.search(r'soundcloud/(\w+):(\d+)', el['href'])
+        #             if m:
+        #                 if m.group(1) == 'sounds':
+        #                     api_url = 'https://api.soundcloud.com/tracks/{}'.format(m.group(2))
+        #                 else:
+        #                     api_url = 'https://api.soundcloud.com/{}/{}'.format(m.group(1), m.group(2))
     if not api_url:
         logger.warning('unable to find the api url in ' + url)
         return None
 
+    logger.debug(api_url)
     #sites_json = utils.read_json_file('./sites.json')
-
+    
     widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), site_json['client_id'], site_json['app_version'])
     query = parse_qs(urlsplit(api_url).query)
     if query.get('secret_token'):
@@ -283,16 +294,16 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 item['tags'].append(it)
     if api_json.get('artwork_url'):
-        item['_image'] = api_json['artwork_url'].replace('large', 't500x500')
-        poster = '{}/image?url={}&height=128'.format(config.server, item['_image'])
+        item['image'] = api_json['artwork_url'].replace('large', 't500x500')
+        poster = '{}/image?url={}&height=128'.format(config.server, item['image'])
     elif api_json['user'].get('avatar_url'):
-        item['_image'] = api_json['user']['avatar_url'].replace('large', 't500x500')
-        poster = '{}/image?url={}&height=128'.format(config.server, item['_image'])
+        item['image'] = api_json['user']['avatar_url'].replace('large', 't500x500')
+        poster = '{}/image?url={}&height=128'.format(config.server, item['image'])
     else:
-        #item['_image'] = '{}/image?height=500&width=500'.format(config.server)
+        #item['image'] = '{}/image?height=500&width=500'.format(config.server)
         #poster = '{}/image?height=128&width=128'.format(config.server)
-        item['_image'] = 'https://d21buns5ku92am.cloudfront.net/26628/images/419678-1x1_SoundCloudLogo_wordmark-341a25-original-1645807040.jpg'
-        poster = '{}/image?url={}&height=128'.format(config.server, item['_image'])
+        item['image'] = 'https://d21buns5ku92am.cloudfront.net/26628/images/419678-1x1_SoundCloudLogo_wordmark-341a25-original-1645807040.jpg'
+        poster = '{}/image?url={}&height=128'.format(config.server, item['image'])
     if api_json.get('description'):
         item['summary'] = api_json['description']
 
@@ -309,40 +320,44 @@ def get_content(url, args, site_json, save_debug=False):
             audio_json = utils.get_url_json(media_url)
             if audio_json:
                 item['_audio'] = audio_json['url']
-
-        item['content_html'] = utils.add_audio_v2(item['_audio'], item['_image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], float(api_json['duration']) / 1000, icon_logo=config.icon_soundcloud)
-    
+                item['_audio_type'] = media['format']['mime_type']
+        audio_src = config.server + '/audio?url=' + quote_plus(item['url'])
+        title = '<a href="{0}" target="_blank" title="{1}">{1}</a>'.format(item['url'], item['title'])
+        artist = '<a href="{0}" target="_blank" title="{1}">{1}</a>'.format(item['author']['url'], item['author']['name'])
+        date_time = utils.calc_duration(float(api_json['duration']) / 1000, time_format=':')
+        item['content_html'] = utils.add_audio_player(audio_src, item['image'], title, artist, date_time, logo=config.logo_soundcloud)
         if 'embed' not in args and api_json.get('description'):
-            item['content_html'] += '<p>{}</p>'.format(api_json['description'])
+            item['content_html'] += '<p>' + api_json['description'] + '</p>'
 
     elif api_json['kind'] == 'playlist':
-        poster = '<img src="{}"/>'.format(poster)
-        item['content_html'] = '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;"><tr><td style="width:128px;">{}</td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/>by <a href="{}">{}</a><br/><small>released {}</small></td></tr><table>'.format(poster, item['url'], item['title'], item['author']['url'], item['author']['name'], item['_display_date'])
-
-        item['content_html'] += '<table style="width:90%; max-width:496px; margin-left:auto; margin-right:auto;">'
-        for i, track in enumerate(api_json['tracks']):
+        tracks = []
+        for i, track in enumerate(api_json['tracks'], start=1):
             if track.get('title'):
                 track_json = track
             else:
                 api_url = 'https://api.soundcloud.com/tracks/{}'.format(track['id'])
                 widget_url = 'https://api-widget.soundcloud.com/resolve?url={}&format=json&client_id={}&app_version={}'.format(quote_plus(api_url), site_json['client_id'], site_json['app_version'])
                 track_json = utils.get_url_json(widget_url)
-            item['content_html'] += '<tr><td style="width:1em;">{}.</td><td style="width:1em;">'.format(i+1)
+
             media = next((it for it in track_json['media']['transcodings'] if it['format']['protocol'] == 'progressive'), None)
             if not media:
                 media = next((it for it in track_json['media']['transcodings'] if (it['format']['protocol'] == 'hls' and it['preset'].startswith('mp3'))), None)
             if media:
-                audio_json = utils.get_url_json(media['url'] + '?client_id=' + site_json['client_id'])
-                if audio_json:
-                    item['content_html'] += '<a href="{}/openplayer?url={}&content_type=audio&poster={}" style="text-decoration:none;">'.format(config.server, quote_plus(track_json['uri']), quote_plus(track_json['artwork_url'].replace('large', 't500x500')))
-                    if media['snipped']:
-                        item['content_html'] += '&#9655;</a>'
-                    else:
-                        item['content_html'] += '&#9654;</a>'
-            item['content_html'] += '</td><td style="width:99%;"><a href="{}">{}</a>'.format(track_json['permalink_url'], track_json['title'])
+                audio_src = config.server + '/audio?url=' + quote_plus(track_json['permalink_url'])
+            else:
+                audio_src = ''
+            title = str(i) + '. <a href="' + track_json['permalink_url'] + '" target="_blank">' + track_json['title'] + '</a>'
             if track_json['user']['id'] != api_json['user']['id']:
-                item['content_html'] += ' by <a href="{}" style="text-decoration:none;">{}</a>'.format(track_json['user']['permalink_url'], track_json['user']['username'])
-            item['content_html'] += '</td></tr>'
+                artist = '<a href="' + track_json['user']['permalink_url'] + '" target="_blank">' + track_json['user']['username'] + '</a>'
+            else:
+                artist = ''
+            tracks.append({
+                "src": audio_src,
+                "title": title,
+                "artist": artist,
+                "duration": utils.calc_duration(track_json['duration']/1000, True, ':'),
+                "poster": track_json['artwork_url']
+            })
             if track_json.get('tag_list'):
                 tag = ''
                 for it in track_json['tag_list'].split(' '):
@@ -358,7 +373,13 @@ def get_content(url, args, site_json, save_debug=False):
                     else:
                         if it not in item['tags']:
                             item['tags'].append(it)
-        item['content_html'] += '</table>'
+        title = '<a href="{0}" target="_blank" title="{1}">{1}</a>'.format(item['url'], item['title'])
+        artist = '<a href="{0}" target="_blank" title="{1}">{1}</a>'.format(item['author']['url'], item['author']['name'])
+        date_time = item['_display_date']
+        item['content_html'] = utils.add_audio_player(audio_src, item['image'], title, artist, date_time, logo=config.logo_soundcloud, tracks=tracks)
+
+        # item['content_html'] = utils.add_audio_v2(config.server + '/playlist?url=' + quote_plus(item['url']), item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], '', audio_type='audio_link', desc=tracks_html, icon_logo=config.logo_soundcloud)
+
 
     if not item.get('tags'):
         del item['tags']

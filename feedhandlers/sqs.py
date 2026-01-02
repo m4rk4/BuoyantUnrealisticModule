@@ -17,36 +17,55 @@ def resize_image(img_src, width=1080):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    page_json = utils.get_url_json('{}://{}{}?format=json-pretty'.format(split_url.scheme, split_url.netloc, split_url.path))
+    page_json = utils.get_url_json(split_url.scheme + '://' + split_url.netloc + split_url.path + '?format=json-pretty')
     if not page_json:
         return None
     if save_debug:
         utils.write_file(page_json, './debug/debug.json')
 
-    post_json = page_json['item']
+    if 'item' in page_json:
+        post_json = page_json['item']
+    elif 'collection' in page_json:
+        post_json = page_json['collection']
+    else:
+        logger.warning('unknown post data in ' + url)
+        return None
 
     item = {}
     item['id'] = post_json['id']
-    item['url'] = '{}://{}{}'.format(split_url.scheme, split_url.netloc, post_json['fullUrl'])
+    item['url'] = split_url.scheme + '://' + split_url.netloc + post_json['fullUrl']
     item['title'] = post_json['title']
 
     # TODO: check timezone
     tz_loc = pytz.timezone('US/Eastern')
-    dt_loc = datetime.fromtimestamp(post_json['publishOn']/1000)
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
+    if post_json.get('publishOn'):
+        dt_loc = datetime.fromtimestamp(post_json['publishOn']/1000)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
     if post_json.get('updatedOn'):
         dt_loc = datetime.fromtimestamp(post_json['updatedOn']/1000)
         dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-        item['date_modified'] = dt.isoformat()
+        if 'date_published' not in item:
+            item['date_published'] = dt.isoformat()
+            item['_timestamp'] = dt.timestamp()
+            item['_display_date'] = utils.format_display_date(dt)
+        else:
+            item['date_modified'] = dt.isoformat()
 
-    item['author'] = {
-        "name": post_json['author']['displayName']
-    }
-    item['authors'] = []
-    item['authors'].append(item['author'])
+    if post_json.get('author'):
+        item['author'] = {
+            "name": post_json['author']['displayName']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    elif page_json.get('website'):
+        item['author'] = {
+            "name": page_json['website']['siteTitle']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
 
     item['tags'] = []
     if post_json.get('categories'):
@@ -63,10 +82,14 @@ def get_content(url, args, site_json, save_debug=False):
                 del item['image']
         else:
             item['image'] = post_json['assetUrl']
+    elif post_json.get('seoData') and post_json['seoData'].get('seoImage'):
+        item['image'] = post_json['seoData']['seoImage']['assetUrl']
 
     if post_json.get('excerpt'):
         soup = BeautifulSoup(post_json['excerpt'], 'html.parser')
         item['summary'] = soup.get_text()
+    elif post_json.get('seoData') and post_json['seoData'].get('seoDescription'):
+        item['summary'] = post_json['seoData']['seoDescription']
 
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
@@ -76,8 +99,10 @@ def get_content(url, args, site_json, save_debug=False):
 
     if post_json.get('promotedBlock'):
         soup = BeautifulSoup(post_json['promotedBlock'] + post_json['body'], 'html.parser')
-    else:
+    elif post_json.get('body'):
         soup = BeautifulSoup(post_json['body'], 'html.parser')
+    elif page_json.get('mainContent'):
+        soup = BeautifulSoup(page_json['mainContent'], 'html.parser')
 
     if save_debug:
         utils.write_file(str(soup), './debug/debug.html')

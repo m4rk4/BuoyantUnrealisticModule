@@ -35,7 +35,7 @@ def get_content(url, args, site_json, save_debug=False):
         if query.get('list'):
             playlist_id = query['list'][0]
 
-    if 'embed' in args:
+    if False:
         page_html = utils.get_url_html('https://www.youtube-nocookie.com/embed/' + video_id, user_agent='googlebot-video')
         if page_html:
             m = re.search(r'ytcfg\.set\((.*?)\);window\.ytcfg', page_html)
@@ -71,29 +71,29 @@ def get_content(url, args, site_json, save_debug=False):
     # By default, the only combined video+audio format is 360p
     # player_client = mediaconnect has higher quality combined video+audio formats in m3u8 playlist
     ydl_opts = {
+        "js_runtimes": {
+            "deno": {
+                "path": config.deno_exe
+            }
+        },
         "skip_download": True,
         "ignore_no_formats_error": True,
         "forcejson": True,
         "noprogress": True,
         "quiet": True,
         "extractor_args": {
-            "youtube": {
-                "player_client": [
-                    "mweb"
-                ]
-            }
         }
     }
-    if config.bgutil_base_url:
-        ydl_opts['extractor_args']['youtubepot-bgutilhttp'] = {
-            "base_url": [
-                config.bgutil_base_url
-            ]
-        }
-    elif config.youtube_po_token:
-        ydl_opts['extractor_args']['youtube']['po_token'] = [
-            "mweb.gvs+" + config.youtube_po_token
-        ]
+    # if config.bgutil_base_url:
+    #     ydl_opts['extractor_args']['youtubepot-bgutilhttp'] = {
+    #         "base_url": [
+    #             config.bgutil_base_url
+    #         ]
+    #     }
+    # elif config.youtube_po_token:
+    #     ydl_opts['extractor_args']['youtube']['po_token'] = [
+    #         "mweb.gvs+" + config.youtube_po_token
+    #     ]
 
     if 'player_client' in args:
         ydl_opts["extractor_args"]['youtube']['player_client'] = args['player_client'].split(',')
@@ -146,6 +146,7 @@ def get_content(url, args, site_json, save_debug=False):
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt)
 
+    # TODO: multiple creators: https://www.youtube.com/watch?v=lKWvtcGfLHI (how to get both creator ids?)
     if video_info.get('uploader'):
         item['author'] = {
             "name": video_info['uploader']
@@ -224,7 +225,7 @@ def get_content(url, args, site_json, save_debug=False):
         video_url = config.server + '/video?url=' + quote_plus(item['url'])
         if 'player_client'  in args:
             video_url += '&player_client=' + args['player_client']
-        item['content_html'] = utils.add_image(item['image'], caption, link=video_url, overlay=config.video_button_overlay, overlay_heading=heading)
+        item['content_html'] = utils.add_image(item['image'], caption, link=video_url, overlay=config.youtube_button_overlay, overlay_heading=heading)
 
     if playlist_info:
         item['_playlist'] = []

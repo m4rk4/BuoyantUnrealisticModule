@@ -77,7 +77,7 @@ def add_media(media_id):
                     video_type = 'application/dash+xml'
                 else:
                     video_type = 'application/x-mpegURL'
-            media_html = utils.add_video(video_src, video_type, poster, media_json.get('caption'))
+            media_html = utils.add_video(video_src, video_type, poster, media_json.get('caption'), use_videojs=True)
     return media_html
 
 
@@ -200,29 +200,50 @@ def get_content(url, args, site_json, save_debug=False):
             return item
 
     if article_json.get('body'):
-        soup = BeautifulSoup(article_json['body'], 'html.parser')
+        # item['content_html'] += article_json['body']
+        def sub_img(matchobj):
+            return add_media(matchobj.group(1))
+        body_html = re.sub(r'<img[^>]*data-document-id="([^"]+)"[^>]*>', sub_img, article_json['body'])
+
+        soup = BeautifulSoup(body_html, 'html.parser')
+        if save_debug:
+            utils.write_file(str(soup), './debug/debug.html')
+
         for el in soup.find_all(class_=re.compile(r'tabula')):
             el.decompose()
+
+        for el in soup.find_all(class_='related-entries'):
+            el.decompose()
+
+        for el in soup.find_all(attrs={"data-id": "injected-recirculation-link"}):
+            el.decompose()
+
+        for el in soup.select('p:has(> a > strong)'):
+            if el.string and el.string.isupper():
+                el.decompose()
 
         for el in soup.find_all(class_='buy-block-info'):
             el.name = 'p'
 
-        for el in soup.find_all(class_='buy-block-promo'):
+        for el in soup.find_all(class_=['content-list-component', 'buy-block-promo']):
             el.unwrap()
+
+        for el in soup.find_all(class_=['wp-block-heading', 'wp-block-list']):
+            el.attrs = {}
 
         for el in soup.find_all('a', class_='buy-block-cta'):
             new_html = utils.add_button(el['href'], el.string)
             new_el = BeautifulSoup(new_html, 'html.parser')
             el.replace_with(new_el)
 
-        for el in soup.find_all('img'):
-            new_html = add_media(el['data-document-id'])
-            if new_html:
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.insert_after(new_el)
-                el.decompose()
-            else:
-                logger.warning('unhandled img in ' + url)
+        # This was removing some content. Replace by re.sub above.
+        # for el in soup.find_all('img', attrs={"data-document-id": True}):
+        #     new_html = add_media(el['data-document-id'])
+        #     if new_html:
+        #         new_el = BeautifulSoup(new_html, 'html.parser')
+        #         el.replace_with(new_el)
+        #     else:
+        #         logger.warning('unhandled img in ' + url)
 
         for el in soup.find_all(attrs={"data-embed-type": True}):
             new_html = ''
@@ -258,10 +279,8 @@ def get_content(url, args, site_json, save_debug=False):
                 desc += '<h4>{}</h4>'.format(slide['title'])
             if slide.get('body'):
                 desc += slide['body']
-            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": img_src, "desc": desc})
+            item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb, "desc": desc})
             item['content_html'] += utils.add_image(resize_image(slide['image']['url']), caption, desc=desc)
-
-    item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
 
     if article_json.get('sourceHref') and urlsplit(article_json['sourceHref']).netloc != 'www.msn.com':
         item['content_html'] += '<h2>Original article</h2>'

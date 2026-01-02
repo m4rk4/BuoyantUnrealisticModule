@@ -6,7 +6,7 @@ authors = ["m4rk4 <<>>"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.11"
 Flask = "*"
 flask-cors = "*"
 av = "*"
@@ -31,7 +31,6 @@ tldextract = "*"
 urllib3 = "*"
 cloudscraper = "*"
 staticmap = "*"
-pytube = "*"
 basencode = "*"
 requests-oauthlib = "*"
 cryptography = "*"
@@ -39,26 +38,22 @@ utils = "*"
 config = "*"
 playwright = "*"
 image-utils = "*"
-js2py = "*"
 curl-cffi = "*"
 certifi = "*"
 pygal = "*"
 duckduckgo-search = "*"
-#yt-dlp = {extras = ["default", "curl-cffi"], version = "*"}
-yt-dlp = "*"
 podcastparser = "*"
-stpyv8 = "*"
-herbal = "*"
 browserforge = {extras = ["all"], version = "*"}
-pyjwt = "*"
 pip-system-certs = "*"
 unidecode = "*"
-pyotp = "*"
-pybatchexecute = "^1.0.0"
-g4f = {extras = ["slim"], version = "^0.5.2.2"}
-spotifyscraper = "^2.0.20"
+pybatchexecute = "*"
+g4f = {extras = ["slim"], version = "*"}
+spotifyscraper = "*"
 ytmusicapi = "*"
-bgutil-ytdlp-pot-provider = "*"
+asyncio = "*"
+rnet = "3.0.0rc14"
+pythonmonkey = "*"
+yt-dlp = {extras = ["default"], version = "^2025.11.12"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -38,15 +38,17 @@ def get_img_src(fig_html):
     if not fig_html:
         return '', ''
     figure = BeautifulSoup(fig_html, 'html.parser')
-    img_src = figure.img['src']
-    if figure.figcaption:
-        caption = figure.figcaption.decode_contents()
+    images = figure.find_all('img')
+    img_src = images[-1]['src']
+    figcap = figure.find('figcaption')
+    if figcap:
+        caption = figcap.decode_contents()
     else:
         caption = ''
     return img_src, caption
 
 
-def get_field_data(data, api_path, caption='', video_poster=''):
+def get_field_data(data, api_path, caption='', video_poster='', site_json=None):
     field_html = ''
     if data['id'] == 'missing':
         return ''
@@ -54,8 +56,8 @@ def get_field_data(data, api_path, caption='', video_poster=''):
     if field_json:
         #utils.write_file(field_json, './debug/field.json')
         if field_json['data']['type'] == 'brightcove_video--brightcove_video':
-            player = get_field_data(field_json['data']['relationships']['player']['data'], api_path)
-            poster = get_field_data(field_json['data']['relationships']['poster']['data'], api_path)
+            player = get_field_data(field_json['data']['relationships']['player']['data'], api_path, site_json=site_json)
+            poster = get_field_data(field_json['data']['relationships']['poster']['data'], api_path, site_json=site_json)
             m = re.search(r'v1_static_(\d+)', poster)
             if m:
                 field_html = utils.add_embed('https://players.brightcove.net/{}/{}_default/index.html?videoId={}'.format(m.group(1), player, field_json['data']['attributes']['video_id']))
@@ -66,7 +68,9 @@ def get_field_data(data, api_path, caption='', video_poster=''):
             field_html = field_json['data']['attributes']['player_id']
 
         elif field_json['data']['type'] == 'file--file':
-            if field_json['data']['attributes']['uri']['url'].startswith('/'):
+            if field_json['data']['attributes']['uri'].get('value') and field_json['data']['attributes']['uri']['value'].startswith('public://') and 'public_path' in site_json:
+                field_html = site_json['public_path'] + field_json['data']['attributes']['uri']['value'].replace('public://', '/public/')
+            elif field_json['data']['attributes']['uri']['url'].startswith('/'):
                 field_html = 'https://' + urlsplit(api_path).netloc + field_json['data']['attributes']['uri']['url']
             else:
                 field_html = field_json['data']['attributes']['uri']['url']
@@ -83,7 +87,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
             field_html = utils.add_audio_v2(field_json['data']['attributes']['field_audio_url'], field_json['data']['attributes']['field_imageuri'], field_json['data']['attributes']['name'], field_json['data']['attributes']['field_embedurl'], author, author_url, utils.format_display_date(dt, True), field_json['data']['attributes']['field_durationseconds'])
 
         elif field_json['data']['type'] == 'media--brightcove_video':
-            field_html = get_field_data(field_json['data']['relationships']['field_media_brightcove_video']['data'], api_path)
+            field_html = get_field_data(field_json['data']['relationships']['field_media_brightcove_video']['data'], api_path, site_json=site_json)
 
         elif field_json['data']['type'] == 'media--image':
             captions = []
@@ -116,11 +120,11 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                     x.insert(6, 'c_fill,g_auto,w_1000')
                     img_src = '/'.join(x)
                 else:
-                    img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_path)
+                    img_src = get_field_data(field_json['data']['relationships']['field_media_image']['data'], api_path, site_json=site_json)
             elif field_json['data']['relationships'].get('image'):
-                img_src = get_field_data(field_json['data']['relationships']['image']['data'], api_path)
+                img_src = get_field_data(field_json['data']['relationships']['image']['data'], api_path, site_json=site_json)
             elif field_json['data']['relationships'].get('field_image'):
-                img_src = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path)
+                img_src = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path, site_json=site_json)
             else:
                 logger.warning('unknown image source for {} {}'.format(field_json['data']['type'], field_json['data']['id']))
             field_html = utils.add_image(img_src, ' | '.join(captions), link=link)
@@ -142,7 +146,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                         video_type = 'application/x-mpegURL'
                     if not video_poster:
                         if field_json['data']['relationships'].get('field_thumbnail') and field_json['data']['relationships']['field_thumbnail'].get('data'):
-                            video_poster = get_field_data(field_json['data']['relationships']['field_thumbnail']['data'], api_path)
+                            video_poster = get_field_data(field_json['data']['relationships']['field_thumbnail']['data'], api_path, site_json=site_json)
                         else:
                             el = player_soup.find('meta', attrs={"property": "og:image"})
                             if el:
@@ -155,7 +159,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                 caption = field_json['data']['relationships']['field_p_media_img']['data']['meta']['title']
             else:
                 caption = ''
-            img_src = get_field_data(field_json['data']['relationships']['field_p_media_img']['data'], api_path)
+            img_src = get_field_data(field_json['data']['relationships']['field_p_media_img']['data'], api_path, site_json=site_json)
             field_html = utils.add_image(img_src, caption)
 
         elif (field_json['data']['type'] == 'media--facebook' or field_json['data']['type'] == 'media--instagram' or field_json['data']['type'] == 'media--tiktok' or field_json['data']['type'] == 'media--tweet') and field_json['data']['attributes'].get('embed_code'):
@@ -170,7 +174,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
         elif field_json['data']['type'] == 'media--video':
             if field_json['data']['relationships'].get('field_image') and field_json['data']['relationships']['field_image'].get('data'):
                 img_src = ''
-                image_html = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path, caption, video_poster)
+                image_html = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path, caption, video_poster, site_json)
                 if image_html:
                     m = re.search(r'src="([^"]+)', image_html)
                     if m:
@@ -194,6 +198,9 @@ def get_field_data(data, api_path, caption='', video_poster=''):
         elif field_json['data']['type'] == 'media--youtube':
             field_html = utils.add_embed(field_json['data']['attributes']['field_media_video_embed_field'])
 
+        elif field_json['data']['type'] == 'media--remote_video':
+            field_html = utils.add_embed(field_json['data']['attributes']['field_media_oembed_video'])
+
         elif field_json['data']['type'] == 'paragraph--context_snippet':
             field_html = '<div style="border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#e5e7eb; padding:0 1em; margin:1em 0;">'
             if field_json['data']['attributes'].get('field_title'):
@@ -208,7 +215,7 @@ def get_field_data(data, api_path, caption='', video_poster=''):
         elif field_json['data']['type'] == 'paragraph--gallery':
             field_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;">'
             for field_data in field_json['data']['relationships']['field_media_items']['data']:
-                field_html += '<div style="flex:1; min-width:360px;">' + get_field_data(field_data, api_path, caption, video_poster) + '</div>'
+                field_html += '<div style="flex:1; min-width:360px;">' + get_field_data(field_data, api_path, caption, video_poster, site_json) + '</div>'
             field_html += '</div>'
             # utils.write_file(field_html, './debug/field.html')
             if len(field_json['data']['relationships']['field_media_items']['data']) > 2:
@@ -229,18 +236,35 @@ def get_field_data(data, api_path, caption='', video_poster=''):
                 field_html = '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + field_html
 
         elif field_json['data']['type'] == 'paragraph--from_library':
-            field_html = get_field_data(field_json['data']['relationships']['field_reusable_paragraph']['data'], api_path, caption, video_poster)
+            field_html = get_field_data(field_json['data']['relationships']['field_reusable_paragraph']['data'], api_path, caption, video_poster, site_json)
 
-        elif field_json['data']['type'] == 'paragraph--image':
-            for field_data in field_json['data']['relationships']['field_image']['data']:
-                field_html += get_field_data(field_data, api_path, caption, video_poster)
+        elif field_json['data']['type'] == 'paragraph--image' or field_json['data']['type'] == 'paragraph--header_image':
+            if field_json['data']['relationships'].get('field_image') and field_json['data']['relationships']['field_image'].get('data'):
+                if isinstance(field_json['data']['relationships']['field_image']['data'], list):
+                    for field_data in field_json['data']['relationships']['field_image']['data']:
+                        field_html += get_field_data(field_data, api_path, caption, video_poster, site_json)
+                else:
+                    img_src = get_field_data(field_json['data']['relationships']['field_image']['data'], api_path, site_json=site_json)
+                    if img_src:
+                        captions = []
+                        link = ''
+                        if field_json['data']['relationships']['field_image']['data'].get('meta'):
+                            if field_json['data']['relationships']['field_image']['data']['meta'].get('caption'):
+                                captions.append(field_json['data']['relationships']['field_image']['data']['meta']['caption'])
+                            elif field_json['data']['relationships']['field_image']['data']['meta'].get('caption_title'):
+                                captions.append(field_json['data']['relationships']['field_image']['data']['meta']['caption_title'])
+                            if field_json['data']['relationships']['field_image']['data']['meta'].get('attribution'):
+                                captions.append(field_json['data']['relationships']['field_image']['data']['meta']['attribution'])
+                            if field_json['data']['relationships']['field_image']['data']['meta'].get('link'):
+                                link = field_json['data']['relationships']['field_image']['data']['meta']['link']
+                        field_html = utils.add_image(img_src, ' | '.join(captions), link=link)
 
         elif field_json['data']['type'] == 'paragraph--p_text':
             field_html = field_json['data']['attributes']['field_p_text_text']['processed']
 
         elif field_json['data']['type'] == 'paragraph--p_media':
             for field_data in field_json['data']['relationships']['field_p_media_upload']['data']:
-                field_html += get_field_data(field_data, api_path, caption, video_poster)
+                field_html += get_field_data(field_data, api_path, caption, video_poster, site_json)
 
         elif field_json['data']['type'] == 'paragraph--quote':
             field_html = utils.add_pullquote(field_json['data']['attributes']['field_quote'], field_json['data']['attributes']['field_source'])
@@ -250,13 +274,24 @@ def get_field_data(data, api_path, caption='', video_poster=''):
             pass
 
         elif field_json['data']['type'] == 'paragraph--social_media':
-            field_html = get_field_data(field_json['data']['relationships']['field_social_media']['data'], api_path, caption, video_poster)
+            field_html = get_field_data(field_json['data']['relationships']['field_social_media']['data'], api_path, caption, video_poster, site_json)
 
-        elif field_json['data']['type'] == 'paragraph--text':
+        elif field_json['data']['type'] == 'paragraph--text' or field_json['data']['type'] == 'paragraph--body_narrow':
             field_html = field_json['data']['attributes']['field_body']['processed']
 
         elif field_json['data']['type'] == 'paragraphs_library_item--paragraphs_library_item':
-            field_html = get_field_data(field_json['data']['relationships']['paragraphs']['data'], api_path, caption, video_poster)
+            field_html = get_field_data(field_json['data']['relationships']['paragraphs']['data'], api_path, caption, video_poster, site_json)
+
+        elif field_json['data']['type'] == 'paragraph--header_news' or field_json['data']['type'] == 'paragraph--header_lead_feature':
+            if field_json['data']['attributes'].get('field_standfirst') and field_json['data']['attributes']['field_standfirst'].get('processed'):
+                field_html += '<p><em>' + re.sub(r'^<p>|</p>$', '', field_json['data']['attributes']['field_standfirst']['processed']) + '</em></p>'
+            elif field_json['data']['attributes'].get('field_intro') and field_json['data']['attributes']['field_intro'].get('processed'):
+                field_html += '<p><em>' + re.sub(r'^<p>|</p>$', '', field_json['data']['attributes']['field_intro']['processed']) + '</em></p>'
+            if field_json['data']['relationships'].get('field_lead_media') and field_json['data']['relationships']['field_lead_media'].get('data'):
+                field_html += get_field_data(field_json['data']['relationships']['field_lead_media']['data'], api_path, caption, video_poster, site_json)
+
+        elif field_json['data']['type'] == 'paragraph--embed_anything':
+            field_html = utils.add_embed(field_json['data']['attributes']['field_url_of_an_embed']['uri'])
 
         else:
             logger.warning('unhandled {} {}'.format(field_json['data']['type'], field_json['data']['id']))
@@ -443,6 +478,8 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
                         authors.append(api_json['data']['attributes']['title'])
                     elif api_json['data']['attributes'].get('name'):
                         authors.append(api_json['data']['attributes']['name'])
+                    elif api_json['data']['attributes'].get('display_name'):
+                        authors.append(api_json['data']['attributes']['display_name'])
                     else:
                         logger.warning('unknown field_author data attributes')
         else:
@@ -453,6 +490,8 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
                     authors.append(api_json['data']['attributes']['title'])
                 elif api_json['data']['attributes'].get('name'):
                     authors.append(api_json['data']['attributes']['name'])
+                elif api_json['data']['attributes'].get('display_name'):
+                    authors.append(api_json['data']['attributes']['display_name'])
                 else:
                     logger.warning('unknown field_author data attributes')
     elif page_json['relationships'].get('field_article_author') and page_json['relationships']['field_article_author'].get('data'):
@@ -544,35 +583,39 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
     else:
         caption = ''
     if page_json['relationships'].get('field_lede_image') and page_json['relationships']['field_lede_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_lede_image']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_article_hero_image') and page_json['relationships']['field_article_hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_article_hero_image']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_main_hero_image') and page_json['relationships']['field_main_hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_main_hero_image']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_hero_media') and page_json['relationships']['field_hero_media'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_hero_media']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_hero_media']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_hero_video') and page_json['relationships']['field_hero_video'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_hero_video']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_hero_video']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('hero_image') and page_json['relationships']['hero_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['hero_image']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['hero_image']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_image_source') and page_json['relationships']['field_image_source'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_image_source']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_media') and page_json['relationships']['field_media'].get('data') and page_json['relationships']['field_media']['data']['type'] == 'media--image':
-        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_path, caption=caption, site_json=site_json)
+        item['_image'], caption = get_img_src(data_html)
+        lede_html += data_html
+    elif page_json['relationships'].get('field_media') and page_json['relationships']['field_media'].get('data') and page_json['relationships']['field_media']['data']['type'] == 'media--remote_video':
+        data_html = get_field_data(page_json['relationships']['field_media']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_image') and page_json['relationships']['field_image'].get('data'):
@@ -580,7 +623,7 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             data = page_json['relationships']['field_image']['data'][0]
         else:
             data = page_json['relationships']['field_image']['data']
-        data_html = get_field_data(data, api_path, caption=caption)
+        data_html = get_field_data(data, api_path, caption=caption, site_json=site_json)
         if data['type'] == 'file--file':
             if not caption and data.get('meta') and data['meta'].get('title'):
                 caption = data['meta']['title']
@@ -594,7 +637,7 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             data = page_json['relationships']['field_new_photo']['data'][0]
         else:
             data = page_json['relationships']['field_new_photo']['data']
-        data_html = get_field_data(data, api_path, caption=caption)
+        data_html = get_field_data(data, api_path, caption=caption, site_json=site_json)
         if data['type'] == 'file--file':
             if not caption and data.get('meta') and data['meta'].get('title'):
                 caption = data['meta']['title']
@@ -604,10 +647,10 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             item['_image'], caption = get_img_src(data_html)
         lede_html += data_html
     elif page_json['relationships'].get('field_thumbnail') and page_json['relationships']['field_thumbnail'].get('data'):
-        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['field_thumbnail']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
     elif page_json['relationships'].get('teaser_image') and page_json['relationships']['teaser_image'].get('data'):
-        data_html = get_field_data(page_json['relationships']['teaser_image']['data'], api_path, caption=caption)
+        data_html = get_field_data(page_json['relationships']['teaser_image']['data'], api_path, caption=caption, site_json=site_json)
         item['_image'], caption = get_img_src(data_html)
 
     if page_json['attributes'].get('field_video_pid'):
@@ -641,10 +684,10 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
     if page_json['type'] == 'node--gallery':
         item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
         for it in page_json['relationships']['field_gallery_items']['data']:
-            item['content_html'] += get_field_data(it, api_path)
+            item['content_html'] += get_field_data(it, api_path, site_json=site_json)
 
     elif page_json['type'] == 'node--audio' and page_json['relationships'].get('field_related_audio'):
-        item['content_html'] = lede_html + get_field_data(page_json['relationships']['field_related_audio']['data'], api_path)
+        item['content_html'] = lede_html + get_field_data(page_json['relationships']['field_related_audio']['data'], api_path, site_json=site_json)
         if page_json['attributes'].get('field_brief'):
             if page_json['attributes']['field_brief']['value'].startswith('<p'):
                 item['content_html'] += page_json['attributes']['field_brief']['value']
@@ -665,7 +708,7 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
 
     elif page_json['type'] == 'node--video_page':
         if page_json['relationships'].get('field_mpx_video') and page_json['relationships']['field_mpx_video'].get('data'):
-            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], api_path)
+            item['content_html'] += get_field_data(page_json['relationships']['field_mpx_video']['data'], api_path, site_json=site_json)
             item['content_html'] += '<p>{}</p>'.format(page_json['attributes']['body']['processed'])
 
     elif page_json['type'] == 'node--cars_car':
@@ -696,13 +739,13 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             for i, data in enumerate(page_json['relationships']['field_carousel_media']['data']):
                 if i == 0:
                     if data['type'] != 'media--image':
-                        lede_html = get_field_data(data, api_path)
+                        lede_html = get_field_data(data, api_path, site_json=site_json)
                     else:
-                        item['content_html'] += get_field_data(data, api_path)
+                        item['content_html'] += get_field_data(data, api_path, site_json=site_json)
                 else:
-                    item['content_html'] += get_field_data(data, api_path)
+                    item['content_html'] += get_field_data(data, api_path, site_json=site_json)
         if not lede_html:
-            data = get_field_data(page_json['relationships']['field_image']['data'], api_path)
+            data = get_field_data(page_json['relationships']['field_image']['data'], api_path, site_json=site_json)
             if data.startswith('http'):
                 lede_html += utils.add_image(data)
             else:
@@ -720,11 +763,11 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             lede_html += '<p><b>PRICE:</b><br/>£{:,.0f} &ndash; £{:,.0f}</p>'.format(float(page_json['attributes']['tg_price_range_field']['min_price_range']), float(page_json['attributes']['tg_price_range_field']['max_price_range']))
         item['content_html'] = lede_html + '<hr/>' + item['content_html']
 
-    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--opinion' or page_json['type'] == 'node--cars_road_test':
+    elif page_json['type'] == 'node--article' or page_json['type'] == 'node--news_article' or page_json['type'] == 'node--blog_article' or page_json['type'] == 'node--content' or page_json['type'] == 'node--opinion' or page_json['type'] == 'node--cars_road_test':
         if page_json['relationships'].get('field_mpx_video_lede') and page_json['relationships']['field_mpx_video_lede'].get('data'):
             if lede_html:
                 poster, caption = get_img_src(lede_html)
-            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], api_path, video_poster=poster)
+            lede_html = get_field_data(page_json['relationships']['field_mpx_video_lede']['data'], api_path, video_poster=poster, site_json=site_json)
         if lede_html:
             item['content_html'] += lede_html
 
@@ -735,10 +778,10 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             body_html = page_json['attributes']['field_article_body'][0]['processed']
         elif page_json['relationships'].get('field_paragraphs'):
             for data in page_json['relationships']['field_paragraphs']['data']:
-                body_html += get_field_data(data, api_path)
+                body_html += get_field_data(data, api_path, site_json=site_json)
         elif page_json['relationships'].get('field_content'):
             for data in page_json['relationships']['field_content']['data']:
-                body_html += get_field_data(data, api_path)
+                body_html += get_field_data(data, api_path, site_json=site_json)
         else:
             logger.warning('unknown body content in ' + item['url'])
         if body_html:
@@ -750,13 +793,13 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
                     it = el.find(class_=re.compile(r'media--type-'))
                     if it:
                         if 'media--type-image' in it['class']:
-                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_path)
+                            new_html = get_field_data({"type": "media--image", "id": el['data-entity-uuid']}, api_path, site_json=site_json)
                         elif 'media--type-twitter' in it['class']:
-                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_path)
+                            new_html = get_field_data({"type": "media--twitter", "id": el['data-entity-uuid']}, api_path, site_json=site_json)
                         elif 'media--type-instagram' in it['class']:
-                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_path)
+                            new_html = get_field_data({"type": "media--instagram", "id": el['data-entity-uuid']}, api_path, site_json=site_json)
                 elif el['data-embed-button'] == 'mpx_video_embed':
-                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_path)
+                    new_html = get_field_data({"type": "media--mpx_video", "id": el['data-entity-uuid']}, api_path, site_json=site_json)
                 elif el['data-embed-button'] == 'teaser_embed':
                     el.decompose()
                     continue
@@ -884,7 +927,7 @@ def get_item(page_json, api_path, drupal_settings, url, args, site_json, save_de
             if page_json['relationships'].get('field_carousel_media') and page_json['relationships']['field_carousel_media'].get('data'):
                 item['content_html'] += '<hr/><h2><u>GALLERY</u></h2>'
                 for data in page_json['relationships']['field_carousel_media']['data']:
-                    item['content_html'] += get_field_data(data, api_path)
+                    item['content_html'] += get_field_data(data, api_path, site_json=site_json)
 
     elif page_json['type'] == 'blog_entry':
         # https://www.psychologytoday.com/us/blog/psych-unseen/202309/antipsychotic-therapy-since-the-1950s-little-has-changed

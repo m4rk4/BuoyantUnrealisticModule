@@ -1,11 +1,10 @@
-import asyncio, curl_cffi, base64, glob, importlib, io, json, os, random, re, string, sys
-import subprocess, time
-# import certifi, primp
-import requests
-from bs4 import BeautifulSoup
+import asyncio, curl_cffi, base64, glob, importlib, io, json, os, random, re, requests, string, subprocess, sys
 import logging, logging.handlers
+
+# TODO: use fastapi?
 from flask import Flask, jsonify, make_response, render_template, redirect, Response, request, send_file, stream_with_context
 from flask_cors import CORS
+
 from io import BytesIO
 from staticmap import StaticMap, CircleMarker
 from urllib.parse import quote, quote_plus, urlsplit
@@ -32,15 +31,12 @@ logging.getLogger('asyncio').setLevel(logging.WARNING)
 logging.getLogger('chardet').setLevel(logging.WARNING)
 logging.getLogger('filelock').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
-logging.getLogger('pytube').setLevel(logging.WARNING)
 logging.getLogger('urllib3').setLevel(logging.WARNING)
 logging.getLogger('websockets').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('requests_oauthlib').setLevel(logging.WARNING)
 logging.getLogger('oauthlib').setLevel(logging.WARNING)
 logging.getLogger('duckduckgo_search').setLevel(logging.WARNING)
-logging.getLogger('rquest').setLevel(logging.WARNING)
-logging.getLogger('primp').setLevel(logging.WARNING)
 #logging.getLogger('flask_cors').setLevel(logging.DEBUG)
 
 
@@ -451,14 +447,18 @@ def gallery():
 @app.route('/map')
 def map():
     args = request.args
-    if args.get('lat'):
-        lat = float(args['lat'])
+    if args.get('latitude'):
+        latitude = float(args['latitude'])
+    elif args.get('lat'):
+        latitude = float(args['lat'])
     else:
-        return 'No lat specified'
-    if args.get('lon'):
-        lon = float(args['lon'])
+        return 'No latitude specified'
+    if args.get('longitude'):
+        longitude = float(args['longitude'])
+    elif args.get('lon'):
+        longitude = float(args['lon'])
     else:
-        return 'No lon specified'
+        return 'No longitude specified'
     if args.get('width'):
         w = int(args['width'])
     else:
@@ -468,8 +468,31 @@ def map():
     else:
         h = 720
     map = StaticMap(w, h)
-    marker = CircleMarker((lon, lat), 'blue', 18)
-    map.add_marker(marker)
+    if args.get('markers'):
+        if args.get('markers'):
+            for it in json.loads(args['markers']):
+                if it.get('latitude'):
+                    lat = float(it['latitude'])
+                elif it.get('lat'):
+                    lat = float(it['lat'])
+                else:
+                    lat = None
+                if it.get('longitude'):
+                    lon = float(it['longitude'])
+                elif it.get('lon'):
+                    lon = float(it['lon'])
+                else:
+                    lon = None
+                if it.get('color'):
+                    color = it['color']
+                else:
+                    color = 'blue'
+                if lat and lon:
+                    marker = CircleMarker((lon, lat), color, 18)
+                    map.add_marker(marker)
+    else:
+        marker = CircleMarker((longitude, latitude), 'blue', 18)
+        map.add_marker(marker)
     if args.get('zoom'):
         image = map.render(zoom=int(args['zoom']))
     else:
@@ -592,7 +615,6 @@ def screenshot():
         #     return 'Something went wrong ({})'.format(r.status_code), r.status_code
 
 
-
 @app.route('/send_src')
 def send_src():
     args = request.args
@@ -681,7 +703,9 @@ def proxy(url):
         return send_file(f_io, mimetype='text/plain')
 
     # r = requests.get(proxy_url, headers=headers, stream=True)
-    if headers:
+    if 'static-assets-1.truthsocial.com':
+        r = curl_cffi.get(proxy_url, impersonate=config.impersonate, stream=True)
+    elif headers:
         r = curl_cffi.get(proxy_url, headers=headers, impersonate=config.impersonate, proxies=config.proxies, stream=True)
     else:
         r = curl_cffi.get(proxy_url, impersonate=config.impersonate, proxies=config.proxies, stream=True)
@@ -822,6 +846,33 @@ def stream_spotify():
     #         process.kill()
     # # GeneratorExit/on_close don't get triggered when window is closed so the process doen't get killed
     # return response
+
+
+@app.route('/stock_chart')
+def stock_chart():
+    args = request.args
+    if not args.get('symbol'):
+        return 'No stock symbol specified'
+    if 'debug' in args:
+        save_debug = True
+    else:
+        save_debug = False
+    if 'output' in args and args['output'] == 'png':
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+        url = config.server + '/stock_chart?'
+        if save_debug:
+            url += 'debug&'
+        url += '&symbol=' + args['symbol']
+        im_io = loop.run_until_complete(image_utils.get_screenshot(url, {}))
+        if im_io:
+            im_io, mimetype = image_utils.get_image({'cropbbox': '1'}, im_io=im_io)
+            if im_io:
+                return send_file(im_io, mimetype=mimetype)
+        else:
+            return 'Something happened'
+    chart_svg = utils.add_stock_chart(args['symbol'], save_debug)
+    return Response(chart_svg, mimetype="image/svg+xml")
 
 
 @app.route('/')

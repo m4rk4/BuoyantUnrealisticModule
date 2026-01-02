@@ -1,7 +1,7 @@
 import json, math, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
-from pytube.cipher import Cipher
+# from pytube.cipher import Cipher
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils

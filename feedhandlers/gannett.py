@@ -62,31 +62,43 @@ def get_image(el):
     return img_src, ' | '.join(caption)
 
 
-def add_video(el_button, base_url, site_json):
+def add_video(el, base_url, site_json):
+    if el.get('data-c-vpdata'):
+        video_json = json.loads(el['data-c-vpdata'])
+    elif el.get('data-c-vpd'):
+        video_json = json.loads(el['data-c-vpd'])
+    else:
+        logger.warning('unhandled video element ' + str(el))
+        return ''
+
     video_html = ''
-    if el_button.get('data-c-vpdata'):
-        video_json = json.loads(el_button['data-c-vpdata'])
-        if video_json:
-            poster = video_json['image']['url']
-            if poster.startswith('/'):
-                poster = base_url + poster
-            if video_json.get('title'):
-                caption = video_json['title']
-            elif video_json.get('headline'):
-                caption = video_json['headline']
-            else:
-                caption = ''
-            if video_json.get('hlsURL'):
-                video_html = utils.add_video(video_json['hlsURL'], 'application/x-mpegURL', poster, caption)
-            elif video_json.get('mp4URL'):
-                video_html = utils.add_video(video_json['mp4URL'], 'video/mp4', poster, caption, use_proxy=True)
-            elif video_json.get('url'):
-                video_url = video_json['url']
-                if video_url.startswith('/'):
-                    video_url = base_url + video_url
-                video_item = get_content(video_url, {"embed": True}, site_json, False)
-                if video_item:
-                    video_html = video_item['content_html']
+    if video_json.get('image'):
+        poster = video_json['image']['url']
+    elif video_json.get('videoStill'):
+        poster = video_json['videoStill']
+    else:
+        poster = ''
+    if poster.startswith('/'):
+        poster = base_url + poster
+
+    if video_json.get('title'):
+        caption = video_json['title']
+    elif video_json.get('headline'):
+        caption = video_json['headline']
+    else:
+        caption = ''
+
+    if video_json.get('hlsURL'):
+        video_html = utils.add_video(video_json['hlsURL'], 'application/x-mpegURL', poster, caption)
+    elif video_json.get('mp4URL'):
+        video_html = utils.add_video(video_json['mp4URL'], 'video/mp4', poster, caption, use_proxy=True, use_videojs=True)
+    elif video_json.get('url'):
+        video_url = video_json['url']
+        if video_url.startswith('/'):
+            video_url = base_url + video_url
+        video_item = get_content(video_url, {"embed": True}, site_json, False)
+        if video_item:
+            video_html = video_item['content_html']
     return video_html
 
 
@@ -310,35 +322,39 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all(attrs={"aria-label": "advertisement"}):
             el.decompose()
 
-        # Lead image
-        new_el = None
-        el = soup.find(class_='gnt_em__fp')
-        if not el:
-            el = soup.find('h1', class_=re.compile(r'gnt_\w+_hl'))
-            if el:
-                el = el.next_sibling
-        if el:
-            if el.name == 'figure':
-                img_src, caption = get_image(el)
-                if img_src.startswith(':'):
-                    img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
-                new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
-            elif el.name == 'aside':
-                if el.button and el.button.has_attr('data-c-vpdata'):
-                    new_html = add_video(el.button, base_url, site_json)
-                    if new_html:
-                        new_el = BeautifulSoup(new_html, 'html.parser')
-                    else:
-                        logger.warning('unhandled lede video in ' + item['url'])
-                elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
-                    new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
-        if new_el:
-            article.insert(0, new_el)
+        # AI
+        for el in article.select('.gnt_sh_tpw:has(> button[data-g-tn="aitp"])'):
             el.decompose()
-        elif 'image' in item:
-            new_html = utils.add_image(item['image'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            article.insert(0, new_el)
+
+        # Lead image
+        # new_el = None
+        # el = soup.find(class_='gnt_em__fp')
+        # if not el:
+        #     el = soup.find('h1', class_=re.compile(r'gnt_\w+_hl'))
+        #     if el:
+        #         el = el.next_sibling
+        # if el:
+        #     if el.name == 'figure':
+        #         img_src, caption = get_image(el)
+        #         if img_src.startswith(':'):
+        #             img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
+        #         new_el = BeautifulSoup(utils.add_image(img_src, caption), 'html.parser')
+        #     elif el.name == 'aside':
+        #         if el.button and el.button.has_attr('data-c-vpdata'):
+        #             new_html = add_video(el.button, base_url, site_json)
+        #             if new_html:
+        #                 new_el = BeautifulSoup(new_html, 'html.parser')
+        #             else:
+        #                 logger.warning('unhandled lede video in ' + item['url'])
+        #         elif el.has_attr('data-c-vt') and el['data-c-vt'] == 'youtube':
+        #             new_el = BeautifulSoup(utils.add_embed(el.a['href']), 'html.parser')
+        # if new_el:
+        #     article.insert(0, new_el)
+        #     el.decompose()
+        # elif 'image' in item:
+        #     new_html = utils.add_image(item['image'])
+        #     new_el = BeautifulSoup(new_html, 'html.parser')
+        #     article.insert(0, new_el)
 
         # Images
         for el in article.find_all('figure', class_='gnt_em_img'):
@@ -354,26 +370,26 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
             caption = ''
             it = el.find('img', class_='ar-lead-image')
             if it:
-                img_src = resize_image('{}://{}{}'.format(split_url.scheme, split_url.netloc, it['src']))
+                img_src = resize_image(split_url.scheme + '://' + split_url.netloc + it['src'])
             else:
                 it = el.find('img', class_='gnt_em_gl_i')
                 if it:
-                    img_src = resize_image('{}://{}{}'.format(split_url.scheme, split_url.netloc, it['data-gl-src']))
+                    img_src = resize_image(split_url.scheme + '://' + split_url.netloc + it['data-gl-src'])
                 else:
                     img_src, caption = get_image(el)
             if not caption:
                 it = el.find('div', class_='gnt_em_t', attrs={"aria-label": True})
                 if it:
                     caption = it['aria-label']
-            if caption:
-                caption += '<br/>'
-            gallery_url = '{}/content?read&url={}'.format(config.server, quote_plus(base_url + el['href']))
-            caption += '<a href="{}">{}</a>'.format(gallery_url, el['aria-label'])
+            # if caption:
+            #     caption += '<br/>'
+            # caption += '<a href="' + gallery_url + '">' + el['aria-label'] + '</a>'
+            gallery_url = config.server + '/content?read&url=' + quote_plus(base_url + el['href'])
+            heading = '<div style="text-align:center; font-weight:bold;"><a href="' + gallery_url + '">' + el['aria-label'] + '</a></div>'
             if img_src:
                 if img_src.startswith(':'):
                     img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
-                img_src = config.server + '/image?url=' + quote_plus(img_src) + '&overlay=gallery'
-                new_html = utils.add_image(img_src, caption, link=gallery_url)
+                new_html = utils.add_image(img_src, caption, link=gallery_url, heading=heading, overlay=config.gallery_button_overlay)
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
@@ -401,8 +417,13 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                 el.decompose()
                 continue
             elif 'gnt_em_vp__tp' in el['class']:
-                if el.button and el.button.get('data-c-vpdata'):
-                    new_html = add_video(el.button, base_url, site_json)
+                it = el.find(attrs={"data-c-vpd": True})
+                if it:
+                    new_html = add_video(it, base_url, site_json)
+                else:
+                    it = el.find('button', attrs={"data-c-vpdata": True})
+                    if it:
+                        new_html = add_video(it, base_url, site_json)
             elif 'gnt_em_vp__yt' in el['class']:
                 it = el.find(attrs={"data-c-vpattrs": True})
                 if it:
@@ -458,6 +479,9 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
                         it = data_soup.find(class_='oembed-asset-photo-image')
                         if it:
                             new_html = utils.add_image(it['src'], ' | '.join(captions))
+                    elif data_soup.find('img', class_='oembed-asset-photo-image'):
+                        it = data_soup.find('img', class_='oembed-asset-photo-image')
+                        new_html = '<figure style="margin:1em 0; padding:0; overflow:hidden; width:100%; height:400px;"><a href="' + it['src'] + '"><img loading="lazy" src="' + it['src'] + '" style="display:block; margin:0 auto; width:100%"></a></figure>'
                 elif el['data-gl-method'] == 'loadAnc' or el['data-gl-method'] == 'flp':
                     el.decompose()
                     continue

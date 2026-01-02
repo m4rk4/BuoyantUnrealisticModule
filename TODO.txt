@@ -1,3 +1,10 @@
+# Fix poetry venv:
+https://stackoverflow.com/questions/70064449/how-to-force-reinstall-poetry-environment-from-scratch
+poetry env info -p
+poetry env remove test-O3eWbxRl-py3.11
+poetry install
+
+
 FIX:
 mashable.com
 lifehacker.com

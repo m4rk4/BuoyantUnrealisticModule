@@ -181,7 +181,7 @@ def get_item(post_json, args, site_json, save_debug):
                         caption = re.sub(r'^<p>|</p>$', '', figcap.decode_contents().strip())
                     else:
                         caption = ''
-                    new_html = utils.add_video(it['src'], 'video/mp4', poster, caption)
+                    new_html = utils.add_video(it['src'], 'video/mp4', poster, caption, use_videojs=True)
             elif 'kg-embed-card' in el['class']:
                 if el.find(class_='twitter-tweet'):
                     links = el.find_all('a')
@@ -308,6 +308,16 @@ def get_item(post_json, args, site_json, save_debug):
             elif 'kg-signup-card' in el['class'] or 'kg-cta-card' in el['class']:
                 el.decompose()
                 continue
+            elif 'kg-toggle-card' in el['class']:
+                new_html += '<details><summary><strong>'
+                it = el.find(class_='kg-toggle-heading-text')
+                if it:
+                    new_html += it.get_text().strip()
+                new_html += '</strong></summary><div style="margin-left:1em;">'
+                it = el.find(class_='kg-toggle-content')
+                if it:
+                    new_html += it.decode_contents()
+                new_html += '</div></details>'
             elif el.find(class_='activity-card'):
                 # https://selfh.st/newsletter/2025-03-28/
                 for it in el.find_all(class_='activity-card'):
@@ -341,7 +351,7 @@ def get_item(post_json, args, site_json, save_debug):
                         iframe_soup = BeautifulSoup(iframe_html, 'lxml')
                         it = iframe_soup.find('video')
                         if it:
-                            new_html = utils.add_video(it['src'], 'video/mp4', it.get('poster'))
+                            new_html = utils.add_video(it['src'], 'video/mp4', it.get('poster'), use_videojs=True)
                 else:
                     new_html = utils.add_embed(it['src'])
             elif el.find('script', attrs={"src": re.compile(r'www\.buzzsprout\.com')}):
@@ -424,7 +434,7 @@ def get_item(post_json, args, site_json, save_debug):
                 it['style'] = 'font-size:0.9em; font-style:italic;'
                 el.unwrap()
                 continue
-            elif el.find(class_='gh-article-collab') or el.find(attrs={"data-umami-event": re.compile(r'newsletter-sponsor-headline')}):
+            elif el.find(class_=['gh-article-collab', 'gh-insert-email-mailer', 'gh-post-cta']) or el.find(attrs={"data-umami-event": re.compile(r'newsletter-sponsor-headline')}):
                 el.decompose()
                 continue
             elif all([True if it.name == 'img' or it.name == 'br' else False for it in el.find_all()]) and not el.get_text().strip():

@@ -27,6 +27,7 @@ def get_program_details(program):
 
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.strip('/').split('/')))
     page_html = utils.get_url_html(url)
     if not page_html:
         return None
@@ -52,11 +53,17 @@ def get_content(url, args, site_json, save_debug=False):
     if npr_vars:
         item['id'] = npr_vars['storyId']
     else:
-        m = re.search(r'^/\d{4}/\d{2}/\d{2}/(\d+)/', urlsplit(url).path)
-        if not m:
-            logger.warning('unable to determine story id in ' + url)
-            return None
-        item['id'] = m.group(1)
+        el = page_soup.find('article', class_='story_container', attrs={"data-storyid": True})
+        if el:
+            item['id'] = el['data-storyid']
+        else:
+            item['id'] = paths[-2]
+            # m = re.search(r'^/\d{4}/\d{2}/\d{2}/(\d+)/', urlsplit(url).path)
+            # if m:
+            #     item['id'] = m.group(1)
+            # else:
+            #     logger.warning('unable to determine story id in ' + url)
+            #     return None
 
     item['url'] = ld_json['mainEntityOfPage']['@id']
     item['title'] = ld_json['headline']
@@ -84,6 +91,11 @@ def get_content(url, args, site_json, save_debug=False):
                 item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(ld_json['author']['name']))
         elif isinstance(ld_json['author'], str):
             item['author']['name'] = ld_json['author']
+    elif page_soup.find(class_='byline'):
+        el = page_soup.find(class_='byline')
+        for it in el.find_all('span'):
+            it.decompose()
+        item['author']['name'] = re.sub(r'^By\s+', '', el.get_text(strip=True))
     elif ld_json.get('publisher') and ld_json['publisher'].get('name'):
         item['author']['name'] = ld_json['publisher']['name']
     else:
@@ -98,27 +110,35 @@ def get_content(url, args, site_json, save_debug=False):
         if npr_vars.get('programId'):
             item['tags'].append(npr_vars['programId'])
 
+
+    item['content_html'] = ''
+
     if ld_json.get('image'):
         if isinstance(ld_json['image'], dict):
             item['_image'] = ld_json['image']['url']
         elif isinstance(ld_json['image'], list):
             item['_image'] = ld_json['image'][0]['url']
+        elif isinstance(ld_json['image'], str):
+            item['_image'] = ld_json['image']
+
+    el = page_soup.find(class_='primaryImage')
+    if el and el.img:
+        if '_image' not in item:
+            item['_image'] = el.img['src']
+        it = el.find(class_='caption')
+        if it:
+            caption = it.decode_contents()
+        else:
+            caption = ''
+        item['content_html'] += utils.add_image(el.img['src'], caption)
 
     if ld_json.get('description'):
         item['summary'] = ld_json['description']
 
     if 'embed' in args:
-        item['content_html'] = '<div style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0; border:1px solid black; border-radius:10px;">'
-        if item.get('_image'):
-            item['content_html'] += '<a href="{}"><img src="{}" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'.format(item['url'], item['_image'])
-        item['content_html'] += '<div style="margin:8px 8px 0 8px;"><div style="font-size:0.8em;">{}</div><div style="font-weight:bold;"><a href="{}">{}</a></div>'.format(split_url.netloc, item['url'], item['title'])
-        if item.get('summary'):
-            item['content_html'] += '<p style="font-size:0.9em;">{}</p>'.format(item['summary'])
-        item['content_html'] += '<p><a href="{}/content?read&url={}" target="_blank">Read</a></p></div></div><div>&nbsp;</div>'.format(config.server, quote_plus(item['url']))
+        item['content_html'] = utils.format_embed_preview(item)
         return item
 
-
-    item['content_html'] = ''
     if '/player/' in url:
         el = page_soup.find('script', string=re.compile(r'audioModel'))
         if el:
@@ -139,8 +159,10 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     text_soup = BeautifulSoup(text_html, 'html.parser')
-    paragraphs = text_soup.find(class_='paragraphs-container')
+    if save_debug:
+        utils.write_file(str(text_soup), './debug/npr.html')
 
+    paragraphs = text_soup.find(class_='paragraphs-container')
     for el in paragraphs.find_all('hr'):
         if el.name == None:
             continue

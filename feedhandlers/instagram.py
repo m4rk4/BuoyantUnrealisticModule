@@ -112,7 +112,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             if ig_data['owner'].get('full_name'):
                 user['full_name'] = ig_data['owner']['full_name']
             else:
-                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+                user['full_name'] = get_fullname(user['name'])
+                # user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
             user['verified'] = ig_data['owner'].get('is_verified')
             item['authors'].append(user)
         elif ig_data.get('user'):
@@ -122,7 +123,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
             if ig_data['user'].get('full_name'):
                 user['full_name'] = ig_data['user']['full_name']
             else:
-                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+                user['full_name'] = get_fullname(user['name'])
+                # user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
             user['verified'] = ig_data['user'].get('is_verified')
             item['authors'].append(user)
         if ig_data.get('coauthor_producers'):
@@ -133,7 +135,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 if it.get('full_name'):
                     name = it['full_name']
                 else:
-                    name = search_for_fullname('https://www.instagram.com/{}/'.format(it['username']))
+                    name = get_fullname(it['username'])
+                    # name = search_for_fullname('https://www.instagram.com/{}/'.format(it['username']))
                 user['full_name'] = name
                 user['verified'] = it.get('is_verified')
                 item['authors'].append(user)
@@ -156,7 +159,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 user['full_name'] = ig_soup.title.string.split('|')[0].strip()
                 # print(user['full_name'])
             else:
-                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+                user['full_name'] = get_fullname(user['name'])
+                # user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
             user['verified'] = False
             for it in soup.select('span.Username:has(+ i.VerifiedSprite)'):
                 if it.get_text().strip() == user['name']:
@@ -168,7 +172,8 @@ def get_content(url, args, site_json, save_debug=False, ig_data=None):
                 m = re.search(r'^/([^/]+)/', urlsplit(el['href']).path)
                 user['name'] = m.group(1)
                 user['avatar'] = el.img['src']
-                user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
+                user['full_name'] = get_fullname(user['name'])
+                # user['full_name'] = search_for_fullname('https://www.instagram.com/{}/'.format(user['name']))
                 user['verified'] = False
                 for it in soup.select('span.Username:has(+ i.VerifiedSprite)'):
                     if it.get_text().strip() == user['name']:
@@ -1001,6 +1006,26 @@ def search_for_fullname(url):
                 if m:
                     return m.group(1)
     return ''
+
+
+def get_fullname(username):
+    url = "https://anon-viewer.com/content.php?url=pearljam"
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+        "cache-control": "no-cache",
+        "content-type": "application/x-www-form-urlencoded",
+        "pragma": "no-cache",
+        "priority": "u=1, i"
+    }
+    viewer_json = utils.get_url_json('https://anon-viewer.com/content.php?url=' + username, headers=headers)
+    if viewer_json:
+        soup = BeautifulSoup(viewer_json['html'], 'html.parser')
+        el = soup.find('p', class_='text-muted')
+        if el:
+            return el.get_text().strip()
+    return ''
+
 
 
 def inflact_ig_viewer(username, get_profile=True, get_stories=False, get_reels=False, save_debug=False):
