@@ -102,53 +102,25 @@ def add_video(el, base_url, site_json):
     return video_html
 
 
-def get_gallery_content_old(gallery_soup):
-    gallery_html = ''
-    for slide in gallery_soup.find_all('slide'):
-        img_src = resize_image(slide['original'])
-        captions = []
-        if slide.get('caption'):
-            capption = slide['caption'].replace('&nbsp;', ' ').strip()
-            if caption.endswith('<br />'):
-                caption = caption[:-6].strip()
-            captions.append(caption)
-        if slide.get('author'):
-            captions.append(slide['author'])
-        gallery_html += utils.add_image(img_src, ' | '.join(captions)) + '<div>&nbsp;</div>'
-    return gallery_html
-
-
-def get_gallery_content(item, site_code, embed=False):
-    api_url = 'https://api.gannett-cdn.com/thorium/gallery/?apiKey=TGgXAxAcR3ktiGl6cRsHSGsLS6ySi6yz&site-code={}&id={}'.format(site_code, item['id'])
-    api_json = utils.get_url_json(api_url)
-    if not api_json:
-        return ''
-    utils.write_file(api_json, './debug/gallery.json')
-    images = api_json['data']['asset']['links']['assets']
-    item['_gallery'] = []
-    gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-    for image in images:
-        img = next((it for it in image['asset']['crops'] if it['name'] == 'bestCrop'), None)
-        if not img:
-            img = next((it for it in image['asset']['crops'] if it['name'] == '16_9'), None)
-        thumb = resize_image(img['path'], 600, img['width'], img['height'])
-        captions = []
-        if image['asset'].get('caption'):
-            captions.append(image['asset']['caption'])
-        if image['asset'].get('byline'):
-            captions.append(image['asset']['byline'])
-        caption = ' | '.join(captions)
-        item['_gallery'].append({"src": img['path'], "caption": caption, "thumb": thumb})
-        gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img['path']) + '</div>'
-    gallery_html += '</div>'
-    gallery_url = '{}/gallery?url={}'.format(config.server, quote_plus(api_json['data']['asset']['pageURL']['long']))
-    if not embed:
-        content_html = '<h2><a href="{}" target="_blank">View Photo Gallery</a> ({} images)</h2>'.format(gallery_url, len(images))
-        content_html += gallery_html
-    else:
-        caption = '<a href="{}" target="_blank">View Photo Gallery</a> ({} images): {}'.format(gallery_url, len(images), api_json['data']['asset']['headline'])
-        content_html = utils.add_image(item['_gallery'][0]['src'], caption, link=gallery_url)
-    return content_html
+def get_gallery_images(gallery_id, site_code, embed=False):
+    gallery_images = []
+    gallery_json = utils.get_url_json('https://api.gannett-cdn.com/thorium/gallery/?apiKey=TGgXAxAcR3ktiGl6cRsHSGsLS6ySi6yz&site-code=' + site_code + '&id=' + gallery_id)
+    if gallery_json:
+        utils.write_file(gallery_json, './debug/gallery.json')
+        images = gallery_json['data']['asset']['links']['assets']
+        for image in images:
+            img = next((it for it in image['asset']['crops'] if it['name'] == 'bestCrop'), None)
+            if not img:
+                img = next((it for it in image['asset']['crops'] if it['name'] == '16_9'), None)
+            thumb = resize_image(img['path'], 600, img['width'], img['height'])
+            captions = []
+            if image['asset'].get('caption'):
+                captions.append(image['asset']['caption'])
+            if image['asset'].get('byline'):
+                captions.append(image['asset']['byline'])
+            caption = ' | '.join(captions)
+            gallery_images.append({"src": img['path'], "caption": caption, "thumb": thumb})
+    return gallery_images
 
 
 def get_content(url, args, site_json, save_debug=False, article_json=None):
@@ -307,10 +279,12 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
     el = soup.find('h2', class_='gnt_ar_shl')
     if el:
         # Subheadline
-        item['content_html'] += '<p><em>{}</em></p>'.format(el.decode_contents())
+        item['content_html'] += '<p><em>' + el.decode_contents() + '</em></p>'
 
     if article_json['type'] == 'gallery':
-        item['content_html'] += get_gallery_content(item, site_code)
+        item['_gallery'] = get_gallery_images(item['id'], site_code)
+        gallery_url = config.server + '/gallery?url=' + quote_plus(item['url'])
+        item['content_html'] = utils.add_gallery(item['_gallery'], gallery_url)
     else:
         # article_json['type'] == 'text'
         article = soup.find(class_='gnt_ar_b')
@@ -325,6 +299,20 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         # AI
         for el in article.select('.gnt_sh_tpw:has(> button[data-g-tn="aitp"])'):
             el.decompose()
+
+        for el in article.select('.gnt_ar_b_p:has(> a[href*="whatsapp.com/channel"])'):
+            el.decompose()
+        for el in article.select('.gnt_ar_b_p:has(> a[href*="profile.usatoday.com/newsletters"])'):
+            el.decompose()
+
+        el = article.find('ul', class_='gnt_sh')
+        if el:
+            el.attrs = {}
+            new_el = soup.new_tag('div', attrs={"style": "margin:1em 0; font-weight:bold;"})
+            new_el.string = 'Key Points'
+            el.insert_before(new_el)
+            new_el = soup.new_tag('hr', attrs={"style": "margin:1em 0;"})
+            el.insert_after(new_el)
 
         # Lead image
         # new_el = None
@@ -367,29 +355,20 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
 
         # Gallery
         for el in article.find_all('a', class_='gnt_em_gl'):
-            caption = ''
-            it = el.find('img', class_='ar-lead-image')
-            if it:
-                img_src = resize_image(split_url.scheme + '://' + split_url.netloc + it['src'])
-            else:
-                it = el.find('img', class_='gnt_em_gl_i')
+            gallery_url = base_url + el['href']
+            gallery_id = list(filter(None, urlsplit(gallery_url).path[1:].split('/')))[-1]
+            gallery_images = get_gallery_images(gallery_id, site_code)
+            if gallery_images:
+                it = el.find(attrs={"data-c-et": True})
                 if it:
-                    img_src = resize_image(split_url.scheme + '://' + split_url.netloc + it['data-gl-src'])
+                    caption = it['data-c-et']
+                elif el.get('aria-label'):
+                    caption = el['aria-label']
                 else:
-                    img_src, caption = get_image(el)
-            if not caption:
-                it = el.find('div', class_='gnt_em_t', attrs={"aria-label": True})
-                if it:
-                    caption = it['aria-label']
-            # if caption:
-            #     caption += '<br/>'
-            # caption += '<a href="' + gallery_url + '">' + el['aria-label'] + '</a>'
-            gallery_url = config.server + '/content?read&url=' + quote_plus(base_url + el['href'])
-            heading = '<div style="text-align:center; font-weight:bold;"><a href="' + gallery_url + '">' + el['aria-label'] + '</a></div>'
-            if img_src:
-                if img_src.startswith(':'):
-                    img_src = re.sub(r'^[:/]+', r'https://{}/'.format(split_url.netloc), img_src)
-                new_html = utils.add_image(img_src, caption, link=gallery_url, heading=heading, overlay=config.gallery_button_overlay)
+                    caption = 'View Gallery'
+                caption = '<a href="' + gallery_url + '" target="_blank">' + caption + '</a>'
+                gallery_url = config.server + '/gallery?url=' + quote_plus(gallery_url)
+                new_html = utils.add_gallery(gallery_images, gallery_url=gallery_url, gallery_caption=caption, show_gallery_poster=True)
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.insert_after(new_el)
                 el.decompose()
@@ -512,12 +491,12 @@ def get_content(url, args, site_json, save_debug=False, article_json=None):
         for el in article.find_all(re.compile(r'\b(h\d|li|ol|p|span|ul)\b'), class_=True):
             el.attrs = {}
 
-        item['content_html'] += re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><div>&nbsp;</div><\2', str(article))
+        if 'image' not in item:
+            el = article.find('img')
+            if el:
+                item['image'] = el['src']
 
-    if 'image' not in item:
-        el = article.find('img')
-        if el:
-            item['image'] = el['src']
+        item['content_html'] += article.decode_contents()
     return item
 
 

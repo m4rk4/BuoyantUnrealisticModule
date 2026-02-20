@@ -11,7 +11,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_next_data(url, site_json):
+# /_next/data url doesn't work now
+def _get_next_data(url, site_json):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     if paths[0] == 'news' or paths[0] == 'watch':
@@ -28,8 +29,8 @@ def get_next_data(url, site_json):
         else:
             path = split_url.path
     path += '.json'
-    next_url = '{}://{}{}/_next/data/{}{}'.format(split_url.scheme, split_url.netloc, prefix, build_id, path)
-    # print(next_url)
+    next_url = split_url.scheme + '://' + split_url.netloc + prefix + '/_next/data/' + build_id + path
+    print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
         page_html = utils.get_url_html(url)
@@ -48,6 +49,17 @@ def get_next_data(url, site_json):
             utils.update_sites(url, site_json)
         return next_data['props']
     return next_data
+
+
+def get_next_data(url, site_json):
+    page_html = utils.get_url_html(url)
+    soup = BeautifulSoup(page_html, 'lxml')
+    el = soup.find('script', id='__NEXT_DATA__')
+    if not el:
+        logger.warning('unable to find __NEXT_DATA__ in ' + url)
+        return None
+    next_data = json.loads(el.string)
+    return next_data['props']
 
 
 def get_content(url, args, site_json, save_debug=False):

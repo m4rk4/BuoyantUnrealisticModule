@@ -14,8 +14,8 @@ def get_content(url, args, site_json, save_debug=False):
     # Content sites https://sbgi.net/tv-stations/
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path[1:].split('/')))
-    base_url = '{}://{}'.format(split_url.scheme, split_url.netloc)
-    api_url = '{}/api/rest/facade/story/{}'.format(base_url, paths[-1])
+    base_url = split_url.scheme + '://' + split_url.netloc
+    api_url = base_url + '/api/rest/facade/story/' + paths[-1]
     api_json = utils.get_url_json(api_url)
     if not api_json:
         return None
@@ -162,22 +162,22 @@ def get_content(url, args, site_json, save_debug=False):
 
     item['content_html'] = re.sub(r'{sd-embed [^}]+}(<="" sd-embed="">)?{/sd-embed}', sub_embeds, item['content_html'])
 
+    lede_html = ''
     if article_json.get('videos'):
-        item['content_html'] = utils.add_video(article_json['videos'][0]['mp4Url'], 'video/mp4', article_json['videos'][0]['thumbUrl'], article_json['videos'][0]['title'], use_videojs=True) + item['content_html']
+        lede_html = utils.add_video(article_json['videos'][0]['mp4Url'], 'video/mp4', article_json['videos'][0]['thumbUrl'], article_json['videos'][0]['title'], use_videojs=True)
     elif article_json.get('heroImage'):
         img_src = base_url + article_json['heroImage']['image']['originalUrl']
         if article_json['heroImage']['image'].get('caption'):
             caption = re.sub(r'\{/?(p|&nbsp;)\}', '', article_json['heroImage']['image']['caption'])
         else:
             caption = ''
-        item['content_html'] = utils.add_image(img_src, caption) + item['content_html']
+        lede_html = utils.add_image(img_src, caption)
 
-    if len(article_json['images']) + len(article_json['videos']) > 1:
+    n = len(article_json['images']) + len(article_json['videos'])
+    if n > 1:
         item['_gallery'] = []
-        item['content_html'] += '<h2><a href="{}/gallery?url={}" target="_blank">View gallery</a></h2>'.format(config.server, quote_plus(item['url']))
-        item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
-        for i in range(len(article_json['images']) + len(article_json['videos'])):
-            image = next((it for it in article_json['images'] if it['orderNumber'] == i + 1), None)
+        for i in range(1, n + 1):
+            image = next((it for it in article_json['images'] if it['orderNumber'] == i), None)
             if image:
                 img_src = base_url + image['originalUrl']
                 thumb = img_src.replace('/resources/media/', '/resources/media2/original/full/640/center/80/')
@@ -186,9 +186,8 @@ def get_content(url, args, site_json, save_debug=False):
                 else:
                     caption = ''
                 item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
-                item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_image(thumb, caption, link=img_src) + '</div>'
             else:
-                video = next((it for it in article_json['videos'] if it['orderNumber'] == i + 1), None)
+                video = next((it for it in article_json['videos'] if it['orderNumber'] == i), None)
                 if video:
                     if video['thumbUrl'].startswith('/'):
                         img_src = base_url + video['thumbUrl']
@@ -198,10 +197,10 @@ def get_content(url, args, site_json, save_debug=False):
                         caption = video['title']
                     else:
                         caption = ''
-                    item['_gallery'].append({"src": video['mp4Url'], "caption": caption, "thumb": img_src})
-                    item['content_html'] += '<div style="flex:1; min-width:360px;">' +  utils.add_video(video['mp4Url'], 'video/mp4', img_src, caption, use_videojs=True) + '</div>'
-        item['content_html'] += '</div>'
+                    item['_gallery'].append({"src": video['mp4Url'], "caption": caption, "thumb": img_src, "video_type": 'video/mp4'})
+        lede_html = utils.add_gallery(item['_gallery'], show_thumbnails=True)
 
+    item['content_html'] = lede_html + item['content_html']
     return item
 
 

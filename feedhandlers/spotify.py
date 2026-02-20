@@ -1,44 +1,25 @@
-import json, re, requests
-import base64, curl_cffi, hashlib, hmac, math
+import base64, hashlib, hmac, json, math, re
+import curl_cffi, requests, rnet
 from bs4 import BeautifulSoup
 from datetime import datetime
 from urllib.parse import quote_plus, urlencode, urlsplit
 from ytmusicapi import YTMusic
 
 import config, utils
-from feedhandlers import ytdl
+from feedhandlers import odesli, ytdl
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-def get_ytmusic_audio(track):
-    ytmusic = YTMusic()
-    query = ''
-    artists = []
-    if track.get('artists'):
-        for artist in track['artists']['items']:
-            artists.append(re.sub(r'\W', '', artist['profile']['name']).lower())
-            if artist['profile']['name'] not in track['name']:
-                query += artist['profile']['name'] + ' '
-    elif track.get('firstArtist'):
-        for artist in track['firstArtist']['items'] + track['otherArtists']['items']:
-            artists.append(re.sub(r'\W', '', artist['profile']['name']).lower())
-            if artist['profile']['name'] not in track['name']:
-                query += artist['profile']['name'] + ' '
-    query += '"' + track['name'] + '"'
-    title = re.sub(r'\W', '', track['name']).lower()
-    if track.get('albumOfTrack') and track['albumOfTrack'] != 'SINGLE':
-        query += ' from "' + track['albumOfTrack']['name'] + '"'
-    results = ytmusic.search(query, filter='songs')
-    if results:
-        for res in results:
-            res_title = re.sub(r'\W', '', res['title']).lower()
-            if title in res_title or res_title in title:
-                for artist in res['artists']:
-                    if re.sub(r'\W', '', artist['name']).lower() in artists:
-                        return 'https://www.youtube.com/watch?v=' + res['videoId']
+def get_ytmusic_audio(track_id):
+    r = requests.get('https://api.song.link/v1-alpha.1/links?type=song&platform=spotify&id=' + track_id + '&userCountry=US')
+    if r.status_code == 200:
+        songlink = r.json()
+        for key, val in songlink['entitiesByUniqueId'].items():
+            if key.startswith('YOUTUBE'):
+                return 'https://music.youtube.com/watch?v=' + val['id']
     return ''
 
 
@@ -100,12 +81,20 @@ def get_key(file_id, save_debug=False):
 
 def get_server_cfg():
     # Find web-player.xxx.js and parse needed parameters
-    r = curl_cffi.get('https://open.spotify.com/', impersonate='chrome', proxies=config.proxies)
+    # r = curl_cffi.get('https://open.spotify.com/', impersonate='chrome', proxies=config.proxies)
     if r.status_code != 200:
         logger.warning('unable to get https://open.spotify.com/')
         return None
 
-    soup = BeautifulSoup(r.text, 'lxml')
+    client = rnet.blocking.Client()
+    try:
+        r = client.get('https://open.spotify.com/', emulation=rnet.Emulation.Safari26, proxy=rnet.Proxy.all(config.http_proxy))
+        r.raise_for_status()
+    except Exception as e:
+        logger.warning('unable to get https://open.spotify.com/ ' + str(r.status))
+        return None
+
+    soup = BeautifulSoup(r.text(), 'lxml')
     el = soup.find('script', id='appServerConfig')
     if not el:
         return None
@@ -115,7 +104,7 @@ def get_server_cfg():
 # Credit: https://github.com/glomatico/votify/blob/main/votify/totp.py
 # and https://github.com/akashrchandran/syrics/blob/main/syrics/totp.py
 def get_secret_version() -> tuple[str, int]:
-    r = curl_cffi.get(config.SECRET_CIPHER_DICT_URL, impersonate='chrome', proxies=config.proxies)
+    r = requests.get(config.SECRET_CIPHER_DICT_URL)
     if r.status_code != 200:
         logger.warning('Failed to fetch TOTP secret and version.')
         return None
@@ -154,7 +143,7 @@ def get_tokens(server_cfg=None):
     tokens['clientVersion'] = server_cfg['clientVersion']
     tokens['deviceId'] = server_cfg['correlationId']
 
-    r = curl_cffi.get('https://open.spotify.com/api/server-time', impersonate='chrome', proxies=config.proxies)
+    r = requests.get('https://open.spotify.com/api/server-time')
     if r.status_code != 200:
         logger.warning('unable to get server time from https://open.spotify.com/api/server-time')
         return None
@@ -168,10 +157,19 @@ def get_tokens(server_cfg=None):
         'totpServer': totp,
         'totpVer': totp_version,
     }
-    r = curl_cffi.get('https://open.spotify.com/api/token?' + urlencode(params), impersonate='chrome', proxies=config.proxies)
-    if not r or r.status_code != 200:
+
+    # r = curl_cffi.get('https://open.spotify.com/api/token?' + urlencode(params), impersonate='chrome', proxies=config.proxies)
+    # if not r or r.status_code != 200:
+    #     logger.warning('unable to get access token from https://open.spotify.com/api/token')
+    #     return None
+    client = rnet.blocking.Client()
+    try:
+        r = client.get('https://open.spotify.com/api/token?' + urlencode(params), emulation=rnet.Emulation.Safari26, proxy=rnet.Proxy.all(config.http_proxy))
+        r.raise_for_status()
+    except Exception as e:
         logger.warning('unable to get access token from https://open.spotify.com/api/token')
         return None
+
     access_token = r.json()
     tokens['access_token'] = access_token['accessToken']
     tokens['clientId'] = access_token['clientId']
@@ -199,8 +197,15 @@ def get_tokens(server_cfg=None):
         }
     }
     # print(json.dumps(data, indent=4))
-    r = curl_cffi.post('https://clienttoken.spotify.com/v1/clienttoken', json=data, impersonate='chrome', headers=headers, proxies=config.proxies)
-    if r.status_code != 200:
+
+    # r = curl_cffi.post('https://clienttoken.spotify.com/v1/clienttoken', json=data, impersonate='chrome', headers=headers, proxies=config.proxies)
+    # if r.status_code != 200:
+    #     logger.warning('unable to get client token from https://clienttoken.spotify.com/v1/clienttoken')
+    #     return None
+    try:
+        r = client.post('https://clienttoken.spotify.com/v1/clienttoken', json=data, emulation=rnet.Emulation.Safari26, headers=headers, proxy=rnet.Proxy.all(config.http_proxy))
+        r.raise_for_status()
+    except Exception as e:
         logger.warning('unable to get client token from https://clienttoken.spotify.com/v1/clienttoken')
         return None
 
@@ -216,7 +221,7 @@ def get_embed_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
     embed_url = 'https://open.spotify.com/embed/' + paths[-2] + '/' + paths[-1]
-    embed_html = utils.get_url_html(embed_url)
+    embed_html = utils.get_url_html(embed_url, user_agent='googlebot')
     if not embed_html:
         return None
     soup = BeautifulSoup(embed_html, 'lxml')
@@ -302,6 +307,7 @@ def get_embed_content(url, args, site_json, save_debug=False):
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
     paths = list(filter(None, split_url.path.split('/')))
+
     if split_url.netloc == 'podcasters.spotify.com' or split_url.netloc == 'creators.spotify.com':
         if 'episodes' in paths:
             # https://creators.spotify.com/pod/profile/adeptenglish/episodes/Stop-Translating--Start-Thinking-in-English---Rule-57-e3354j2
@@ -416,6 +422,129 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += '<div><a href="{}">View more episodes</a></div>'.format(item['url'])
             return item
 
+    if split_url.path.startswith('/embed'):
+        embed_url = 'https://open.spotify.com' + split_url.path
+    else:
+        embed_url = 'https://open.spotify.com/embed' + split_url.path
+    r = requests.get(embed_url, headers={"user-agent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/144.0.0.0 Safari/537.36"})
+    if r.status_code == 200:
+        embed_soup = BeautifulSoup(r.text, 'lxml')
+        el = embed_soup.find('script', id='__NEXT_DATA__')
+        if el:
+            next_data = json.loads(el.string)
+            if save_debug:
+                utils.write_file(next_data, './debug/spotify.json')
+            entity_type = next_data['props']['pageProps']['state']['data']['embeded_entity_uri'].split(':')[1]
+            entity = next_data['props']['pageProps']['state']['data']['entity']
+            item = {}
+            item['id'] = entity['uri']
+            item['url'] = entity['uri'].replace(':', '/').replace('spotify', 'https://open.spotify.com')
+            item['title'] = entity['title']
+            dt = None
+            if entity.get('releaseDate'):
+                dt = datetime.fromisoformat(entity['releaseDate']['isoString'])
+            elif entity.get('attributes'):
+                attr = next((it for it in entity['attributes'] if it['key'] == 'last_updated'), None)
+                if attr:
+                    dt = datetime.fromisoformat(attr['value'])
+            if dt:
+                item['date_published'] = dt.isoformat()
+                item['_timestamp'] = dt.timestamp()
+                item['_display_date'] = utils.format_display_date(dt, date_only=True)
+
+            if entity.get('artists'):
+                item['authors'] = [{"name": x['name'], "url": x['uri'].replace(':', '/').replace('spotify', 'https://open.spotify.com')} for x in entity['artists']]
+                item['author'] = {
+                    "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+                }
+            elif entity.get('subtitle'):
+                item['author'] = {
+                    "name": entity['subtitle']
+                }
+                if entity.get('relatedEntityUri'):
+                    item['author']['url'] = entity['relatedEntityUri'].replace(':', '/').replace('spotify', 'https://open.spotify.com')
+                item['authors'] = []
+                item['authors'].append(item['author'])
+            if entity['visualIdentity'].get('image'):
+                item['image'] = utils.closest_dict(entity['visualIdentity']['image'], 'maxWidth', 640)['url']
+            elif entity.get('coverArt') and entity['coverArt'].get('sources'):
+                item['image'] = entity['coverArt']['sources'][-1]['url']
+
+            if entity_type == 'track':
+                if entity.get('audioPreview'):
+                    attachment = {}
+                    attachment['url'] = entity['audioPreview']['url']
+                    attachment['mime_type'] = 'audio/mpeg'
+                    item['attachments'] = []
+                    item['attachments'].append(attachment)
+                item['_duration'] = utils.calc_duration(entity['duration']/1000, time_format=':')
+                yt_link = get_ytmusic_audio(entity['id'])
+                if yt_link:
+                    item['_audio'] = config.server + '/audio?url=' + quote_plus(yt_link)
+                    item['_audio'] = 'audio_link'
+                else:
+                    if entity.get('audioPreview'):
+                        item['_audio'] = entity['audioPreview']['url']
+                        item['_audio_type'] = 'audio/mpeg'
+            elif entity_type == 'album' or entity_type == 'playlist':
+                item['_playlist'] = []
+                for it in entity['trackList']:
+                    track = {
+                        "url": it['uri'].replace(':', '/').replace('spotify', 'https://open.spotify.com'),
+                        "title": it['title'],
+                        "image": item['image'],
+                        "duration": utils.calc_duration(it['duration']/1000, time_format=':')
+                    }
+                    if it['subtitle'] != entity['subtitle']:
+                        track['artist'] = it['subtitle']
+                    yt_link = get_ytmusic_audio(it['uri'].split(':')[-1])
+                    if yt_link:
+                        track['src'] = config.server + '/audio?url=' + quote_plus(yt_link)
+                        track['mime_type'] = 'audio_link'
+                    elif it.get('audioPreview'):
+                        track['src'] = it['audioPreview']['url']
+                        track['mime_type'] = 'audio/mpeg'
+                    item['_playlist'].append(track)
+            elif entity_type == 'episode':
+                item['_duration'] = utils.calc_duration(entity['duration']/1000, time_format=':')
+                if next_data['props']['pageProps']['state']['data'].get('defaultAudioFileObject'):
+                    if next_data['props']['pageProps']['state']['data']['defaultAudioFileObject'].get('passthroughUrl'):
+                        item['_audio'] = next_data['props']['pageProps']['state']['data']['defaultAudioFileObject']['passthroughUrl']
+                        item['_audio_type'] = 'audio/mpeg'
+                        attachment = {}
+                        attachment['url'] = item['_audio']
+                        attachment['mime_type'] = item['_audio_type']
+                        item['attachments'] = []
+                        item['attachments'].append(attachment)
+                    else:
+                        if entity['relatedEntityUri'].startswith('spotify:show'):
+                            logger.debug('getting content from https://odesli.co/podcast/s/' + entity['relatedEntityUri'].split(':')[-1])
+                            podcast_item = odesli.get_content('https://odesli.co/podcast/s/' + entity['relatedEntityUri'].split(':')[-1], {"embed": True}, {}, save_debug)
+                            if podcast_item:
+                                for track in podcast_item['_playlist']:
+                                    if re.sub(r'\W', '', track['title']).lower() == re.sub(r'\W', '', item['title']).lower():
+                                        item['_audio'] = track['src']
+                                        item['_audio_type'] = track['mime_type']
+                                        attachment = {}
+                                        attachment['url'] = item['_audio']
+                                        attachment['mime_type'] = item['_audio_type']
+                                        item['attachments'] = []
+                                        item['attachments'].append(attachment)
+                                        break
+            elif entity_type == 'show':
+                logger.debug('getting content from https://odesli.co/podcast/s/' + next_data['props']['pageProps']['state']['data']['embeded_entity_uri'].split(':')[-1])
+                podcast_item = odesli.get_content('https://odesli.co/podcast/s/' + next_data['props']['pageProps']['state']['data']['embeded_entity_uri'].split(':')[-1], {"embed": True}, {}, save_debug)
+                item['id'] = next_data['props']['pageProps']['state']['data']['embeded_entity_uri']
+                item['url'] = next_data['props']['pageProps']['state']['data']['embeded_entity_uri'].replace(':', '/').replace('spotify', 'https://open.spotify.com')
+                item['title'] = entity['subtitle']
+                item['author'] = podcast_item['author'].copy()
+                item['authors'] = podcast_item['authors'].copy()
+                item['_playlist'] = podcast_item['_playlist'].copy()
+                item['_playlist_title'] = podcast_item['_playlist_title']
+            item['content_html'] = utils.format_audio_content(item, logo=config.logo_spotify)
+            return item
+
+
     m = re.search(r'https://open\.spotify\.com/embed(-legacy|-podcast)?/([^/]+)/([0-9a-zA-Z]+)', url)
     if m:
         content_type = m.group(2)
@@ -433,15 +562,25 @@ def get_content(url, args, site_json, save_debug=False):
     # Find web-player.xxx.js and parse needed parameters
     server_cfg = None
     web_player_js = ''
-    r = curl_cffi.get('https://open.spotify.com/', impersonate='chrome', proxies=config.proxies)
-    if r.status_code == 200:
-        soup = BeautifulSoup(r.text, 'lxml')
+    # r = curl_cffi.get('https://open.spotify.com/', impersonate='chrome', proxies=config.proxies)
+    # if r.status_code == 200:
+
+    client = rnet.blocking.Client()
+    try:
+        r = client.get('https://open.spotify.com/', emulation=rnet.Emulation.Safari26, proxy=rnet.Proxy.all(config.http_proxy))
+        r.raise_for_status()
+    except Exception as e:
+        logger.warning('unable to get https://open.spotify.com/ ' + str(r.status))
+        r = None
+
+    if r:
+        soup = BeautifulSoup(r.text(), 'lxml')
         el = soup.find('script', id='appServerConfig')
         if el:
             server_cfg = json.loads(base64.b64decode(el.string.strip()).decode("utf-8"))
         el = soup.find('script', src=re.compile(r'/web-player/web-player\.([^\.]+)\.js'))
         if el:
-            r = curl_cffi.get(el['src'], impersonate='chrome', proxies=config.proxies)
+            r = requests.get(el['src'])
             if r.status_code == 200:
                 web_player_js = r.text
     if not server_cfg:

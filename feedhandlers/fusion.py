@@ -138,6 +138,35 @@ def resize_image(image_item, site_json, width=1280):
     return img_src
 
 
+def get_image(element, site_json, is_gallery=False):
+    if element['type'] != 'image':
+        return None
+    image = {}
+    if is_gallery:
+        image['src'] = element['url']
+    else:
+        image['src'] = resize_image(element, site_json)
+    image['thumb'] = resize_image(element, site_json, width=640)
+    captions = []
+    if element.get('credits_caption_display'):
+        captions.append(element['credits_caption_display'])
+    else:
+        if element.get('caption') and element['caption'].strip() and element['caption'].strip() != '-':
+            captions.append(re.sub(r'^<p>|</p>$', '', element['caption'].strip()))
+        if element.get('credits'):
+            if element['credits'].get('by') and element['credits']['by'][0].get('byline'):
+                if element['credits']['by'][0]['byline'] == 'Fanatics':
+                    # Skip ad
+                    return None
+                else:
+                    captions.append(element['credits']['by'][0]['byline'])
+            elif element['credits'].get('affiliation'):
+                captions.append(re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation'] if x.get('name')])))
+    if len(captions) > 0:
+        image['caption'] = ' | '.join(captions)
+    return image
+
+
 def process_content_element(element, url, site_json, save_debug):
     if save_debug and '_id' in element:
         logger.debug(element['_id'])
@@ -593,31 +622,9 @@ def process_content_element(element, url, site_json, save_debug):
         if element.get('image_type') and element['image_type'] == 'graphic' and element.get('alt_text') and re.search(r'Roku|Watch Anywhere', element['alt_text']):
             # Skip
             return ''
-        img_src = resize_image(element, site_json)
-        captions = []
-        if element.get('credits_caption_display'):
-            captions.append(element['credits_caption_display'])
-        else:
-            if element.get('caption') and element['caption'] != '-':
-                captions.append(
-                    re.sub(r'^<p>|</p>$', '', element['caption'])
-                )
-            if element.get('credits'):
-                if element['credits'].get('by') and element['credits']['by'][0].get('byline'):
-                    if element['credits']['by'][0]['byline'] == 'Fanatics':
-                        # Skip ad
-                        img_src = ''
-                    else:
-                        captions.append(element['credits']['by'][0]['byline'])
-                elif element['credits'].get('affiliation'):
-                    captions.append(
-                        re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in element['credits']['affiliation'] if x.get('name')]))
-                    )
-        caption = ' | '.join(captions)
-        #if element.get('subtitle') and element['subtitle'].strip():
-        #    caption = '<strong>{}.</strong> '.format(element['subtitle'].strip()) + caption
-        if img_src:
-            element_html += utils.add_image(img_src, caption)
+        image = get_image(element, site_json)
+        if image:
+            element_html += utils.add_image(image['src'], image['caption'])
 
     elif element['type'] == 'gallery':
         img_src = resize_image(element['content_elements'][0], site_json)
@@ -630,6 +637,39 @@ def process_content_element(element, url, site_json, save_debug):
         link = config.server + '/content?read&url=' + quote_plus(link)
         if img_src:
             element_html += utils.add_image(img_src, caption, link=link, overlay=config.gallery_button_overlay)
+
+        if element.get('canonical_url') or element.get('slug'):
+            gallery_link = split_url.scheme + '://' + split_url.netloc
+            if element.get('canonical_url'):
+                gallery_link += element['canonical_url']
+            elif element.get('slug'):
+                gallery_link += element['slug']
+            element_html += process_content_element(element, url, site_json, save_debug)
+        elif element.get('content_elements'):
+            gallery_images = []
+            for el in element['content_elements']:
+                if element['type'] == 'image':
+                    image = get_image(el, site_json, is_gallery=True)
+                    if image:
+                        gallery_images.append(image)
+            if element.get('title'):
+                gallery_caption = element['title']
+                # Find duplicate captions
+                s = re.sub(r'\W', '', gallery_caption).lower()
+                x = []
+                for i, image in enumerate(gallery_images):
+                    if image['caption']:
+                        if re.sub(r'\W', '', image['caption']).lower() == s:
+                            x.append(i)
+                if len(x) > 0:
+                    if len(x) == n and n > 1:
+                        for image in gallery_images:
+                            image['caption'] = ''
+                    else:
+                        gallery_caption = ''
+            else:
+                gallery_caption = ''
+            element_html += utils.add_gallery(gallery_images, gallery_caption=gallery_caption, show_thumbnails=True)
 
     elif element['type'] == 'graphic':
         if element['graphic_type'] == 'image':
@@ -655,50 +695,55 @@ def process_content_element(element, url, site_json, save_debug):
             api_json = utils.get_url_json(api_url)
             if api_json:
                 video_json = api_json[0]
+        elif element.get('source') and element['source'].get('hls'):
+            # Reuters
+            element_html += utils.add_video(element['source']['hls'], element['subtype'], element['thumbnail']['url'], element['description'])
+            video_json = None
         elif not element.get('streams'):
-            api_url = '{}video-by-id?query=%7B%22id%22%3A%22{}%22%7D&d={}&_website={}'.format(site_json['api_url'], element['_id'], site_json['deployment'], site_json['arc_site'])
+            api_url = site_json['api_url'] + 'video-by-id?query=%7B%22id%22%3A%22' + element['_id'] + '%22%7D&d=' + str(site_json['deployment']) + '&_website=' + site_json['arc_site']
             api_json = utils.get_url_json(api_url)
             if api_json:
                 video_json = api_json
         else:
             video_json = element
         #utils.write_file(video_json, './debug/video.json')
-        streams_mp4 = []
-        streams_ts = []
-        for stream in video_json['streams']:
-            if stream.get('stream_type'):
-                if stream['stream_type'] == 'mp4':
-                    streams_mp4.append(stream)
-                elif stream['stream_type'] == 'ts':
-                    streams_ts.append(stream)
+        if video_json:
+            streams_mp4 = []
+            streams_ts = []
+            for stream in video_json['streams']:
+                if stream.get('stream_type'):
+                    if stream['stream_type'] == 'mp4':
+                        streams_mp4.append(stream)
+                    elif stream['stream_type'] == 'ts':
+                        streams_ts.append(stream)
+                else:
+                    if re.search(r'\.mp4', stream['url']):
+                        streams_mp4.append(stream)
+                    elif re.search(r'\.m3u8', stream['url']):
+                        streams_ts.append(stream)
+            stream = None
+            if streams_ts:
+                if streams_ts[0].get('height'):
+                    stream = utils.closest_dict(streams_ts, 'height', 720)
+                else:
+                    stream = streams_ts[0]
+                stream_type = 'application/x-mpegURL'
+            elif streams_mp4:
+                if streams_mp4[0].get('height'):
+                    stream = utils.closest_dict(streams_mp4, 'height', 720)
+                else:
+                    stream = streams_mp4[0]
+                stream_type = 'video/mp4'
+            if stream:
+                if element.get('imageResizerUrls'):
+                    poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
+                elif element.get('promo_image'):
+                    poster = resize_image(element['promo_image'], site_json)
+                else:
+                    poster = ''
+                element_html += utils.add_video(stream['url'], stream_type, poster, element['headlines']['basic'])
             else:
-                if re.search(r'\.mp4', stream['url']):
-                    streams_mp4.append(stream)
-                elif re.search(r'\.m3u8', stream['url']):
-                    streams_ts.append(stream)
-        stream = None
-        if streams_ts:
-            if streams_ts[0].get('height'):
-                stream = utils.closest_dict(streams_ts, 'height', 720)
-            else:
-                stream = streams_ts[0]
-            stream_type = 'application/x-mpegURL'
-        elif streams_mp4:
-            if streams_mp4[0].get('height'):
-                stream = utils.closest_dict(streams_mp4, 'height', 720)
-            else:
-                stream = streams_mp4[0]
-            stream_type = 'video/mp4'
-        if stream:
-            if element.get('imageResizerUrls'):
-                poster = utils.closest_dict(element['imageResizerUrls'], 'width', 1000)
-            elif element.get('promo_image'):
-                poster = resize_image(element['promo_image'], site_json)
-            else:
-                poster = ''
-            element_html += utils.add_video(stream['url'], stream_type, poster, element['headlines']['basic'])
-        else:
-            logger.warning('unhandled video streams')
+                logger.warning('unhandled video streams')
 
     elif element['type'] == 'social_media' and element['sub_type'] == 'twitter':
         links = BeautifulSoup(element['html'], 'html.parser').find_all('a')
@@ -846,25 +891,19 @@ def get_content_html(content, url, args, site_json, save_debug):
     elif 'args' in site_json and 'add_subtitle' in site_json['args'] and content.get('description') and content['description'].get('basic'):
         content_html += '<p><em>' + content['description']['basic'] + '</em></p>'
 
-    if content.get('summary'):
-        content_html += '<ul>'
-        for it in content['summary']:
-            if it.get('link'):
-                content_html += '<li><a href="{}">{}</a></li>'.format(it['link'], it['description'])
-            else:
-                content_html += '<li>{}</li>'.format(it['description'])
-        content_html += '</ul>'
-
     lead_image = None
-    if content.get('promo_items'):
-        promo_items = content['promo_items']
-    elif content.get('promoItems'):
-        promo_items = content['promoItems']
-    else:
-        promo_items = None
     if content.get('multimedia_main'):
         lead_image = content['multimedia_main']
-    elif promo_items:
+    elif content.get('lead_art'):
+        if content['lead_art']['type'] == 'video':
+            content_html += process_content_element(content['lead_art'], url, site_json, save_debug)
+        else:
+            lead_image = content['lead_art']
+    elif content.get('promo_items') or content.get('promoItems'):
+        if content.get('promo_items'):
+            promo_items = content['promo_items']
+        else:
+            promo_items = content['promoItems']
         if promo_items.get('video'):
             content_html += process_content_element(promo_items['video'], url, site_json, save_debug)
         elif promo_items.get('youtube'):
@@ -890,7 +929,19 @@ def get_content_html(content, url, args, site_json, save_debug):
         if not lead_image.get('type'):
             lead_image['type'] = 'image'
         if not content.get('content_elements') or content['type'] == 'gallery' or (content['content_elements'][0]['type'] != 'image' and content['content_elements'][0]['type'] != 'video' and content['content_elements'][0].get('subtype') != 'youtube' and content['content_elements'][0].get('subtype') != 'video'):
-            content_html += process_content_element(lead_image, url, site_json, save_debug)
+            if 'primary_media_type' in content and content['primary_media_type'] == 'video' and content.get('related_content') and content['related_content'].get('videos'):
+                content_html += process_content_element(content['related_content']['videos'][0], url, site_json, save_debug)
+            else:
+                content_html += process_content_element(lead_image, url, site_json, save_debug)
+
+    if content.get('summary'):
+        content_html += '<div><b>Summary:</b></div><ul style="margin-top:0;">'
+        for it in content['summary']:
+            if it.get('link'):
+                content_html += '<li><a href="' + it['link'] + '">' + it['description'] + '</a></li>'
+            else:
+                content_html += '<li>' + it['description'] + '</li>'
+        content_html += '</ul>'
 
     if content.get('content_elements'):
         elements = content['content_elements']
@@ -918,29 +969,55 @@ def get_content_html(content, url, args, site_json, save_debug):
                 content_html += process_content_element(gallery, url, site_json, save_debug)
             else:
                 content_html += '<h3>Photo Gallery</h3>'
+                gallery_images = []
                 for element in gallery['content_elements']:
-                    if lead_image and lead_image['id'] == element['id']:
-                        continue
-                    content_html += process_content_element(element, url, site_json, save_debug)
+                    if element['type'] == 'image':
+                        image = get_image(element, site_json, is_gallery=True)
+                        if image:
+                            gallery_images.append(image)
+                if gallery.get('title'):
+                    gallery_caption = gallery['title']
+                    # Find duplicate captions
+                    s = re.sub(r'\W', '', gallery_caption).lower()
+                    x = []
+                    for i, image in enumerate(gallery_images):
+                        if image['caption']:
+                            if re.sub(r'\W', '', image['caption']).lower() == s:
+                                x.append(i)
+                    if len(x) > 0:
+                        if len(x) == n and n > 1:
+                            for image in gallery_images:
+                                image['caption'] = ''
+                        else:
+                            gallery_caption = ''
+                else:
+                    gallery_caption = ''
+                content_html += utils.add_gallery(gallery_images, gallery_caption=gallery_caption, show_thumbnails=True)
+
+                    # if lead_image and lead_image['id'] == element['id']:
+                    #     continue
+                    # content_html += process_content_element(element, url, site_json, save_debug)
 
     # Reuters specific
     if content.get('related_content') and content['related_content'].get('videos'):
         content_html += '<h3>Related Videos</h3>'
+        gallery_images = []
         for video in content['related_content']['videos']:
-            caption = '<b>{}</b> &mdash; {}'.format(video['title'], video['description'])
+            if video['source'].get('mp4'):
+                src = video['source']['mp4']
+                video_type = 'video/mp4'
+            elif video['source'].get('hls'):
+                src = video['source']['hls']
+                video_type = 'application/x-mpegURL'
             if video['thumbnail'].get('renditions'):
-                poster = video['thumbnail']['renditions']['original']['480w']
+                thumb = video['thumbnail']['renditions']['original']['480w']
             elif video['thumbnail'].get('url'):
-                poster = video['thumbnail']['url']
+                thumb = video['thumbnail']['url']
             else:
                 logger.warning('unknown video thumbnail for id ' + video['id'])
-                poster = ''
-            if video['source'].get('mp4'):
-                content_html += utils.add_video(video['source']['mp4'], 'video/mp4', poster, caption)
-            elif video['source'].get('hls'):
-                content_html += utils.add_video(video['source']['hls'], 'application/x-mpegURL', poster, caption)
-            else:
-                logger.warning('unhandled related content video in ' + url)
+                thumb = ''
+            gallery_images.append({"src": src, "caption": video['title'], "thumb": thumb, "video_type": video_type})
+        content_html += utils.add_gallery(gallery_images, show_thumbnails=True)
 
     if content.get('subtype'):
         if content['subtype'] == 'audio':
@@ -973,7 +1050,7 @@ def get_content_html(content, url, args, site_json, save_debug):
     if content.get('content_restrictions') and content['content_restrictions'].get('content_code') and content['content_restrictions']['content_code'] == 'hard-paywall':
         content_html += '<h2 style="text-align:center;"><a href="{}">This post is for paid subscribers</a></h2>'.format(url)
 
-    content_html = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', content_html)
+    # content_html = re.sub(r'</figure><(figure|table)', r'</figure><div>&nbsp;</div><\1', content_html)
     return content_html
 
 
@@ -1096,6 +1173,8 @@ def get_item(content, url, args, site_json, save_debug):
                     tags.append(val['website_section']['name'])
     if content.get('meta') and content['meta'].get('seoKeywords'):
         tags += content['meta']['seoKeywords'].copy()
+    if content.get('companies'):
+        tags += [x['name'] for x in content['companies'] if x['name'] not in tags]
     if tags:
         item['tags'] = list(set(tags))
 
@@ -1114,9 +1193,10 @@ def get_item(content, url, args, site_json, save_debug):
             item['_image'] = resize_image(promo_items['basic']['promo_items']['basic'], site_json)
         elif promo_items.get('basic') and promo_items['basic']['type'] == 'video':
             item['_image'] = resize_image(promo_items['basic']['promo_items']['basic'], site_json)
-        elif promo_items.get('images'):
-            if promo_items['images'][0] != None:
-                item['_image'] = resize_image(promo_items['images'][0], site_json)
+        elif promo_items.get('images') and len(promo_items['images']) > 0:
+            item['_image'] = resize_image(promo_items['images'][0], site_json)
+    elif content.get('thumbnail'):
+        item['_image'] = resize_image(content['thumbnail'], site_json)
     elif content.get('content_elements'):
         if content['content_elements'][0]['type'] == 'image':
             item['_image'] = resize_image(content['content_elements'][0], site_json)

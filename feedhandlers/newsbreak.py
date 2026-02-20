@@ -1,6 +1,6 @@
 import json, pytz, re
-import dateutil.parser
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
+from datetime import datetime
 from urllib.parse import parse_qs, urlsplit
 
 import config, utils
@@ -23,7 +23,7 @@ def get_next_data(url, site_json):
         params = '?local_id=' + paths[0] + '&doc_id=' + paths[1]
     else:
         params = ''
-    next_url = '{}://{}/_next/data/{}{}.json{}'.format(split_url.scheme, split_url.netloc, site_json['buildId'], path, params)
+    next_url = split_url.scheme + '://' + split_url.netloc + '/_next/data/' + site_json['buildId'] + path + '.json' + params
     print(next_url)
     next_data = utils.get_url_json(next_url, retries=1)
     if not next_data:
@@ -53,102 +53,194 @@ def get_content(url, args, site_json, save_debug=False):
         logger.debug('getting content from ' + next_data['pageProps']['__N_REDIRECT'])
         return utils.get_content(next_data['pageProps']['__N_REDIRECT'], {}, False)
 
-    page_json = next_data['pageProps']
-    item = {}
-    item['id'] = page_json['id']
-    item['url'] = page_json['seoCanonicalUrl']
-    item['title'] = page_json['title']
+    doc_info = next_data['pageProps']['docInfo']
+    if next_data['pageProps']['seoConfig'].get('newsArticleJsonLD'):
+        article_json = next_data['pageProps']['seoConfig']['newsArticleJsonLD']
+    else:
+        article_json = {}
 
-    tz_loc = pytz.timezone(config.local_tz)
-    dt_loc = dateutil.parser.parse(page_json['date'])
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+    item = {}
+    item['id'] = doc_info['post_id']
+    if article_json.get('url'):
+        item['url'] = article_json['url']
+    else:
+        item['url'] = url
+    item['title'] = doc_info['title']
+
+    if article_json.get('datePublished'):
+        dt = datetime.fromisoformat(article_json['datePublished'])
+    else:
+        tz_loc = pytz.timezone(config.local_tz)
+        dt_loc = datetime.fromtimestamp(doc_info['epoch'])
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    if page_json['seoConfig'].get('articleJson') and page_json['seoConfig']['articleJson'].get('dateModified'):
-        dt_loc = dateutil.parser.parse(page_json['seoConfig']['articleJson']['dateModified'])
-        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+
+    if article_json.get('dateModified'):
+        dt = datetime.fromisoformat(article_json['dateModified'])
         item['date_modified'] = dt.isoformat()
 
-    if page_json.get('authors'):
-        authors = []
-        for it in page_json['authors']:
-            authors.append(it.replace(',', '&#44;'))
-        if authors:
-            item['author'] = {}
-            item['author']['name'] = re.sub(r'(,)([^,]+)$', r' and\2', ', '.join(authors)).replace('&#44;', ',')
-    elif page_json.get('publisher'):
-        item['author'] = {"name": page_json['publisher']}
+    if doc_info.get('authors'):
+        item['authors'] = [{"name": x} for x in doc_info['authors']]
+        item['author'] = {
+            "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'].replace(',', '&#44;') for x in item['authors']])).replace('&#44;', ',')
+		}
+    elif article_json.get('author'):
+        item['author'] = {
+            "name": article_json['author']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    elif article_json.get('publisher'):
+        item['author'] = {
+            "name": article_json['publisher']['name']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+    else:
+        item['author'] = {
+            "name": doc_info['source']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
 
     item['tags'] = []
-    if page_json.get('cityChannel'):
-        item['tags'].append(page_json['cityChannel']['name'])
-    if page_json.get('catChannel'):
-        if page_json['catChannel']['name'] not in item['tags']:
-            item['tags'].append(page_json['catChannel']['name'])
+    if doc_info.get('city_name'):
+        item['tags'].append(doc_info['city_name'])
+    if doc_info.get('category_display'):
+        item['tags'].append(doc_info['category_display'])
+    if doc_info.get('unified_category'):
+        item['tags'].append(doc_info['unified_category'])
 
-    if page_json.get('cover'):
-        item['_image'] = 'https://img.particlenews.com/image.php?url=' + page_json['cover']
+    if doc_info.get('image'):
+        item['_image'] = 'https://img.particlenews.com/img/id/' + doc_info['image']
 
-    if page_json['contentType'] == 'VIDEO':
-        item['content_html'] = utils.add_video(page_json['videoUrl'], 'video/mp4', item['_image'], item['title'], use_videojs=True)
-    elif page_json.get('content'):
-        soup = BeautifulSoup(page_json['content'], 'html.parser')
-        soup.div.unwrap()
+    if doc_info.get('summary'):
+        item['summary'] = doc_info['summary']
+    elif doc_info.get('ai_summary'):
+        item['summary'] = doc_info['ai_summary']
+    elif article_json.get('description'):
+        item['summary'] = article_json['description']
 
-        for el in soup.find_all('nbtemplate'):
+    if 'embed' in args:
+        item['content_html'] = utils.format_embed_preview(item)
+        return item
+    
+    soup = BeautifulSoup(doc_info['content'], 'html.parser')
+    if soup.contents[0].name == 'body':
+        soup.contents[0].unwrap()
+
+    if soup.contents[0].name == 'div' and not soup.contents[0].get('class'):
+        soup.contents[0].unwrap()
+
+    if save_debug:
+        utils.write_file(str(soup), './debug/debug.html')
+
+    for el in soup.select('p:has(> a[href*=\"foxnews.onelink.me\"])'):
+        el.decompose()
+
+    for el in soup.select('div:has(> iframe[src*=\"nyp-video-player/embed\"])'):
+        el.decompose()
+
+    for el in soup.select('p:has(a[href*=\"people-true-crime-newsletter-sign-up\"])'):
+        el.decompose()
+
+    for el in soup.select('p:has(a)'):
+        if el.get_text(strip=True).isupper():
+            el.decompose()
+        elif el.get_text(strip=True) == el.a.get_text(strip=True):
             el.decompose()
 
-        for el in soup.find_all('a', class_='promo-link__link'):
-            el.decompose()
+    for el in soup.select('div:not([class]):has(> iframe)'):
+        el.unwrap()
 
-        for el in soup.find_all('iframe'):
-            new_html = utils.add_embed(el['src'])
-            new_el = BeautifulSoup(new_html, 'html.parser')
-            for it in el.find_parents(['div', 'p']):
-                it.unwrap()
-            it = el.find_previous_sibling()
-            if (it.name == 'figure' or it.name == 'p') and it.img:
-                if page_json['cover'] in it.img['src']:
-                    it.decompose()
-            el.replace_with(new_el)
+    for el in soup.select('p:has(> img)'):
+        if not el.get_text(strip=True):
+            el.unwrap()
 
-        for el in soup.find_all('figure'):
-            if el.img:
-                if 'img.particlenews.com' in el.img['src']:
-                    params = parse_qs(urlsplit(el.img['src']).query)
-                    img_src =  'https://img.particlenews.com/image.php?url=' + params['url'][0]
+    for el in soup.contents:
+        # print(type(el))
+        new_html = ''
+        if isinstance(el, NavigableString):
+            continue
+        if el.name == 'p' or el.name == 'ul':
+            continue
+        elif el.name == 'figure':
+            if el.get('class') and 'wp-block-embed' in el['class']:
+                if 'wp-block-embed-twitter' in el['class']:
+                    links = el.find_all('a')
+                    new_html = utils.add_embed(links[-1]['href'])
+            elif el.find('img'):
+                img = el.find('img')
+                if img.get('alt') and img['alt'].startswith('https'):
+                    img_src = img['alt']
                 else:
-                    img_src = el.img['src']
-                if el.figcaption:
-                    caption = el.figcaption.decode_contents()
-                else:
-                    caption = ''
+                    params = parse_qs(urlsplit(img['src']).query)
+                    if 'url' in params:
+                        img_src = 'https://img.particlenews.com/img/id/' + params['url'][0]
+                    else:
+                        img_src = img['src']
+                caption = ''
+                if el.name == 'figure':
+                    it = el.find('figcaption')
+                    if it:
+                        if it.i:
+                            x = it.i.find('p')
+                            if x:
+                                caption = x.decode_contents()
+                                x.decompose()
+                            if it.i.get_text(strip=True):
+                                if caption:
+                                    caption = ' | ' + caption
+                                caption = it.i.decode_contents() + caption
+                        else:
+                            caption = it.decode_contents()
                 new_html = utils.add_image(img_src, caption)
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.replace_with(new_el)
+            elif el.find('iframe'):
+                it = el.find('iframe')
+                new_html += utils.add_embed(it['src'])
+        elif el.name == 'img':
+            if el.get('alt') and el['alt'].startswith('https'):
+                img_src = el['alt']
             else:
-                logger.warning('unhandled figure in ' + item['url'])
-
-        for el in soup.select('p:has(> img)'):
-            if el.img:
-                if 'img.particlenews.com' in el.img['src']:
-                    params = parse_qs(urlsplit(el.img['src']).query)
-                    img_src =  'https://img.particlenews.com/image.php?url=' + params['url'][0]
+                params = parse_qs(urlsplit(el['src']).query)
+                if 'url' in params:
+                    img_src = 'https://img.particlenews.com/img/id/' + params['url'][0]
                 else:
-                    img_src = el.img['src']
-                new_html = utils.add_image(img_src)
-                new_el = BeautifulSoup(new_html, 'html.parser')
-                el.replace_with(new_el)
+                    img_src = el['src']
+            new_html = utils.add_image(img_src)
+        elif el.name == 'div' and not el.get('class'):
+            if el.find('iframe'):
+                new_html = utils.add_embed(el.iframe['src'])
+            elif el.find('video'):
+                it = el.find('source')
+                if it:
+                    new_html = utils.add_video(it['src'], it['type'], el.video.get('poster'), el.video.get('title'), use_videojs=True)
+                elif el.video.get('src'):
+                    new_html = utils.add_video(el.video['src'], 'video/mp4', '', '', use_videojs=True)
+        elif el.name == 'iframe':
+            new_html = utils.add_embed(el['src'])
+        elif el.name == 'blockquote':
+            if el.get('class'): 
+                if 'twitter-tweet' in el['class']:
+                    links = el.find_all('a')
+                    new_html = utils.add_embed(links[-1]['href'])
+                elif 'instagram-media' in el['class']:
+                    new_html = utils.add_embed(el['data-instgrm-permalink'])
             else:
-                logger.warning('unhandled p > img in ' + item['url'])
+                new_html = utils.add_blockquote(el.decode_contents())
+        if new_html:
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+        else:
+            logger.warning('unhandled element {} in {}'.format(el.name, item['url']))
 
-        item['content_html'] = str(soup)
-    elif page_json['originalUrl'] != item['url']:
-        logger.debug('getting content form ' + page_json['originalUrl'])
-        orig_item = utils.get_content(page_json['originalUrl'], {}, False)
-        if orig_item:
-            item['content_html'] = orig_item['content_html']
+    item['content_html'] = str(soup)
+
+    if doc_info.get('origin_url'):
+        item['content_html'] += '<p><a href="' + doc_info['origin_url'] + '" target="_blank"><b>Read original article</b></a></p>'
     return item
 
 

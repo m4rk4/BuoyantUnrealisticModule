@@ -671,9 +671,14 @@ def get_content(url, args, site_json, save_debug=False):
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.replace_with(new_el)
         for el in body.find_all(class_=['rm-embed', 'rm-shortcode']):
-            it = el.find('iframe')
-            if it:
+            new_html = ''
+            if el.find('iframe'):
+                it = el.find('iframe')
                 new_html = utils.add_embed(it['src'])
+            elif el.find(class_='tiktok_lazy_shortcode'):
+                it = el.find(class_='tiktok_lazy_shortcode')
+                new_html = utils.add_embed(it['cite'])
+            if new_html:
                 new_el = BeautifulSoup(new_html, 'html.parser')
                 el.replace_with(new_el)
             else:

@@ -211,6 +211,7 @@ def get_content(url, args, site_json, save_debug=False):
             article_json = gql_json['data']['liveBlog']
         else:
             article_json = gql_json['data']['articleById']
+
     if not article_json:
         logger.debug('getting __NEXT_DATA__ from ' + url)
         next_data = get_next_data(url)
@@ -359,9 +360,81 @@ def get_content(url, args, site_json, save_debug=False):
         return item
 
     if article_json.get('article_body_desktop'):
-        item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item, site_json)
+        soup = BeautifulSoup(article_json['article_body_desktop'], 'html.parser')
+        # item['content_html'] += wp_posts.format_content(article_json['article_body_desktop'], item, site_json)
     elif article_json.get('article_body'):
-        item['content_html'] += wp_posts.format_content(article_json['article_body'], item, site_json)
+        soup = BeautifulSoup(article_json['article_body'], 'html.parser')
+        # item['content_html'] += wp_posts.format_content(article_json['article_body'], item, site_json)
+    if soup:
+        if save_debug:
+            utils.write_file(str(soup), './debug/debug.html')
+
+        for el in soup.find_all(class_='embed-article'):
+            el.decompose()
+
+        for el in soup.find_all(class_='wp-caption', recursive=False):
+            img_src = ''
+            it = el.find('img')
+            if it:
+                if it.get('srcset'):
+                    img_src = utils.image_from_srcset(it['srcset'], 1200)
+                elif it.get('src'):
+                    img_src = it['src']
+            if img_src:
+                it = el.find('a')
+                if it:
+                    link = it['href']
+                else:
+                    link = ''
+                it = el.find(class_='credits-text')
+                if it:
+                    caption = it.decode_contents()
+                else:
+                    caption = ''
+                new_html = utils.add_image(img_src, caption, link=link)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+            else:
+                logger.warning('unhandled wp-caption in ' + item['url'])
+
+        for el in soup.find_all(attrs={"data-ath-video-stream": True}, recursive=False):
+            it = el.find(attrs={"data-type": "application/x-mpegURL"})
+            if not it:
+                it = el.find(attrs={"data-type": "application/dash+xml"})
+            if it:
+                paths = list(filter(None, urlsplit(it['data-source']).path[1:].split('/')))
+                i = paths.index(el['data-ath-video-stream'])
+                poster = 'https://cdn-media.theathletic.com/video-stream/auto-thumbnail/' + paths[i] + '/' + paths[i + 1] + '.0000000.jpg'
+                new_html = utils.add_video(it['data-source'], it['data-type'], poster)
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                el.replace_with(new_el)
+
+        for el in soup.find_all(id='inline-graphic'):
+            if el.find(class_='showcase-link-container'):
+                el.decompose()
+            elif el.find('iframe'):
+                it = el.find('iframe')
+                new_html = utils.add_embed(it['src'])
+                new_el = BeautifulSoup(new_html, 'html.parser')
+                if el.parent and el.parent.name == 'div':
+                    el.parent.replace_with(new_el)
+                else:
+                    el.replace_with(new_el)
+            else:
+                logger.warning('unhandled inline-graphic in ' + item['url'])
+
+        for el in soup.find_all(class_='instagram-media'):
+            links = el.find_all('a')
+            new_html = utils.add_embed(links[-1]['href'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+
+        for el in soup.find_all(class_='twitter-tweet'):
+            new_html = utils.add_embed(el['data-instgrm-permalink'])
+            new_el = BeautifulSoup(new_html, 'html.parser')
+            el.replace_with(new_el)
+
+        item['content_html'] += str(soup)
 
     if article_json.get('posts') and article_json['posts'].get('items'):
         for i, post in enumerate(article_json['posts']['items']):

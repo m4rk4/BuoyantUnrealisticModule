@@ -1,5 +1,5 @@
 import json, pytz, re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime
 from urllib.parse import quote_plus, urlsplit
 
@@ -12,7 +12,43 @@ logger = logging.getLogger(__name__)
 
 
 def resize_image(img_src, width=1080):
+    if width < 0:
+        return utils.clean_url(img_src)
     return utils.clean_url(img_src) + '?format={}w'.format(width)
+
+
+def get_image(block, width=1080):
+    image = {}
+    el = block.find('img', attrs={"data-src": True})
+    if el:
+        image['src'] = el['data-src']
+    else:
+        el = block.find('img', attrs={"data-image": True})
+        if el:
+            image['src'] = el['data-image']
+        else:
+            el = block.find('img', attrs={"srcset": True})
+            if el:
+                image['src'] = utils.image_from_srcset(el['srcset'], width)
+            else:
+                el = block.find('img', attrs={"src": True})
+                if el:
+                    image['src'] = el['src']
+    if 'src' in image:
+        image['src'] = resize_image(image['src'], width)
+        image['thumb'] = resize_image(image['src'], 640)
+        el = block.find(class_='image-caption')
+        if el:
+            if el.p:
+                image['caption'] = el.p.decode_contents()
+            else:
+                image['caption'] = el.decode_contents()
+        else:
+            image['caption'] = ''
+        el = block.find('a', class_='sqs-block-image-link')
+        if el:
+            image['link'] = el['href']
+    return image    
 
 
 def get_content(url, args, site_json, save_debug=False):
@@ -104,6 +140,10 @@ def get_content(url, args, site_json, save_debug=False):
     elif page_json.get('mainContent'):
         soup = BeautifulSoup(page_json['mainContent'], 'html.parser')
 
+    # Remove beginning layout elements
+    while not isinstance(soup.contents[0], NavigableString) and soup.contents[0].get('class') and list(set(['sqs-layout', 'row', 'col']) & set(soup.contents[0]['class'])):
+        soup.contents[0].unwrap()
+
     if save_debug:
         utils.write_file(str(soup), './debug/debug.html')
 
@@ -129,73 +169,71 @@ def get_content(url, args, site_json, save_debug=False):
         el['style'] = 'border-left:3px solid #ccc; margin:1.5em 10px; padding:0.5em 10px;'
 
     blocks = soup.find_all('div', class_='sqs-block')
-    if 'image' in item and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'skip_lede_img' not in args:
+    if 'image' in item and 'sqs-block-image' not in blocks[0]['class'] and 'sqs-block-video' not in blocks[0]['class'] and 'sqs-block-embed' not in blocks[0]['class'] and 'skip_lede_img' not in args:
         item['content_html'] += utils.add_image(item['image'])
 
     for block in blocks:
+        if not block.name:
+            continue
+
         if 'sqs-block-html' in block['class'] or 'sqs-block-markdown' in block['class']:
-            for el in block.find_all('p'):
-                if re.search(r'^By {}'.format(item['author']['name']), el.get_text().strip(), flags=re.I):
-                    el.decompose()
-                    break
-            el = block.find('div', class_='sqs-block-content')
-            item['content_html'] += el.decode_contents()
+            el = block.find(string=re.compile(r'^By ' + item['author']['name'], flags=re.I))
+            if el:
+                el.decompose()
+            else:
+                el = block.find('div', class_='sqs-html-content')
+                if el:
+                    item['content_html'] += el.decode_contents()
+                else:
+                    el = block.find('div', class_='sqs-block-content')
+                    if el:
+                        item['content_html'] += el.decode_contents()
 
         elif 'sqs-block-image' in block['class']:
             if block.find(class_='sqs-empty'):
                 continue
-            el = block.find(class_='image-caption')
+            el = block.find_parent(class_='sqs-row')
             if el:
-                caption = el.get_text().strip()
+                gallery_images = []
+                for it in el.find_all(class_='sqs-block-image'):
+                    image = get_image(it, width=-1)
+                    if 'src' in image:
+                        gallery_images.append(image)
+                    else:
+                        logger.warning('unhandled sqs-block-image in ' + item['url'])
+                    it.decompose()
+                item['content_html'] += utils.add_gallery(gallery_images)
             else:
-                caption = ''
-            el = block.find('a', class_='sqs-block-image-link')
+                image = get_image(block)
+                if 'src' in image:
+                    item['content_html'] += utils.add_image(image['src'], image.get('caption'), link=image.get('link'))
+                else:
+                    logger.warning('unhandled sqs-block-image in ' + item['url'])
+            el = block.find(class_='image-card')
             if el:
-                link = el['href']
-            else:
-                link = ''
-            img_src = ''
-            el = block.find('img', attrs={"data-src": True})
-            if el:
-                img_src = el['data-src']
-            else:
-                el = block.find('img', attrs={"src": True})
-                if el:
-                    img_src = el['src']
-            if img_src:
-                item['content_html'] += utils.add_image(el['data-src'], caption, link=link)
-                el = block.find(class_='image-card')
-                if el:
-                    card_html = ''
-                    it = el.find(class_='image-title')
-                    if it:
-                        card_html += '<h4>{}</h4>'.format(it.get_text().strip())
-                    it = el.find(class_='image-subtitle')
-                    if it:
-                        card_html += it.decode_contents()
-                    it = el.find(class_='image-button')
-                    if it:
-                        if it.a:
-                            card_html += '<a href="{}">{}</a>'.format(utils.get_redirect_url(it.a['href']), it.get_text().strip())
-                    item['content_html'] += utils.add_blockquote(card_html)
-            else:
-                #print(block)
-                logger.warning('unhandled sqs-block-image in ' + item['url'])
+                card_html = ''
+                it = el.find(class_='image-title')
+                if it:
+                    card_html += '<h4>' + it.get_text(strip=True) + '</h4>'
+                it = el.find(class_='image-subtitle')
+                if it:
+                    card_html += it.decode_contents()
+                it = el.find(class_='image-button')
+                if it:
+                    if it.a:
+                        card_html += '<a href="' + it.a['href'] + '">' + it.get_text(strip=True) + '</a>'
+                item['content_html'] += utils.add_blockquote(card_html)
 
         elif 'sqs-block-gallery' in block['class']:
             # https://www.tokyocowboy.co/articles/uy1r8j003qdvb4ozr4qgplhd3yujyn
             # TODO: captions. Need and example.
             gallery_images = []
-            gallery_html = '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
             el = block.find(class_='sqs-gallery')
             for it in el.find_all('noscript'):
-                img_src = resize_image(it.img['src'], 1200)
+                src = resize_image(it.img['src'], -1)
                 thumb = resize_image(it.img['src'], 640)
-                gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src) + '</div>'
-                gallery_images.append({"src": img_src, "caption": '', "thumb": thumb})
-            gallery_html += '</div>'
-            gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
-            item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
+                gallery_images.append({"src": src, "caption": '', "thumb": thumb})
+            item['content_html'] += utils.add_gallery(gallery_images)
 
         elif 'sqs-block-video' in block['class']:
             if block.get('data-block-json'):
@@ -278,6 +316,12 @@ def get_content(url, args, site_json, save_debug=False):
                 it = block.find('blockquote', class_='instagram-media')
                 item['content_html'] += utils.add_embed(it['data-instgrm-permalink'])
                 continue
+            elif block['data-block-type'] == "1337" and block.find('pre'):
+                it = block.find('pre')
+                it.attrs = {}
+                it['style'] = 'margin:1em 0; padding:0.5em; white-space:pre; overflow-x:scroll; background-color:light-dark(#ccc,#333);'
+                item['content_html'] += str(it)
+                continue
             elif block['data-block-type'] == "23":
                 el = block.find('a')
                 if el:
@@ -302,26 +346,12 @@ def get_content(url, args, site_json, save_debug=False):
                 logger.warning('unhandled sqs-block-summary-v2 block in ' + item['url'])
 
         elif 'sqs-block-button' in block['class']:
-            el = block.find(class_='sqs-block-button-container')
+            # el = block.find(class_='sqs-block-button-container')
+            el = block.find('a', class_='sqs-block-button-element')
             if el:
-                if re.search(r'Share on (Facebook|Twitter)', el.get_text(), flags=re.I):
+                if re.search(r'Share on (Facebook|Twitter)', el.get_text(strip=True), flags=re.I):
                     continue
-                style = 'width:80%; margin-right:auto; margin-left:auto; padding:8px; border-style:solid; background-color:grey; font-size:1.2em; weight:bold;'
-                if el['data-alignment'] == 'center':
-                    style += ' text-align:center;'
-                el.attrs = {}
-                el['style'] = style
-                if el.a:
-                    href = el.a['href']
-                    # https://www.aboveavalon.com/notes/2023/5/19/youtube-gaining-tv-momentum-value-of-ad-supported-tiers-in-paid-video-streaming-apple-tv-and-ads
-                    if not re.search(r'https://app\.moonclerk\.com/pay/', href):
-                        el.a.attrs = {}
-                        el.a['href'] = href
-                        el.a['style'] = 'text-decoration:none; color:white;'
-                        el['onclick'] = "location.href='{}'".format(href)
-                        item['content_html'] += str(el)
-                else:
-                    item['content_html'] += str(el)
+                item['content_html'] += utils.add_button(el['href'], el.get_text().strip())
             else:
                 logger.warning('unhandled sqs-block-button in ' + item['url'])
 
@@ -341,7 +371,7 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             logger.warning('unhandled sqs-block class {} in {}'.format(block['class'], item['url']))
 
-    item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
+    # item['content_html'] = re.sub(r'</(figure|table)><(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 

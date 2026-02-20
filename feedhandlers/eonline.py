@@ -566,7 +566,7 @@ def get_content(url, args, site_json, save_debug=False):
     if 'author' not in item and 'authors' in item and len(item['authors']) > 0:
         item['author'] = {
             "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
-		}   
+		}
 
     if article_json.get('categories'):
         item['tags'] = []
@@ -579,7 +579,7 @@ def get_content(url, args, site_json, save_debug=False):
     item['content_html'] = ''
     if article_json.get('subhead'):
         item['summary'] = article_json['subhead']
-        item['content_html'] += '<p><em>{}</em></p>'.format(article_json['subhead'])
+        item['content_html'] += '<p><em>' + article_json['subhead'] + '</em></p>'
         
     if 'embed' in args:
         item['content_html'] = utils.format_embed_preview(item)
@@ -596,9 +596,9 @@ def get_content(url, args, site_json, save_debug=False):
         else:
             poster = article_json['thumbnail']['uri']
         caption = 'Watch: ' + article_json['title']
-        item['content_html'] += utils.add_video(video_src, video_type, poster, caption)
+        item['content_html'] += utils.add_video(video_src, video_type, poster, caption, use_videojs=True)
         if article_json.get('description'):
-            item['content_html'] += '<p>{}</p>'.format(article_json['description'])
+            item['content_html'] += '<p>' + article_json['description'] + '</p>'
 
     if article_json.get('segments'):
         for segment in article_json['segments']:
@@ -636,15 +636,32 @@ def get_content(url, args, site_json, save_debug=False):
                         caption = 'Watch: ' + segment['video']['title']
                     else:
                         caption = ''
-                    item['content_html'] += utils.add_video(video_src, video_type, poster, caption)
+                    item['content_html'] += utils.add_video(video_src, video_type, poster, caption, use_videojs=True)
                 if segment.get('text'):
                     item['content_html'] += segment['text']
 
             elif segment['type'] == 'VERTICAL_GALLERY':
-                gallery_url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, segment['gallery']['uri'])
-                gallery_url = '{}/content?read&url={}'.format(config.server, quote_plus(gallery_url))
-                caption = '<a href="{}">Gallery: {}</a>'.format(gallery_url, segment['gallery']['title'])
-                item['content_html'] += utils.add_image(resize_image(segment['gallery']['galleryitems']['nodes'][0]['image']['uri']), caption, link=gallery_url)
+                gallery_images = []
+                for it in segment['gallery']['galleryitems']['nodes']:
+                    img_src = it['image']['uri']
+                    thumb = resize_image(img_src, 640)
+                    desc = ''
+                    if it.get('title'):
+                        desc += '<h4>{}</h4>'.format(it['title'])
+                    if it.get('caption'):
+                        desc += it['caption']
+                    captions = []
+                    if it['image'].get('title'):
+                        captions.append(it['image']['title'])
+                    if it['image'].get('agency'):
+                        captions.append(it['image']['agency'])
+                    caption = ' | '.join(captions)
+                    gallery_images.append({"src": img_src, "caption": caption, "desc": desc, "thumb": thumb})
+                gallery_url = split_url.scheme + '://' + split_url.netloc + segment['gallery']['uri']
+                gallery_caption = '<a href="' + gallery_url + '" target="_blank">Gallery: ' + segment['gallery']['title'] + '</a>'
+                gallery_url = config.server + '/content?read&url=' + quote_plus(gallery_url)
+                # item['content_html'] += utils.add_image(resize_image(segment['gallery']['galleryitems']['nodes'][0]['image']['uri']), gallery_caption, link=gallery_url, overlay=config.gallery_button_overlay)
+                item['content_html'] += utils.add_gallery(gallery_images, gallery_url=gallery_url, gallery_caption=gallery_caption, show_gallery_poster=True)
 
             elif segment['type'] == 'SOCIAL_CONTENT':
                 if segment['socialContent']['type'] == 'twitter':
@@ -700,10 +717,10 @@ def get_content(url, args, site_json, save_debug=False):
             gallery_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, desc=desc) + '</div>'
             gallery_images.append({"src": img_src, "caption": caption, "desc": desc, "thumb": thumb})
         gallery_html += '</div>'
-        gallery_url = '{}/gallery?images={}'.format(config.server, quote_plus(json.dumps(gallery_images)))
+        gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
         item['content_html'] += '<h3><a href="{}" target="_blank">View photo gallery</a></h3>'.format(gallery_url) + gallery_html
 
-    item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
+    # item['content_html'] = re.sub(r'</(div|figure|table)>\s*<(div|figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 
@@ -729,7 +746,7 @@ def get_feed(url, args, site_json, save_debug=False):
     n = 0
     items = []
     for article in content_json:
-        url = '{}://{}{}'.format(split_url.scheme, split_url.netloc, article['uri'])
+        url = split_url.scheme + '://' + split_url.netloc + article['uri']
         if save_debug:
             logger.debug('getting content for ' + url)
         item = get_content(url, args, site_json, save_debug)

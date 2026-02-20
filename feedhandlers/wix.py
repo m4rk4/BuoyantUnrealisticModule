@@ -83,31 +83,36 @@ def apply_entity_styles(block, entity_map):
     return text
 
 
+def get_decorations(decorations):
+    link = ''
+    style = ''
+    for dec in decorations:
+        if dec['type'] == 'LINK':
+            link = dec['linkData']['link']['url']
+        elif dec['type'] == 'ITALIC':
+            style += 'font-style:italic; '
+        elif dec['type'] == 'UNDERLINE':
+            style += 'text-decoration:underline; '
+        elif dec['type'] == 'BOLD':
+            style += 'font-weight:bold; '
+        elif dec['type'] == 'FONT_SIZE':
+            style += 'font-size:{}{}; '.format(dec['fontSizeData']['value'], dec['fontSizeData']['unit'].lower())
+        elif dec['type'] == 'COLOR':
+            if dec['colorData'].get('foreground'):
+                style += 'color:' + dec['colorData']['foreground'] + '; '
+            if dec['colorData'].get('background'):
+                style += 'background-color:' + dec['colorData']['background'] + '; '
+        else:
+            logger.warning('unhandled text decoration ' + dec['type'])
+    return style.strip(), link
+
+
 def format_content(node):
     node_html = ''
     if node['type'] == 'TEXT':
-        style = ''
-        link = ''
-        for dec in node['textData']['decorations']:
-            if dec['type'] == 'LINK':
-                link = dec['linkData']['link']['url']
-            elif dec['type'] == 'ITALIC':
-                style += 'text-decoration:italic; '
-            elif dec['type'] == 'UNDERLINE':
-                style += 'text-decoration:underline; '
-            elif dec['type'] == 'BOLD':
-                style += 'font-weight:bold; '
-            elif dec['type'] == 'FONT_SIZE':
-                style += 'font-size:{}{}; '.format(dec['fontSizeData']['value'], dec['fontSizeData']['unit'].lower())
-            elif dec['type'] == 'COLOR':
-                if dec['colorData'].get('foreground'):
-                    style += 'color:' + dec['colorData']['foreground'] + '; '
-                if dec['colorData'].get('background'):
-                    style += 'background-color:' + dec['colorData']['background'] + '; '
-            else:
-                logger.warning('unhandled text decoration ' + dec['type'])
+        style, link = get_decorations(node['textData']['decorations'])
         if style:
-            node_html = '<span style="' + style.strip() + '">' + node['textData']['text'] + '</span>'
+            node_html = '<span style="' + style + '">' + node['textData']['text'] + '</span>'
         else:
             node_html = node['textData']['text']
         if link:
@@ -131,30 +136,12 @@ def format_content(node):
     elif node['type'] == 'IMAGE':
         node_html += utils.add_image(get_img_src(node['imageData']['image']))
     elif node['type'] == 'GALLERY':
-        n = len(node['galleryData']['items'])
         gallery_images = []
-        new_html = ''
-        for i, it in enumerate(node['galleryData']['items']):
+        for it in node['galleryData']['items']:
             img_src = get_img_src(it['image']['media'], 1800)
             thumb = get_img_src(it['image']['media'], 600)
-            gallery_images.append({"src": img_src, "caption": "", "thumb": thumb})
-            if i == 0:
-                if n % 2 == 1:
-                    # start with full width image if odd number of images
-                    new_html += utils.add_image(get_img_src(it['image']['media']), link=img_src, fig_style='margin:1em 0 8px 0; padding:0;')
-                else:
-                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px;"><div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src, fig_style='margin:0; padding:0;') + '</div>'
-            elif i == 1:
-                if n % 2 == 1:
-                    new_html += '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">'
-                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src, fig_style='margin:0; padding:0;') + '</div>'
-            else:
-                new_html += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, link=img_src, fig_style='margin:0; padding:0;') + '</div>'
-        new_html += '</div>'
-        if n > 2:
-            gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images, separators=(',', ':')))
-            node_html = '<h3><a href="' + gallery_url + '" target="_blank">View photo gallery</a></h3>'
-        node_html += new_html
+            gallery_images.append({"src": img_src, "caption": "", "thumb": thumb, "width": it['media']['width'], "height": it['media']['height']})
+        node_html += utils.add_gallery(gallery_images, use_gallery_url=True, columns=3)
     elif node['type'] == 'VIDEO':
         if re.search(r'youtube\.com|youtu\.be', node['videoData']['video']['src']['url']):
             node_html += utils.add_embed(node['videoData']['video']['src']['url'])

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus, urlsplit
 
 import config, utils
-from feedhandlers import spotify
+from feedhandlers import spotify, ytdl
 
 import logging
 
@@ -54,6 +54,8 @@ def get_content(url, args, site_json, save_debug=False):
 
     if '/podcasts/' in url and next_data['pageProps']['__TEMPLATE_QUERY_DATA__'].get('episode'):
         return get_episode_content(next_data['pageProps']['__TEMPLATE_QUERY_DATA__']['episode'], args, site_json, save_debug)
+    elif '/podcasts/' in url and next_data['pageProps']['__TEMPLATE_QUERY_DATA__'].get('show'):
+        return get_show_content(next_data['pageProps']['__TEMPLATE_QUERY_DATA__']['show'], args, site_json, save_debug)
     elif next_data['pageProps']['__TEMPLATE_QUERY_DATA__'].get('post'):
         return get_post_content(next_data['pageProps']['__TEMPLATE_QUERY_DATA__']['post'], 'https://www.theringer.com' + next_data['pageProps']['__SEED_NODE__']['uri'], args, site_json, save_debug)
 
@@ -61,68 +63,91 @@ def get_content(url, args, site_json, save_debug=False):
     return None
 
 
-def get_episode_content(episode_json, args, site_json, save_debug):
-    item = {}
-    item['id'] = episode_json['databaseId']
-    item['url'] = 'https://www.theringer.com' + episode_json['uri']
-    item['title'] = episode_json['title']
-
-    if episode_json.get('date'):
-        dt_loc = datetime.fromisoformat(episode_json['date'])
+def get_show_content(show_json, args, site_json, save_debug):
+    if show_json['showSettings'].get('spotifyId'):
+        item = spotify.get_content('https://open.spotify.com/show/' + show_json['showSettings']['spotifyId'], args, site_json, save_debug)
     else:
-        dt_loc = datetime.fromisoformat(episode_json['episodeSettings']['releaseDate'].replace('+00:00', ''))
-    tz_loc = pytz.timezone(config.local_tz)
-    dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt, date_only=True)
+        item = {}
+        item['id'] = show_json['databaseId']
+        item['url'] = 'https://www.theringer.com' + show_json['uri']
+        item['title'] = show_json['title']
 
-    item['authors'] = [{"name": episode_json['episodeSettings']['show']['node']['title']}]
-    item['author'] = {
-        "name": episode_json['episodeSettings']['show']['node']['title'],
-        "url": "https://www.theringer.com" + episode_json['episodeSettings']['show']['node']['uri']
-    }
-    if episode_json['episodeSettings'].get('creators') and episode_json['episodeSettings']['creators'].get('nodes'):
-        item['authors'] += [{"name": x['name']} for x in episode_json['episodeSettings']['creators']['nodes']]
-        if len(item['authors']) > 1:
-            item['author']['name'] += ' with ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors'][1:]]))
-
-    item['tags'] = [x['name'] for x in episode_json['categories']['nodes']]
-
-    if episode_json.get('excerpt'):
-        item['summary'] = episode_json['excerpt']
-
-    item['content_html'] = ''
-    if episode_json['episodeSettings'].get('youtubeId'):
-        item['content_html'] += utils.add_embed('https://www.youtube.com/watch?v=' + episode_json['episodeSettings']['youtubeId'])
-    elif episode_json.get('featuredImage') and episode_json['featuredImage'].get('node'):
-        item['image'] = resize_image(episode_json['featuredImage']['node']['sourceUrl'], site_json)
-        if 'embed' not in args:
-            captions = []
-            if episode_json['featuredImage']['node'].get('caption'):
-                captions.append(episode_json['featuredImage']['node']['caption'])
-            if episode_json['featuredImage']['node'].get('credits'):
-                captions.append(episode_json['featuredImage']['node']['credits'])
-            item['content_html'] += utils.add_image(item['image'], ' | '.join(captions))
-
-    if episode_json['episodeSettings'].get('spotifyId'):
-        # TODO: use embed link since the Spotify episodes are DRM protected
-        audio_src = 'https://open.spotify.com/episode/' + episode_json['episodeSettings']['spotifyId']
-        # audio_src = 'https://embed-standalone.spotify.com/embed/episode/' + episode_json['episodeSettings']['spotifyId']
-        poster = resize_image(episode_json['episodeSettings']['show']['node']['featuredImage']['node']['sourceUrl'], site_json, 640)
-        if 'image' not in item:
-            item['image'] = poster
-        duration = 60 * episode_json['episodeSettings']['watchTime']
-        if episode_json['episodeSettings'].get('youtubeId'):
-            desc = '<a href="{}">Watch on Youtube</a>'.format('https://www.youtube.com/watch?v=' + episode_json['episodeSettings']['youtubeId'])
+        episode = show_json['episodes']['nodes'][0]
+        if episode.get('date'):
+            dt_loc = datetime.fromisoformat(episode['date'])
         else:
-            desc = ''
-        item['content_html'] = utils.add_audio(audio_src, poster, item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], duration, audio_type='audio_link', desc=desc)
-    else:
-        logger.warning('unknown podcast episode source in ' + item['url'])
+            dt_loc = datetime.fromisoformat(episode['episodeSettings']['releaseDate'].replace('+00:00', ''))
+        tz_loc = pytz.timezone(config.local_tz)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
 
-    if 'embed' not in args and episode_json.get('content'):
-        item['content_html'] += episode_json['content']
+        if show_json['showSettings'].get('creators') and show_json['showSettings']['creators'].get('nodes'):
+            item['authors'] = [{"name": x['name'], "url": "https://www.theringer.com" + x['uri']} for x in show_json['showSettings']['creators']['nodes']]
+            item['author'] = {
+                "name": re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors']]))
+            }   
+
+        if show_json.get('featuredImage') and show_json['featuredImage'].get('node'):
+            item['image'] = resize_image(show_json['featuredImage']['node']['sourceUrl'], site_json)
+
+        if show_json['showSettings'].get('primaryTopic') and show_json['showSettings']['primaryTopic'].get('nodes'):
+            item['tags'] = [x['name'] for x in show_json['showSettings']['primaryTopic']['nodes']]
+
+        if show_json.get('excerpt'):
+            item['summary'] = show_json['excerpt']
+
+    return item
+
+
+
+def get_episode_content(episode_json, args, site_json, save_debug):
+    if episode_json['episodeSettings'].get('youtubeId') and 'video' in args:
+        return ytdl.get_content('https://www.youtube.com/watch?v=' + episode_json['episodeSettings']['youtubeId'], args, site_json, save_debug)
+    elif episode_json['episodeSettings'].get('youtubeId'):
+        return ytdl.get_content('https://music.youtube.com/watch?v=' + episode_json['episodeSettings']['youtubeId'], args, site_json, save_debug)
+    elif episode_json['episodeSettings'].get('spotifyId'):
+        return spotify.get_content('https://open.spotify.com/episode/' + episode_json['episodeSettings']['spotifyId'], args, site_json, save_debug)
+    else:
+        item = {}
+        item['id'] = episode_json['databaseId']
+        item['url'] = 'https://www.theringer.com' + episode_json['uri']
+        item['title'] = episode_json['title']
+
+        if episode_json.get('date'):
+            dt_loc = datetime.fromisoformat(episode_json['date'])
+        else:
+            dt_loc = datetime.fromisoformat(episode_json['episodeSettings']['releaseDate'].replace('+00:00', ''))
+        tz_loc = pytz.timezone(config.local_tz)
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt, date_only=True)
+
+        show = episode_json['episodeSettings']['show']['node']
+        item['author'] = {
+            "name": show['title'],
+            "url": "https://www.theringer.com" + show['uri']
+        }
+        item['authors'] = []
+        item['authors'].append(item['author'])
+
+        # if episode_json['episodeSettings'].get('creators') and episode_json['episodeSettings']['creators'].get('nodes'):
+        #     item['authors'] += [{"name": x['name']} for x in episode_json['episodeSettings']['creators']['nodes']]
+        #     if len(item['authors']) > 1:
+        #         item['author']['name'] += ' with ' + re.sub(r'(,)([^,]+)$', r' and\2', ', '.join([x['name'] for x in item['authors'][1:]]))
+
+        item['tags'] = [x['name'] for x in episode_json['categories']['nodes']]
+
+        if episode_json.get('featuredImage') and episode_json['featuredImage'].get('node'):
+            item['image'] = resize_image(episode_json['featuredImage']['node']['sourceUrl'], site_json)
+
+        if episode_json.get('excerpt'):
+            item['summary'] = episode_json['excerpt']
+
+        if 'embed' not in args and episode_json.get('content'):
+            item['content_html'] += episode_json['content']
     return item
 
 

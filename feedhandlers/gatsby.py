@@ -326,6 +326,7 @@ def get_content(url, args, site_json, save_debug=False):
 
     elif api_json['result'].get('data') and api_json['result']['data'].get('mdx'):
         # https://ericmigi.com/blog/introducing-two-new-pebbleos-watches
+        # https://ente.io/blog/r/gpt-is-my-friend/
         item['id'] = page_context['id']
         item['url'] = url
         item['title'] = api_json['result']['data']['mdx']['frontmatter']['title']
@@ -341,10 +342,14 @@ def get_content(url, args, site_json, save_debug=False):
             dt = datetime.fromisoformat(m.group(1))
             item['date_modified'] = dt.isoformat()
 
-        # TODO: author?
-        item['author'] = {
-            "name": split_url.netloc
-        }
+        if api_json['result']['data']['mdx']['frontmatter'].get('author'):
+            item['author'] = {
+                "name": api_json['result']['data']['mdx']['frontmatter']['author']
+            }
+        else:
+            item['author'] = {
+                "name": split_url.netloc
+            }
         item['authors'] = []
         item['authors'].append(item['author'])
 

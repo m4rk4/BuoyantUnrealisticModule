@@ -3,7 +3,7 @@
 	<head>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@6.0/dist/fancybox/fancybox.css"/>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.css"/>
         <style>
             body {
                 font-size: 18px;
@@ -41,7 +41,7 @@
                 </div>
             {% endfor %}
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@6.0/dist/fancybox/fancybox.umd.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox/fancybox.umd.js"></script>
         <script>
             Fancybox.bind('[data-fancybox="gallery"]', {
                 Toolbar: {
@@ -64,7 +64,9 @@
                 }
             });
             // Start Fancybox on page load
-            Fancybox.fromSelector('[data-fancybox="gallery"]');
+            Fancybox.fromSelector('[data-fancybox="gallery"]', {
+                startIndex: "{{ start_index }}",
+            });
         </script>
     </body>
 </html>

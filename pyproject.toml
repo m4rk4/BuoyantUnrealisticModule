@@ -51,9 +51,10 @@ g4f = {extras = ["slim"], version = "*"}
 spotifyscraper = "*"
 ytmusicapi = "*"
 asyncio = "*"
-rnet = "3.0.0rc14"
+rnet = "3.0.0rc21"
 pythonmonkey = "*"
 yt-dlp = {extras = ["default"], version = "^2025.11.12"}
+css-inline = "^0.20.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

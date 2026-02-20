@@ -99,18 +99,19 @@ def get_next_data(url):
 def render_body_component(component):
     content_html = ''
     if component['__typename'] == 'EntryBodyParagraph' or component['__typename'] == 'CoreParagraphBlockType':
-        content_html = '<p'
-        if component.get('dropcap') and component['dropcap'] == True:
-            content_html += ' class="dropcap"'
-        content_html += '>'
         if component.get('contents'):
-            content_html += component['contents']['html']
+            contents = component['contents']['html']
+        elif component.get('paragraphContents'):
+            contents = component['paragraphContents'][0]['html']
+            if len(component['paragraphContents']) > 1:
+                logger.warning('unhandled paragraphContents with multiple items')
         elif component.get('tempContents'):
-            # if len(component['tempContents']) > 1:
-            #     logger.warning('unhandled CoreParagraphBlockType tempContents')
-            # content_html += component['tempContents'][0]['html']
-            content_html += '<br>'.join([x['html'] for x in component['tempContents']])
-        content_html += '</p>'
+            contents = '<br>'.join([x['html'] for x in component['tempContents']])
+        else:
+            contents = ''
+        if contents and 'dropcap' in component and component['dropcap'] == True:
+            contents = re.sub(r'^(\W*\w)', r'<span style="DROPCAP_STYLE">\1</span>', contents).replace('DROPCAP_STYLE', config.dropcap_first_character)
+        content_html += '<p>' + contents + '</p>'
 
     elif component['__typename'] == 'EntryBodyHeading' or component['__typename'] == 'CoreHeadingBlockType':
         content_html += '<h{0}>{1}</h{0}>'.format(component['level'], component['contents']['html'])
@@ -548,10 +549,9 @@ def get_item(entry_json, args, site_json, save_debug):
         for component in entry_json['blocks']:
             item['content_html'] += render_body_component(component)
 
-    if re.search(r'<p class="dropcap">', item['content_html']):
-        item['content_html'] += '<style>' + config.dropcap_style + '</style>'
+    # if re.search(r'<p class="dropcap">', item['content_html']):
+    #     item['content_html'] += '<style>' + config.dropcap_style + '</style>'
 
-    item['content_html'] = re.sub(r'</(figure|table)>\s*<(figure|table)', r'</\1><br/><\2', item['content_html'])
     return item
 
 

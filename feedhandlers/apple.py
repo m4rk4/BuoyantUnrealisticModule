@@ -1,6 +1,6 @@
 import math, re, requests
 from datetime import datetime
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlsplit
 
 import config, utils
 
@@ -286,10 +286,21 @@ def get_podcast_episode(episode):
     if not item.get('tags'):
         del item['tags']
 
-    item['image'] = episode['attributes']['artwork']['url'].replace('{w}', '160').replace('{h}', '160').replace('{f}', 'jpg')
-    item['_audio'] = utils.get_redirect_url(episode['attributes']['assetUrl'])
-    item['_duration'] = utils.calc_duration(float(episode['attributes']['durationInMilliseconds']) / 1000)
+    item['image'] = episode['attributes']['artwork']['url'].replace('{w}', '640').replace('{h}', '640').replace('{f}', 'webp')
+
     item['summary'] = episode['attributes']['description']['standard'].replace('\n', '<br/>')
+
+    # item['_audio'] = utils.get_redirect_url(episode['attributes']['assetUrl'])
+    item['_audio'] = episode['attributes']['assetUrl']
+    item['_audio_type'] = 'audio/mpeg'
+    attachment = {}
+    attachment['url'] = item['_audio']
+    attachment['mime_type'] = item['_audio_type']
+    item['attachments'] = []
+    item['attachments'].append(attachment)
+
+    item['_duration'] = utils.calc_duration(float(episode['attributes']['durationInMilliseconds']) / 1000, time_format=':')
+
     return item
 
 
@@ -298,14 +309,8 @@ def get_podcast(url, args, site_json, save_debug):
     if not m:
         logger.warning('unable to parse podcast id in ' + url)
         return None
+
     api_url = 'https://amp-api.podcasts.apple.com/v1/catalog/us/podcasts/{}?include=episodes'.format(m.group(1))
-
-    m = re.search(r'\bi=(\d+)', url)
-    if m:
-        episode_id = m.group(1)
-    else:
-        episode_id = ''
-
     api_json = get_apple_data(api_url, url, save_debug)
     if not api_json:
         return None
@@ -314,56 +319,41 @@ def get_podcast(url, args, site_json, save_debug):
 
     show = api_json['data'][0]
 
-    if episode_id:
+    split_url = urlsplit(url)
+    params = parse_qs(split_url.query)
+    if 'i' in params:
         for episode in show['relationships']['episodes']['data']:
-            if episode['id'] == episode_id:
+            if episode['id'] == params['i'][0]:
+                episode_id = episode['id']
                 break
-    else:
-        # Should be the most recent episode
-        episode = show['relationships']['episodes']['data'][0]
+        if not episode_id:
+            logger.warning('unable to find episode for ' + url)
+            return None
 
-    item = get_podcast_episode(episode)
-    if episode_id:
-        item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], show['attributes']['name'], show['attributes']['url'], item['_display_date'], item['_duration'])
-        if 'summary' in item and 'embed' not in args:
-            item['content_html'] += '<div>{}</div>'.format(item['summary'].replace('\n', '<br/>'))
+        item = get_podcast_episode(episode)
     else:
         item = {}
         item['id'] = show['id']
         item['url'] = show['attributes']['url']
         item['title'] = show['attributes']['name']
+
         item['author'] = {
             "name": show['attributes']['artistName']
         }
         item['_timestamp'] = 0
+
         item['tags'] = show['attributes']['genreNames'].copy()
+
         item['image'] = show['attributes']['artwork']['url'].replace('{w}', '160').replace('{h}', '160').replace('{f}', 'jpg')
+
         if show['attributes'].get('description'):
             item['summary'] = show['attributes']['description']['standard'].replace('\n', '<br/>')
         elif show['attributes'].get('editorialNotes'):
             item['summary'] = show['attributes']['editorialNotes']['standard'].replace('\n', '<br/>')
 
-        card_image = '<a href="{}" target="_blank"><div style="width:100%; height:100%; background:url(\'{}\'); background-position:center; background-size:cover; border-radius:10px 0 0 0;"></div></a>'.format(item['url'], item['image'])
-
-        card_content = '<div style="font-size:1.1em; font-weight:bold;"><a href="{}">{}</a></div>'.format(item['url'], item['title'])
-        card_content += '<div style="margin-top:8px;">' + item['author']['name'] + '</div>'
-
-        card_footer = ''
-        if 'embed' not in args and 'summary' in item:
-            card_footer += '<p>' + item['summary'] + '</p>'
-
-        # Max number of episodes to display. All episodes are added to _playlist
-        if 'max' in args:
-            n_max = int(args['max'])
-        elif 'embed' in args:
-            n_max = 3
-        else:
-            n_max = 10
-        n_max = min(n_max, len(show['relationships']['episodes']['data']))
-
         item['_playlist'] = []
-        card_footer += '<details><summary style="font-weight:bold;">Episodes:</summary>'
-        for i, ep in enumerate(show['relationships']['episodes']['data']):
+        item['_playlist_title'] = 'Episodes'
+        for ep in show['relationships']['episodes']['data']:
             episode = get_podcast_episode(ep)
             if episode['_timestamp'] > item['_timestamp']:
                 item['date_published'] = episode['date_published']
@@ -371,16 +361,17 @@ def get_podcast(url, args, site_json, save_debug):
                 item['_display_date'] = episode['_display_date']
             item['_playlist'].append({
                 "src": episode['_audio'],
-                "name": episode['title'],
-                "artist": episode['_display_date'],
-                "image": episode['image']
+                "mime_type": episode['_audio_type'],
+                "title": episode['title'],
+                "url": episode['url'],
+                "image": episode['image'],
+                "date": episode['_display_date']
             })
-            if i < n_max:
-                card_footer += utils.add_audio_v2(episode['_audio'], episode['image'], episode['title'], episode['url'], '', '', episode['_display_date'], episode['_duration'], show_poster=False, border=False)
-        if n_max < len(show['relationships']['episodes']['data']):
-            card_footer += '<div><a href="{}">View more episodes</a></div>'.format(item['url'])
-        card_footer += '</details>'
-        item['content_html'] = utils.format_small_card(card_image, card_content, card_footer)
+
+    item['content_html'] = utils.format_audio_content(item, logo=config.logo_apple_podcasts)
+
+    if 'summary' in item and 'embed' not in args:
+        item['content_html'] += '<p>' + item['summary'] + '</p>'
     return item
 
 

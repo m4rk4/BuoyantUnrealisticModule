@@ -262,13 +262,7 @@ def get_slideshow_content(url, args, site_json, save_debug):
     n = 0
     total = slideshow_images['pageInfo']['total']
     cursor = slideshow_images['pageInfo']['nextCursor']
-    gallery_link = config.server + '/gallery?url=' + quote_plus(item['url'])
-    if 'embed' in args:
-        caption = '<a href="' + item['url'] + '">Slideshow: ' + item['title'] + ' (' + str(total) + ' images)</a>'
-        item['content_html'] = utils.add_image(item['image'], caption, link=gallery_link, overlay=config.gallery_button_overlay)
-        return item
 
-    item['content_html'] = '<h3><a href="' + gallery_link + '" target="_blank">View slideshow</a></h3>'
     item['_gallery'] = []
     while n < total:
         if not slideshow_json:
@@ -285,16 +279,16 @@ def get_slideshow_content(url, args, site_json, save_debug):
                 caption = image['caption']
             else:
                 caption = ''
-            if n == 0 and total % 2 == 1:
-                item['content_html'] += utils.add_image(img_src + '?width=1000', caption, link=img_src, fig_style='margin:1em 0 0 0; padding:0;')
-            else:
-                if n == 0 or (n == 1 and total % 2 == 1):
-                    item['content_html'] += '<div style="display:flex; flex-wrap:wrap; gap:1em; margin:1em 0;">'
-                item['content_html'] += '<div style="flex:1; min-width:360px;">' + utils.add_image(thumb, caption, link=img_src, fig_style='margin:0; padding:0;') + '</div>'
             item['_gallery'].append({"src": img_src, "caption": caption, "thumb": thumb})
             n += 1
         slideshow_json = None
-    item['content_html'] += '</div>'
+
+    gallery_url = config.server + '/gallery?url=' + quote_plus(item['url'])
+    if 'embed' in args:
+        caption = '<a href="' + item['url'] + '" target="_blank">View: ' + item['title'] + ' (' + str(total) + ' images)</a>'
+        item['content_html'] = utils.add_gallery(item['_gallery'], gallery_url=gallery_url, gallery_caption=caption, show_gallery_poster=True)
+    else:
+        item['content_html'] = utils.add_gallery(item['_gallery'])
     return item
 
 

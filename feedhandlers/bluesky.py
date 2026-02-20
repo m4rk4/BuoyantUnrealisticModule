@@ -1,4 +1,4 @@
-import json, pytz, re
+import json, pytz, re, requests
 from datetime import datetime
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
@@ -13,64 +13,234 @@ def get_profile(actor_did):
     return utils.get_url_json('https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=' + actor_did)
 
 
+def get_post_thread(uri):
+    api_url = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=' + quote_plus(uri)
+    return utils.get_url_json(api_url)
+
+
 def get_content(url, args, site_json, save_debug=False):
     # https://docs.bsky.app/docs/api/app-bsky-feed-get-post-thread
     if url.startswith('at://'):
-        api_url = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=' + quote_plus(url)
+        post_uri = url
     else:
         split_url = urlsplit(url)
         paths = list(filter(None, split_url.path.split('/')))
-        if 'profile' not in paths:
+        if 'profile' not in paths and 'post' not in paths:
             logger.warning('unhandled url ' + url)
             return None
-        api_url = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at%3A%2F%2F{}%2Fapp.bsky.feed.post%2F{}'.format(quote_plus(paths[1]), paths[-1])
+        i = paths.index('profile')
+        post_uri = 'at://' + paths[i + 1]
+        i = paths.index('post')
+        post_uri += '/app.bsky.feed.post/' + paths[i + 1]
+        # api_url = 'https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at%3A%2F%2F{}%2Fapp.bsky.feed.post%2F{}'.format(quote_plus(paths[1]), paths[-1])
     # print(api_url)
-    api_json = utils.get_url_json(api_url)
+    # api_json = utils.get_url_json(api_url)
+    api_json = get_post_thread(post_uri)
     if not api_json:
         return None
     if save_debug:
         utils.write_file(api_json, './debug/bluesky.json')
 
-    post_json = api_json['thread']['post']
+    item = get_item(api_json['thread']['post'])
+    
+    if api_json['thread'].get('parent'):
+        item['_parents'] = []
+        parent = api_json['thread']['parent']
+        while parent:
+            item['_parents'].insert(0, get_item(parent['post']))
+            if parent.get('parent'):
+                parent = parent['parent']
+            else:
+                parent = None
+
+    def add_replies(replies, author_did):
+        children = []
+        for reply in replies:
+            if reply['post']['author']['did'] == author_did:
+                children.append(get_item(reply['post']))
+                if reply.get('replies'):
+                    children += add_replies(reply['replies'], author_did)
+        return children
+    if api_json['thread'].get('replies'):
+        item['_children'] = add_replies(api_json['thread']['replies'], api_json['thread']['post']['author']['did'])
+
+    item['content_html'] = utils.format_social_media_post(item, config.logo_bluesky, avatar_border_radius='50%', icon_verified=config.icon_verified)
+    return item
+
+
+def get_item(post_json):
+    if post_json.get('record'):
+        post_record = post_json['record']
+    elif post_json.get('value'):
+        post_record = post_json['value']
+
     item = {}
     item['id'] = post_json['uri']
     item['url'] = post_json['uri'].replace('at://', 'https://bsky.app/profile/').replace('/app.bsky.feed.post/', '/post/')
+    item['title'] = 'Post by @' + post_json['author']['handle']
 
-    dt = datetime.fromisoformat(post_json['record']['createdAt'])
-    item['date_published'] = dt.isoformat()
-    item['_timestamp'] = dt.timestamp()
-    item['_display_date'] = utils.format_display_date(dt)
+    if post_record.get('createdAt'):
+        dt = datetime.fromisoformat(post_record['createdAt'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
 
-    item['author'] = {}
+    item['author'] = {
+        "url": "https://bsky.app/profile/" + post_json['author']['handle'],
+        "avatar": post_json['author']['avatar'],
+        "_username": post_json['author']['handle']
+    }
     if post_json['author'].get('displayName'):
         item['author']['name'] = post_json['author']['displayName']
     else:
-        item['author']['name'] = post_json['author']['handle']
-    item['author']['url'] = "https://bsky.app/profile/" + post_json['author']['handle']
+        item['author']['name'] = post_json['author']['handle'].split(':')[0]
+    if post_json['author'].get('verification') and post_json['author']['verification']['verifiedStatus'] == 'valid':
+        item['author']['_verified'] = True
+    else:
+        item['author']['_verified'] = False
     item['authors'] = []
     item['authors'].append(item['author'])
 
-    item['title'] = '{}: "{}"'.format(item['author']['name'], post_json['record']['text'])
+    if post_record.get('text'):
+        item['title'] += ': ' + post_record['text']
+        if post_record.get('facets'):
+            facets = post_record['facets'].copy()
+            indices = []
+            for facet in facets:
+                indices.append(facet['index']['byteStart'])
+                indices.append(facet['index']['byteEnd'])
+                facet['start_tag'] = ''
+                facet['end_tag'] = ''
+                for feature in facet['features']:
+                    if feature['$type'] == 'app.bsky.richtext.facet#mention':
+                        profile = get_profile(feature['did'])
+                        if profile:
+                            facet['start_tag'] += '<a href="https://bsky.app/profile/{}">'.format(profile['handle'])
+                            facet['end_tag'] = '</a>' + facet['end_tag']
+                    elif feature['$type'] == 'app.bsky.richtext.facet#tag':
+                        facet['start_tag'] += '<a href="https://bsky.app/hashtag/{}">'.format(feature['tag'])
+                        facet['end_tag'] = '</a>' + facet['end_tag']
+                    elif feature['$type'] == 'app.bsky.richtext.facet#link':
+                        facet['start_tag'] += '<a href="{}">'.format(feature['uri'])
+                        facet['end_tag'] = '</a>' + facet['end_tag']
+                    else:
+                        logger.warning('unhandled facet feature type ' + feature['$type'])
+                # remove duplicates and sort
+                indices = sorted(list(set(indices)))
+                n = 0
+                post_text = ''
+                text_bytes = post_record['text'].encode()
+                for i in indices:
+                    post_text += text_bytes[n:i].decode()
+                    from_facets = list(filter(lambda facets: facets['index']['byteStart'] == i and facets.get('start_tag'), facets))
+                    from_facets = sorted(from_facets, key=lambda x: x['index']['byteEnd'])
+                    for j, facet in enumerate(from_facets):
+                        post_text += facet['start_tag']
+                        facet['order'] = i + j
+                    to_facets = list(filter(lambda facets: facets['index']['byteEnd'] == i and facets.get('end_tag'), facets))
+                    to_facets = sorted(to_facets, key=lambda x: (x['index']['byteStart'], x['order']), reverse=True)
+                    for facet in to_facets:
+                        post_text += facet['end_tag']
+                    n = i
+                post_text += text_bytes[n:].decode()
+        else:
+            post_text = post_record['text']
+        item['summary'] = post_text.replace('\n\n', '<br><br>')
 
-    item['content_html'] = '<table style="width:100%; min-width:320px; max-width:540px; margin-left:auto; margin-right:auto; padding:0 0.5em 0 0.5em; border:1px solid light-dark(#ccc, #333); border-radius:10px;">'
+    embeds = []
+    if post_json.get('embed'):
+        if post_json['embed']['$type'].startswith('app.bsky.embed.recordWithMedia'):
+            embeds.append(post_json['embed']['media'])
+            embeds.append(post_json['embed']['record']['record'])
+        else:
+            embeds.append(post_json['embed'])
+    elif post_json.get('embeds'):
+        for embed in post_json['embeds']:
+            if embed['$type'].startswith('app.bsky.embed.recordWithMedia'):
+                embeds.append(embed['media'])
+                embeds.append(embed['record']['record'])
+            else:
+                embeds.append(embed)
+    elif post_record.get('embed'):
+        if post_record['embed']['$type'].startswith('app.bsky.embed.recordWithMedia'):
+            embeds.append(post_record['embed']['media'])
+            embeds.append(post_record['embed']['record'])
+        else:
+            embeds.append(post_record['embed'])
 
-    if api_json['thread'].get('parent'):
-        item['content_html'] += make_post(api_json['thread']['parent']['post'], is_parent=True)
+    item['_gallery'] = []
+    for embed in embeds:
+        if embed['$type'].startswith('app.bsky.embed.images'):
+            for media in embed['images']:
+                if 'fullsize' in media:
+                    item['_gallery'].append({
+                        "src": media['fullsize'],
+                        "thumb": media['thumb'],
+                        "width": media['aspectRatio']['width'],
+                        "height": media['aspectRatio']['height'],
+                        "caption": ""
+                    })
+                elif 'image' in media and media['image']['$type'] == 'blob':
+                    item['_gallery'].append({
+                        "src": "https://cdn.bsky.app/img/feed_fullsize/plain/" + post_json['author']['did'] + "/" + media['image']['ref']['$link'] + "@jpeg",
+                        "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/" + post_json['author']['did'] + "/" + media['image']['ref']['$link'] + "@jpeg",
+                        "width": media['aspectRatio']['width'],
+                        "height": media['aspectRatio']['height'],
+                        "caption": ""
+                    })
+                else:
+                    logger.warning('unhandled app.bsky.embed.images image in ' + item['id'])
+        elif embed['$type'].startswith('app.bsky.embed.video'):
+            item['_gallery'].append({
+                "src": embed['playlist'],
+                "video_type": "application/x-mpegURL",
+                "thumb": embed['thumbnail'],
+                "width": embed['aspectRatio']['width'],
+                "height": embed['aspectRatio']['height'],
+                "caption": ""
+            })
+        elif embed['$type'].startswith('app.bsky.embed.external'):
+            split_url = urlsplit(embed['external']['uri'])
+            if split_url.netloc == 'media.tenor.com':
+                item['_gallery'].append({
+                    "src": "https://t.gifs.bsky.app/" + split_url.path.replace('.gif', 'webm'),
+                    "video_type": "video/webm",
+                    "thumb": embed['external']['thumb'],
+                    "caption": ""
+                })
+            else:
+                link = embed['external']['uri']
+                if split_url.netloc == 'bit.ly' or split_url.netloc == 'buff.ly':
+                    r = requests.get(embed['external']['uri'], allow_redirects=False)
+                    try:
+                        link = r.headers['location']
+                    except:
+                        link = embed['external']['uri']
+                else:
+                    link = embed['external']['uri']
+                item['_card'] = {
+                    "url": link,
+                    "title": embed['external']['title'],
+                }
+                if embed['external'].get('thumb'):
+                    item['_card']['image'] = embed['external']['thumb']
+                if embed['external'].get('description'):
+                    item['_card']['summary'] = embed['external']['description']
+        elif embed['$type'].startswith('app.bsky.embed.record'):
+            if embed.get('record'):
+                record = embed['record']
+                if record.get('record'):
+                    record = record['record']
+            elif embed.get('cid'):
+                record = embed
+            if '#view' not in embed['$type']:
+                api_json = get_post_thread(record['uri'])
+                if api_json:
+                    record = api_json['thread']['post']
+            item['_quote'] = get_item(record)
 
-    item['content_html'] += make_post(api_json['thread']['post'])
-
-    def add_replies(replies, author_did):
-        reply_html = ''
-        for reply in replies:
-            if reply['post']['author']['did'] == author_did:
-                reply_html += make_post(reply['post'], is_reply=True)
-                if reply.get('replies'):
-                    reply_html += add_replies(reply['replies'], author_did)
-        return reply_html
-    if api_json['thread'].get('replies'):
-        item['content_html'] += add_replies(api_json['thread']['replies'], post_json['author']['did'])
-
-    item['content_html'] += '</table>'
+    if len(item['_gallery']) == 0:
+        del item['_gallery']
     return item
 
 

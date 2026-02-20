@@ -22,7 +22,7 @@ def get_content(url, args, site_json, save_debug=False):
     post_id = paths[-1].split('-')[-1]
     article_json = None
     if re.search(r'\d', post_id):
-        api_url = 'https://{}/api/properties/{}/posts?ids={}&limit=1&withBody=true'.format(split_url.netloc, site_json['site_property'], post_id)
+        api_url = 'https://' + split_url.netloc + '/api/properties/' + site_json['site_property'] + '/posts?ids=' + post_id + '&limit=1&withBody=true'
         # print(api_url)
         api_json = utils.get_url_json(api_url)
         if api_json and api_json.get('data') and api_json['data'].get('articles'):

@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 
-import utils
+import config, utils
 
 import logging
 
@@ -58,13 +58,14 @@ def get_content(url, args, site_json, save_debug=False):
     }
     item['attachments'] = []
     item['attachments'].append(attachment)
+    item['_duration'] = utils.calc_duration(audio_json['duration'], True, ':')
 
     item['summary'] = audio_json['subtitle']
 
-    if 'embed' not in args:
-        desc = '<p>' + item['summary'] + '</p>'
-    else:
-        desc = ''
+    # item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], audio_json['duration'], desc=desc)
+    item['content_html'] = utils.format_audio_content(item, config.logo_acast)
 
-    item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author']['url'], item['_display_date'], audio_json['duration'], desc=desc)
+    if 'embed' not in args and 'summary' in item:
+        item['content_html'] += '<p>' + item['summary'] + '</p>'
+
     return item

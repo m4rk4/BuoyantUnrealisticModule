@@ -117,21 +117,20 @@ def get_content(url, args, site_json, save_debug=False):
             else:
                 item['tags'].append(it)
 
-    playlist = ''
     if playlist_id:
         item['_playlist'] = []
-        playlist += '<h3>Episodes:</h3>'
+        item['_playlist_title'] = 'Episodes'
         for episode in episodes[:5]:
             title = episode['title'].strip()
             if episode.get('subtitle'):
                 title += ': ' + episode['subtitle'].strip()
             dt = datetime.fromisoformat(episode['pubDate'])
-            playlist += utils.add_audio_v2(episode['episodeUrlHRef'], episode['imageUrl'], title, 'https://playlist.megaphone.fm/?e=' + episode['uid'], '', '', utils.format_display_date(dt, date_only=True), episode['duration'], show_poster=False, border=False)
             item['_playlist'].append({
                 "src": episode['episodeUrlHRef'],
-                "name": title,
-                "artist": item['author']['name'],
-                "image": episode['imageUrl']
+                "title": title,
+                "artist": utils.format_display_date(dt, date_only=True),
+                "image": episode['imageUrl'],
+                "duration": utils.calc_duration(float(episode['duration']), True, ':')
             })
 
     if episode_id:
@@ -142,9 +141,7 @@ def get_content(url, args, site_json, save_debug=False):
         attachment['mime_type'] = 'audio/mpeg'
         item['attachments'] = []
         item['attachments'].append(attachment)
-        if 'embed' not in args and 'summary' in item:
-            playlist = item['summary'] + playlist
-        item['content_html'] = utils.add_audio_v2(item['_audio'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], episode['duration'], desc=playlist)
+        item['content_html'] = utils.format_audio_content(item, logo=config.logo_megaphone)
 
     elif playlist_id:
         if podcast_feed:
@@ -153,12 +150,10 @@ def get_content(url, args, site_json, save_debug=False):
             if podcast_feed.get('description'):
                 item['summary'] = podcast_feed['description']
 
-        playlist_url = config.server + '/playlist?url=' + quote_plus(item['url'])
+        item['content_html'] = utils.format_audio_content(item, logo=config.logo_megaphone)
 
-        if 'embed' not in args and 'summary' in item:
-            playlist = '<p>' + item['summary'] + '</p>' + playlist
-
-        item['content_html'] = utils.add_audio_v2(playlist_url, item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', '', audio_type='audio_link', desc=playlist, use_video_js=False)
+    if 'embed' not in args and 'summary' in item:
+        item['content_html'] += '<p>' + item['summary'] + '</p>'
 
     return item
 

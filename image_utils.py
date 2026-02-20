@@ -359,7 +359,7 @@ def get_image(args, im=None, im_io=None):
                 container = None
                 try:
                     container = av.open(img_src)
-                except av.error.InvalidDataError:
+                except (av.error.HTTPForbiddenError, av.error.InvalidDataError):
                     im_io = read_image(img_src)
                     if im_io:
                         container = av.open(im_io)
@@ -570,3 +570,113 @@ def get_image(args, im=None, im_io=None):
 #     # End of drawing code
 #
 #     surface.write_to_png('text.png')
+
+
+# https://github.com/delimitry/collage_maker/blob/master/collage_maker.py
+def make_collage(args):
+    """
+    Make a collage image with a width equal to `width` from `images` and save to `filename`.
+    """
+    images = args.getlist("image")
+    if not images:
+        logger.warning('No images for collage found!')
+        return None, ''
+
+    # TODO: make width scale with the number of images otherwise the collage becomes too vertical
+    if 'width' in args:
+        width = int(args['width'])
+    else:
+        width = 1280
+
+    if 'init_height' in args:
+        init_height = int(args['init_height'])
+    else:
+        init_height = 640
+
+    if 'margin' in args:
+        margin_size = int(args['margin'])
+    else:
+        margin_size = 2
+
+    if 'max' in args:
+        n_max = int(args['max'])
+    else:
+        n_max = 6
+
+    # run until a suitable arrangement of images is found
+    while True:
+        # copy images to images_list
+        images_list = images[:]
+        coefs_lines = []
+        images_line = []
+        x = 0
+        n = 0
+        while images_list and n < n_max:
+            # get first image and resize to `init_height`
+            img_path = images_list.pop(0)
+            im_io = read_image(img_path)
+            if not im_io:
+                logger.warning('unable to open ' + img_path)
+                continue
+            img = Image.open(im_io)
+            img.thumbnail((width, init_height))
+            # when `x` will go beyond the `width`, start the next line
+            if x > width:
+                coefs_lines.append((float(x) / width, images_line))
+                images_line = []
+                x = 0
+            x += img.size[0] + margin_size
+            images_line.append(img_path)
+            n += 1
+        # finally add the last line with images
+        coefs_lines.append((float(x) / width, images_line))
+
+        # compact the lines, by reducing the `init_height`, if any with one or less images
+        if len(coefs_lines) <= 1:
+            break
+        if any(map(lambda c: len(c[1]) <= 1, coefs_lines)):
+            # reduce `init_height`
+            init_height -= 10
+        else:
+            break
+
+    # get output height
+    out_height = 0
+    for coef, imgs_line in coefs_lines:
+        if imgs_line:
+            out_height += int(init_height / coef) + margin_size
+    if not out_height:
+        logger.warning('Height of collage could not be 0!')
+        return None, ''
+
+    collage_image = Image.new('RGB', (width, int(out_height)), (35, 35, 35))
+    # put images to the collage
+    y = 0
+    for coef, imgs_line in coefs_lines:
+        if imgs_line:
+            x = 0
+            for img_path in imgs_line:
+                # img = Image.open(img_path)
+                img = Image.open(read_image(img_path))
+                # if need to enlarge an image - use `resize`, otherwise use `thumbnail`, it's faster
+                k = (init_height / coef) / img.size[1]
+                if k > 1:
+                    img = img.resize((int(img.size[0] * k), int(img.size[1] * k)), Image.LANCZOS)
+                else:
+                    img.thumbnail((int(width / coef), int(init_height / coef)), Image.LANCZOS)
+                if collage_image:
+                    collage_image.paste(img, (int(x), int(y)))
+                x += img.size[0] + margin_size
+            y += int(init_height / coef) + margin_size
+
+    # collage_image.save(filename)
+    im_io = BytesIO()
+    # print(im.mode)
+    if collage_image.mode in ['RGBA', 'P', 'LA']:
+        collage_image.save(im_io, 'PNG')
+        mimetype = 'image/png'
+    else:
+        collage_image.save(im_io, 'JPEG')
+        mimetype = 'image/jpeg'
+    im_io.seek(0)
+    return im_io, mimetype

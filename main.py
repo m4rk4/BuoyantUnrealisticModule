@@ -439,9 +439,22 @@ def gallery():
             link = content['url']
         if not title:
             title = content['title']
+    if args.get('start'):
+        start = args['start']
+    else:
+        start = 0
     if 'desc' in images[0]:
         return render_template('gallery_desc.html', title=title, link=link, images=images)
-    return render_template('gallery.html', title=title, link=link, images=images)
+    return render_template('gallery.html', title=title, link=link, images=images, start_index=start)
+
+
+@app.route('/collage')
+def collage():
+    args = request.args
+    im_io, mimetype = image_utils.make_collage(request.args)
+    if im_io:
+        return send_file(im_io, mimetype=mimetype)
+    return mimetype
 
 
 @app.route('/map')
@@ -877,6 +890,9 @@ def stock_chart():
 
 @app.route('/')
 def home():
+    args = request.args
+    if args:
+        print(args.getlist("image"))
     return 'Hello! You must be lost :('
 
 

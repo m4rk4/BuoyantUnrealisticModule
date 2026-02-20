@@ -1,4 +1,4 @@
-import json
+import json, re
 import dateutil.parser
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
@@ -82,7 +82,8 @@ def get_content(url, args, site_json, save_debug=False):
                     item['attachments'].append(attachment)
                     break
 
-        item['content_html'] = utils.add_audio_v2(item['url'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect', icon_logo=config.logo_bandcamp)
+        # item['content_html'] = utils.add_audio_v2(item['url'], item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect', icon_logo=config.logo_bandcamp)
+        item['content_html'] = utils.format_audio_content(item, logo=config.logo_bandcamp)
 
     elif '/album=' in embed_url:
         if save_debug:
@@ -115,42 +116,35 @@ def get_content(url, args, site_json, save_debug=False):
         }
         if bc_json.get('band_url'):
             item['author']['url'] = bc_json['band_url']
-        # for track in bc_json['tracks']:
-        #     if track['artist'] != bc_json['artist']:
-        #         item['author'] = {
-        #             "name": "Various Artists"
-        #         }
-        #         break
 
-        item['image'] = bc_json['album_art']
+        # _10 = 1200x1200
+        # _16 = 700x700
+        item['image'] = re.sub(r'_\d+\.jpg', '_16.jpg', bc_json['album_art'])
 
-        tracks_html = ''
         if bc_json.get('tracks'):
             item['_playlist'] = []
-            tracks_html += '<details><summary style="font-weight:bold;">Tracks:</summary>'
+            item['_playlist_title'] = 'Tracks'
             for i, track in enumerate(bc_json['tracks'], 1):
-                title = str(i) + '. <a href="' + track['title_link'] + '" target="_blank" title="{0}">{0}</a>'.format(track['title'])
+                title = '<a href="' + track['title_link'] + '" target="_blank">' + track['title'] + '</a>'
                 if track['artist'] != bc_json['artist']:
-                    title += ' (' + track['artist'] + ')'
-                duration = utils.calc_duration(track['duration'], True, ':')
-                if track['track_streaming'] == True:
-                    # tracks_html += utils.add_audio_v2(track['title_link'], item['image'], title, '', '', '', '', utils.calc_duration(track['duration'], True, ':'), audio_type='audio_redirect', show_poster=False, border=False, margin='')
-                    tracks_html += utils.add_audio_track(track['title_link'], title, duration=duration, poster=item['image'])
-                    if track.get('file'):
-                        for key, val in track['file'].items():
-                            if 'mp3' in key:
-                                item['_playlist'].append({
-                                    "src": val,
-                                    "name": '{}. {}'.format(i, track['title']),
-                                    "artist": track['artist'],
-                                    "image": item['image']
-                                })
-                                break
+                    artist = track['artist']
                 else:
-                    # tracks_html += utils.add_audio_v2('', '', title, '', '', '', '', utils.calc_duration(track['duration'], True, ':'), show_poster=False, border=False, margin='')
-                    tracks_html += utils.add_audio_track('', title, duration=duration)
-            tracks_html += '</details>'
-        item['content_html'] = utils.add_audio_v2(config.server + '/playlist?url=' + quote_plus(item['url']), item['image'], item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], '', audio_type='audio_link', desc=tracks_html, icon_logo=config.logo_bandcamp)
+                    artist = ''
+                audio_src = ''
+                if track['track_streaming'] == True and track.get('file'):
+                    for key, val in track['file'].items():
+                        if 'mp3' in key:
+                            audio_src = val
+                            break
+                item['_playlist'].append({
+                    "src": audio_src,
+                    "mime_type": 'audio/mpeg',
+                    "title": title,
+                    "artist": artist,
+                    "duration": utils.calc_duration(track['duration'], True, ':'),
+                    "image": item['image']
+                })
+        item['content_html'] = utils.format_audio_content(item, config.logo_bandcamp)
     return item
 
 

@@ -297,6 +297,22 @@ def get_item_info(article_json, save_debug=False):
     return item
 
 
+def get_gallery_images(component):
+    gallery_images = []
+    for it in component['slides']:
+        captions = []
+        if it['metadata'].get('caption'):
+            captions.append(it['metadata']['caption'])
+        elif component.get('galleryCaption'):
+            captions.append(component['galleryCaption'])
+        if it['metadata'].get('credit'):
+            captions.append(it['metadata']['credit'])
+        elif component.get('galleryCredit'):
+            captions.append(component['galleryCredit'])
+        gallery_images.append({"src": it['url'], "caption": " | ".join(captions), "thumb": resize_image(it['url'], 640)})
+    return gallery_images
+
+
 def format_component(component):
     component_type = urlsplit(component['_ref']).path.strip('/').split('/')[2]
     component_html = ''
@@ -304,7 +320,7 @@ def format_component(component):
         component_html = '<p>' + component['text'] + '</p>'
     elif component_type == 'subheader':
         if component.get('text'):
-            if component['type'] == 'h5':
+            if component['type'] == 'h5' or component['type'] == 'h6':
                 component_html = '<h4>' + component['text'] + '</h4>'
             else:
                 component_html = '<{0}>{1}</{0}>'.format(component['type'], component['text'])
@@ -335,21 +351,26 @@ def format_component(component):
         else:
             component_html = utils.add_image(resize_image(component['url']), ' | '.join(captions))
     elif component_type == 'gallery-inline':
-        gallery_images = []
-        for it in component['slides']:
-            captions = []
-            if it['metadata'].get('caption'):
-                captions.append(it['metadata']['caption'])
-            elif component.get('galleryCaption'):
-                captions.append(component['galleryCaption'])
-            if it['metadata'].get('credit'):
-                captions.append(it['metadata']['credit'])
+        gallery_images = get_gallery_images(component)
+        if 'canonicalUrlPath' in component:
+            if '/gallery/' in component['canonicalUrlPath']:
+                gallery_url = config.server + '/gallery?url=' + quote_plus('https://www.cnn.com/' + component['canonicalUrlPath'])
+            else:
+                gallery_url = ''
+            gallery_caption = 'Gallery: <a href="https://www.cnn.com' + component['canonicalUrlPath'] + '" target="_blank">' + component['headline'] + '</a>'
+            if component.get('galleryCredit'):
+                gallery_caption += ' | ' + component['galleryCredit']
+            elif component.get('metadata') and component['metadata'].get('credit'):
+                gallery_caption += ' | ' + component['metadata']['credit']
+            component_html += utils.add_gallery(gallery_images, gallery_url, gallery_caption, show_gallery_poster=True)
+        else:
+            aspect_ratio = '{}/{}'.format(component['slides'][0]['width'], component['slides'][0]['height'])
+            gallery_caption = component['headline']
+            if component['metadata'].get('credit'):
+                gallery_caption += ' | ' + component['metadata']['credit']
             elif component.get('galleryCredit'):
-                captions.append(component['galleryCredit'])
-            gallery_images.append({"src": it['url'], "caption": " | ".join(captions), "thumb": resize_image(it['url'], 640)})
-        gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
-        img_src = 'https://media.cnn.com/api/v1/images' + component['slidesPicker']['uri']
-        component_html += utils.add_image(resize_image(img_src), component['headline'], link=gallery_url, overlay=config.gallery_button_overlay)
+                gallery_caption += ' | ' + component['galleryCredit']
+            component_html += utils.add_carousel(gallery_images, aspect_ratio, gallery_caption)
     elif component_type == 'video-inline' or component_type == 'video-resource':
         if 'contentType' in component and component['contentType'] == 'live-stream':
             # TODO: get live stream video url
@@ -573,7 +594,7 @@ def get_content(url, args, site_json, save_debug=False):
         return None
 
     if save_debug:
-        utils.write_file(cms_json, './debug/cnn.json')
+        utils.write_file(cms_json, './debug/debug.json')
     return get_item(cms_json, args, site_json, save_debug)
 
 
@@ -679,6 +700,10 @@ def get_item(cms_json, args, site_json, save_debug):
                 component_type = urlsplit(component['_ref']).path.strip('/').split('/')[2]
                 if component_type == 'source':
                     location = component['location']
+                    continue
+                elif page_type == 'gallery' and component_type == 'gallery-inline':
+                    item['_gallery'] = get_gallery_images(component)
+                    item['content_html'] += utils.add_gallery(item['_gallery'], gallery_url=config.server + '/gallery?url=' + quote_plus(item['url']))
                     continue
                 elif component_type == 'image' and component['componentVariation'] == 'image_expandable':
                     if image_expandable == False:

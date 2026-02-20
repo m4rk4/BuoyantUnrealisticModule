@@ -1,10 +1,10 @@
 from __future__ import unicode_literals
-import asyncio, base64, basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, secrets, string, tldextract
+import asyncio, base64, basencode, certifi, cloudscraper, html, importlib, io, json, math, os, pytz, random, re, secrets, string, time, tldextract
 import curl_cffi, requests
 import pygal, pygal.style
 from browserforge.headers import HeaderGenerator
 from bs4 import BeautifulSoup, NavigableString
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 from duckduckgo_search import DDGS
 from markdown2 import markdown
 from PIL import ImageFile
@@ -13,8 +13,8 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 from urllib.parse import parse_qs, quote, quote_plus, urlsplit
 
-import config
-from feedhandlers import twitter, vimeo, youtube
+import config, image_utils
+from feedhandlers import vimeo, youtube
 
 import logging
 logger = logging.getLogger(__name__)
@@ -140,7 +140,17 @@ def get_site_json(url, domain=''):
 def update_sites(url, site_json):
   tld = tldextract.extract(url)
   sites_json = read_json_file('./sites.json')
-  sites_json[tld.domain] = site_json
+  if tld.domain not in sites_json:
+    logger.warning('site' + tld.domain + ' is not in sites.json')
+    return None
+  if isinstance(sites_json[tld.domain], dict):
+    sites_json[tld.domain] = site_json
+  elif isinstance(sites_json[tld.domain], list):
+    netloc = urlsplit(url).netloc
+    if netloc not in sites_json[tld.domain][0]:
+      logger.warning('site' + netloc + ' is not in sites.json')
+      return None
+    sites_json[tld.domain][0][netloc] = site_json
   write_file(sites_json, './sites.json')
 
 def get_module(url, handler=''):
@@ -220,6 +230,9 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
   elif user_agent == 'googlebot-video':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
     ua = 'Googlebot-Video/1.0'
+  elif user_agent == 'googlebot-news':
+    # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
+    ua = 'Googlebot-News/1.0'
   elif user_agent == 'google-inspectiontool':
     # https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers
     ua = 'Mozilla/5.0 (compatible; Google-InspectionTool/1.0;)'
@@ -287,13 +300,14 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
 
   if use_certifi:
     verify = certifi.where()
+    # verify = config.verify_path
   else:
     verify = False
 
   r = None
   try:
     if use_curl_cffi:
-      r = curl_cffi.get(url, impersonate=config.impersonate, headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=proxies)
+      r = curl_cffi.get(url, impersonate=config.impersonate, proxies=proxies, verify=verify)
     elif use_cloudscraper:
       scraper = cloudscraper.create_scraper()
       r = scraper.get(url)
@@ -330,7 +344,7 @@ def get_request(url, user_agent, headers=None, retries=3, allow_redirects=True, 
     if r != None and (r.status_code == 401 or r.status_code == 403):
       logger.debug('trying curl_cffi')
       try:
-        r = curl_cffi.get(url, impersonate=config.impersonate, proxies=config.proxies)
+        r = curl_cffi.get(url, impersonate=config.impersonate, proxies=config.proxies, verify=verify)
         # r = curl_cffi.get(url, impersonate="chrome116", headers=headers, timeout=10, allow_redirects=allow_redirects, proxies=config.proxies)
         r.raise_for_status()
       except Exception as e:
@@ -786,6 +800,19 @@ def closest_dict(lst_of_dict, k, target, greater_than=False):
 def find_dict(lst_of_dicts, key, val):
   return next((x for x in lst_of_dicts if x.get(key) == val), None)
 
+def dedupe_case_insensitive(list_of_strings):
+  # https://oneuptime.com/blog/post/2026-01-25-remove-duplicates-from-list-python/view
+  # Remove duplicate strings, ignoring case differences.
+  seen = set()
+  result = []
+  for s in list_of_strings:
+    lower = s.lower()
+    if lower not in seen:
+      seen.add(lower)
+      result.append(s)  # Keep original case
+  return result
+
+
 def image_from_srcset(srcset, target):
   # https://developer.mozilla.org/en-US/docs/Learn/HTML/Multimedia_and_embedding/Responsive_images
   # Two types of srcset:
@@ -1073,7 +1100,7 @@ def get_image_size(img_src):
       pass
   return None, None
 
-def add_image(img_src, caption='', width=None, height=None, link='', img_style='margin:0 auto;', fig_style='margin:1em 0; padding:0;', object_fit='contain', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
+def add_image(img_src, caption='', link='', img_style='width:100%; max-height:800px; object-fit:contain;', fig_style='margin:1em 0; padding:0;', figcap_style='', heading='', desc='', overlay={}, overlay_heading=''):
   fig_html = '<figure'
   if fig_style:
     fig_html += ' style="' + fig_style + '"'
@@ -1081,51 +1108,19 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
 
   if heading:
     fig_html += heading
-    #fig_html += '<div style="text-align:center; font-size:1.2em; font-weight:bold">{}</div>'.format(heading)
 
   if overlay_heading:
     fig_html += '<div style="position:relative;">'
     fig_html += '<div style="position:absolute; z-index:2; top:0; left:0; right:0;">' + overlay_heading + '</div>'
 
   if overlay or overlay_heading:
-    fig_html += '<div style="position:relative; z-index:1;">'
+    fig_html += '<div style="position:relative; z-index:1; width:100%; height:100%;">'
 
   if link:
-    fig_html += '<a href="{}" target="_blank">'.format(link)
+    fig_html += '<a href="' + link + '" target="_blank">'
 
-  style = 'display:block;'
-  if img_style:
-    style += ' ' + img_style
-  if object_fit:
-    style += ' object-fit:' + object_fit + ';'
-  if width and width != '0':
-    style += ' width:{};'.format(width)
-  elif not re.search(r'width:\s?\d+', img_style):
-    style += ' width:100%;'
-    #fig_html += ' width:100%;'
-  if height and height != '0':
-    style += ' height:{};'.format(height)
-  else:
-    style += ' height:100%; max-height:800px;'
-
-  if fallback_img:
-    fig_html += '<object data="' + fallback_img + '" '
-    if '.jpg' in fallback_img or '.jpeg' in fallback_img:
-      fig_html += 'type="image/jpeg"'
-    elif '.png' in fallback_img:
-      fig_html += 'type="image/png"'
-    elif '.webp' in fallback_img:
-      fig_html += 'type="image/webp"'
-    elif '.gif' in fallback_img:
-      fig_html += 'type="image/gif"'
-    else:
-      fig_html += 'type="image/jpeg"'
-    fig_html += ' style="' + style + '">'
-
-  fig_html += '<img src="' + img_src + '" loading="lazy" style="' + style + '"/>'
-
-  if fallback_img:
-    fig_html += '</object>'
+  # fig_html += '<div style="display:flex; align-items:center; justify-content:center;"><img src="' + img_src + '" loading="lazy" style="' + img_style + '"/></div>'
+  fig_html += '<img src="' + img_src + '" loading="lazy" style="' + img_style + '"/>'
 
   if overlay:
     fig_html += '<div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + overlay['src'] + '\') no-repeat center center;'
@@ -1148,9 +1143,9 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
 
   if caption:
     if figcap_style:
-      fig_html += '<figcaption style="{}"><small>{}</small></figcaption>'.format(figcap_style, caption)
+      fig_html += '<figcaption style="' + figcap_style + '"><small>' + caption + '</small></figcaption>'
     else:
-      fig_html += '<figcaption><small>{}</small></figcaption>'.format(caption)
+      fig_html += '<figcaption><small>' + caption + '</small></figcaption>'
 
   if desc:
     fig_html += desc
@@ -1158,10 +1153,278 @@ def add_image(img_src, caption='', width=None, height=None, link='', img_style='
   fig_html += '</figure>'
   return fig_html
 
-def add_small_card(img_src, img_overlay, img_link, header='', title='', desc=''):
-  card_html = '<div style="display:grid; grid-template-areas:\'image header\' \'image title\' \'image desc\'; grid-template-columns:96px auto; width:99%; min-width:324px; max-width:540px; margin:1em auto; align-items:center; border:1px solid light-dark(#333,#ccc); border-radius:10px;">'
+def add_gallery(gallery_images, gallery_url='', gallery_caption='', show_gallery_link=True, show_gallery_poster=False, show_thumbnails=False, use_gallery_url=False, columns=2):
+  if not gallery_url:
+    gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
 
-  card_html += '<div style="grid-area:image; max-width:96px; aspect-ratio:1/1;">'
+  n = len(gallery_images)
+  if n == 1:
+    if gallery_images[0].get('caption'):
+      caption = gallery_images[0]['caption']
+    else:
+      caption = gallery_caption
+    if 'video_type' in gallery_images[0]:
+      gallery_html = add_video(gallery_images[0]['src'], gallery_images[0]['video_type'], gallery_images[0]['thumb'], caption, use_videojs=True)
+    else:
+      gallery_html = add_image(gallery_images[0]['src'], caption)
+    return gallery_html
+
+  if show_gallery_poster:
+    # Create a photo collage grid
+    # Based on https://fatukunda.github.io/Responsive-Photo-grid/
+    gallery_html = '<figure style="position:relative; container-type:inline-size; margin:1em 0; padding:0;"><div style="position:relative; z-index:1;"><a href="' + gallery_url + '" target="_blank">'
+    gallery_html += '<div style="position:relative; z-index:1; display:grid; grid-template-columns:repeat(auto-fit, minmax(25cqw, 1fr)); grid-auto-rows:25cqw; grid-auto-flow:dense; max-height:50cqw; overflow:hidden;">'
+    for i in range(4):
+      gallery_html += '<div'
+      if i == 0:
+        # 2x2 square
+        gallery_html += ' style="grid-column:span 2; grid-row:span 2;"'
+      elif i == 1:
+        # 2x1 horiz rect
+        gallery_html += ' style="grid-column:span 2;"'
+      #   # 1x2 vert rect
+      #   gallery_html += ' style="grid-row:span 2;"'
+      # else:
+      #  1x1 square
+      gallery_html += '><img src="' + gallery_images[i]['thumb'] + '" loading="lazy" style="width:100%; height:100%; object-fit:cover;"></div>'
+    gallery_html += '</div>'
+
+    gallery_html += '<div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + config.gallery_button_overlay['src'] + '\') no-repeat center center;'
+    if config.gallery_button_overlay.get('size'):
+      gallery_html += ' background-size:{};'.format(config.gallery_button_overlay['size'])
+    if config.gallery_button_overlay.get('opacity'):
+      gallery_html += ' opacity:{};'.format(config.gallery_button_overlay['opacity'])
+    if config.gallery_button_overlay.get('filter'):
+      gallery_html += ' filter:{};'.format(config.gallery_button_overlay['filter'])
+    gallery_html += '"></div></a></div>'
+
+    if gallery_caption:
+      gallery_html += '<figcaption><small>' + gallery_caption + '</small></figcaption>'
+    gallery_html += '</figure>'
+    return gallery_html
+
+  if show_thumbnails:
+    if 'video_type' in gallery_images[0]:
+      gallery_html = add_video(gallery_images[0]['src'], gallery_images[0]['video_type'], gallery_images[0]['thumb'], gallery_images[0].get('caption'), fig_style="margin:1em 0 0 0; padding:0;", use_videojs=True)
+    else:
+      gallery_html = add_image(gallery_images[0]['src'], gallery_images[0].get('caption'), link=gallery_images[0]['src'], fig_style="margin:1em 0 0 0; padding:0;")
+    gallery_html += '<div style="margin:4px 0;"><a href="' + gallery_url + '" target="_blank"><b>Gallery:</b></a></div><div style="display:grid; grid-gap:1rem; grid-auto-flow:column; grid-auto-columns:150px; overflow-x:auto; margin-bottom:1em;">'
+    for it in gallery_images[1:]:
+      if 'video_type' in it:
+        video_src = config.server + '/videojs?src=' + quote_plus(it['src']) + '&type=' + quote_plus(it['video_type']) + '&poster=' + quote_plus(it['thumb'])
+        gallery_html += add_image(it['thumb'], it.get('caption'), link=video_src, fig_style='margin:0; padding:0;', img_style='width:100%; aspect-ratio:16/9; object-fit:cover;', figcap_style='overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;', overlay=config.video_button_overlay)
+      else:
+        gallery_html += add_image(it['thumb'], it.get('caption'), link=it['src'], fig_style='margin:0; padding:0;', img_style='width:100%; aspect-ratio:16/9; object-fit:cover;', figcap_style='overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;')
+    gallery_html += '</div>'
+    return gallery_html
+
+  # gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
+
+  if show_gallery_link and n > 2:
+    gallery_html = '<h3><a href="' + gallery_url + '" target="_blank">View photo gallery</a></h3>'
+  else:
+    gallery_html = ''
+  # TODO: page width
+  w = math.floor(800 / columns - 20)
+  gallery_html += '<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(' + str(w) + 'px, 1fr)); grid-gap:1em 8px; padding:0; '
+  if gallery_caption:
+    gallery_html += 'margin:1em 0 0 0;">'
+  else:
+    gallery_html += 'margin:1em 0;">'
+  for i, it in enumerate(gallery_images):
+    if i == 0 and len(gallery_images) % 2 == 1:
+      gallery_html += '<div style="grid-column:1/-1;">'
+    else:
+      gallery_html += '<div>'
+    if 'video_type' in it:
+      video_src = config.server + '/videojs?src=' + quote_plus(it['src']) + '&type=' + quote_plus(it['video_type']) + '&poster=' + quote_plus(it['thumb'])
+      gallery_html += add_image(it['thumb'], it.get('caption'), link=video_src, fig_style='margin:0; padding:0;', img_style='width:100%; aspect-ratio:16/9; object-fit:cover;', overlay=config.video_button_overlay)
+    else:
+      if use_gallery_url:
+        link = gallery_url + '&start=' + str(i)
+      else:
+        link = it['src']
+      gallery_html += add_image(it['thumb'], it.get('caption'), link=link, fig_style='margin:0; padding:0;')
+    gallery_html += '</div>'
+  gallery_html += '</div>'
+  if gallery_caption:
+    gallery_html += '<div style="margin:4px 0 1em 0;"><small>' + gallery_caption + '</small></div>'
+  return gallery_html
+
+def _add_carousel(gallery_images, aspect_ratio='1/1', margin='1em 0', border_radius=''):
+  carousel_html = '<div style="width:100%; text-align:center; overflow:hidden; margin:' + margin + ';"><div style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:none; -webkit-overflow-scrolling:touch;">'
+  # Random identifier in case there are multiple carousels on the same page
+  rnd = base36encode(math.floor(random.random() * 2176782336)).zfill(6)
+  slides = ''
+  for i, image in enumerate(gallery_images, 1):
+    slide_id = 'slide-{}-{}'.format(rnd, i)
+    carousel_html += '<div id="' + slide_id + '" style="scroll-snap-align:start; flex-shrink:0; width:100%; aspect-ratio:' + aspect_ratio + '; background:light-dark(#ccc,#333); transform-origin:center center; transform:scale(1); transition:transform 0.5s; position:relative; display:flex; justify-content:center; align-items:center;'
+    if border_radius:
+      carousel_html += ' border-radius:' + border_radius + ';'
+    carousel_html += '">'
+    if 'video_type' in image:
+      overlay = config.video_button_overlay
+      video_src = config.server + '/videojs?src=' + quote_plus(image['src']) + '&type=' + quote_plus(image['video_type']) + '&poster=' + quote_plus(image['thumb'])
+      carousel_html += '<div style="position:relative; z-index:1; margin:0;"><a href="' + video_src + '" target="_blank"><img src="' + image['thumb'] + '" loading="lazy" style="display:block; margin:0 auto; object-fit:contain; width:100%;'
+      if border_radius:
+        carousel_html += ' border-radius:' + border_radius + ';'
+      carousel_html += '"><div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + overlay['src'] + '\') no-repeat center center; background-size:' + overlay['size'] + '; filter:' + overlay['filter'] + ';"></div></a></div>'
+    else:
+      carousel_html += '<a href="' + image['src'] + '" target="_blank"><img src="' + image['thumb'] + '" style="object-fit:contain; position:absolute; top:0; left:0; width:100%; height:100%;'
+      if border_radius:
+        carousel_html += ' border-radius:' + border_radius + ';'
+      carousel_html += '"></a>'
+    carousel_html += '</div>'
+
+    slides += '<a href="#{}" style="display:inline-flex; width:1.5rem; height:1.5rem; color:light-dark(white,black); background:light-dark(#333,#ccc); text-decoration:none; align-items:center; justify-content:center; border-radius:50%; margin:4px; position:relative;">&nbsp;</a>'.format(slide_id)
+  carousel_html += '</div>' + slides + '</div>'
+  return carousel_html
+
+def add_carousel(gallery_images, aspect_ratio='', gallery_caption='', margin='1em 0', border_radius='',  max_height='', use_gallery_url=False):
+  if not aspect_ratio and 'width' in gallery_images[0]:
+    aspect_ratio = str(gallery_images[0]['width']) + '/' + str(gallery_images[0]['height'])
+  else:
+    aspect_ratio = '1/1'
+  fig_style = 'margin:0; padding:0; width:100%; flex-shrink:0; scroll-snap-align:start; transform-origin:center center; transform:scale(1); transition:transform 0.5s;'
+  img_style = 'object-fit:contain; width:100%; aspect-ratio:' + aspect_ratio + '; background:light-dark(#ccc,#333);'
+  if max_height:
+    img_style += ' max-height:' + max_height + ';'
+  if border_radius:
+    img_style += ' border-radius:' + border_radius + ';'
+    fig_style += ' border-radius:' + border_radius + ';'
+
+  # Random identifier in case there are multiple carousels on the same page
+  rnd = base36encode(math.floor(random.random() * 2176782336)).zfill(6)
+
+  carousel_html = '<div style="width:100%; overflow:hidden; margin:' + margin + ';">'
+
+  if gallery_caption:
+    carousel_html += '<div style="text-align:center; font-weight:bold;">' + gallery_caption + '</div>'
+
+  carousel_html += '<div style="display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scroll-behavior:smooth; scrollbar-width:none; -webkit-overflow-scrolling:touch;">'
+  slide_links = ''
+  gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
+  for i, image in enumerate(gallery_images, 1):
+    slide_id = 'slide-{}-{}'.format(rnd, i)
+    if 'video_type' in image:
+      overlay = config.video_button_overlay
+      link = config.server + '/videojs?src=' + quote_plus(image['src']) + '&type=' + quote_plus(image['video_type']) + '&poster=' + quote_plus(image['thumb'])
+    else:
+      overlay = None
+      link = image['src']
+    if use_gallery_url:
+      link = gallery_url
+    image_html = add_image(image['thumb'], image['caption'], link=link, img_style=img_style, fig_style=fig_style, overlay=overlay)
+    carousel_html += image_html.replace('<figure ', '<figure id="' + slide_id + '" ')
+    slide_links += '<a href="#' + slide_id + '" style="display:inline-flex; width:1.5rem; height:1.5rem; background:SteelBlue; text-decoration:none; align-items:center; justify-content:center; border-radius:50%; margin:4px; position:relative;">&nbsp;</a>'
+
+  carousel_html += '</div><div style="text-align:center;">' + slide_links + '</div></div>'
+  return carousel_html
+
+def format_embed_preview(item, margin='1em auto', add_summary=True, add_authors=False, image_overlay=None, small_card=False, content_link=True):
+  if item.get('image'):
+    image = item['image']
+  elif item.get('_image'):
+    image = item['_image']
+  else:
+    image = ''
+
+  if item.get('_image_overlay'):
+    image_overlay = item['_image_overlay']
+  if isinstance(image_overlay, dict):
+    overlay = image_overlay
+  elif isinstance(image_overlay, bool):
+    if image_overlay == True:
+      overlay = config.video_button_overlay
+    else:
+      overlay = None
+  elif isinstance(image_overlay, str):
+    if image_overlay == 'video':
+      overlay = config.video_button_overlay
+    elif image_overlay == 'youtube':
+      overlay = config.youtube_button_overlay
+    elif image_overlay == 'audio':
+      overlay = config.audio_button_overlay
+    elif image_overlay == 'file':
+      overlay = config.file_button_overlay
+    elif image_overlay == 'website':
+      overlay = config.website_button_overlay
+    else:
+      overlay = None
+  else:
+    overlay = None
+
+  if not image and not overlay:
+    overlay = config.website_button_overlay
+
+  desc = ''
+  if add_summary and item.get('summary'):
+    if len(desc) > 0:
+      desc += '<br/><br/>'
+    if item['summary'].startswith('<'):
+      desc += BeautifulSoup(item['summary'], 'html.parser').get_text(strip=True)
+    else:
+      desc += item['summary']
+
+  byline = ''
+  if item.get('authors') or item.get('author'):
+    byline += 'By '
+    if 'authors' in item:
+      n = len(item['authors'])
+      for i, author in enumerate(item['authors']):
+        if i > 0:
+          if n > 2:
+            byline += ', '
+          if i + 1 == n:
+            byline += ' and '
+        if 'url' in author:
+          byline += '<a href="' + author['url'] + '" target="_blank">' + author['name'] + '</a>'
+        else:
+          byline += author['name']
+    elif 'author' in item:
+      if 'url' in item['author']:
+        byline += '<a href="' + item['author']['url'] + '" target="_blank">' + item['author']['name'] + '</a>'
+      else:
+        byline += item['author']['name']
+
+  if byline:
+    if not desc:
+      desc = byline
+    elif add_authors:
+      desc = '<div style="margin:0 0 4px 0;">' + byline + '</div>' + desc
+
+  title = '<a href="' + item['url'] + '" target="_blank" style="text-decoration:none;">' + item['title'] + '</a>'
+
+  if item.get('_card_header'):
+    header = item['_card_header']
+  else:
+    header = urlsplit(item['url']).netloc
+
+  if content_link == True:
+    img_link = config.server + '/content?read&url=' + quote_plus(item['url'])
+  else:
+    site_json = get_site_json(item['url'])
+    if site_json:
+      img_link = config.server + '/content?read&url=' + quote_plus(item['url'])
+    else:
+      img_link = item['url']
+
+  if '_card_style' in item:
+    if item['_card_style'] == 'small':
+      small_card = True
+    else:
+      small_card = False
+
+  if small_card:
+    return add_small_card(image, overlay, img_link, header, title, desc, margin)
+  return add_large_card(image, overlay, img_link, header, title, desc, margin)
+
+def add_small_card(img_src, img_overlay, img_link, header='', title='', desc='', margin='1em auto'):
+  # img_width = '96px'
+  img_width = '5.5lh'
+  card_html = '<div style="display:grid; grid-template-areas:\'image header\' \'image title\' \'image desc\'; grid-template-columns:' + img_width + ' auto; width:99%; min-width:324px; max-width:540px; margin:' + margin + '; align-items:center; border:1px solid light-dark(#333,#ccc); border-radius:10px;">'
+
+  card_html += '<div style="grid-area:image; width:' + img_width + '; aspect-ratio:1/1;">'
   if img_link:
     card_html += '<a href="' + img_link + '" target="_blank">'
   if img_src:
@@ -1183,19 +1446,19 @@ def add_small_card(img_src, img_overlay, img_link, header='', title='', desc='')
     card_html += '</a>'
   card_html += '</div>'
 
-  card_html += '<div style="grid-area:header; margin:4px; font-size:small; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+  card_html += '<div style="grid-area:header; margin:4px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
   if header:
     card_html += header + '</div>'
   else:
     card_html += '&nbsp;</div>'
 
-  card_html += '<div style="grid-area:title; margin:4px; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+  card_html += '<div style="grid-area:title; margin:4px; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">'
   if title:
     card_html += title + '</div>'
   else:
     card_html += '&nbsp;</div>'
 
-  card_html += '<div style="grid-area:desc; margin:4px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+  card_html += '<div style="grid-area:desc; margin:4px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
   if desc:
     card_html += desc + '</div>'
   else:
@@ -1204,8 +1467,8 @@ def add_small_card(img_src, img_overlay, img_link, header='', title='', desc='')
   card_html += '</div>'
   return card_html
 
-def add_large_card(img_src, img_overlay, img_link, header, title, desc):
-  card_html = '<div style="width:100%; min-width:320px; max-width:540px; margin:1em auto; padding:0; border:1px solid light-dark(#333, #ccc); border-radius:10px;">'
+def add_large_card(img_src, img_overlay, img_link, header='', title='', desc='', margin='1em auto'):
+  card_html = '<div style="width:100%; min-width:320px; max-width:540px; margin:' + margin + '; padding:0; border:1px solid light-dark(#333, #ccc); border-radius:10px;">'
 
   if img_link:
     card_html += '<a href="' + img_link + '" target="_blank">'
@@ -1229,11 +1492,11 @@ def add_large_card(img_src, img_overlay, img_link, header, title, desc):
 
   card_html += '<div style="padding:4px;">'
   if header:
-    card_html += '<div style="grid-area:header; margin:4px; font-size:small; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + header + '</div>'
+    card_html += '<div style="grid-area:header; margin:4px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + header + '</div>'
   if title:
     card_html += '<div style="grid-area:title; margin:4px; font-weight:bold;">' + title + '</div>'
   if desc:
-    card_html += '<div style="grid-area:desc; margin:4px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical;">' + desc + '</div>'
+    card_html += '<div style="grid-area:desc; margin:4px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; line-clamp:3; -webkit-box-orient:vertical;">' + desc + '</div>'
   card_html += '</div></div>'
   return card_html
 
@@ -1281,28 +1544,166 @@ def format_small_card(image_html, content_html, footer_html='', image_width='160
   card_html += '</div>'
   return card_html
 
-def add_audio_track(audio_src, title, artist='', duration=''):
-  track_html = '<div style="display:grid; grid-template-areas:\'image content duration\'; grid-template-columns:4em auto 4em; width:99%; min-width:324px; max-width:540px; align-items:center; font-size:smaller;">'
+def format_audio_track(track, font_size='', full_width=True, use_videojs=True):
+  # track = {
+  #   "src":
+  #   "mime_type":
+  #   "title":
+  #   "url":
+  #   "artist":
+  #   "image":
+  #   "date":
+  #   "duration":
+  # }
+  track_html = '<div style="display:flex; align-items:center;'
+  if font_size:
+    track_html += ' font-size:' + font_size + ';'
+  track_html += '">'
 
-  track_html += '<div style="grid-area:image;">'
-  if audio_src:
-    track_html += '<a href="' + audio_src + '" target="_blank">'
-    track_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:3em; aspect-ratio:1/1;"></a></div>'
-  else:
-    track_html += '</div>'
-  
-  track_html += '<div style="grid-area:content;"><div style="margin-top:0.2em; font-weight:bold;overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">' + title + '</div>'
-  if artist:
-    track_html += '<div style="margin-top:auto; margin-bottom:0.2em; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + artist + '</div>'
+  track_html += '<div>'
+  if track.get('src'):
+    if track.get('mime_type') and track['mime_type'] == 'audio_link':
+      track_html += '<a href="' + track['src'] + '" target="_blank">'
+    elif use_videojs:
+      track_html += '<a href="' + config.server + '/videojs?src=' + quote_plus(track['src'])
+      if track.get('mime_type'):
+        track_html += '&type=' + quote_plus(track['mime_type'])
+      if track.get('image'):
+        track_html += '&poster=' + quote_plus(track['image'])
+      track_html += '" target="_blank">'
+    else:
+      track_html += '<a href="' + track['src'] + '" target="_blank">'
+    track_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:3em; aspect-ratio:1/1;"></a>'
   track_html += '</div>'
 
-  if duration:
-    track_html += '<div style="grid-area:duration; text-align:right;">' + duration + '</div>'
+  track_html += '<div style="'
+  if full_width:
+    track_html += 'flex-grow:1; '
+  track_html += 'padding:0 4px;">'
+
+  if track.get('artist') or track.get('date'):
+    track_html += '<div style="font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">'
+  else:
+    track_html += '<div style="font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;">'
+  if track.get('url'):
+    track_html += '<a href="' + track['url'] + '" target="_blank">' + track['title'] + '</a>'
+  else:
+    track_html += track['title']
+  track_html += '</div>'
+
+  if track.get('artist'):
+    track_html += '<div style="font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + track['artist'] + '</div>'
+  elif track.get('date'):
+    track_html += '<div style="font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + track['date'] + '</div>'
+
+  track_html += '</div>'
+
+  if track.get('duration'):
+    track_html += '<div style="text-align:right;">' + track['duration'] + '</div>'
 
   track_html += '</div>'
   return track_html
 
-def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tracks=None, tracks_title='Tracks'):
+def format_audio_content(audio_item, logo=None, audio_src='', title='', author='', date_time='', use_videojs=True):
+  if '_playlist' in audio_item:
+    image_border_radius = '10px 0 0 0'
+  else:
+    image_border_radius = '10px 0 0 10px'
+
+  if logo:
+    template = '\'image title title\' \'image artist artist\' \'image datetime logo\''
+    template_columns = '80px auto 32px'
+    if '_playlist' in audio_item:
+      template += ' \'tracks tracks tracks\''
+  else:
+    template = '\'image title\' \'image artist\' \'image datetime\''
+    template_columns = '80px auto'    
+    if '_playlist' in audio_item:
+      template += ' \'tracks tracks\''
+
+  audio_html = '<div style="display:grid; grid-template-areas:' + template + '; grid-template-columns:' + template_columns + '; gap:0 4px; width:99%; min-width:324px; max-width:540px; margin:2em auto 2em auto; align-items:center; border:1px solid light-dark(#333,#ccc); border-radius:10px; font-size:smaller;">'
+
+  if not audio_src:
+    if '_audio' in audio_item:
+      if '_audio_type' in audio_item and audio_item['_audio_type'] == 'audio_link':
+        audio_src = audio_item['_audio']
+      elif use_videojs:
+        audio_src = config.server + '/videojs?src=' + quote_plus(audio_item['_audio'])
+        if '_audio_type' in audio_item:
+          audio_src += '&type=' + quote_plus(audio_item['_audio_type'])
+        if 'image' in audio_item:
+          audio_src += '&poster=' + quote_plus(audio_item['image'])
+      else:
+        audio_src = audio_item['_audio']
+    elif '_playlist' in audio_item:
+      audio_src = config.server + '/playlist?url=' + quote_plus(audio_item['url'])
+  
+  audio_html += '<div style="grid-area:image; max-width:80px; aspect-ratio:1/1;">'
+  if audio_src:
+    audio_html += '<a href="' + audio_src + '" target="_blank">'
+    if 'image' in audio_item:
+      audio_html += '<div style="width:100%; height:100%; background:url(\'' + audio_item['image'] + '\'); background-position:center; background-size:cover; text-align:center; border-radius:' + image_border_radius + ';">'
+    else:
+      audio_html += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center; border-radius:10px 0 0 10px;">'
+    audio_html += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="' + config.audio_button_overlay['src'] + '" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
+    if config.audio_button_overlay.get('filter'):
+      audio_html += ' filter:' + config.audio_button_overlay['filter'] + ';'
+    audio_html += '"></div></a>'
+  else:
+    if 'image' in audio_item:
+      audio_html += '<div style="width:100%; height:100%; background:url(\'' + audio_item['image'] + '\'); background-position:center; background-size:cover; text-align:center; border-radius:10px 0 0 10px;"></div>'
+    else:
+      audio_html += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center; border-radius:10px 0 0 10px;"></div>'
+  audio_html += '</div>'
+
+  if not title:
+    title = '<a href="' + audio_item['url'] + '" target="_blank">' + audio_item['title'] + '</a>'
+  audio_html += '<div style="grid-area:title; align-self:center; line-height:24px; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + title + '</div>'
+
+  if not author:
+    if '_display_name' in audio_item['author']:
+      author = audio_item['author']['_display_name']
+    elif 'authors' in audio_item:
+      for it in audio_item['authors']:
+        if 'url' in it:
+          author += '<a href="' + it['url'] + '" target="_blank">' + it['name'] + '</a>'
+        else:
+          author += it['name']
+        author += '&#44; '
+      author = re.sub(r'(.*)&#44;', r'\1 and', author.strip('&#44; ')).replace('&#44;', ',')
+    elif 'url' in audio_item['author']:
+      author = '<a href="' + audio_item['author']['url'] + '" target="_blank">' + audio_item['author']['name'] + '</a>'
+    else:
+      author = audio_item['author']['name']
+  audio_html += '<div style="grid-area:artist; align-self:center; line-height:24px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + author + '</div>'
+
+  if not date_time:
+    if '_display_date' in audio_item:
+      date_time += audio_item['_display_date']
+    if '_duration' in audio_item:
+      if date_time:
+        date_time += '&nbsp;&bull;&nbsp;'
+      date_time += audio_item['_duration']
+  audio_html += '<div style="grid-area:datetime; align-self:center; line-height:24px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + date_time + '</div>'
+
+  if logo:
+    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '"></div>'
+
+  if '_playlist' in audio_item:
+    audio_html += '<div style="grid-area:tracks; padding:8px; font-size:smaller;"><details><summary style="font-size:larger; font-weight:bold; padding:4px 0;">'
+    if '_playlist_title' in audio_item:
+      audio_html += audio_item['_playlist_title']
+    else:
+      audio_html += 'Tracks'
+    audio_html += '</summary>'
+    for track in audio_item['_playlist']:
+      audio_html += format_audio_track(track, use_videojs=use_videojs)
+    audio_html += '</summary></div>'
+
+  audio_html += '</div>'
+  return audio_html
+
+def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tracks=None, tracks_title='Tracks', num_tracks=-1, tracks_use_videojs=True):
   if tracks:
     image_border_radius = '10px 0 0 0'
   else:
@@ -1317,7 +1718,7 @@ def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tra
     template_columns = '80px auto'    
     if tracks:
       template += ' \'tracks tracks\''
-  audio_html = '<div style="display:grid; grid-template-areas:' + template + '; grid-template-columns:' + template_columns + '; gap:0 4px; width:99%; min-width:324px; max-width:540px; margin:2em auto 2em auto; align-items:center; border:1px solid light-dark(#333,#ccc); border-radius:10px;">'
+  audio_html = '<div style="display:grid; grid-template-areas:' + template + '; grid-template-columns:' + template_columns + '; gap:0 4px; width:99%; min-width:324px; max-width:540px; margin:2em auto 2em auto; align-items:center; border:1px solid light-dark(#333,#ccc); border-radius:10px; font-size:smaller;">'
 
   audio_html += '<div style="grid-area:image; max-width:80px; aspect-ratio:1/1;">'
   if audio_src:
@@ -1337,15 +1738,16 @@ def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tra
       audio_html += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center; border-radius:10px 0 0 10px;"></div>'
   audio_html += '</div>'
 
-  audio_html += '<div style="grid-area:title; line-height:24px; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + title + '</div>'
-  audio_html += '<div style="grid-area:artist; line-height:24px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + artist + '</div>'
-  audio_html += '<div style="grid-area:datetime; line-height:24px; font-size:small; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + date_time + '</div>'
+  audio_html += '<div style="grid-area:title; align-self:center; line-height:24px; font-weight:bold; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + title + '</div>'
+  audio_html += '<div style="grid-area:artist; align-self:center; line-height:24px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + artist + '</div>'
+  audio_html += '<div style="grid-area:datetime; align-self:center; line-height:24px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + date_time + '</div>'
   if logo:
-    audio_html += '<div style="grid-area:logo;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '"></div>'
+    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '"></div>'
   if tracks:
     audio_html += '<div style="grid-area:tracks; padding:8px; font-size:smaller;"><details><summary style="font-size:larger; font-weight:bold; padding:4px 0;">' + tracks_title + '</summary>'
-    for track in tracks:
-      audio_html += add_audio_track(track['src'], track['title'], track['artist'], track['duration'])
+    for i, track in enumerate(tracks):
+      if num_tracks < 0 or i < num_tracks:
+        audio_html += format_audio_track(track, use_videojs=tracks_use_videojs)
     audio_html += '</summary></div>'
   audio_html += '</div>'
   return audio_html
@@ -1613,7 +2015,7 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
   audio_html += '</div></div>'
   return audio_html
 
-def add_video(video_url, video_type, poster='', caption='', width='', height='', img_style='margin:0 auto;', fig_style='margin:1em 0; padding:0;', heading='', desc='', figcap_style='', use_videojs=False, use_proxy=False):
+def add_video(video_url, video_type, poster='', caption='', img_style='width:100%; max-height:800px; object-fit:contain;', fig_style='margin:1em 0; padding:0;', figcap_style='', heading='', desc='', overlay=config.video_button_overlay, overlay_heading='', use_videojs=False, use_proxy=False):
   if not video_type:
     if '.mp4' in video_url:
       video_type = 'video/mp4'
@@ -1699,8 +2101,7 @@ def add_video(video_url, video_type, poster='', caption='', width='', height='',
       #   poster += '&height=720'
       # poster += '&overlay=video'
 
-  # def add_image(img_src, caption='', width=None, height=None, link='', img_style='', fig_style='', heading='', desc='', figcap_style='', fallback_img='', overlay={}, overlay_heading=''):
-  return add_image(poster, caption, width, height, link=video_src, img_style=img_style, fig_style=fig_style, heading=heading, desc=desc, figcap_style=figcap_style, overlay=config.video_button_overlay)
+  return add_image(poster, caption, video_src, img_style=img_style, fig_style=fig_style, figcap_style=figcap_style, heading=heading, desc=desc, overlay=overlay, overlay_heading=overlay_heading)
 
 def get_youtube_id(ytstr):
   # ytstr can be either:
@@ -1759,15 +2160,174 @@ def get_twitter_url(tweet_id):
     return ''
   return 'https://twitter.com/{}/status/{}'.format(tweet_json['user']['screen_name'], tweet_id)
 
-def add_twitter(tweet_url, tweet_id=''):
-  if tweet_url:
-    url = tweet_url
-  elif tweet_id:
-    url = get_twitter_url(tweet_id)
-  tweet = twitter.get_content(url, {}, {}, False)
-  if not tweet:
-    return ''
-  return tweet['content_html']
+def format_social_media_post(item, logo, post_style='main', avatar_border_radius='50%', icon_verified=config.icon_verified):
+  post_html = ''
+
+  if '_display_name' in item['author']:
+    author_name = item['author']['_display_name']
+  else:
+    author_name = item['author']['name']
+
+  if post_style == 'main':
+    post_html += '<div style="min-width:320px; max-width:540px; margin:1em auto; padding:8px; border:1px solid light-dark(#333,#ccc); border-radius:10px; font-size:smaller;">'
+
+  if '_parents' in item:
+    for it in item['_parents']:
+      post_html += format_social_media_post(it, logo, 'parent', avatar_border_radius, icon_verified)
+
+  if item['author'].get('avatar'):
+    im_io, mime_type = image_utils.get_image({"url": item['author']['avatar'], "height": 64, "width": 64})
+    if im_io:
+      avatar = 'data:image/jpeg;base64,' + base64.b64encode(im_io.getvalue()).decode('utf-8')
+    else:
+      avatar = item['author']['avatar']
+
+  if post_style == 'main':
+    post_html += '<div style="display:grid; grid-template-areas:\'avatar name logo\' \'avatar username logo\' \'content content content\' \'date date date\'; grid-template-columns:3em auto 2.8em;">'
+
+    post_html += '<div style="grid-area:logo; width:2.6em; height:3em; align-self:center;"><a href="' + item['url'] + '" target="_blank"><img src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '" style="width:100%;"></a></div>'
+
+  elif post_style == 'parent':
+    post_html += '<div style="display:grid; grid-template-areas:\'avatar avatar name\' \'avatar avatar username\' \'col1 col2 content\' \'col1 col2 date\' \'post1 post2 empty\'; grid-template-columns:1.6em 1.4em auto; font-size:smaller;">'
+    post_html += '<div style="grid-area:col1; border-right:3px solid light-dark(#ccc,#333);"></div>'
+    post_html += '<div style="grid-area:post1; border-right:3px solid light-dark(#ccc,#333); height:2em;"></div>'
+
+  elif post_style == 'child':
+    post_html += '<div style="display:grid; grid-template-areas:\'pre1 pre2 empty\' \'avatar avatar name\' \'avatar avatar username\' \'col1 col2 content\' \'col1 col2 date\'; grid-template-columns:1.6em 1.4em auto; font-size:smaller;">'
+    post_html += '<div style="grid-area:pre1; border-right:3px solid light-dark(#ccc,#333); height:2em;"></div>'
+    post_html += '<div style="grid-area:col1; border-right:3px solid light-dark(#ccc,#333);"></div>'
+
+  elif post_style == 'quote':
+    if item['author'].get('name') and item['author'].get('_username'):
+      post_html += '<div style="display:grid; grid-template-areas:\'avatar name\' \'avatar username\' \'content content\' \'date date\'; grid-template-columns:2.5em auto; font-size:smaller;">'
+
+      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+
+      post_html += '<div style="grid-area:name; align-self:end; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
+      if item['author']['_verified']:
+        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+      post_html += '</div></a></div>'
+
+      post_html += '<div style="grid-area:username; align-self:start; padding-left:0.5em; font-size:smaller;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;">' + item['author']['_username'] + '</a></div>'
+    else:
+      post_html += '<div style="display:grid; grid-template-areas:\'avatar name\' \'content content\' \'date date\'; grid-template-columns:2.5em auto; font-size:smaller;">'
+
+      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+
+      post_html += '<div style="grid-area:name; align-self:center; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
+      if item['author']['_verified']:
+        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+      # if item['author'].get('_username'):
+      #   post_html += ' &bull; <span style="font-weight:normal;">' + item['author']['_username'] + '</span>'
+      post_html += '</div></a></div>'
+
+  if post_style != 'quote':
+    post_html += '<div style="grid-area:avatar; width:3em; height:3em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+
+    post_html += '<div style="grid-area:name; align-self:end; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
+    if item['author']['_verified']:
+      post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+    post_html += '</div></a></div>'
+
+    post_html += '<div style="grid-area:username; align-self:start; padding-left:0.5em; font-size:smaller;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;">' + item['author']['_username'] + '</a></div>'
+
+  post_html += '<div style="grid-area:content;">'
+  if item.get('_spoiler_text'):
+    post_html += '<details><summary>' + item['_spoiler_text'] + '</summary>'
+
+  if item.get('summary'):
+    post_html += '<p>' + item['summary'] + '</p>'
+
+  if item.get('_gallery'):
+    media = item['_gallery'][0]
+    if len(item['_gallery']) == 1:
+      if 'video_type' in media:
+        post_html += add_video(media['src'], media['video_type'], media['thumb'], media['caption'], img_style='width:100%; aspect-ratio:3/2; object-fit:contain; background:light-dark(#ccc,#333); border-radius:10px;', fig_style='margin:0; padding:0;', use_videojs=True)
+      else:
+        post_html += add_image(media['thumb'], media['caption'], media['src'], img_style='width:100%; aspect-ratio:3/2; object-fit:contain; background:light-dark(#ccc,#333); border-radius:10px;', fig_style='margin:0; padding:0;')
+    elif len(item['_gallery']) == 2:
+      gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(item['_gallery']))
+      post_html += '<div style="container-type:inline-size; margin:0; padding:0;"><div style="display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:67cqw; grid-gap:4px;">'
+      border_radius = ['10px 0 0 10px', '0 10px 10px 0']
+      fig_style = 'margin:0; padding:0;'
+      for i, media in enumerate(item['_gallery']):
+        img_style = 'width:100%; height:100%; object-fit:cover; border-radius:' + border_radius[i] + ';'
+        if 'video_type' in media:
+          post_html += add_video(media['src'], media['video_type'], media['thumb'], media['caption'], img_style, fig_style, use_videojs=True)
+        else:
+          post_html += add_image(media['thumb'], media['caption'], media['src'], img_style, fig_style)
+      post_html += '</div></div>'
+    elif len(item['_gallery']) == 3:
+      gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(item['_gallery']))
+      post_html += '<div style="container-type:inline-size; margin:0; padding:0;"><div style="display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:33cqw; grid-gap:4px;">'
+      border_radius = ['10px 0 0 10px', '0 10px 0 0', '0 0 10px 0']
+      for i, media in enumerate(item['_gallery']):
+        img_style = 'width:100%; height:100%; object-fit:cover; border-radius:' + border_radius[i] + ';'
+        if i == 0:
+          fig_style = 'margin:0; padding:0; grid-row:span 2;'
+        else:
+          fig_style = 'margin:0; padding:0;'
+        if 'video_type' in media:
+          # post_html += add_video(gallery_url, media['video_type'], media['thumb'], media['caption'], img_style, fig_style, use_videojs=True)
+          post_html += add_image(media['thumb'], media['caption'], gallery_url, img_style, fig_style, overlay=config.video_button_overlay)
+        else:
+          post_html += add_image(media['thumb'], media['caption'], gallery_url, img_style, fig_style)
+      post_html += '</div></div>'
+    elif len(item['_gallery']) == 4:
+      gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(item['_gallery']))
+      post_html += '<div style="container-type:inline-size; margin:0; padding:0;"><div style="display:grid; grid-template-columns:1fr 1fr; grid-auto-rows:33cqw; grid-gap:4px;">'
+      border_radius = ['10px 0 0 0', '0 10px 0 0', '0 0 0 10px', '0 0 10px 0']
+      fig_style = 'margin:0; padding:0;'
+      for i, media in enumerate(item['_gallery']):
+        img_style = 'width:100%; height:100%; object-fit:cover; border-radius:' + border_radius[i] + ';'
+        if 'video_type' in media:
+          # post_html += add_video(gallery_url, media['video_type'], media['thumb'], media['caption'], img_style, fig_style)
+          post_html += add_image(media['thumb'], media['caption'], gallery_url, img_style, fig_style, overlay=config.video_button_overlay)
+        else:
+          post_html += add_image(media['thumb'], media['caption'], gallery_url, img_style, fig_style)
+      post_html += '</div></div>'
+    else:
+      if 'height' in media and 'width' in media:
+        aspect_ratio = '{}/{}'.format(media['width'], media['height'])
+      else:
+        aspect_ratio = '1/1'
+      post_html += add_carousel(item['_gallery'], '3/2', border_radius='10px', max_height='360px', use_gallery_url=True)
+
+  if item.get('_card'):
+    post_html += format_embed_preview(item['_card'], margin='0')
+
+  if item.get('_quote'):
+      post_html += '<div style="margin:1em auto; padding:8px; border:1px solid light-dark(#333,#ccc); border-radius:10px;">' + format_social_media_post(item['_quote'], logo, 'quote', avatar_border_radius, icon_verified) + '</div>'
+
+  # Mastodon-specific
+  if item.get('_poll'):
+    post_html += '<div style="margin:0;">'
+    for it in item['_poll']['options']:
+      post_html += add_bar(it['title'], it['votes_count'], item['_poll']['votes_count'])
+    post_html += '<div><small>' + str(item['_poll']['voters_count']) + ' people • '
+    if item['_poll']['expired']:
+      post_html += 'Closed'
+    else:
+      post_html += 'Expires ' + format_display_date(datetime.fromisoformat(item['_poll']['expires_at']))
+    post_html += '</small></div></div>'
+
+  post_html += '</div>'
+
+  post_html += '<div style="grid-area:date; margin-top:0.5em; font-size:smaller;"><a href="' + item['url'] + '" target="_blank" style="text-decoration:none;">' + item['_display_date'] + '</a></div>'
+
+  if item.get('_spoiler_text'):
+    post_html += '</details>'
+
+  post_html += '</div>'
+
+  if '_children' in item:
+    for it in item['_children']:
+      post_html += format_social_media_post(it, logo, 'child', avatar_border_radius, icon_verified)
+
+  if post_style == 'main':
+    post_html += '</div>'
+  return post_html
+
 
 def add_score_gauge(val_pct, val_str, margin='1em auto', size='160px', gauge_color='', gauge_bgcolor=config.text_color, text_color=config.text_color, text_outline='none'):
   # Red to green color scale
@@ -1863,29 +2423,6 @@ def add_button(link, text, img_src='', button_color='light-dark(#555, #ccc)', te
   button += '</a></div>'
   return button
 
-def _add_stars(num_stars, max_stars=5, star_color='gold', star_size='3em', label='', no_empty=False, center=True, show_rating=False):
-  # num_stars is a float
-  star_html = '<div style="'
-  if center:
-    star_html += 'text-align:center; '
-  star_html += 'color:{}; font-size:{};">'.format(star_color, star_size)
-  if label:
-    star_html += label
-  for i in range(1, max_stars + 1):
-    if i <= num_stars:
-      star_html += '★'
-    elif i == math.ceil(num_stars):
-      x = 100 - int(100 * (i - num_stars))
-      # star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(to right, {} {}%, transparent {}%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, 100 - x, x)
-      star_html += '<div style="display:inline-block; position:relative; margin:0 auto; text-align:center;"><div style="display:inline-block; background:linear-gradient(90deg, {0} 0%, {0} {1}%, transparent {1}%, transparent 100%); background-clip:text; -webkit-text-fill-color:transparent;">★</div><div style="position:absolute; top:0; width:100%">☆</div></div>'.format(star_color, x)
-    else:
-      if not no_empty:
-        star_html += '☆'
-  if show_rating:
-    star_html += '&nbsp;({}/{})'.format(num_stars, max_stars)
-  star_html += '</div>'
-  return star_html
-
 def add_stars(num_stars, max_stars=5, star_color='Gold', star_size='3em', label='', no_empty=False, center=True, show_rating=False, empty_fill="rgb(0,0,0,0)", stroke_color="DimGrey"):
   # num_stars is a float
   star_html = '<div style="display:flex; align-items:center;'
@@ -1899,12 +2436,12 @@ def add_stars(num_stars, max_stars=5, star_color='Gold', star_size='3em', label=
       star_html += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{0}" height="{0}"><path fill="{1}" stroke="{2}" stroke-width="2" d="M30.859 12.545c-0.168-0.506-0.637-0.864-1.189-0.864h-9.535l-2.946-9.067c-0.208-0.459-0.662-0.772-1.188-0.772s-0.981 0.313-1.185 0.764l-0.003 0.008-2.946 9.067h-9.534c-0.69 0-1.25 0.56-1.25 1.25 0 0.414 0.202 0.782 0.512 1.009l0.004 0.002 7.713 5.603-2.946 9.068c-0.039 0.116-0.061 0.249-0.061 0.387 0 0.69 0.56 1.25 1.25 1.25 0.276 0 0.531-0.089 0.738-0.241l-0.004 0.002 7.714-5.605 7.713 5.605c0.203 0.149 0.458 0.238 0.734 0.238 0.691 0 1.251-0.56 1.251-1.251 0-0.138-0.022-0.271-0.064-0.395l0.003 0.009-2.947-9.066 7.715-5.604c0.314-0.231 0.515-0.598 0.515-1.013 0-0.137-0.022-0.27-0.063-0.393l0.003 0.009z"></path></svg>'.format(star_size, star_color, stroke_color)
     elif i == math.ceil(num_stars):
       x = 100 - int(100 * (i - num_stars))
-      star_html += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{0}" height="{0}"><defs><linearGradient id="grad"><stop offset="{1}%" stop-color="{2}"/><stop offset="{3}%" stop-color="{4}"/></linearGradient></defs><path fill="url(#grad)" stroke="{5}" stroke-width="2" d="M30.859 12.545c-0.168-0.506-0.637-0.864-1.189-0.864h-9.535l-2.946-9.067c-0.208-0.459-0.662-0.772-1.188-0.772s-0.981 0.313-1.185 0.764l-0.003 0.008-2.946 9.067h-9.534c-0.69 0-1.25 0.56-1.25 1.25 0 0.414 0.202 0.782 0.512 1.009l0.004 0.002 7.713 5.603-2.946 9.068c-0.039 0.116-0.061 0.249-0.061 0.387 0 0.69 0.56 1.25 1.25 1.25 0.276 0 0.531-0.089 0.738-0.241l-0.004 0.002 7.714-5.605 7.713 5.605c0.203 0.149 0.458 0.238 0.734 0.238 0.691 0 1.251-0.56 1.251-1.251 0-0.138-0.022-0.271-0.064-0.395l0.003 0.009-2.947-9.066 7.715-5.604c0.314-0.231 0.515-0.598 0.515-1.013 0-0.137-0.022-0.27-0.063-0.393l0.003 0.009z"></path>'.format(star_size, x, star_color, 100 - x, empty_fill, stroke_color)
+      star_html += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{0}" height="{0}"><defs><linearGradient id="grad"><stop offset="{1}%" stop-color="{2}"/><stop offset="{3}%" stop-color="{4}"/></linearGradient></defs><path fill="url(#grad)" stroke="{5}" stroke-width="2" d="M30.859 12.545c-0.168-0.506-0.637-0.864-1.189-0.864h-9.535l-2.946-9.067c-0.208-0.459-0.662-0.772-1.188-0.772s-0.981 0.313-1.185 0.764l-0.003 0.008-2.946 9.067h-9.534c-0.69 0-1.25 0.56-1.25 1.25 0 0.414 0.202 0.782 0.512 1.009l0.004 0.002 7.713 5.603-2.946 9.068c-0.039 0.116-0.061 0.249-0.061 0.387 0 0.69 0.56 1.25 1.25 1.25 0.276 0 0.531-0.089 0.738-0.241l-0.004 0.002 7.714-5.605 7.713 5.605c0.203 0.149 0.458 0.238 0.734 0.238 0.691 0 1.251-0.56 1.251-1.251 0-0.138-0.022-0.271-0.064-0.395l0.003 0.009-2.947-9.066 7.715-5.604c0.314-0.231 0.515-0.598 0.515-1.013 0-0.137-0.022-0.27-0.063-0.393l0.003 0.009z"></path></svg>'.format(star_size, x, star_color, 100 - x, empty_fill, stroke_color)
     else:
       if not no_empty:
         star_html += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="{0}" height="{0}"><path fill="{1}" stroke="{2}" stroke-width="2" d="M30.859 12.545c-0.168-0.506-0.637-0.864-1.189-0.864h-9.535l-2.946-9.067c-0.208-0.459-0.662-0.772-1.188-0.772s-0.981 0.313-1.185 0.764l-0.003 0.008-2.946 9.067h-9.534c-0.69 0-1.25 0.56-1.25 1.25 0 0.414 0.202 0.782 0.512 1.009l0.004 0.002 7.713 5.603-2.946 9.068c-0.039 0.116-0.061 0.249-0.061 0.387 0 0.69 0.56 1.25 1.25 1.25 0.276 0 0.531-0.089 0.738-0.241l-0.004 0.002 7.714-5.605 7.713 5.605c0.203 0.149 0.458 0.238 0.734 0.238 0.691 0 1.251-0.56 1.251-1.251 0-0.138-0.022-0.271-0.064-0.395l0.003 0.009-2.947-9.066 7.715-5.604c0.314-0.231 0.515-0.598 0.515-1.013 0-0.137-0.022-0.27-0.063-0.393l0.003 0.009z"></path></svg>'.format(star_size, empty_fill, stroke_color)
   if show_rating:
-    star_html += '<div style="padding-left:1em;">({}/{})</div>'.format(num_stars, max_stars)
+    star_html += '<div style="padding-left:1em; font-weight:bold;">({:,g}/{:,g})</div>'.format(num_stars, max_stars)
   star_html += '</div>'
   return star_html
 
@@ -1960,6 +2497,10 @@ def add_embed(url, args={}, save_debug=False):
       embed_url = 'https://' + m.group(1)
     else:
       embed_url = get_redirect_url(embed_url)
+  elif '/nyp-video-player/embed' in embed_url:
+    params = parse_qs(urlsplit(embed_url).query)
+    if 'platform' in params and params['platform'][0] == 'jw-player' and 'playlist' in params:
+      embed_url = 'https://content.jwplatform.com/players/' + params['playlist'][0] + '.html'
   logger.debug('embed content from ' + embed_url)
 
   embed_args = args.copy()
@@ -2036,94 +2577,6 @@ def get_content(url, args, save_debug=False):
       args_copy.update(site_json['args'])
   return module.get_content(url, args_copy, site_json, save_debug)
 
-def format_embed_preview(item, content_link=True, margin='1em auto', add_summary=True, add_authors=False, video_overlay=False, small_card=False):
-  if item.get('image'):
-    image = item['image']
-  elif item.get('_image'):
-    image = item['_image']
-  else:
-    image = ''
-
-  authors = ''
-  if add_authors:
-    if 'authors' in item:
-      n = len(item['authors'])
-      for i, author in enumerate(item['authors']):
-        if i > 0:
-          if n > 2:
-            authors += ', '
-          if i + 1 == n:
-            authors += ' and '
-        if 'url' in author:
-          authors += '<a href="' + author['url'] + '" target="_blank">' + author['name'] + '</a>'
-        else:
-          authors += author['name']
-    elif 'author' in item:
-      if 'url' in item['author']:
-        authors += '<a href="' + item['author']['url'] + '" target="_blank">' + item['author']['name'] + '</a>'
-      else:
-        authors += item['author']['name']
-
-  if small_card:
-    card_image = '<a href="' + item['url'] + '" target="_blank">'
-    if image:
-      card_image = '<div style="width:100%; height:100%; background:url(\'' + image + '\'); background-position:center; background-size:cover; border-radius:10px 0 0 10px; text-align:center;">'
-      if video_overlay:
-        card_image += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:72px; aspect-ratio:1/1; vertical-align:middle; margin:auto; opacity:60%;">'
-    else:
-      card_image += '<div style="width:100%; height:100%; background-color:SlateGray; text-align:center; border-radius:10px 0 0 10px; text-align:center;">'
-      if video_overlay:
-        card_image += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:72px; aspect-ratio:1/1; vertical-align:middle; margin:auto; opacity:60%;">'
-      else:
-        card_image += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_file.encode()).decode() + '" style="width:72px; aspect-ratio:1/1; vertical-align:middle; margin:auto; opacity:90%;">'
-    card_image += '</div></a>'
-  
-    card_content = '<div style="padding:4px;">'
-    card_content += '<div style="font-size:small;">' + urlsplit(item['url']).netloc + '</div>'
-    card_content += '<div style="font-weight:bold;"><a href="' + item['url'] + '" target="_blank">' + item['title'] + '</a></div>'
-    if authors:
-      card_content += '<div style="font-size:smaller;">By ' + authors + '</div>'
-    card_content += '</div>'
-
-    content_html = format_small_card(card_image, card_content)
-  else:
-    content_html = '<div style="width:100%; min-width:320px; max-width:540px; margin:' + margin + '; padding:0; border:1px solid light-dark(#333, #ccc); border-radius:10px;">'
-
-    if image:
-      if video_overlay:
-        content_html += '<div style="position:relative; z-index:1;"><a href="' + item['url'] + '" target="_blank"><img src="' + image + '" loading="lazy" style="display:block; margin:0 auto; object-fit:contain; width:100%; border-top-left-radius:10px; border-top-right-radius:10px;"><div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + config.server + '/static/video_play_button.svg\') no-repeat center center; background-size:20%; opacity:90%;"></div></a></div>'
-      else:
-        content_html += '<a href="' + item['url'] + '" target="_blank"><img src="' + image + '" style="width:100%; border-top-left-radius:10px; border-top-right-radius:10px;" /></a>'
-
-    summary = ''
-    if add_summary:
-      if item.get('summary'):
-        summary = item['summary']
-      elif item.get('description'):
-        summary = item['description']
-
-    if not summary and not content_link:
-      style = 'margin:8px 8px 16px 8px;'
-    else:
-      style = 'margin:8px 8px 0 8px;'
-    content_html += '<div style="' + style + '">'
-    
-    content_html += '<div style="font-size:small;">' + urlsplit(item['url']).netloc + '</div>'
-
-    content_html += '<div style="font-weight:bold;"><a href="' + item['url'] + '" target="_blank">' + item['title'] + '</a></div>'
-
-    if authors:
-      content_html += '<div style="font-size:smaller;">By ' + authors + '</div>'
-
-    if summary:
-      content_html += '<p style="font-size:smaller;">' + summary + '</p>'
-
-    if content_link:
-      content_html += '<p><a href="' + config.server + '/content?read&url=' + quote_plus(item['url']) + '" target="_blank">Read</a></p>'
-
-    content_html += '</div></div>'
-  return content_html
-
 def get_ld_json(url, soup=None, site_json=None):
   if not soup:
     page_html = get_url_html(url, site_json=site_json)
@@ -2195,51 +2648,28 @@ def get_soup_elements(tag, soup):
       elements = soup.find_all(attrs=tag['attrs'], recursive=recursive)
   return elements
 
-def calc_duration(seconds, include_sec=False, time_format=','):
-  duration = []
-  if seconds > 3600:
-    h = seconds / 3600
-    if time_format == ':':
-      duration.append(str(math.floor(h)))
+def calc_duration(total_seconds, include_sec=False, time_format=','):
+  m, s = divmod(int(total_seconds), 60)
+  h, m = divmod(m, 60)
+  hours = int(h)
+  minutes = int(m)
+  seconds = int(s)
+  formatted_time = ''
+  if time_format == ',':
+    duration = []
+    if hours > 0:
+      duration.append(f"{hours} hr")
+    if minutes > 0:
+      duration.append(f"{minutes} min")
+    if seconds > 0 and include_sec:
+      duration.append(f"{seconds} sec")
+    formatted_time = ', '.join(duration)
+  elif time_format == ':':
+    if hours > 0:
+      formatted_time += f"{hours}:{minutes:02}:{seconds:02}"
     else:
-      duration.append('{} hr'.format(math.floor(h)))
-    m = (seconds % 3600) / 60
-    if include_sec:
-      if time_format == ':':
-        duration.append(str(math.floor(m)).zfill(2))
-      else:
-        duration.append('{} min'.format(math.floor(m)))
-      s = (seconds % 3600) % 60
-      if time_format == ':':
-        duration.append(str(round(s)).zfill(2))
-      else:
-        duration.append('{} sec'.format(round(s)))
-    else:
-      if time_format == ':':
-        duration.append(str(math.ceil(m)).zfill(2))
-      else:
-        duration.append('{} min'.format(math.ceil(m)))
-  else:
-    m = seconds / 60
-    if include_sec:
-      if time_format == ':':
-        duration.append(str(math.floor(m)))
-      else:
-        duration.append('{} min'.format(math.floor(m)))
-      s = (seconds % 3600) % 60
-      if time_format == ':':
-        duration.append(str(round(s)).zfill(2))
-      else:
-        duration.append('{} sec'.format(round(s)))
-    else:
-      if time_format == ':':
-        duration.append(str(math.ceil(m)))
-      else:
-        duration.append('{} min'.format(math.ceil(m)))
-  if time_format == ':':
-    return ':'.join(duration)
-  return ', '.join(duration)
-
+      formatted_time += f"{minutes}:{seconds:02}"
+  return formatted_time
 
 def get_bing_cache(url, slug=-1, save_debug=False):
   split_url = urlsplit(url)
@@ -2350,7 +2780,6 @@ def search_for(search_query):
     if result:
       results.append(result)
   return results
-
 
 def __get_stock_price(symbol, stock_id):
   stock_html = ''
@@ -2534,6 +2963,18 @@ def get_dict_value_from_path(dict, path):
       return None
   return val
 
+
+# https://github.com/tonyseek/python-base36/blob/master/base36.py
+def base36encode(number):
+  is_negative = number < 0
+  number = abs(number)
+  alphabet, base36 = ['0123456789abcdefghijklmnopqrstuvwxyz', '']
+  while number:
+      number, i = divmod(number, 36)
+      base36 = alphabet[i] + base36
+  if is_negative:
+      base36 = '-' + base36
+  return base36 or alphabet[0]
 
 # Python version of Math.random().toString(36).slice(2);
 # From https://github.com/DanishjeetSingh/base36py/blob/main/base36py/__init__.py
@@ -2742,7 +3183,6 @@ def get_ai_summary(content_html, is_text=False, provider='cloudflare', args={}):
 
   return summary
 
-
 def htmlcss_to_image(html_str, css_str=''):
   # https://htmlcsstoimage.com/
   headers = {
@@ -2774,3 +3214,26 @@ def htmlcss_to_image(html_str, css_str=''):
     logger.warning('status code {} posting to https://htmlcsstoimage.com/demo_run'.format(r.status_code))
     return ''
   return r.json()['url']
+
+def upload_to_postimage(img_src, expire=0):
+  boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
+  headers = {
+      "accept": "application/json",
+      "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
+      "cache-control": "no-cache",
+      "content-type": "multipart/form-data; boundary=" + boundary,
+      "pragma": "no-cache",
+      "priority": "u=1, i",
+      "x-requested-with": "XMLHttpRequest"
+  }
+  data = '--{0}\r\nContent-Disposition: form-data; name=\"gallery\"\r\n\r\n\r\n--{0}\r\nContent-Disposition: form-data; name=\"optsize\"\r\n\r\n0\r\n--{0}\r\nContent-Disposition: form-data; name=\"expire\"\r\n\r\n{1}\r\n--{0}\r\nContent-Disposition: form-data; name=\"url\"\r\n\r\n{2}\r\n--{0}\r\nContent-Disposition: form-data; name=\"numfiles\"\r\n\r\n1\r\n--{0}\r\nContent-Disposition: form-data; name=\"upload_session\"\r\n\r\n1769699454571.599866124108471\r\n--{0}--\r\n'.format(boundary, expire, img_src, time.time() * 1000)
+  r = curl_cffi.post('https://postimages.org/json', data=data, headers=headers, impersonate="chrome", proxies=config.proxies)
+  if r.status_code == 200:
+    postimg_url = r.json()['url']
+    r = curl_cffi.get(postimg_url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code == 200:
+      soup = BeautifulSoup(r.text, 'lxml')
+      el = soup.find('input', id='direct')
+      if el:
+        return el['value']
+  return ''

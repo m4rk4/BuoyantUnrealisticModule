@@ -415,7 +415,17 @@ def render_block(block, full_header=False, headline_url=''):
         if block.get('related'):
             block_html += '<ul style="margin-top:0;">'
             for it in block['related']:
-                block_html += '<li><a href="{}">{}</a></li>'.format(it['url'], it['headline']['default'])
+                block_html += '<li><a href="'
+                if it.get('targetUrl'):
+                    block_html += it['targetUrl']
+                elif it.get('url'):
+                    block_html += it['url']
+                block_html += '" target="_blank">'
+                if it.get('promotionalHeadline'):
+                    block_html += it['promotionalHeadline']
+                elif it.get('headline'):
+                    block_html += it['headline']['default']
+                block_html += '</a></li>'
             block_html += '</ul>'
 
     else:

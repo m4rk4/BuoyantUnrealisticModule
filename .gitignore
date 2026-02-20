@@ -1,10 +1,2 @@
-**/__pycache__
-.idea/
-.venv/
-debug/
-venv/
-.breakpoints
-config.py
-poetry.lock
-.replit
-replit.nix
+# Created by venv; see https://docs.python.org/3/library/venv.html
+*

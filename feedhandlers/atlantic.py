@@ -146,8 +146,8 @@ def get_content(url, args, site_json, save_debug=False):
         return None
 
     next_data = json.loads(el.string)
-    #if save_debug:
-    #    utils.write_file(next_data, './debug/debug.json')
+    if save_debug:
+       utils.write_file(next_data, './debug/next.json')
 
     article_json = None
     for key, val in next_data['props']['pageProps']['urqlState'].items():

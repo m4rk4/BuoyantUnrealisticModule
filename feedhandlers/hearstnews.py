@@ -121,15 +121,49 @@ def render_content(content, img_width=1200):
     return content_html
 
 
+def get_next_data(url, site_json):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+    if len(paths) == 0:
+        path = '/index'
+    else:
+        if split_url.path.endswith('/'):
+            path = split_url.path[:-1]
+        else:
+            path = split_url.path
+    next_url = 'https://' + split_url.netloc + '/_next/data/' + site_json['buildId'] + path + '.json'
+    print(next_url)
+    # next_data = utils.get_url_json(next_url, retries=1, site_json=site_json)
+    # if not next_data:
+    r = curl_cffi.get(next_url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code == 200:
+        next_data = r.json()
+    else:
+        page_html = utils.get_url_html(url)
+        soup = BeautifulSoup(page_html, 'lxml')
+        el = soup.find('script', id='__NEXT_DATA__')
+        if not el:
+            logger.warning('unable to find __NEXT_DATA__ in ' + url)
+            return None
+        next_data = json.loads(el.string)
+        if next_data['buildId'] != site_json['buildId']:
+            logger.debug('updating {} buildId'.format(split_url.netloc))
+            site_json['buildId'] = next_data['buildId']
+            utils.update_sites(url, site_json)
+        return next_data['props']
+    return next_data
+
+
 def get_content(url, args, site_json, save_debug=False):
     split_url = urlsplit(url)
-    r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
-    if r.status_code != 200:
-        logger.warning('curl_cffi error HTTPError status code {} getting {}'.format(r.status_code, url))
-        return None
-    page_soup = BeautifulSoup(r.text, 'lxml')
 
-    if not split_url.path.endswith('.php'):
+    if not re.search(r'-(\d+\.php|a\d+)$', split_url.path):
+        r = curl_cffi.get(url, impersonate="chrome", proxies=config.proxies)
+        if r.status_code != 200:
+            logger.warning('curl_cffi error HTTPError status code {} getting {}'.format(r.status_code, url))
+            return None
+        page_soup = BeautifulSoup(r.text, 'lxml')
+
         page_url = split_url.scheme + '://' + split_url.netloc + split_url.path
         if page_url.endswith('/'):
             page_url = page_url[:-1]
@@ -176,18 +210,19 @@ def get_content(url, args, site_json, save_debug=False):
                         print(m)                        
         return item
 
-    el = page_soup.find('script', id='__NEXT_DATA__')
-    if not el:
-        logger.warning('unable to find __NEXT_DATA__ in ' + url)
-        return None
-    next_data = json.loads(el.string)
+    # el = page_soup.find('script', id='__NEXT_DATA__')
+    # if not el:
+    #     logger.warning('unable to find __NEXT_DATA__ in ' + url)
+    #     return None
+    # next_data = json.loads(el.string)
+    next_data = get_next_data(url, site_json)
     if save_debug:
         utils.write_file(next_data, './debug/debug.json')
 
-    meta_json = next_data['props']['pageProps']['page']['meta']
+    meta_json = next_data['pageProps']['page']['meta']
     article_body = None
     article_header = None
-    for zone_set in next_data['props']['pageProps']['page']['zoneSets']:
+    for zone_set in next_data['pageProps']['page']['zoneSets']:
         for zone in zone_set['zones']:
             if zone['id'] == 'zoneBody':
                 for widget in zone['widgets']:
@@ -284,7 +319,7 @@ def get_content(url, args, site_json, save_debug=False):
                         logger.warning('unhandled TextBlock figure in ' + item['url'])
                         item['content_html'] += block['params']['html1']
                 else:
-                    item['content_html'] += block['params']['html1']
+                    item['content_html'] += block['params']['html1'].replace('<span class="dropcap">', '<span style="' + config.dropcap_first_character + '">')
             elif block['__typename'] == 'ImageBlock':
                 captions = []
                 if block['params']['image'].get('caption') and block['params']['image']['caption'].get('plain'):
@@ -308,7 +343,10 @@ def get_content(url, args, site_json, save_debug=False):
                 item['content_html'] += utils.add_image(gallery_images[0]['src'], gallery_images[0]['caption'], link=gallery_url, overlay=config.gallery_button_overlay)
             elif block['__typename'] == 'EmbedBlock':
                 soup = BeautifulSoup(block['params']['html1'], 'html.parser')
-                if soup.blockquote and 'bluesky-embed' in soup.blockquote['class']:
+                if soup.blockquote and 'twitter-tweet' in soup.blockquote['class']:
+                    links = soup.blockquote.find_all('a')
+                    item['content_html'] += utils.add_embed(links[-1]['href'])
+                elif soup.blockquote and 'bluesky-embed' in soup.blockquote['class']:
                     item['content_html'] += utils.add_embed(soup.blockquote['data-bluesky-uri'].replace('at://', 'https://bsky.app/profile/').replace('app.bsky.feed.post', 'post'))
                 elif soup.blockquote and 'instagram-media' in soup.blockquote['class']:
                     item['content_html'] += utils.add_embed(soup.blockquote['data-instgrm-permalink'])
@@ -320,7 +358,14 @@ def get_content(url, args, site_json, save_debug=False):
                     logger.warning('unhandled EmbedBlock in ' + item['url'])
             elif block['__typename'] == 'FreeformItemBlock' and 'embed' in block['params'] and block['params']['embed'].get('__id') == 'Datawrapper':
                 item['content_html'] += utils.add_embed('https://datawrapper.dwcdn.net/' + block['params']['embed']['__data']['datawrapper_id'] + '/')
-            elif block['__typename'] == 'AdBlock' or (block['__typename'] == 'CardBlock' and re.search(r'^(Best of|More)', block['params']['title'], flags=re.I)):
+            elif block['__typename'] == 'ZoneBlock':
+                if not block['params'].get('embed'):
+                    pass
+                elif block['params']['embed'].get('__id') and (block['params']['embed']['__id'] == 'everlit' or block['params']['embed']['__id'] == 'exco' or block['params']['embed']['__id'] == 'Promo' or block['params']['embed']['__id'] == 'googlepreferredsourcesinlinemodule' or block['params']['embed']['__id'] == 'NewsletterSignup'):
+                    pass
+                else:
+                    logger.warning('unhandled ZoneBlock in ' + item['url'])
+            elif block['__typename'] == 'AdBlock' or block['__typename'] == 'RelatedStoriesBlock' or (block['__typename'] == 'CardBlock' and re.search(r'^(Best of|More)', block['params']['title'], flags=re.I)):
                 continue
             else:
                 logger.warning('unhandled block type {} in {}'.format(block['__typename'], item['url']))
