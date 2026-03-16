@@ -6,9 +6,9 @@ authors = ["m4rk4 <<>>"]
 package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.13"
 Flask = "*"
-flask-cors = "*"
+flask-cors = "^6"
 av = "*"
 bs4 = "*"
 feedparser = "*"

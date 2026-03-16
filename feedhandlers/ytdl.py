@@ -1,11 +1,11 @@
-import json, pytz, re
+import base64, json, pytz, re
 from bs4 import BeautifulSoup
 from datetime import datetime
 from http.cookiejar import Cookie
 from urllib.parse import parse_qs, quote_plus, urlsplit
 from yt_dlp import YoutubeDL, DownloadError
 
-import config, utils
+import config, image_utils, utils
 
 import logging
 
@@ -34,7 +34,7 @@ def get_author(info, ydl_opts):
         if uploader_info:
             thumb = next((it for it in uploader_info['thumbnails'] if it['id'] == 'avatar_uncropped'), None)
             if thumb:
-                author['avatar'] = config.server + '/image?url=' + quote_plus(thumb['url'])
+                author['avatar'] = thumb['url']
 
         if 'avatar' not in author:
             page_html = utils.get_url_html(author['url'])
@@ -42,7 +42,7 @@ def get_author(info, ydl_opts):
                 page_soup = BeautifulSoup(page_html, 'lxml')
                 el = page_soup.find('meta', attrs={"property": "og:image"})
                 if el:
-                    author['avatar'] = config.server + '/image?url=' + quote_plus(el['content'])
+                    author['avatar'] = el['content']
     return author
 
 
@@ -187,12 +187,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['author'] = get_author(video_info, ydl_opts)
         if 'name' not in item['author']:
             item['author']['name'] = 'Private uploader'
-        if 'avatar' not in item['author']:
-            item['author']['avatar'] = "data:image/svg+xml;utf8,<svg width='32' height='32' xmlns='http://www.w3.org/2000/svg'><circle r='16' cx='16' cy='16' fill='SlateGray'/></svg>"
-        if 'url' in item['author']:
-            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + item['author']['avatar'] + '" style="float:left; width:32px; height:32px; border-radius:50%;"><a href="' + item['author']['url'] + '" style="text-decoration:none;" target="_blank"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</span></a></div>'
+        if 'avatar' in item['author']:
+            im_io, mime_type = image_utils.get_image({"url": item['author']['avatar'], "height": 64, "width": 64})
+            if im_io:
+                avatar = 'data:image/jpeg;base64,' + base64.b64encode(im_io.getvalue()).decode('utf-8')
+            else:
+                avatar = config.server + '/image?url=' + quote_plus(item['author']['avatar'])
         else:
-            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + item['author']['avatar'] + '" style="float:left; width:32px; height:32px; border-radius:50%;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</span></div>'
+            avatar = "data:image/svg+xml;utf8,<svg width='32' height='32' xmlns='http://www.w3.org/2000/svg'><circle r='16' cx='16' cy='16' fill='SlateGray'/></svg>"
+        if 'url' in item['author']:
+            heading = '<div style="display:flex; align-items:center; height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + avatar + '" style="width:32px; height:32px; border-radius:50%;" /><div style="padding-left:8px;"><a href="' + item['author']['url'] + '" style="text-decoration:none; color:white; font-weight:bold;" target="_blank">' + item['author']['name'] + '</a></div></div>'
+        else:
+            heading = '<div style="display:flex; align-items:center; height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + avatar + '" style="width:32px; height:32px; border-radius:50%;" /><div style="padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</div></div>'
 
         item['tags'] = []
         if video_info.get('categories'):
@@ -241,12 +247,18 @@ def get_content(url, args, site_json, save_debug=False):
         item['author'] = get_author(playlist_info, ydl_opts)
         if 'name' not in item['author']:
             item['author']['name'] = 'Private uploader'
-        if 'avatar' not in item['author']:
-            item['author']['avatar'] = "data:image/svg+xml;utf8,<svg width='32' height='32' xmlns='http://www.w3.org/2000/svg'><circle r='16' cx='16' cy='16' fill='SlateGray'/></svg>"
-        if 'url' in item['author']:
-            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + item['author']['avatar'] + '" style="float:left; width:32px; height:32px; border-radius:50%;"><a href="' + item['author']['url'] + '" style="text-decoration:none;" target="_blank"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</span></a></div>'
+        if 'avatar' in item['author']:
+            im_io, mime_type = image_utils.get_image({"url": item['author']['avatar'], "height": 64, "width": 64})
+            if im_io:
+                avatar = 'data:image/jpeg;base64,' + base64.b64encode(im_io.getvalue()).decode('utf-8')
+            else:
+                avatar = config.server + '/image?url=' + quote_plus(item['author']['avatar'])
         else:
-            heading = '<div style="height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + item['author']['avatar'] + '" style="float:left; width:32px; height:32px; border-radius:50%;"><span style="line-height:32px; padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</span></div>'
+            avatar = "data:image/svg+xml;utf8,<svg width='32' height='32' xmlns='http://www.w3.org/2000/svg'><circle r='16' cx='16' cy='16' fill='SlateGray'/></svg>"
+        if 'url' in item['author']:
+            heading = '<div style="display:flex; align-items:center; height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + avatar + '" style="width:32px; height:32px; border-radius:50%;" /><div style="padding-left:8px;"><a href="' + item['author']['url'] + '" style="text-decoration:none; color:white; font-weight:bold;" target="_blank">' + item['author']['name'] + '</a></div></div>'
+        else:
+            heading = '<div style="display:flex; align-items:center; height:32px; padding:8px; background-color:rgb(0,0,0,0.5);"><img src="' + avatar + '" style="width:32px; height:32px; border-radius:50%;" /><div style="padding-left:8px; color:white; font-weight:bold;">' + item['author']['name'] + '</div></div>'
 
         item['image'] = utils.closest_dict(playlist_info['thumbnails'], "width", 640)['url']
 

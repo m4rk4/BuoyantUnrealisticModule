@@ -5,7 +5,7 @@ import pygal, pygal.style
 from browserforge.headers import HeaderGenerator
 from bs4 import BeautifulSoup, NavigableString
 from datetime import datetime, timedelta
-from duckduckgo_search import DDGS
+from dateutil.relativedelta import relativedelta
 from markdown2 import markdown
 from PIL import ImageFile
 from playwright.async_api import async_playwright
@@ -812,7 +812,6 @@ def dedupe_case_insensitive(list_of_strings):
       result.append(s)  # Keep original case
   return result
 
-
 def image_from_srcset(srcset, target):
   # https://developer.mozilla.org/en-US/docs/Learn/HTML/Multimedia_and_embedding/Responsive_images
   # Two types of srcset:
@@ -912,6 +911,21 @@ def format_display_date(dt_utc, date_only=False, time_only=False):
   if time_only:
     return '{}:{} {} {}'.format(int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
   return '{} {}, {}, {}:{} {} {}'.format(month, dt_loc.day, dt_loc.year, int(dt_loc.strftime('%I')), dt_loc.strftime('%M'), dt_loc.strftime('%p').lower(), dt_loc.tzname())
+
+def format_byline(authors, links=False):
+  byline = ''
+  n = len(authors)
+  for i, author in enumerate(authors):
+    if i > 0:
+      if n > 2:
+        byline += ', '
+      if i + 1 == n:
+        byline += ' and '
+    if links == True and 'url' in author:
+      byline += '<a href="' + author['url'] + '" target="_blank">' + author['name'] + '</a>'
+    else:
+      byline += author['name']
+  return byline
 
 def random_alphanumeric_string(str_len=8):
   letters_digits = string.ascii_letters + string.digits
@@ -1038,7 +1052,7 @@ def add_blockquote(quote, pullquote_check=True, border_color='light-dark(#ccc,#3
 
 def open_pullquote():
   # return '<div style="margin-left:10px;"><div style="float:left; font-size:3em;">“</div><div style="overflow:hidden; padding-top:1em; padding-left:8px;"><em>'
-  return '<div style="display:grid; grid-template-columns:1fr;"><div style="grid-row-start:1; grid-column-start:1; font-family:Serif; font-size:5em; color:#ccc;">“</div><div style="grid-row-start:1; grid-column-start:1; padding:2em 0 0 2em;"><div style="font-size:1.2em; font-weight:bold; font-style:italic;">'
+  return '<div style="display:grid; grid-template-columns:1fr; margin:1em 0;"><div style="grid-row-start:1; grid-column-start:1; font-family:Serif; font-size:5em; color:#ccc;">“</div><div style="grid-row-start:1; grid-column-start:1; padding:2em 0 0 2em;"><div style="font-size:1.2em; font-weight:bold; font-style:italic;">'
 
 def close_pullquote(author=''):
   # end_html = '</em>'
@@ -1120,7 +1134,7 @@ def add_image(img_src, caption='', link='', img_style='width:100%; max-height:80
     fig_html += '<a href="' + link + '" target="_blank">'
 
   # fig_html += '<div style="display:flex; align-items:center; justify-content:center;"><img src="' + img_src + '" loading="lazy" style="' + img_style + '"/></div>'
-  fig_html += '<img src="' + img_src + '" loading="lazy" style="' + img_style + '"/>'
+  fig_html += '<img src="' + img_src + '" loading="lazy" style="' + img_style + '" />'
 
   if overlay:
     fig_html += '<div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + overlay['src'] + '\') no-repeat center center;'
@@ -1153,7 +1167,8 @@ def add_image(img_src, caption='', link='', img_style='width:100%; max-height:80
   fig_html += '</figure>'
   return fig_html
 
-def add_gallery(gallery_images, gallery_url='', gallery_caption='', show_gallery_link=True, show_gallery_poster=False, show_thumbnails=False, use_gallery_url=False, columns=2):
+def add_gallery(gallery_images, gallery_url='', gallery_caption='', gallery_title='', show_gallery_link=True, show_gallery_poster=False, show_thumbnails=False, show_thumbnails_only=False, use_gallery_url=False, columns=2):
+  gallery_html = ''
   if not gallery_url:
     gallery_url = config.server + '/gallery?images=' + quote_plus(json.dumps(gallery_images))
 
@@ -1186,7 +1201,7 @@ def add_gallery(gallery_images, gallery_url='', gallery_caption='', show_gallery
       #   gallery_html += ' style="grid-row:span 2;"'
       # else:
       #  1x1 square
-      gallery_html += '><img src="' + gallery_images[i]['thumb'] + '" loading="lazy" style="width:100%; height:100%; object-fit:cover;"></div>'
+      gallery_html += '><img src="' + gallery_images[i]['thumb'] + '" loading="lazy" style="width:100%; height:100%; object-fit:cover;" /></div>'
     gallery_html += '</div>'
 
     gallery_html += '<div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + config.gallery_button_overlay['src'] + '\') no-repeat center center;'
@@ -1203,25 +1218,57 @@ def add_gallery(gallery_images, gallery_url='', gallery_caption='', show_gallery
     gallery_html += '</figure>'
     return gallery_html
 
-  if show_thumbnails:
-    if 'video_type' in gallery_images[0]:
-      gallery_html = add_video(gallery_images[0]['src'], gallery_images[0]['video_type'], gallery_images[0]['thumb'], gallery_images[0].get('caption'), fig_style="margin:1em 0 0 0; padding:0;", use_videojs=True)
+  if show_thumbnails or show_thumbnails_only:
+    if show_thumbnails_only == False:
+      if gallery_images[0].get('caption'):
+        caption = gallery_images[0]['caption']
+      elif gallery_caption:
+        caption = gallery_caption
+        gallery_caption = ''
+      else:
+        caption = ''
+      if 'video_type' in gallery_images[0]:
+        gallery_html = add_video(gallery_images[0]['src'], gallery_images[0]['video_type'], gallery_images[0]['thumb'], caption, fig_style="margin:1em 0 0 0; padding:0;", use_videojs=True)
+      else:
+        gallery_html = add_image(gallery_images[0]['src'], caption, link=gallery_images[0]['src'], fig_style="margin:1em 0 0 0; padding:0;")
+      n = 1
+      if show_gallery_link:
+        gallery_html += '<div style="margin:4px 0;">'
     else:
-      gallery_html = add_image(gallery_images[0]['src'], gallery_images[0].get('caption'), link=gallery_images[0]['src'], fig_style="margin:1em 0 0 0; padding:0;")
-    gallery_html += '<div style="margin:4px 0;"><a href="' + gallery_url + '" target="_blank"><b>Gallery:</b></a></div><div style="display:grid; grid-gap:1rem; grid-auto-flow:column; grid-auto-columns:150px; overflow-x:auto; margin-bottom:1em;">'
-    for it in gallery_images[1:]:
+      n = 0
+      if show_gallery_link:
+        gallery_html = '<div style="margin:1em 0 4px 0;">'
+    if show_gallery_link:
+      gallery_html += '<a href="' + gallery_url + '" target="_blank"><b>'
+      if gallery_title:
+        gallery_html += gallery_title
+      else:
+        gallery_html += 'View gallery'
+      gallery_html += '</b></a></div>'
+    gallery_html += '<div style="display:grid; grid-gap:1rem; grid-auto-flow:column; grid-auto-columns:150px; overflow-x:auto;'
+    if not gallery_caption:
+      gallery_html += ' margin-bottom:1em;'
+    gallery_html += '">'
+    for it in gallery_images[n:]:
       if 'video_type' in it:
         video_src = config.server + '/videojs?src=' + quote_plus(it['src']) + '&type=' + quote_plus(it['video_type']) + '&poster=' + quote_plus(it['thumb'])
         gallery_html += add_image(it['thumb'], it.get('caption'), link=video_src, fig_style='margin:0; padding:0;', img_style='width:100%; aspect-ratio:16/9; object-fit:cover;', figcap_style='overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;', overlay=config.video_button_overlay)
       else:
         gallery_html += add_image(it['thumb'], it.get('caption'), link=it['src'], fig_style='margin:0; padding:0;', img_style='width:100%; aspect-ratio:16/9; object-fit:cover;', figcap_style='overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; line-clamp:2; -webkit-box-orient:vertical;')
     gallery_html += '</div>'
+    if gallery_caption:
+      gallery_html += '<div style="margin:4px 0 1em 0;"><small>' + gallery_caption + '</small></div>'
     return gallery_html
 
   # gallery_html += '<div style="display:flex; flex-wrap:wrap; gap:16px 8px;">'
 
   if show_gallery_link and n > 2:
-    gallery_html = '<h3><a href="' + gallery_url + '" target="_blank">View photo gallery</a></h3>'
+    gallery_html = '<h3><a href="' + gallery_url + '" target="_blank">'
+    if gallery_title:
+      gallery_html += gallery_title
+    else:
+      gallery_html += 'View gallery'
+    gallery_html += '</a></h3>'
   else:
     gallery_html = ''
   # TODO: page width
@@ -1268,12 +1315,12 @@ def _add_carousel(gallery_images, aspect_ratio='1/1', margin='1em 0', border_rad
       carousel_html += '<div style="position:relative; z-index:1; margin:0;"><a href="' + video_src + '" target="_blank"><img src="' + image['thumb'] + '" loading="lazy" style="display:block; margin:0 auto; object-fit:contain; width:100%;'
       if border_radius:
         carousel_html += ' border-radius:' + border_radius + ';'
-      carousel_html += '"><div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + overlay['src'] + '\') no-repeat center center; background-size:' + overlay['size'] + '; filter:' + overlay['filter'] + ';"></div></a></div>'
+      carousel_html += '" /><div style="position:absolute; z-index:2; top:0; left:0; bottom:0; right:0; background:url(\'' + overlay['src'] + '\') no-repeat center center; background-size:' + overlay['size'] + '; filter:' + overlay['filter'] + ';"></div></a></div>'
     else:
       carousel_html += '<a href="' + image['src'] + '" target="_blank"><img src="' + image['thumb'] + '" style="object-fit:contain; position:absolute; top:0; left:0; width:100%; height:100%;'
       if border_radius:
         carousel_html += ' border-radius:' + border_radius + ';'
-      carousel_html += '"></a>'
+      carousel_html += '" /></a>'
     carousel_html += '</div>'
 
     slides += '<a href="#{}" style="display:inline-flex; width:1.5rem; height:1.5rem; color:light-dark(white,black); background:light-dark(#333,#ccc); text-decoration:none; align-items:center; justify-content:center; border-radius:50%; margin:4px; position:relative;">&nbsp;</a>'.format(slide_id)
@@ -1440,7 +1487,7 @@ def add_small_card(img_src, img_overlay, img_link, header='', title='', desc='',
     card_html += '; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
     if img_overlay.get('filter'):
       card_html += ' filter:' + img_overlay['filter'] + ';'
-    card_html += '">'
+    card_html += '" />'
   card_html += '</div>'
   if img_link:
     card_html += '</a>'
@@ -1485,7 +1532,7 @@ def add_large_card(img_src, img_overlay, img_link, header='', title='', desc='',
     card_html += '; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
     if img_overlay.get('filter'):
       card_html += ' filter:' + img_overlay['filter'] + ';'
-    card_html += '">'
+    card_html += '" />'
   card_html += '</div>'
   if img_link:
     card_html += '</a>'
@@ -1573,7 +1620,7 @@ def format_audio_track(track, font_size='', full_width=True, use_videojs=True):
       track_html += '" target="_blank">'
     else:
       track_html += '<a href="' + track['src'] + '" target="_blank">'
-    track_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:3em; aspect-ratio:1/1;"></a>'
+    track_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(config.icon_play.encode()).decode() + '" style="width:3em; aspect-ratio:1/1;" /></a>'
   track_html += '</div>'
 
   track_html += '<div style="'
@@ -1648,7 +1695,7 @@ def format_audio_content(audio_item, logo=None, audio_src='', title='', author='
     audio_html += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="' + config.audio_button_overlay['src'] + '" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
     if config.audio_button_overlay.get('filter'):
       audio_html += ' filter:' + config.audio_button_overlay['filter'] + ';'
-    audio_html += '"></div></a>'
+    audio_html += '" /></div></a>'
   else:
     if 'image' in audio_item:
       audio_html += '<div style="width:100%; height:100%; background:url(\'' + audio_item['image'] + '\'); background-position:center; background-size:cover; text-align:center; border-radius:10px 0 0 10px;"></div>'
@@ -1687,7 +1734,7 @@ def format_audio_content(audio_item, logo=None, audio_src='', title='', author='
   audio_html += '<div style="grid-area:datetime; align-self:center; line-height:24px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + date_time + '</div>'
 
   if logo:
-    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '"></div>'
+    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '" /></div>'
 
   if '_playlist' in audio_item:
     audio_html += '<div style="grid-area:tracks; padding:8px; font-size:smaller;"><details><summary style="font-size:larger; font-weight:bold; padding:4px 0;">'
@@ -1730,7 +1777,7 @@ def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tra
     audio_html += '<span style="display:inline-block; height:100%; vertical-align:middle;"></span><img src="' + config.audio_button_overlay['src'] + '" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
     if config.audio_button_overlay.get('filter'):
       audio_html += ' filter:' + config.audio_button_overlay['filter'] + ';'
-    audio_html += '"></div></a>'
+    audio_html += '" /></div></a>'
   else:
     if poster:
       audio_html += '<div style="width:100%; height:100%; background:url(\'' + poster + '\'); background-position:center; background-size:cover; text-align:center; border-radius:10px 0 0 10px;"></div>'
@@ -1742,7 +1789,7 @@ def add_audio_player(audio_src, poster, title, artist, date_time, logo=None, tra
   audio_html += '<div style="grid-area:artist; align-self:center; line-height:24px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + artist + '</div>'
   audio_html += '<div style="grid-area:datetime; align-self:center; line-height:24px; font-size:smaller; overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; line-clamp:1; -webkit-box-orient:vertical;">' + date_time + '</div>'
   if logo:
-    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '"></div>'
+    audio_html += '<div style="grid-area:logo; align-self:end;"><img style="height:24px" src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '" /></div>'
   if tracks:
     audio_html += '<div style="grid-area:tracks; padding:8px; font-size:smaller;"><details><summary style="font-size:larger; font-weight:bold; padding:4px 0;">' + tracks_title + '</summary>'
     for i, track in enumerate(tracks):
@@ -1787,7 +1834,7 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
   img = ''
   if show_poster == True:
     if poster:
-      img = '<img src="' + poster + '" style="width:100%; border-radius:10px 0 0 10px;">'
+      img = '<img src="' + poster + '" style="width:100%; border-radius:10px 0 0 10px;" />'
     else:
       img = '<div style="width:{0}; height:{0}; background-color:SlateGray; border-radius:10px 0 0 10px;"></div>'.format(w)
 
@@ -1809,14 +1856,14 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
         image_html += ' opacity:' + button_overlay['opacity'] + ';'
       if button_overlay.get('filter'):
         image_html += ' filter:' + button_overlay['filter'] + ';'
-      image_html += '">'
+      image_html += '" />'
     else:
       image_html += '<img src="' + button_overlay['src'] + '" style="width:48px; aspect-ratio:1/1; vertical-align:middle; margin:auto;'
       if button_overlay.get('opacity'):
         image_html += ' opacity:' + button_overlay['opacity'] + ';'
       if button_overlay.get('filter'):
         image_html += ' filter:' + button_overlay['filter'] + ';'
-      image_html += '">'
+      image_html += '" />'
   image_html += '</div>'
   if audio_link:
     image_html += '</a>'
@@ -1907,7 +1954,7 @@ def add_audio_v2(audio_src, poster, title, title_url, author, author_url, date, 
         date_time += duration
   
   if icon_logo:
-    content_html += '<div style="display:flex; align-items:flex-end;"><div style="flex:1;">' + date_time + '</div><div style="padding-right:8px;"><img style="height:1em;" src="data:image/svg+xml;base64,' + base64.b64encode(icon_logo.encode()).decode() + '"></div></div>'
+    content_html += '<div style="display:flex; align-items:flex-end;"><div style="flex:1;">' + date_time + '</div><div style="padding-right:8px;"><img style="height:1em;" src="data:image/svg+xml;base64,' + base64.b64encode(icon_logo.encode()).decode() + '" /></div></div>'
   else:
     content_html += date_time
   content_html += '</div>'
@@ -1952,11 +1999,11 @@ def add_audio(audio_src, poster, title, title_url, author, author_url, date, dur
     else:
       w = 64
     if audio_src:
-      audio_html += '<img src="{}/image?url={}&width={}&overlay=audio" style="width:100%;"/>'.format(config.server, quote_plus(poster), w)
+      audio_html += '<img src="{}/image?url={}&width={}&overlay=audio" style="width:100%;" />'.format(config.server, quote_plus(poster), w)
     else:
-      audio_html += '<img src="{}/image?url={}&width={}" style="width:100%;"/>'.format(config.server, quote_plus(poster), w)
+      audio_html += '<img src="{}/image?url={}&width={}" style="width:100%;" />'.format(config.server, quote_plus(poster), w)
   elif audio_src:
-    audio_html += '<img src="{}/static/play_button-64x64.png" style="width:100%;"/>'.format(config.server)
+    audio_html += '<img src="' + config.server + '/static/play_button-64x64.png" style="width:100%;" />'
   else:
     # transparent circle
     audio_html += '<span style="height:64px; width:64px; background-color:rgba(0,0,0,0); border-radius:50%; display:inline-block;"></span>'
@@ -2185,7 +2232,7 @@ def format_social_media_post(item, logo, post_style='main', avatar_border_radius
   if post_style == 'main':
     post_html += '<div style="display:grid; grid-template-areas:\'avatar name logo\' \'avatar username logo\' \'content content content\' \'date date date\'; grid-template-columns:3em auto 2.8em;">'
 
-    post_html += '<div style="grid-area:logo; width:2.6em; height:3em; align-self:center;"><a href="' + item['url'] + '" target="_blank"><img src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '" style="width:100%;"></a></div>'
+    post_html += '<div style="grid-area:logo; width:2.6em; height:3em; align-self:center;"><a href="' + item['url'] + '" target="_blank"><img src="data:image/svg+xml;base64,' + base64.b64encode(logo.encode()).decode() + '" style="width:100%;" /></a></div>'
 
   elif post_style == 'parent':
     post_html += '<div style="display:grid; grid-template-areas:\'avatar avatar name\' \'avatar avatar username\' \'col1 col2 content\' \'col1 col2 date\' \'post1 post2 empty\'; grid-template-columns:1.6em 1.4em auto; font-size:smaller;">'
@@ -2201,32 +2248,32 @@ def format_social_media_post(item, logo, post_style='main', avatar_border_radius
     if item['author'].get('name') and item['author'].get('_username'):
       post_html += '<div style="display:grid; grid-template-areas:\'avatar name\' \'avatar username\' \'content content\' \'date date\'; grid-template-columns:2.5em auto; font-size:smaller;">'
 
-      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';" /></a></div>'
 
       post_html += '<div style="grid-area:name; align-self:end; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
       if item['author']['_verified']:
-        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;" />'
       post_html += '</div></a></div>'
 
       post_html += '<div style="grid-area:username; align-self:start; padding-left:0.5em; font-size:smaller;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;">' + item['author']['_username'] + '</a></div>'
     else:
       post_html += '<div style="display:grid; grid-template-areas:\'avatar name\' \'content content\' \'date date\'; grid-template-columns:2.5em auto; font-size:smaller;">'
 
-      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+      post_html += '<div style="grid-area:avatar; width:2.5em; height:2.5em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';" /></a></div>'
 
       post_html += '<div style="grid-area:name; align-self:center; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
       if item['author']['_verified']:
-        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+        post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;" />'
       # if item['author'].get('_username'):
       #   post_html += ' &bull; <span style="font-weight:normal;">' + item['author']['_username'] + '</span>'
       post_html += '</div></a></div>'
 
   if post_style != 'quote':
-    post_html += '<div style="grid-area:avatar; width:3em; height:3em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';"></a></div>'
+    post_html += '<div style="grid-area:avatar; width:3em; height:3em;"><a href="' + item['author']['url'] + '" target="_blank"><img src="' + avatar + '" style="width:100%; border-radius:' + avatar_border_radius + ';" /></a></div>'
 
     post_html += '<div style="grid-area:name; align-self:end; padding-left:0.5em;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;"><div style="display:flex; align-items:center; font-weight:bold;">' + author_name
     if item['author']['_verified']:
-      post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;">'
+      post_html += '<img src="data:image/svg+xml;base64,' + base64.b64encode(icon_verified.encode()).decode() + '" style="width:1lh; height:1lh; padding:0 0.2em;" />'
     post_html += '</div></a></div>'
 
     post_html += '<div style="grid-area:username; align-self:start; padding-left:0.5em; font-size:smaller;"><a href="' + item['author']['url'] + '" target="_blank" style="text-decoration:none;">' + item['author']['_username'] + '</a></div>'
@@ -2419,7 +2466,7 @@ def add_button(link, text, img_src='', button_color='light-dark(#555, #ccc)', te
   if text:
     button += '<span style="' + style + '">' + text + '</span>'
   elif img_src:
-    button += '<img style="' + style + '" src="' + img_src + '">'
+    button += '<img style="' + style + '" src="' + img_src + '" />'
   button += '</a></div>'
   return button
 
@@ -2732,55 +2779,6 @@ def get_bing_cache(url, slug=-1, save_debug=False):
   logger.warning('no bing search result found for ' + url)
   return ''
 
-def search_for(search_query):
-  try:
-    results = DDGS().text(search_query, max_results=10)
-    return results
-  except Exception as e:
-    logger.debug('DDGS exception {} searching for {}'.format(e.__class__.__name__, search_query))
-
-  headers = {
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-    "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-    "cache-control": "max-age=0",
-    "content-type": "application/x-www-form-urlencoded",
-    "priority": "u=0, i",
-    "sec-ch-ua": "\"Microsoft Edge\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"",
-    "sec-ch-ua-mobile": "?0",
-    "sec-ch-ua-platform": "\"Windows\"",
-    "sec-fetch-dest": "document",
-    "sec-fetch-mode": "navigate",
-    "sec-fetch-site": "same-origin",
-    "sec-fetch-user": "?1",
-    "upgrade-insecure-requests": "1",
-    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0"
-  }
-  data = {
-      'q': search_query,
-      'category_general': 1,
-      'pageno': 1,
-      'language': 'all',
-      'time_range': '',
-      'safesearch': 0,
-      'theme': 'simple'
-  }
-  r = requests.post(config.searxng_host + '/search', data=data, headers=headers)
-  if r.status_code != 200:
-    return None
-  results = []
-  soup = BeautifulSoup(r.text, 'lxml')
-  for el in soup.find_all('article', class_='result'):
-    result = {}
-    if el.h3:
-      result['href'] = el.h3.a['href']
-      result['title'] = el.h3.a.get_text().strip()
-    it = el.find('p', class_='content')
-    if it:
-      result['content'] = it.decode_contents().strip()
-    if result:
-      results.append(result)
-  return results
-
 def __get_stock_price(symbol, stock_id):
   stock_html = ''
   if not stock_id:
@@ -2807,7 +2805,7 @@ def __get_stock_price(symbol, stock_id):
   return stock_html
 
 
-def get_stock_price(stock_sym, stock_name):
+def get_stock_price(stock_sym, stock_name, include_name=False):
   symbols = []
   if stock_sym:
     symbols.append(stock_sym)
@@ -2859,7 +2857,16 @@ def get_stock_price(stock_sym, stock_name):
       else:
           color = 'green'
           arrow = '▲'
-      stock_html = '<span style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</span>'.format(color, stock_json['symbol'], stock_json['regularMarketPrice'], arrow, pct)
+      if include_name:
+        if stock_json.get('longName'):
+          name = stock_json['longName']
+        elif stock_json.get('shortName'):
+          name = stock_json['shortName']
+        else:
+          name = stock_json['symbol']
+        stock_html = '{} (<a href="https://finance.yahoo.com/quote/{}/" target="_blank" style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</a>)'.format(name, quote_plus(stock_json['symbol']), color, stock_json['symbol'], stock_json['regularMarketPrice'], arrow, pct)
+      else:
+        stock_html = '<a href="https://finance.yahoo.com/quote/{}/" target="_blank" style="color:{}; text-decoration:none;">{} ${:,.2f} {} {:,.2f}%</a>'.format(quote_plus(stock_json['symbol']), color, stock_json['symbol'], stock_json['regularMarketPrice'], arrow, pct)
       return stock_html
   return ''
 
@@ -2867,17 +2874,15 @@ def get_stock_price(stock_sym, stock_name):
 def add_stock_chart(stock_sym, save_debug=False):
   chart_svg = ''
   dt = datetime.now()
-  if dt.weekday() == 6:
-    # Sunday (show Friday's results)
-    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0) - timedelta(days=2)
-  elif dt.weekday() == 5:
-    # Saturday (show Friday's results)
-    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0) - timedelta(days=1)
+  if dt.weekday() == 5 or dt.weekday() == 6:
+    # Show Friday's results if today is Saturday or Sunday
+    dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0) - timedelta(days=dt.weekday() - 4)
   else:
     # Mon - Fri
     dt1 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0)
   # dt2 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=18, minute=00)
   dt2 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=dt.hour + 1, minute=00)
+
   api_url = 'https://query1.finance.yahoo.com/v8/finance/chart/{}?period1={}&period2={}&interval=1m&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US'.format(stock_sym, int(dt1.timestamp()), int(dt2.timestamp()))
   # print(api_url)
   r = curl_cffi.get(api_url, impersonate="chrome", proxies=config.proxies)
@@ -2951,6 +2956,145 @@ def add_stock_chart(stock_sym, save_debug=False):
     line_chart.add('Prev close: {:.2f} {}'.format(prev_price, data_json['meta']['currency']), [(x[0], prev_price), (x[-1], prev_price)], show_dots=False)
   
     chart_svg = line_chart.render(is_unicode=True)
+  return chart_svg
+
+
+def add_stock_chart_compare(symbols, data_range='1d', normalize_data=False, save_debug=False):
+  # Stock symbol info
+  # https://query2.finance.yahoo.com/v1/finance/quoteType/?symbol=ROKU&lang=en-US&region=US&enablePrivateCompany=false
+  chart_svg = ''
+  dt = datetime.now()
+
+  # end of day
+  # dt2 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=dt.hour + 1, minute=00)
+  dt2 = datetime(year=dt.year, month=dt.month, day=dt.day, hour=23, minute=59)
+  if dt.weekday() == 5 or dt.weekday() == 6:
+    # Saturday or Sunday - use Friday as end time
+    dt2 -= timedelta(days=dt.weekday() - 4)
+
+  date_labels = []
+  if data_range == '1d':
+    data_interval = '1m'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=dt2.day, hour=0, minute=0)
+  if data_range == '5d':
+    data_interval = '5m'
+    if dt2.weekday() == 4:
+      dt1 = datetime(year=dt2.year, month=dt2.month, day=dt2.day, hour=0, minute=0) - timedelta(days=4)
+    else:
+      dt1 = datetime(year=dt2.year, month=dt2.month, day=dt2.day, hour=0, minute=0) - timedelta(days=6)
+  elif data_range == '1mo':
+    data_interval = '1d'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=dt2.day, hour=0, minute=0) - relativedelta(months=3)
+  elif data_range == '3mo':
+    data_interval = '1d'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(months=3)
+    for n in range(4):
+      date_labels.append(dt1 + relativedelta(months=n))
+      date_labels.append(dt1 + relativedelta(months=n, days=14))
+  elif data_range == '6mo':
+    data_interval = '1d'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(months=6)
+    for n in range(7):
+      date_labels.append(dt1 + relativedelta(months=n))
+  elif data_range == '1y':
+    data_interval = '1d'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(years=1)
+    for n in range(13):
+      date_labels.append(dt1 + relativedelta(months=n))
+  elif data_range == '2y':
+    data_interval = '1wk'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(years=2)
+  elif data_range == '5y':
+    data_interval = '1wk'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(years=5)
+  elif data_range == '10y':
+    data_interval = '1mo'
+    dt1 = datetime(year=dt2.year, month=dt2.month, day=1, hour=0, minute=0) - relativedelta(years=10)
+  elif data_range == 'ytd':
+    dt1 = datetime(year=dt2.year, month=1, day=1, hour=0, minute=0)
+  else:
+    logger.warning('invalid data range ' + data_range)
+
+  custom_style = pygal.style.Style(
+      background='transparent',
+      plot_background='transparent',
+      title_font_size=24,
+      major_label_font_size=16,
+      label_font_size=16,
+      stroke_width=3,
+      colors=('#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51')
+  )
+  # line_chart = pygal.DateTimeLine(x_value_formatter=lambda dt: dt.strftime('%I:%M %p'), x_label_rotation=-25, truncate_label=-1, legend_at_bottom=True, style=custom_style)
+  if data_range == '1d' or data_range == '5d':
+    line_chart = pygal.DateTimeLine(x_value_formatter=lambda dt: dt.strftime('%H:%M'), x_label_rotation=-25, truncate_label=-1, legend_at_bottom=True, show_x_guides=True, style=custom_style)
+  else:
+    line_chart = pygal.DateTimeLine(x_value_formatter=lambda dt: dt.strftime('%Y-%m-%d'), x_label_rotation=-25, truncate_label=-1, legend_at_bottom=True, show_x_guides=True, style=custom_style)
+  # line_chart.x_title = format_display_date(dt1, date_only=True)
+
+  for sym in symbols:
+    api_url = 'https://query1.finance.yahoo.com/v8/finance/chart/{}?period1={}&period2={}&interval={}&includePrePost=true&events=div%7Csplit%7Cearn&&lang=en-US&region=US'.format(sym, int(dt1.timestamp()), int(dt2.timestamp()), data_interval)
+    # print(api_url)
+    r = curl_cffi.get(api_url, impersonate="chrome", proxies=config.proxies)
+    if r.status_code != 200:
+      logger.warning('error {} getting {}'.format(r.status_code, api_url))
+      continue
+    api_json = r.json()
+    write_file(api_json, './debug/stock.json')
+    data_json = api_json['chart']['result'][0]
+
+    x = [datetime.fromtimestamp(t) for t in data_json['timestamp']]
+    if data_json['meta'].get('previousClose'):
+      norm_price = float(data_json['meta']['previousClose'])
+    elif data_json['meta'].get('chartPreviousClose'):
+      norm_price = float(data_json['meta']['chartPreviousClose'])
+    else:
+      norm_price = float(data_json['meta']['regularMarketPrice'])
+    if normalize_data:
+      line_chart.y_title = '% from prev. close'
+      y = [100*price/norm_price if price is not None else None for price in data_json['indicators']['quote'][0]['close']]
+    else:
+      line_chart.y_title = 'Price (' + data_json['meta']['currency'] + ')'
+      y = data_json['indicators']['quote'][0]['close']
+
+    if data_range == '1d':
+      # Start on the hour
+      start = datetime.fromtimestamp(data_json['meta']['tradingPeriods']['regular'][0][0]['start'])
+      if start.minute != 0:
+        start = datetime(year=start.year, month=start.month, day=start.day, hour=start.hour, minute=0)
+      end = datetime.fromtimestamp(data_json['meta']['tradingPeriods']['regular'][0][0]['end'])
+      if end.minute != 0:
+        start = datetime(year=end.year, month=end.month, day=end.day, hour=end.hour + 1, minute=0)
+      hrs = math.ceil((end - start).seconds / 3600) + 1
+      for n in range(hrs):
+        # date_labels.append(datetime(year=start.year, month=start.month, day=start.day, hour=start.hour + n, minute=0))
+        date_labels.append(start + relativedelta(hours=n))
+      # line_chart.x_labels = map(lambda d: d.strftime('%H:%M'), date_labels)
+      line_chart.x_title = format_display_date(start, date_only=True)
+    
+    line_chart.x_labels = date_labels
+
+    if data_json['meta'].get('longName'):
+      title = data_json['meta']['longName'] + ' (' + data_json['meta']['symbol'] + ')'
+    elif data_json['meta'].get('shortName'):
+      title = data_json['meta']['shortName'] + ' (' + data_json['meta']['symbol'] + ')'
+    else:
+      title = data_json['meta']['symbol']
+    curr_price = float(data_json['meta']['regularMarketPrice'])
+    title += '\n {:.2f} {} '.format(curr_price, data_json['meta']['currency'])
+    diff = 100 * (curr_price - norm_price) / norm_price
+    if diff < 0:
+      title += ' (▼ {:.2f}%)'.format(diff)
+    else:
+      title += ' (▲ {:.2f}%)'.format(diff)
+
+    line_chart.add(title, [(x[i], y[i]) for i in range(len(x))], allow_interruptions=True)
+
+    # # divide axis by days
+    # for period in data_json['meta']['tradingPeriods']['regular']:
+    #   date_labels.append(datetime.fromtimestamp(period[0]['start']))
+    # line_chart.x_labels = map(lambda d: d.strftime('%Y-%m-%d'), date_labels)
+
+  chart_svg = line_chart.render(is_unicode=True)
   return chart_svg
 
 

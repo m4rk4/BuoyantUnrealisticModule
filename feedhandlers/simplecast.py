@@ -78,16 +78,17 @@ def get_content(url, args, site_json, save_debug=False):
     item['attachments'] = []
     item['attachments'].append(attachment)
     item['_audio'] = attachment['url']
+    item['_audio_type'] = attachment['mime_type']
 
-    desc = ''
+    item['_duration'] = utils.calc_duration(episode_json['duration'])
+
+    item['content_html'] = utils.format_audio_content(item, logo=config.logo_simplecast)
+
     if episode_json.get('description'):
         item['summary'] = episode_json['description']
         if 'embed' not in args:
-            desc = '<p style="white-space:pre-line">' + episode_json['description'] + '</p>'
+            item['content_html'] += '<p style="white-space:pre-line">' + episode_json['description'] + '</p>'
 
-    duration = utils.calc_duration(episode_json['duration'])
-
-    item['content_html'] = utils.add_audio_v2(item['_audio'], item.get('image'), item['title'], item['url'], item['author']['name'], item['author'].get('url'), item['_display_date'], duration, episode_json['audio_content_type'], desc=desc)
     return item
 
 

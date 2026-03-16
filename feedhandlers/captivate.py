@@ -1,12 +1,12 @@
-import math, re
+import dateutil.parser
+import pytz, re
 from bs4 import BeautifulSoup
-from datetime import datetime
-from urllib.parse import quote_plus
 
 import config, utils
 
 import logging
 logger = logging.getLogger(__name__)
+
 
 def get_content(url, args, site_json, save_debug=False):
     # https://player.captivate.fm/episode/466b78ff-8033-410d-9244-a350e3039e28
@@ -37,12 +37,15 @@ def get_content(url, args, site_json, save_debug=False):
     if el:
         item['title'] = el['content']
     else:
-        item['title'] = soup.title.get_text()
+        item['title'] = soup.title.get_text(strip=True)
 
     el = soup.find(class_='cp-episode-date')
     if el:
-        date = re.sub(r'(\d+)(nd|st|th)', r'\1', el.get_text())
-        dt = datetime.strptime(date, '%d %B %Y')
+        # date = re.sub(r'(\d+)(nd|st|th)', r'\1', el.get_text())
+        # dt = datetime.strptime(date, '%d %B %Y')
+        tz_loc = pytz.timezone(config.local_tz)
+        dt_loc = dateutil.parser.parse(el.get_text(strip=True))
+        dt = tz_loc.localize(dt_loc).astimezone(pytz.utc)
         item['date_published'] = dt.isoformat()
         item['_timestamp'] = dt.timestamp()
         item['_display_date'] = utils.format_display_date(dt, date_only=True)
@@ -57,26 +60,17 @@ def get_content(url, args, site_json, save_debug=False):
 
     el = soup.find('img', class_='player-image')
     if el:
-        item['_image'] = el['src']
+        item['image'] = el['src']
     else:
         el = soup.find('meta', attrs={"property": "og:image"})
         if el:
-            item['_image'] = el['content']
-    if item.get('_image'):
-        poster = '{}/image?url={}&height=128'.format(config.server, quote_plus(item['_image']))
-    else:
-        poster = '{}/image?height=128&width=128'.format(config.server)
+            item['image'] = el['content']
 
     duration = []
     el = soup.find('audio', class_='player-audio')
     if el:
         item['_audio'] = el.source['src']
-        t = math.floor(float(el['data-duration']) / 3600)
-        if t >= 1:
-            duration.append('{} hr'.format(t))
-        t = math.ceil((float(el['data-duration']) - 3600 * t) / 60)
-        if t > 0:
-            duration.append('{} min.'.format(t))
+        item['_duration'] = utils.calc_duration(float(el['data-duration']))
     else:
         el = soup.find('meta', attrs={"name": "twitter:player:stream"})
         if el:
@@ -87,13 +81,11 @@ def get_content(url, args, site_json, save_debug=False):
         attachment['mime_type'] = 'audio/mpeg'
         item['attachments'] = []
         item['attachments'].append(attachment)
-        poster = '<a href="{}"><img src="{}&overlay=audio"/></a>'.format(item['_audio'], poster)
-    else:
-        poster = '<img src="{}"/>'.format(poster)
 
     el = soup.find(class_='player-shownotes')
     if el:
         item['summary'] = el.decode_contents()
 
-    item['content_html'] = '<table><tr><td style="width:128px;">{}</td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/>by {}<br/><small>{}&nbsp;&bull;&nbsp;{}</small>'.format(poster, item['url'], item['title'], item['author']['name'], item['_display_date'], ', '.join(duration))
+    # item['content_html'] = '<table><tr><td style="width:128px;">{}</td><td style="vertical-align:top;"><a href="{}"><b>{}</b></a><br/>by {}<br/><small>{}&nbsp;&bull;&nbsp;{}</small>'.format(poster, item['url'], item['title'], item['author']['name'], item['_display_date'], ', '.join(duration))
+    item['content_html'] = utils.format_audio_content(item, logo=config.logo_captivate)
     return item

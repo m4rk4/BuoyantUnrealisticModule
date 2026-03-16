@@ -235,6 +235,37 @@
         "module": "ghost",
         "post_filters": []
     },
+    "cascadepbs": {
+        "data-api": "https://www.cascadepbs.org/ghost/api/content/",
+        "data-key": "e1bde802cf6c7551d905c2ceec",
+        "feeds": [
+            "https://www.cascadepbs.org/articles/briefs/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
+    "matthewbrunelle": [
+        {
+            "blog.matthewbrunelle.com": {
+                "data-api": "https://blog.matthewbrunelle.com/ghost/api/content/",
+                "data-key": "03dd5f63ebf246e8a988ad3566",
+                "feeds": [
+                    "https://blog.matthewbrunelle.com/rss/"
+                ],
+                "module": "ghost",
+                "post_filters": []
+            }
+        }
+    ],
+    "androidfaithful": {
+        "data-api": "https://android-faithful.ghost.io/ghost/api/content/",
+        "data-key": "2b1ddc29879220db33f7294ae9",
+        "feeds": [
+            "https://www.androidfaithful.com/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
     "425business": {
         "feeds": [
             "https://www.425business.com/search/?f=rss&t=article&c=news&l=10&s=start_time&sd=desc"
@@ -581,6 +612,15 @@
     "9to5toys": {
         "family": "9to5"
     },
+    "nintendolife": {
+        "family": "hookshot.media"
+    },
+    "digitalfoundry": {
+        "family": "hookshot.media"
+    },
+    "pushsquare": {
+        "family": "hookshot.media"
+    },
     "_families": {
         "9to5": {
             "author": [
@@ -809,6 +849,127 @@
                 }
             ],
             "wpjson_path": "/wp-json"
+        },
+        "hookshot.media": {
+            "module": "wp_posts_v2",
+            "content": {
+                "selector": "article > .body > section.text"
+            },
+            "add_content": [
+                {
+                    "selector": ".article-text > .source",
+                    "position": "bottom"
+                }
+            ],
+            "subtitle": {
+                "selector": "article > header .headline + p.description"
+            },
+            "decompose": [
+                {
+                    "attrs": {
+                        "class": [
+                            "insert",
+                            "table-of-contents",
+                            "table-of-contents-quick"
+                        ]
+                    }
+                }
+            ],
+            "images": [
+                {
+                    "attrs": {
+                        "class": "picture"
+                    },
+                    "tag": "figure",
+                    "recursive": false
+                }
+            ],
+            "gallery": [
+                {
+                    "attrs": {
+                        "class": "pictures"
+                    },
+                    "tag": "aside",
+                    "recursive": false,
+                    "image": {
+                        "selector": "a:has(> img)"
+                    },
+                    "show_gallery_poster": true
+                },
+                {
+                    "attrs": {
+                        "class": "object-gallery"
+                    },
+                    "tag": "aside",
+                    "recursive": false,
+                    "image": {
+                        "attrs": {
+                            "class": "picture"
+                        },
+                        "tag": "figure",
+                        "caption": {
+                            "attrs": {
+                                "class": "caption"
+                            },
+                            "tag": "figcaption"
+                        }
+                    },
+                    "show_thumbnails": true
+                },
+                {
+                    "attrs": {
+                        "class": "gallery"
+                    },
+                    "tag": "aside",
+                    "recursive": false,
+                    "image": {
+                        "attrs": {
+                            "class": "scanlines"
+                        },
+                        "tag": "a"
+                    },
+                    "credit": {
+                        "selector": "figcaption > .credit"
+                    },
+                    "caption": {
+                        "attrs": {
+                            "class": "caption"
+                        },
+                        "tag": "figcaption"
+                    }
+                }
+            ],
+            "extras": [
+                {
+                    "attrs": {
+                        "class": [
+                            "list",
+                            "poll"
+                        ]
+                    }
+                }
+            ],
+            "rename": [
+                {
+                    "old": {
+                        "attrs": {
+                            "class": "object-bsky-post"
+                        },
+                        "tag": "aside"
+                    },
+                    "new": {
+                        "attrs": {
+                            "class": ["wp-block-embed", "wp-block-embed-bluesky-social"]
+                        },
+                        "tag": "div"
+                    }
+                }
+            ],
+            "unwrap": [
+                {
+                    "selector": ".object-video:has(> figure.youtube)"
+                }
+            ]
         }
     },
     "aasnova": {
@@ -5170,6 +5331,148 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://boredbat.com/wp-json"
     },
+    "boredpanda": {
+        "content": {
+            "attrs": {
+                "class": "post-content"
+            }
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "affiliate-links-block",
+                        "append-open-list",
+                        "clear",
+                        "email-share-modal",
+                        "mobile-add-image-block",
+                        "newly-appended-submission-without-recents-list",
+                        "open-list-add-form",
+                        "open-list-comments",
+                        "open-list-footer",
+                        "poll-component",
+                        "post-ads",
+                        "post-footer-reached",
+                        "post-mobile-ad-within-content",
+                        "post-poll",
+                        "post-submission-line",
+                        "see-also-recommendations",
+                        "web-share-button"
+                    ]
+                }
+            },
+            {
+                "attrs": {
+                    "id": [
+                        "add-post-modal"
+                    ]
+                }
+            },
+            {
+                "selector": "div[id*=\"recommendations-block\"]"
+            },
+            {
+                "selector": "ul:has(> li > strong:-soup-contains(\"You Might Also Like:\"))"
+            },
+            {
+                "attrs": {
+                    "style": "display:none;"
+                },
+                "tag": "p"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "style": "font-weight: 400;"
+                }
+            },
+            {
+                "attrs": {
+                    "class": [
+                        "open-list-item",
+                        "open-list-items",
+                        "open-list-post-description",
+                        "shareable-post-image"
+                    ]
+                }
+            },
+            {
+                "attrs": {
+                    "class": "shareable-image-block"
+                },
+                "tag": "span"
+            },
+            {
+                "selector": ".video-container:has(> iframe)"
+            },
+            {
+                "selector": "h3 > b"
+            }
+        ],
+        "clear_attrs": [
+            {
+                "attrs": {
+                    "class": [
+                        "attachment-link-container",
+                        "open-list-media-container",
+                        "post-content-media-source",
+                        "post-content-description"
+                    ]
+                }
+            },
+            {
+                "attrs": {
+                    "style": "text-align: justify;"
+                },
+                "tag": "p"
+            }
+        ],
+        "rename": [
+            {
+                "old": {
+                    "attrs": {
+                        "class": "open-list-header"
+                    }
+                },
+                "new": {
+                    "attrs": {},
+                    "tag": "h1"
+                }
+            },
+            {
+                "old": {
+                    "attrs": {
+                        "class": "post-bottom-meta-links"
+                    }
+                },
+                "new": {
+                    "attrs": {
+                        "style": "font-size:smaller;"
+                    }
+                }
+            },
+            {
+                "old": {
+                    "attrs": {
+                        "id": "post-highlights"
+                    }
+                },
+                "new": {
+                    "attrs": {
+                        "style": "background-color:#a5cae4; border:1px solid light-dark(#333,#ccc); border-radius:10px; padding:1em; margin:1em 0;"
+                    }
+                }
+            }
+        ],
+        "images": [
+            {
+                "selector": "p > img, h3 > img",
+                "unwrap_figure": true
+            }
+        ],
+        "module": "wp_posts_v2"
+    },
     "boristhebrave": {
         "authors": {
             "2": "Boris"
@@ -5454,6 +5757,50 @@
         "module": "wp_posts",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.brewersassociation.org/wp-json"
+    },
+    "thebrewsite": {
+        "feeds": [
+            "https://www.brewersassociation.com/feed"
+        ],
+        "images": [
+            {
+                "selector": "p:has(> img[class*=\"wp-image\"])"
+            }
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.thebrewsite.com/wp-json"
+    },
+    "abetterbeerblog427": {
+        "feeds": [
+            "https://abetterbeerblog427.com/feed"
+        ],
+        "images": [
+            {
+                "selector": "p:has(> a > img[class*=\"wp-image\"])"
+            }
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://abetterbeerblog427.com/wp-json"
+    },
+    "boakandbailey": {
+        "author": ["post", "yoast_head_json", "author"],
+        "feeds": [
+            "https://boakandbailey.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://boakandbailey.com/wp-json"
+    },
+    "dcbeer": {
+        "author": ["post", "yoast_head_json", "author"],
+        "feeds": [
+            "https://dcbeer.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://dcbeer.com/wp-json"
     },
     "brewersjournal": {
         "feeds": [
@@ -6825,6 +7172,14 @@
         {
             "chaos.social": {
                 "api_path": "https://chaos.social/api/v1",
+                "module": "mastodon"
+            }
+        }
+    ],
+    "androiddev": [
+        {
+            "chaos.social": {
+                "api_path": "https://androiddev.social/api/v1",
                 "module": "mastodon"
             }
         }
@@ -8274,7 +8629,7 @@
     },
     "cnet": {
         "api_key": "073ecda0-c8e1-42ea-8d06-60b4ee845981",
-        "api_path": "https://bender.cnetstatic.com/api/neutron",
+        "api_path": "https://bender.prod.cnet.tech/api/neutron",
         "article_path": "news",
         "feeds": [
             "https://www.cnet.com/rss/reviews/",
@@ -13478,9 +13833,6 @@
         ],
         "module": "beehiiv"
     },
-    "everlit": {
-        "module": "everlit"
-    },
     "everydayadvocacy": {
         "commonconfig": {
             "BSI": "a78e9fe8-e597-4770-8e22-858a1e9093ef|2",
@@ -17472,10 +17824,16 @@
         "module": "healthline"
     },
     "greatlakesnow": {
+        "author": ["post", "yoast_head_json", "author"],
+        "unwrap": [
+            {
+                "selector": ".video-embed-wrapper:has(> iframe)"
+            }
+        ],
         "feeds": [
             "https://www.greatlakesnow.org/feed"
         ],
-        "module": "wp_posts",
+        "module": "wp_posts_v2",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.greatlakesnow.org/wp-json"
     },
@@ -18759,16 +19117,75 @@
         "module": "hearstnews"
     },
     "houstonpublicmedia": {
-        "args": {
-            "add_subtitle": true
-        },
+        "author": ["post", "coauthors"],
+        "author_key": "display_name",
+        "images": [
+            {
+                "attrs": {
+                    "class": "credits-container"
+                },
+                "recursive": false,
+                "credit": {
+                    "attrs": {
+                        "class": "credits-overlay"
+                    }
+                }
+            }
+        ],
+        "subtitle": ["post", "excerpt", "rendered"],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": "wp-block-group"
+                }
+            }
+        ],
         "feeds": [
             "https://www.houstonpublicmedia.org/feed"
         ],
-        "module": "wp_posts",
+        "module": "wp_posts_v2",
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://www.houstonpublicmedia.org/wp-json"
     },
+    "texastribune": [
+        {
+            "apps.texastribune.org": {
+                "module": "screenshot",
+                "viewport": {
+                    "width": 750,
+                    "height": 1800
+                },
+                "cropbbox": 1
+            },
+            "www.texastribune.org": {
+                "author": ["post", "parsely", "meta", "author"],
+                "author_key": "name",
+                "subtitle": ["post", "excerpt", "rendered"],
+                "unwrap": [
+                    {
+                        "attrs": {
+                            "class": [
+                                "everlit-disclaimer",
+                                "wp-block-custom-everlit-iframe-embed",
+                                "wp-block-newspack-blocks-iframe"
+                            ]
+                        }
+                    },
+                    {
+                        "selector": ".wp-block-embed__wrapper:has(> iframe)"
+                    }
+                ],
+                "feeds": [
+                    "https://www.texastribune.org/feed"
+                ],
+                "module": "wp_posts_v2",
+                "posts_path": "/wp/v2/posts",
+                "wpjson_path": "https://www.texastribune.org/wp-json",
+                "use_curl_cffi": true,
+                "use_proxy": true
+            }
+        }
+    ],
     "howstuffworks": {
         "feeds": [
             "https://syndication.howstuffworks.com/rss/HSW"
@@ -20515,14 +20932,46 @@
         },
         "wpjson_path": "https://investorplace.com/wp-json"
     },
-    "investors": {
-        "feeds": [
-            "https://www.investors.com/feed"
-        ],
-        "module": "wp_posts",
-        "posts_path": "/wp/v2/posts",
-        "wpjson_path": "https://www.investors.com/wp-json"
-    },
+    "investors": [
+        {
+            "www.investors.com": {
+                "author": ["post", "parsely", "meta", "author"],
+                "author_key": "name",
+                "decompose": [
+                    {
+                        "attrs": {
+                            "class": "subscribe-widget"
+                        }
+                    }
+                ],
+                "unwrap": [
+                    {
+                        "selector": "span:has(> .video-player-container)"
+                    },
+                    {
+                        "attrs": {
+                            "class": [
+                                "columns",
+                                "ibd-chart-container",
+                                "video-player-container"
+                            ]
+                        }
+                    }
+                ],
+                "feeds": [
+                    "https://www.investors.com/feed"
+                ],
+                "module": "wp_posts_v2",
+                "posts_path": "/wp/v2/posts",
+                "wpjson_path": "https://www.investors.com/wp-json"
+            },
+            "research.investors.com": {
+                "module": "screenshot",
+                "cropbbox": 1,
+                "waitfortime": 5000
+            }
+        }
+    ],
     "ioflood": {
         "args": {
             "skip_lede_img": true
@@ -22241,6 +22690,9 @@
     "knpr": {
         "module": "brightspot"
     },
+    "mtpr": {
+        "module": "brightspot"
+    },
     "koaa": {
         "module": "brightspot"
     },
@@ -23255,9 +23707,26 @@
     },
     "leadstories": {
         "content": {
-            "selector": "article > div.mod-full-article-content"
+            "selector": "article > .mod-full-article-content"
         },
-        "module": "wp"
+        "images": [
+            {
+                "attrs": {
+                    "class": "fixed-media"
+                },
+                "tag": "figure",
+                "recursive": false,
+                "caption": {
+                    "attrs": {
+                        "class": "caption-overlay"
+                    }
+                }
+            },
+            {
+                "selector": "p:has(> img.mt-image-none)"
+            }
+        ],
+        "module": "wp_posts_v2"
     },
     "learnlinux": {
         "args": {
@@ -25283,6 +25752,12 @@
             }
         },
         {
+            "mastodon.beer": {
+                "api_path": "https://mastodon.beer/api/v1",
+                "module": "mastodon"
+            }
+        },
+        {
             "mastodon.bot": {
                 "api_path": "https://mastodon.bot/api/v1",
                 "module": "mastodon"
@@ -27174,6 +27649,25 @@
         ],
         "module": "wix"
     },
+    "ms": [
+        {
+            "www.ms.now": {
+                "author": ["post", "parsely", "meta", "author"],
+                "author_key": "name",
+                "subtitle": ["post", "excerpt", "rendered"],
+                "slug": -1,
+                "feeds": [
+                    "https://www.ms.now/feed"
+                ],
+                "module": "wp_posts_v2",
+                "posts_path": {
+                    "default": "/wp/v2/posts",
+                    "watch": "/wp/v2/video"
+                },
+                "wpjson_path": "https://www.ms.now/wp-json"
+            }
+        }
+    ],
     "msn": {
         "module": "msn"
     },
@@ -27190,6 +27684,13 @@
         ],
         "module": "wp_public",
         "site_id": 142615557
+    },
+    "quareswally": {
+        "feeds": [
+            "https://quareswally.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "wp_site_id": 124217032
     },
     "mstdn": {
         "api_path": "https://mstdn.social/api/v1",
@@ -29379,54 +29880,6 @@
             "selector": "h2.storySubTItle > p"
         }
     },
-    "nintendolife": {
-        "add_content": [
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.scoring",
-                "unwrap": false
-            },
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.positive-negative",
-                "unwrap": false
-            },
-            {
-                "position": "bottom",
-                "selector": "article > div.body > p.source",
-                "unwrap": false
-            }
-        ],
-        "author": {
-            "selector": "article > header.article-header > section.byline > ul.article-author > li.authors > a.author-name"
-        },
-        "content": {
-            "selector": "article > div.body > section.text"
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "insert-label"
-                },
-                "tag": "div"
-            }
-        ],
-        "module": "wp",
-        "subtitle": {
-            "selector": "article > header.article-header > section.title > p.description"
-        },
-        "unwrap": [
-            {
-                "attrs": {
-                    "class": [
-                        "object-tweet",
-                        "object-youtube"
-                    ]
-                },
-                "tag": "aside"
-            }
-        ]
-    },
     "nintendosoup": {
         "feeds": [
             "https://nintendosoup.com/feed"
@@ -30404,6 +30857,15 @@
     "odysseyespresso": {
         "feeds": [
             "https://www.odysseyespresso.com/blog?format=rss"
+        ],
+        "module": "sqs"
+    },
+    "newschoolbeer": {
+        "args": {
+            "skip_lede_img": true
+        },
+        "feeds": [
+            "https://newschoolbeer.com/?format=rss"
         ],
         "module": "sqs"
     },
@@ -33718,7 +34180,7 @@
         "data-api": "https://ghost.privacyguides.org/ghost/api/content/",
         "data-key": "77a3997ec1bec1a6203fcb4166",
         "feeds": [
-            "https://www.privacyguides.com/rss/"
+            "https://www.privacyguides.org/rss/"
         ],
         "module": "ghost",
         "post_filters": []
@@ -34311,52 +34773,7 @@
         "module": "gmg"
     },
     "purexbox": {
-        "add_content": [
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.scoring",
-                "unwrap": false
-            },
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.positive-negative",
-                "unwrap": false
-            },
-            {
-                "position": "bottom",
-                "selector": "article > div.body > p.source",
-                "unwrap": false
-            }
-        ],
-        "author": {
-            "selector": "article > header.article-header > section.byline > ul.article-author > li.authors > a.author-name"
-        },
-        "content": {
-            "selector": "article > div.body > section.text"
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "insert-label"
-                },
-                "tag": "div"
-            }
-        ],
-        "module": "wp",
-        "subtitle": {
-            "selector": "article > header.article-header > section.title > p.description"
-        },
-        "unwrap": [
-            {
-                "attrs": {
-                    "class": [
-                        "object-tweet",
-                        "object-youtube"
-                    ]
-                },
-                "tag": "aside"
-            }
-        ]
+        "family": "hookshot.media"
     },
     "purpleptsd": {
         "author": [
@@ -34390,54 +34807,6 @@
             }
         ],
         "wpjson_path": "https://purpleptsd.com/wp-json"
-    },
-    "pushsquare": {
-        "add_content": [
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.scoring",
-                "unwrap": false
-            },
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.positive-negative",
-                "unwrap": false
-            },
-            {
-                "position": "bottom",
-                "selector": "article > div.body > p.source",
-                "unwrap": false
-            }
-        ],
-        "author": {
-            "selector": "article > header.article-header > section.byline > ul.article-author > li.authors > a.author-name"
-        },
-        "content": {
-            "selector": "article > div.body > section.text"
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "insert-label"
-                },
-                "tag": "div"
-            }
-        ],
-        "module": "wp",
-        "subtitle": {
-            "selector": "article > header.article-header > section.title > p.description"
-        },
-        "unwrap": [
-            {
-                "attrs": {
-                    "class": [
-                        "object-tweet",
-                        "object-youtube"
-                    ]
-                },
-                "tag": "aside"
-            }
-        ]
     },
     "pv-magazine": {
         "feeds": [
@@ -37692,6 +38061,14 @@
             }
         }
     ],
+    "mindly": [
+        {
+            "mindly.social": {
+                "api_path": "https://mindly.social/api/v1",
+                "module": "mastodon"
+            }
+        }
+    ],
     "sfchronicle": {
         "buildId": "4imf8gkkT8ufuIDtqIbPg",
         "module": "hearstnews"
@@ -40168,42 +40545,14 @@
         "module": "drupal_ajax"
     },
     "statnews": {
-        "args": {
-            "add_lede_img": true
-        },
-        "content": {
-            "attrs": {
-                "class": "the-content"
-            }
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "stat-hubspot-signup"
-                },
-                "tag": "form"
-            },
-            {
-                "attrs": {
-                    "class": [
-                        "read-more",
-                        "restricted-content-breaker"
-                    ]
-                },
-                "tag": "div"
-            }
-        ],
+        "author": ["post", "coauthors"],
+        "author_key": "display_name",
+        "subtitle": ["post", "meta", "stat_article_subheadline"],
         "feeds": [
             "https://www.statnews.com/feed"
         ],
-        "lede_img": {
-            "selector": "header.content-header div.media-wrap"
-        },
-        "module": "wp",
+        "module": "wp_posts_v2",
         "posts_path": "/wp/v2/posts",
-        "subtitle": {
-            "selector": "div.wp-block-stat-article-subheadline > h2"
-        },
         "wpjson_path": "https://www.statnews.com/wp-json"
     },
     "statsignificant": {
@@ -40913,6 +41262,15 @@
         "data-key": "d1168cb79ba0cec3d49b9dbe89",
         "feeds": [
             "https://www.swiftcentre.org/rss/"
+        ],
+        "module": "ghost",
+        "post_filters": []
+    },
+    "themakerdad": {
+        "data-api": "https://themakerdad.com/ghost/api/content/",
+        "data-key": "10ea9f8008ca9039258c86de18",
+        "feeds": [
+            "https://themakerdad.com/rss/"
         ],
         "module": "ghost",
         "post_filters": []
@@ -46248,52 +46606,7 @@
         "module": "time"
     },
     "timeextension": {
-        "add_content": [
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.scoring",
-                "unwrap": false
-            },
-            {
-                "position": "top",
-                "selector": "article > div.body > aside.positive-negative",
-                "unwrap": false
-            },
-            {
-                "position": "bottom",
-                "selector": "article > div.body > p.source",
-                "unwrap": false
-            }
-        ],
-        "author": {
-            "selector": "article > header.article-header > section.byline > ul.article-author > li.authors > a.author-name"
-        },
-        "content": {
-            "selector": "article > div.body > section.text"
-        },
-        "decompose": [
-            {
-                "attrs": {
-                    "class": "insert-label"
-                },
-                "tag": "div"
-            }
-        ],
-        "module": "wp",
-        "subtitle": {
-            "selector": "article > header.article-header > section.title > p.description"
-        },
-        "unwrap": [
-            {
-                "attrs": {
-                    "class": [
-                        "object-tweet",
-                        "object-youtube"
-                    ]
-                },
-                "tag": "aside"
-            }
-        ]
+        "family": "hookshot.media"
     },
     "timescall": {
         "feeds": [
@@ -50406,6 +50719,9 @@
         "_lede_caption": {
             "selector": "figure.hero--caption > figcaption"
         },
+        "lede_video": {
+            "selector": "article > .main-article-body > header.entry-header > .media > .iframe-container > iframe "
+        },
         "images": [
             {
                 "attrs": {
@@ -50432,6 +50748,9 @@
             },
             {
                 "selector": ".video-container:has(> iframe)"
+            },
+            {
+                "selector": "center:has(> iframe)"
             }
         ]
     },
@@ -52992,6 +53311,306 @@
         "posts_path": "/wp/v2/posts",
         "wpjson_path": "https://finbold.com/wp-json"
     },
+    "metalsucks": {
+        "author": ["post", "yoast_head_json", "author"],
+        "feeds": [
+            "https://www.metalsucks.net/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.metalsucks.net/wp-json"
+    },
+    "drwebdomain": [
+        {
+            "drwebdomain.blog": {
+                "author": ["post", "uagb_author_info", "display_name"],
+                "decompose": [
+                    {
+                        "attrs": {
+                            "class": "__iawmlf-post-loop-links"
+                        }
+                    }
+                ],
+                "feeds": [
+                    "https://drwebdomain.blog/feed"
+                ],
+                "module": "wp_posts_v2",
+                "posts_path": "/wp/v2/posts",
+                "wpjson_path": "https://drwebdomain.blog/wp-json",
+                "slug": -1,
+                "use_curl_cffi": true,
+                "use_proxy": true
+            }
+        }
+    ],
+    "jaxtoday": {
+        "feeds": [
+            "https://jaxtoday.org/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://jaxtoday.org/wp-json"
+    },
+    "bookstr": {
+        "author": ["post", "uagb_author_info", "display_name"],
+        "subtitle": ["post", "uagb_excerpt"],
+        "decompose": [
+            {
+                "selector": "div[class*=\"adsanity\"]"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "wp-block-column",
+                        "wp-block-columns"
+                    ]
+                }
+            }
+        ],
+        "feeds": [
+            "https://bookstr.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/article",
+        "wpjson_path": "https://bookstr.com/wp-json"
+    },
+    "jaxdailyrecord": {
+        "module": "wp_posts_v2",
+        "content": {
+            "selector": ".wrap__article-detail > .wrap__article-detail-content > .story_body"
+        },
+        "clear_attrs": [
+            {
+                "tag": "p"
+            }
+        ],
+        "decompose": [
+            {
+                "attrs": {
+                    "class": [
+                        "clearfix"
+                    ]
+                }
+            }
+        ],
+        "images": [
+            {
+                "attrs": {
+                    "class": "inline_photo"
+                },
+                "recursive": false,
+                "credit": {
+                    "attrs": {
+                        "class": "photo-credit"
+                    }
+                },
+                "caption": {
+                    "selector": "figcaption > .caption"
+                }
+            }
+        ],
+        "subtitle": {
+            "selector": ".wrap__article-detail > .wrap__article-detail-title > h3"
+        },
+        "lede_image": {
+            "selector": ".wrap__article-detail > .wrap__article-detail-image > figure",
+            "credit": {
+                "attrs": {
+                    "class": "photo-credit"
+                }
+            },
+            "caption": {
+                "selector": "figcaption"
+            }
+        },
+        "tags": {
+            "selector": ".wrap__article-detail > .wrap__article-detail-content .blog-tags > ul > li",
+            "no_link": true
+        }
+    },
+    "myhealthyapple": {
+        "args": {
+            "skip_wp_media": true
+        },
+        "author": ["post", "yoast_head_json", "author"],
+        "lede_image": ["post", "yoast_head_json", "og_image", 0, "url"],
+        "decompose": [
+            {
+                "selector": "h3:has(> strong:-soup-contains(\"Related reading\")) + ul"
+            },
+            {
+                "selector": "h3:has(> strong:-soup-contains(\"Related reading\"))"
+            },
+            {
+                "selector": "ul:has(> li > strong > a[href*=\"myhealthyapple.com\"])"
+            }
+        ],
+        "images": [
+            {
+                "selector": "h2 > img",
+                "unwrap_figure": true
+            }
+        ],
+        "extras": [
+            {
+                "attrs": {
+                    "class": "aawp"
+                }
+            }
+        ],
+        "clear_attrs": [
+            {
+                "tag": ["h2", "h3"]
+            }
+        ],
+        "unwrap": [
+            {
+                "selector": "h2 > strong"
+            }
+        ],
+        "feeds": [
+            "https://www.myhealthyapple.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://www.myhealthyapple.com/wp-json",
+        "image_proxy": true
+    },
+    "eaworldview": {
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://eaworldview.com/wp-json",
+        "unwrap": [
+            {
+                "selector": "p:has(> h1)"
+            },
+            {
+                "selector": "p:has(> p)"
+            },
+            {
+                "selector": "p:has(> iframe)"
+            }
+        ],
+        "rename": [
+            {
+                "old": {
+                    "tag": "h1"
+                },
+                "new": {
+                    "tag": "h2"
+                }
+            }
+        ],
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "wpp_popup_post_end_element"
+                }
+            }
+        ],
+        "images": [
+            {
+                "selector": "p:has(> img[class*=\"wp-image\"])"
+            }
+        ]
+    },
+    "capx": {
+        "args": {
+            "load_page": true
+        },
+        "add_content": [
+            {
+                "selector": ".top-share-lines > ul",
+                "position": "top"
+            }
+        ],
+        "clear_attrs": [
+            {
+                "attrs": {
+                    "class": "selectionShareable"
+                },
+                "tag": "p"
+            }
+        ],
+        "decompose": [
+            {
+                "selector": "a[href*=\"twitter.com/intent/tweet\"]"
+            },
+            {
+                "selector": "a[href*=\"facebook.com/sharer/sharer.php\"]"
+            },
+            {
+                "attrs": {
+                    "class": "gform_wrapper"
+                }
+            }
+        ],
+        "author": ["post", "parsely", "meta", "author"],
+        "author_key": "name",
+        "feeds": [
+            "https://capx.co/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://capx.co/wp-json"
+    },
+    "thecybersecguru": {
+        "feeds": [
+            "https://thecybersecguru.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://thecybersecguru.com/wp-json",
+        "use_curl_cffi": true,
+        "use_proxy": true
+    },
+    "exystence": {
+        "args": {
+            "skip_lede_img": true
+        },
+        "feeds": [
+            "https://exystence.net/feed"
+        ],
+        "images": [
+            {
+                "selector": "p > img[class*=\"wp-image\"]",
+                "unwrap_figure": true
+            }
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://exystence.net/wp-json"
+    },
+    "piunikaweb": {
+        "author": ["post", "yoast_head_json", "author"],
+        "feeds": [
+            "https://piunikaweb.com/feed"
+        ],
+        "module": "wp_posts_v2",
+        "posts_path": "/wp/v2/posts",
+        "wpjson_path": "https://piunikaweb.com/wp-json",
+        "unwrap": [
+            {
+                "selector": "blockquote.wp-block-quote > pre.wp-block-preformatted"
+            },
+            {
+                "selector": ".entry-content-asset:has(> iframe)"
+            }
+        ],
+        "images": [
+            {
+                "selector": "p:has(> a > img[class*=\"wp-image\"])"
+            },
+            {
+                "selector": "blockquote.wp-block-quote > .wp-block-image",
+                "caption": {
+                    "tag": "figcaption"
+                }
+            }
+        ]
+    },
     "next": [
         {
             "next.ink": {
@@ -53007,5 +53626,294 @@
     ],
     "tapinto": {
         "module": "tapinto"
+    },
+    "canarymedia": {
+        "module": "wp_posts_v2",
+        "content": {
+            "_selector": "div[class*=\"md:col-span-9\"] > .prose",
+            "selector": "main > section"
+        },
+        "decompose": [
+            {
+                "attrs": {
+                    "class": "sidebar-form"
+                }
+            },
+            {
+                "selector": "div:has(> h1)"
+            },
+            {
+                "selector": "div:has(> ul > li > a[href*=\"/articles/\"])"
+            },
+            {
+                "selector": "div:not([class]):not([style]):has(a[href*=\"/about/people/\"])"
+            },
+            {
+                "selector": "h2:-soup-contains(\"read next\") + div:has(> ul)"
+            },
+            {
+                "selector": "h2:-soup-contains(\"read next\")"
+            }
+        ],
+        "unwrap": [
+            {
+                "attrs": {
+                    "class": [
+                        "w-full",
+                        "md:grid",
+                        "md:col-start-2",
+                        "prose"
+                    ]
+                },
+                "tag": "div"
+            },
+            {
+                "selector": "div[class=\"\"]:has(> p[dir=\"ltr\"])"
+            }
+        ],
+        "clear_attrs": [
+            {
+                "attrs": {
+                    "dir": "ltr"
+                }
+            }
+        ],
+        "images": [
+            {
+                "selector": "div:has(> figure)",
+                "caption": {
+                    "tag": "figcaption"
+                }
+
+            }
+        ],
+        "author": {
+            "selector": "h1 + div a[href*=\"/about/people/\"]"
+        },
+        "subtitle": {
+            "selector": "main h1 + .prose"
+        },
+        "tags": ["meta", "post_tags"],
+        "tags_delimiter": ",",
+        "rename": [
+            {
+                "old": {
+                    "attrs": {
+                        "class": "border-gray-200"
+                    },
+                    "tag": "div"
+                },
+                "new": {
+                    "attrs": {
+                        "style": "border-top:1px solid light-dark(#333,#ccc); margin:2em 0; padding:1em 0; font-style:italic;"
+                    },
+                    "tag": "div"
+                }
+            }
+        ]
+    },
+    "framer": {
+        "module": "framer"
+    },
+    "trufflesecurity": {
+        "module": "framer"
+    },
+    "techpolicy": {
+        "module": "techpolicy",
+        "buildId": "v33e8vB47hOaep5H0jFVo",
+        "locale": "en"
+    },
+    "canva": {
+        "module": "canva"
+    },
+    "everlit": [
+        {
+            "everlit.audio": {
+                "module": "everlitaudio"
+            }
+        }
+    ],
+    "azpm": [
+        {
+            "news.azpm.org": {
+                "module": "wp_posts_v2",
+                "content": {
+                    "attrs": {
+                        "id": "article-body"
+                    }
+                },
+                "author": {
+                    "selector": "#article-header .byline"
+                },
+                "subtitle": {
+                    "selector": "#article-header .summary"
+                },
+                "tags": {
+                    "selector": "#article-header .polcats > a"
+                },
+                "date_published": ["meta", "article:modified"],
+                "images": [
+                    {
+                        "selector": "div:has(> img.img-responsive), div:has(> a > img.img-responsive)",
+                        "caption": {
+                            "tag": "span",
+                            "recursive": false
+                        },
+                        "credit": {
+                            "attrs": {
+                                "class": "fullphotocred-sm"
+                            }
+                        }
+                    }
+                ],
+                "decompose": [
+                    {
+                        "attrs": {
+                            "id": [
+                                "comments",
+                                "related"
+                            ]
+                        }
+                    },
+                    {
+                        "attrs": {
+                            "class": "jp-flat-audio"
+                        }
+                    },
+                    {
+                        "selector": "div:has(> .polcats)"
+                    },
+                    {
+                        "selector": "strong:has(> a > i.fa-search-plus)"
+                    }
+                ],
+                "unwrap": [
+                    {
+                        "attrs": {
+                            "class": [
+                                "container",
+                                "row",
+                                "col-lg-8",
+                                "responsive-wrapper"
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "blabbermouth": {
+        "args": {
+            "add_lede_img": true
+        },
+        "module": "wp_posts_v2",
+        "author": {
+            "selector": ".news-relative-items > div:has(> strong:-soup-contains(\"Author:\"))"
+        },
+        "add_content": [
+            {
+                "selector": ".reviews-single-article > div > h2:-soup-contains(\"Track listing:\") ~ p",
+                "position": "top"
+            },
+            {
+                "selector": ".reviews-single-article > div > h2:-soup-contains(\"Track listing:\")",
+                "position": "top"
+            },
+            {
+                "selector": ".reviews-single-article > div > .reviews-rate-comments:has(img[alt=\"rating icon\"])",
+                "position": "top"
+            },
+            {
+                "selector": ".reviews-single-article > div >  h1 + h2 + .band-label",
+                "position": "top"
+            },
+            {
+                "selector": ".reviews-single-article > div > h1 + h2",
+                "position": "top"
+            },
+            {
+                "selector": ".reviews-single-article > div > h1",
+                "position": "top"
+            }
+        ],
+        "content": {
+            "attrs": {
+                "class": "news-content"
+            }
+        },
+        "images": [
+            {
+                "selector": "div[align=\"center\"]:has(> img)"
+            }
+        ],
+        "image_proxy": true,
+        "unwrap": [
+            {
+                "selector": "p:has(> iframe)"
+            },
+            {
+                "attrs": {
+                    "class": "reviews-rate-comments"
+                }
+            }
+        ],
+        "clear_attrs": [
+            {
+                "selector": "h2:-soup-contains(\"Track listing:\")"
+            }
+        ],
+        "rename": [
+            {
+                "old": {
+                    "attrs": {
+                        "class": "margin__top-default"
+                    },
+                    "tag": "h1"
+                },
+                "new": {
+                    "attrs": {
+                        "style": "text-align:center;"
+                    }
+                }
+            },
+            {
+                "old": {
+                    "attrs": {
+                        "class": "margin__bottom-default"
+                    },
+                    "tag": "h2"
+                },
+                "new": {
+                    "attrs": {
+                        "style": "text-align:center;"
+                    }
+                }
+            },
+            {
+                "old": {
+                    "attrs": {
+                        "class": "band-label"
+                    },
+                    "tag": "span"
+                },
+                "new": {
+                    "attrs": {
+                        "style": "text-align:center;"
+                    },
+                    "tag": "p"
+                }
+            },
+            {
+                "old": {
+                    "selector": ".reviews-rate-comments > div"
+                },
+                "new": {
+                    "attrs": {
+                        "style": "text-align:center;"
+                    },
+                    "tag": "h4"
+                }
+            }
+        ]
     }
 }

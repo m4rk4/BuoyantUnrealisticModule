@@ -519,113 +519,17 @@ def map():
 @app.route('/screenshot')
 def screenshot():
     args = request.args
-    if 'url' not in args:
-        return 'No url specified'
-
-    # # https://github.com/microsoft/playwright-python/issues/723
-    loop = asyncio.ProactorEventLoop()
-    asyncio.set_event_loop(loop)
-    im_io = loop.run_until_complete(image_utils.get_screenshot(args['url'], args))
-    mimetype = 'image/png'
-    if im_io and len(args) > 1:
-        im_io, mimetype = image_utils.get_image(args, im_io=im_io)
-    if im_io:
-        return send_file(im_io, mimetype=mimetype)
-
-    if args.get('provider') and args['provider'] == 'thumbio':
-        # https://www.thum.io/documentation/api/url
-        # TODO: use https://image.thum.io/get/prefetch/{url} in get_content to prefetch images
-        thumb_url = 'https://image.thum.io/get'
-        if args.get('maxAge'):
-            thumb_url += '/maxAge/' + args['maxAge']
-        else:
-            thumb_url += '/maxAge/12'
-        if args.get('width'):
-            thumb_url += '/width/' + args['width']
-        else:
-            thumb_url += '/width/800'
-        if args.get('crop'):
-            # Default is 1200
-            thumb_url += '/crop/' + args['crop']
-        if args.get('allowJPG'):
-            thumb_url += '/allowJPG'
-        if args.get('png'):
-            thumb_url += '/png'
-        if args.get('noanimate'):
-            thumb_url += '/noanimate'
-        thumb_url += '/' + args['url']
-        logger.debug('screenshot url ' + thumb_url)
-        if 'cropbbox' in args:
-            im_args = {
-                'url': thumb_url,
-                'cropbbox': args['cropbbox']
-            }
-            im_io, mimetype = image_utils.get_image(im_args)
-            if im_io:
-                return send_file(im_io, mimetype=mimetype)
-        return redirect(thumb_url)
-    elif args.get('provider') and args['provider'] == 'pikwy':
-        api_url = 'https://api.pikwy.com/?tkn=125&d=3000&u={}&fs=0&w=1280&h=1200&s=100&z=100&f=jpg&rt=jweb'.format(quote_plus(args['url']))
-        headers = {
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "origin": "https://pikwy.com/",
-            "priority": "u=1, i",
-            "referrer": "https://pikwy.com/"
-        }
-        try:
-            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
-            if r.status_code == 200 and r.json().get('iurl'):
-                return redirect(r.json()['iurl'])
-        except Exception as e:
-            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-            return 'Something went wrong ({})'.format(r.status_code), r.status_code
-    elif args.get('provider') and args['provider'] == 'urlto':
-        api_url = 'https://api.apilight.com/screenshot/get?url={}&base64=1&width=1366&height=1024&time_allocated=10'.format(quote_plus(args['url']))
-        headers = {
-            "accept": "text/plain, */*; q=0.01",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "origin": "https://urltoscreenshot.com/",
-            "priority": "u=1, i",
-            "referrer": "https://urltoscreenshot.com/",
-            "x-api-key": "j1gIaMwfU545P2ymFWA0gan7yHr7Yla05CJnMheL"
-        }
-        try:
-            r = curl_cffi.get(api_url, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
-            if r.status_code == 200:
-                return send_file(BytesIO(base64.b64decode(r.content)), mimetype='image/png')
-        except Exception as e:
-            logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-            return 'Something went wrong ({})'.format(r.status_code), r.status_code
-    else:
-        boundary = '----WebKitFormBoundary' + ''.join(random.sample(string.ascii_letters + string.digits, 16))
-        body = '--' + boundary + '\r\nContent-Disposition: form-data; name=\"url\"\r\n\r\n' + args['url'] + '\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"pricing\"\r\n\r\nmonthly\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"DstFileFormat\"\r\n\r\njpg\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"ConversionDelay\"\r\n\r\n0\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"CookieConsentBlock\"\r\n\r\ntrue\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"Zoom\"\r\n\r\n1\r\n'
-        body += '--' + boundary + '\r\nContent-Disposition: form-data; name=\"ParameterPreset\"\r\n\r\nWide\r\n'
-        body += '--' + boundary + '--\r\n'
-        headers = {
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9,en-GB;q=0.8",
-            "cache-control": "no-cache",
-            "content-type": "multipart/form-data; boundary=" + boundary,
-            "pragma": "no-cache",
-            "priority": "u=1, i",
-            "x-requested-with": "XMLHttpRequest"
-        }
-        api_url = 'https://www.web2pdfconvert.com/api/convert/web/to/jpg?storefile=true&filename=' + urlsplit(args['url']).path[1:].replace('/', '-')
-        r = curl_cffi.post(api_url, data=body, headers=headers, impersonate="chrome", timeout=30, proxies=config.proxies)
-        if r.status_code == 200:
-            return redirect(r.json()['Files'][0]['Url'])
-        else:
-            logger.warning('screenshot error {} getting {}'.format(r.status_code, api_url))
-            return 'Something went wrong ({})'.format(r.status_code), r.status_code
-        # except Exception as e:
-        #     logger.warning('request error {}{} getting {}'.format(e.__class__.__name__, r.status_code, api_url))
-        #     return 'Something went wrong ({})'.format(r.status_code), r.status_code
+    if 'url' in args or 'html' in args:
+        # # https://github.com/microsoft/playwright-python/issues/723
+        loop = asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+        im_io = loop.run_until_complete(image_utils.get_screenshot(args.get('url'), args.get('html'), args))
+        mimetype = 'image/png'
+        if im_io and len(args) > 1:
+            im_io, mimetype = image_utils.get_image(args, im_io=im_io)
+        if im_io:
+            return send_file(im_io, mimetype=mimetype)
+    return 'Invalid url'
 
 
 @app.route('/send_src')
@@ -866,6 +770,15 @@ def stock_chart():
     args = request.args
     if not args.get('symbol'):
         return 'No stock symbol specified'
+    symbols = args.getlist("symbol")
+    if 'range' in args:
+        data_range = args['range']
+    else:
+        data_range = '1d'
+    if 'normalize' in args:
+        normalize_data = True
+    else:
+        normalize_data = False
     if 'debug' in args:
         save_debug = True
     else:
@@ -876,7 +789,9 @@ def stock_chart():
         url = config.server + '/stock_chart?'
         if save_debug:
             url += 'debug&'
-        url += '&symbol=' + args['symbol']
+        url += 'range=' + data_range
+        for sym in symbols:
+            url += '&symbol=' + sym
         im_io = loop.run_until_complete(image_utils.get_screenshot(url, {}))
         if im_io:
             im_io, mimetype = image_utils.get_image({'cropbbox': '1'}, im_io=im_io)
@@ -884,7 +799,10 @@ def stock_chart():
                 return send_file(im_io, mimetype=mimetype)
         else:
             return 'Something happened'
-    chart_svg = utils.add_stock_chart(args['symbol'], save_debug)
+    if len(symbols) == 1:
+        chart_svg = utils.add_stock_chart(symbols[0], save_debug)
+    else:
+        chart_svg = utils.add_stock_chart_compare(symbols, data_range, normalize_data, save_debug)
     return Response(chart_svg, mimetype="image/svg+xml")
 
 
@@ -892,7 +810,8 @@ def stock_chart():
 def home():
     args = request.args
     if args:
-        print(args.getlist("image"))
+        print(args['param'])
+        print(args.getlist("param"))
     return 'Hello! You must be lost :('
 
 

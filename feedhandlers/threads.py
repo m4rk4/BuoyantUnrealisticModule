@@ -78,10 +78,10 @@ def get_content(url, args, site_json, save_debug=False):
                             item['_parents'] = []
                         item['_parents'].append(get_item(it['post']))
                 else:
-                    if it['post']['user']['username'] == item['author']['name']:
-                        if 'children' not in item:
+                    if it['post']['user']['username'] == item['author']['_username'].strip('@'):
+                        if '_children' not in item:
                             item['_children'] = []
-                        item['children'].append(get_item(it['post']))
+                        item['_children'].append(get_item(it['post']))
                     else:
                         return item
         return item
@@ -127,18 +127,27 @@ def get_item(post_json):
         item['title'] += ': ' + post_json['caption']['text'].replace('\n', '')
 
     item['summary'] = ''
-    if post_json.get('text_post_app_info') and post_json['text_post_app_info'].get('text_fragments') and post_json['text_post_app_info']['text_fragments'].get('fragments'):
-        item['summary'] += '<p>'
-        for it in post_json['text_post_app_info']['text_fragments']['fragments']:
-            if it['fragment_type'] == 'plaintext':
-                item['summary'] += it['plaintext'].replace('\n', '<br/>')
-            elif it['fragment_type'] == 'link':
-                item['summary'] += '<a href="' + it['link_fragment']['uri'] + '" target="_blank">' + it['link_fragment']['display_text'] + '</a>'
-            elif it['fragment_type'] == 'mention':
-                item['summary'] += '<a href="https://www.threads.com/@' + it['mention_fragment']['mentioned_user']['username'] + '" target="_blank">' + it['plaintext'] + '</a>'
+
+    def format_fragments(fragments):
+        fragment_html = ''
+        for fragment in fragments:
+            if 'fragment_type' not in fragment and 'plaintext' in fragment:
+                fragment_html += fragment['plaintext'].replace('\n', '<br/>')
+            elif fragment['fragment_type'] == 'plaintext':
+                fragment_html += fragment['plaintext'].replace('\n', '<br/>')
+            elif fragment['fragment_type'] == 'link':
+                fragment_html += '<a href="' + fragment['link_fragment']['uri'] + '" target="_blank">' + fragment['link_fragment']['display_text'] + '</a>'
+            elif fragment['fragment_type'] == 'mention':
+                fragment_html += '<a href="https://www.threads.com/@' + fragment['mention_fragment']['mentioned_user']['username'] + '" target="_blank">' + fragment['plaintext'] + '</a>'
             else:
-                logger.warning('unhandled text fragment type ' + it['fragment_type'])
-        item['summary'] += '</p>'
+                logger.warning('unhandled text fragment type ' + fragment['fragment_type'])
+        return fragment_html
+
+    if post_json.get('text_post_app_info') and post_json['text_post_app_info'].get('text_fragments') and post_json['text_post_app_info']['text_fragments'].get('fragments'):
+        item['summary'] += '<p>' + format_fragments(post_json['text_post_app_info']['text_fragments']['fragments']) + '</p>'
+
+    if post_json.get('text_post_app_info') and post_json['text_post_app_info'].get('snippet_attachment_info') and post_json['text_post_app_info']['snippet_attachment_info'].get('text_fragments') and post_json['text_post_app_info']['snippet_attachment_info']['text_fragments'].get('fragments'):
+        item['summary'] += '<p style="padding:1em; background:#light-dark(#ccc, #333); border-radius:10px;">' + format_fragments(post_json['text_post_app_info']['snippet_attachment_info']['text_fragments']['fragments']) + '</p>'
 
     item['_gallery'] = []
     if post_json.get('carousel_media'):
@@ -218,7 +227,7 @@ def get_item(post_json):
             if quote_post:
                 item['_quote'] = quote_post
         elif post_json['text_post_app_info']['share_info'].get('quoted_post_caption'):
-            item['summary'] += '<p style="margin-left:8px; font-size:smaller;>' + config.icon_left_quote + '&nbsp;' + post_json['text_post_app_info']['share_info']['quoted_post_caption'] + '&nbsp;' + config.icon_right_quote + '</p>'
+            item['summary'] += '<p style="margin-left:8px; font-size:smaller;">' + config.icon_left_quote.replace('role="img"', 'role="img" height="0.9em" fill="currentColor"') + '&nbsp;' + post_json['text_post_app_info']['share_info']['quoted_post_caption'] + '&nbsp;' + config.icon_right_quote.replace('role="img"', 'role="img" height="0.9em" fill="currentColor"') + '</p>'
 
     if post_json.get('text_post_app_info') and post_json['text_post_app_info'].get('link_preview_attachment'):
         link = post_json['text_post_app_info']['link_preview_attachment']['url']

@@ -1,4 +1,4 @@
-import asyncio, av, cloudscraper, curl_cffi, math, re
+import asyncio, av, base64, curl_cffi, math, re
 from io import BytesIO
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageOps
 from playwright.async_api import async_playwright
@@ -29,13 +29,31 @@ def resize(im, width, height, scale):
     return im.resize((w, h), resample=Image.LANCZOS)
 
 
-def crop_bbox(im, invert):
-    # Removes surrounding black borders
+def rgb2hex(r, g, b):
+    """Converts RGB values to a hexadecimal color string."""
+    return '#{:02x}{:02x}{:02x}'.format(r, g, b)
+
+
+def pixel_matches_color(rgb1, rgb2, tolerance=5):
+    return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(rgb1, rgb2))
+
+
+def crop_bbox(im, invert, tolerance=5):
+    # Inspired by https://github.com/python-pillow/Pillow/discussions/7327#discussioncomment-6667017
     if isinstance(invert, str) and invert == '1':
-        # invert to remove white borders
-        bbox = ImageOps.invert(im.convert("RGB")).getbbox()
+        # White borders
+        bbox_color = (255, 255, 255)
     else:
-        bbox = im.getbbox()
+        # Black borders
+        bbox_color = (0, 0, 0)
+    if im.mode == 'RGB':
+        im_filled = im.copy()
+    else:
+        im_filled = im.convert('RGB')
+    for corner in ((0, 0), (im.width-1, im.height-1)):
+        if pixel_matches_color(im.getpixel(corner), bbox_color, tolerance):
+            ImageDraw.floodfill(im_filled, corner, (0, 0, 0, 0), thresh=tolerance)
+    bbox = im_filled.getbbox()
     return im.crop(bbox)
 
 
@@ -207,7 +225,7 @@ def add_overlay(im, overlay, args):
 #     install_playwright.install(p.firefox)
 #
 # async_playwright in Flask example: https://stackoverflow.com/questions/47841985/make-a-python-asyncio-call-from-a-flask-route
-async def get_screenshot(url, args):
+async def get_screenshot(url, html_content, args):
     async with async_playwright() as playwright:
         # Device emulation: https://playwright.dev/python/docs/emulation
         # https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/deviceDescriptorsSource.json
@@ -264,10 +282,14 @@ async def get_screenshot(url, args):
             if m:
                 await page.set_viewport_size({"width": int(m.group(1)), "height": int(m.group(2))})
 
-        if 'wait_until' in args:
-            await page.goto(url, wait_until=args['wait_until'])
-        else:
-            await page.goto(url)
+        if url:
+            if 'wait_until' in args:
+                await page.goto(url, wait_until=args['wait_until'])
+            else:
+                await page.goto(url)
+        elif html_content:
+            print(html_content)
+            await page.set_content(base64.b64decode(html_content).decode())
 
         if 'waitfor' in args:
             await page.wait_for_selector(args['waitfor'])
@@ -543,33 +565,8 @@ def get_image(args, im=None, im_io=None):
     return im_io, mimetype
 
 
-# def text(s):
-#     WIDTH = 3
-#     HEIGHT = 2
-#     PIXEL_SCALE = 200
-#
-#     surface = cairo.ImageSurface(cairo.FORMAT_RGB24, WIDTH * PIXEL_SCALE, HEIGHT * PIXEL_SCALE)
-#     ctx = cairo.Context(surface)
-#     ctx.scale(PIXEL_SCALE, PIXEL_SCALE)
-#
-#     ctx.rectangle(0, 0, WIDTH, HEIGHT)
-#     ctx.set_source_rgb(0.8, 0.8, 1)
-#     ctx.fill()
-#
-#     # Drawing code
-#     ctx.set_source_rgb(1, 0, 0)
-#     ctx.set_font_size(0.75)
-#     ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-#     ctx.move_to(0, 0.6)
-#     ctx.show_text("Outline")
-#
-#     ctx.move_to(0, 1.2)
-#     ctx.text_path("Outline")
-#     ctx.set_line_width(0.02)
-#     ctx.stroke()
-#     # End of drawing code
-#
-#     surface.write_to_png('text.png')
+# TODO: Text
+# https://www.blog.pythonlibrary.org/2021/02/02/drawing-text-on-images-with-pillow-and-python/
 
 
 # https://github.com/delimitry/collage_maker/blob/master/collage_maker.py

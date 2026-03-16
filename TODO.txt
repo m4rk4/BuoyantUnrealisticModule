@@ -1,3 +1,7 @@
+# Update to new Python app_version
+poetry env use 3.14
+poetry update
+
 # Fix poetry venv:
 https://stackoverflow.com/questions/70064449/how-to-force-reinstall-poetry-environment-from-scratch
 poetry env info -p
@@ -549,7 +553,7 @@ https://github.com/yifeikong/curl_cffi
 import certifi
 from curl_cffi import requests
 r = requests.get(url, impersonate="chrome110", headers=headers, verify=certifi.where())
-r = requests.get(url, impersonate="chrome110", headers=headers, verify="C:\\Users\\mark.arigo\\AppData\\Roaming\\pip\\mcafee_uce.pem")
+r = requests.get(url, impersonate="chrome110", headers=headers, verify="C:\\Users\\user.name\\AppData\\Roaming\\pip\\mcafee_uce.pem")
 proxies = {"https": "http://192.168.1.xxx:xxxx"}
 r = requests.get(url, impersonate="chrome110", headers=headers, proxies=proxies)
 

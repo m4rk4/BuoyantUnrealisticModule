@@ -3,7 +3,7 @@ from datetime import datetime
 from urllib.parse import parse_qs, urlsplit
 
 import utils
-from feedhandlers import rss, wp_posts
+from feedhandlers import rss, wp_posts_v2
 
 import logging
 
@@ -41,13 +41,18 @@ def get_content(url, args, site_json, save_debug=False):
     item['date_published'] = dt.isoformat()
     item['_timestamp'] = dt.timestamp()
     item['_display_date'] = utils.format_display_date(dt)
-    dt = datetime.fromisoformat(post_json['modified'])
-    item['date_modified'] = dt.isoformat()
+    if post_json.get('modified'):
+        dt = datetime.fromisoformat(post_json['modified'])
+        item['date_modified'] = dt.isoformat()
 
     if post_json['author'].get('first_name') and post_json['author'].get('last_name'):
-        item['author'] = {"name": '{} {}'.format(post_json['author']['first_name'], post_json['author']['last_name'])}
+        item['author'] = {
+            "name": post_json['author']['first_name'] + ' ' + post_json['author']['last_name']
+            }
     elif post_json['author'].get('name'):
-        item['author'] = {"name": post_json['author']['name']}
+        item['author'] = {
+            "name": post_json['author']['name']
+        }
     if 'author' in item:
         item['authors'] = []
         item['authors'].append(item['author'])
@@ -79,7 +84,8 @@ def get_content(url, args, site_json, save_debug=False):
     if 'add_lede_img' in args and 'image' in item:
         item['content_html'] += utils.add_image(item['image'])
 
-    item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
+    # item['content_html'] += wp_posts.format_content(post_json['content'], item, site_json)
+    item['content_html'] += wp_posts_v2.format_content(post_json['content'], item['url'], args, site_json)
     return item
 
 

@@ -1,7 +1,7 @@
 import json, re, requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-from urllib.parse import quote_plus, unquote_plus, urlsplit
+from urllib.parse import parse_qs, quote_plus, unquote_plus, urlsplit
 
 import config
 from feedhandlers import rss
@@ -106,7 +106,294 @@ def get_iframely(iframely_wrapper):
     return ''
 
 
+
+def get_video_json(video_id, site, region='US'):
+    api_url = 'https://video-api.yql.yahoo.com/v1/video/sapi/streams/' + video_id + '?protocol=http&format=m3u8,mp4,webm&region=' + region + '&site=' + site
+    api_json = utils.get_url_json(api_url)
+    if api_json:
+        try:
+            video_json = api_json['query']['results']['mediaObj'][0]
+        except:
+            video_json = None
+    else:
+        video_json = None
+    return video_json
+
+
+def format_atom(atom, products={}):
+    atom_html = ''
+    if atom['type'] == 'text' and atom['tagName'] == 'p':
+        if re.search(r'(<strong>|<em>)(<strong>|<em>)?(Read more:|Related:)', atom['content'], flags=re.I) or re.search(r'data-ylk="[^"]*slk:(Click here|Read the latest)', atom['content']) or re.search(r'href="[^"]+people-news-daily-newsletter-sign-up', atom['content']):
+            return ''
+        atom_html += '<p>' + re.sub(r'\s?(class|data-i13n|data-ylk|rel)="[^"]+"', '', atom['content']) + '</p>'
+    elif atom['type'] == 'heading':
+        atom_html += '<{0}>{1}</{0}>'.format(atom['tagName'], atom['content'])
+    elif atom['type'] == 'horizontalRule':
+        atom_html += '<hr style="margin:2em 0;>'
+    elif atom['type'] == 'list':
+        atom_html += '<' + atom['tagName'] + '>'
+        for it in atom['items']:
+            list_item = ''
+            for val in it['val']:
+                list_item += format_atom(val, products)
+            atom_html += '<li style="margin:0.5em 0;">' + re.sub(r'^<p>|</p>$', '', list_item) + '</li>'
+        atom_html += '</' + atom['tagName'] + '>'
+    elif atom['type'] == 'blockquote':
+        quote = ''
+        for it in atom['items']:
+            for val in it['val']:
+                quote += format_atom(val, products)
+        atom_html += utils.add_blockquote(quote, False)
+    elif atom['type'] == 'image':
+        captions = []
+        if atom.get('caption'):
+            captions.append(re.sub(r'^<i>|</i>$', '', atom['caption']).replace('<br>', ' | '))
+        if atom.get('credit'):
+            captions.append(atom['credit'])
+        atom_html += utils.add_image(atom['size']['resized']['url'], ' | '.join(captions), link=atom['size']['original']['url'])
+    elif atom['type'] == 'core-slideshow':
+        gallery_images = []
+        for slide in atom['data']['slides']:
+            gallery_images.append({
+                "src": slide['size']['original']['url'],
+                "thumb": slide['size']['resized']['url'],
+                "caption": slide.get('caption')
+            })
+        atom_html += utils.add_gallery(gallery_images, gallery_caption=atom['data'].get('title'), show_gallery_link=False, show_gallery_poster=True)
+    elif atom['type'] == 'yvideo':
+        video_json = get_video_json(atom['config']['playlist']['mediaItems'][0]['id'], atom['config']['site'], atom['config']['region'])
+        if video_json:
+            atom_html += utils.add_video(video_json['streams'][0]['host'] + video_json['streams'][0]['path'], video_json['streams'][0]['mime_type'], video_json['meta']['thumbnail'], video_json['meta']['title'])
+    elif atom['type'] == '3pvideo' and atom['subtype'] == 'youtube':
+        atom_html += utils.add_embed(atom['url'])
+    elif atom['type'] == 'iframe' or atom['type'] == 'youtube':
+        atom_html += utils.add_embed(atom['url'])
+    elif atom['type'] == 'tweet':
+        atom_html += utils.add_embed('https://x.com/_/status/' + atom['id'])
+    elif atom['type'] == 'instagram':
+        link = ''
+        for it in atom['items']:
+            for val in it['val']:
+                if val.get('content'):
+                    for m in re.findall(r'href="([^"]+)', val['content']):
+                        if atom['id'] in m:
+                            link = m
+                            break
+                if link:
+                    break
+            if link:
+                break
+        if link:
+            atom_html += utils.add_embed(link)
+    elif atom['type'] == 'iframely':
+        page_html = utils.get_url_html(atom['url'])
+        if page_html:
+            soup = BeautifulSoup(page_html, 'lxml')
+            el = soup.find('meta', attrs={"name": "canonical"})
+            if el:
+                return utils.add_embed(el['content'])
+    elif atom['type'] == 'core-commerce' and atom['id'] in products:
+        product = products[atom['id']]
+        if product['moduleStyle'] == 'large':
+            atom_html += '<div style="width:100%; margin:1em 0; padding:0 0 1em 0; border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#e5e7eb;">'
+            if product.get('image') and product['image'].get('url'):
+                atom_html += '<img src="' + product['image']['url'] + '" style="width:100%; border-radius:10px 10px 0 0;" />'
+            atom_html += '<h3 style="text-align:center; padding:0 1em;">' + product['productName'] + '</h3>'
+            if product.get('editorialText') or product.get('rating'):
+                atom_html += '<div style="display:flex; flex-wrap:wrap; margin:0 1em; gap:1em;">'
+                if product.get('editorialText'):
+                    atom_html += '<div style="flex:2; min-width:256px; margin:1em 0;">' + product['editorialText'] + '</div>'
+                if product.get('rating'):
+                    atom_html += '<div style="flex:1; min-width:180px; margin:1em 0;">' + utils.add_score_gauge(product['rating'], str(product['rating']), margin='0 auto') + '</div>'
+                atom_html += '</div>'
+            if product.get('pros') or product.get('cons'):
+                atom_html += '<div style="display:flex; flex-wrap:wrap; margin:0 1em; gap:1em;">'
+                if product.get('pros'):
+                    atom_html += '<div style="flex:1; min-width:256px; margin:1em 0;"><div><b>Pros</b></div><ul>' + ''.join(['<li>' + x + '</li>' for x in product['pros']]) + '</ul></div>'
+                if product.get('cons'):
+                    atom_html += '<div style="flex:1; min-width:256px; margin:1em 0;"><div><b>Cons</b></div><ul>' + ''.join(['<li>' + x + '</li>' for x in product['cons']]) + '</ul></div>'
+                atom_html += '</div>'
+            if product.get('productOffers'):
+                for offer in product['productOffers']:
+                    params = parse_qs(urlsplit(offer['affiliateUrl']).query)
+                    if params.get('gcReferrer'):
+                        link = params['gcReferrer'][0]
+                    else:
+                        link = offer['affiliateUrl']
+                    atom_html += utils.add_button(link, offer['ctaText'])
+            atom_html += '</div>'
+        elif product['moduleStyle'] == 'mini':
+            offer = product['productOffers'][0]
+            params = parse_qs(urlsplit(offer['affiliateUrl']).query)
+            if params.get('gcReferrer'):
+                link = params['gcReferrer'][0]
+            else:
+                link = offer['affiliateUrl']
+            atom_html += '<div style="display:grid; grid-template-areas:\'image content\'; grid-template-columns:120px auto; grid-gap:0.5em; width:100%; align-items:center; font-size:smaller;">'
+            atom_html += '<div style="grid-area:image; width:120px;";><img src="' + product['image']['url'] + '" style="width:100%;" /></div>'
+            atom_html += '<div style="grid-area:content;"><div style="display:flex; flex-wrap:wrap; width:100%; align-items:center;">'
+            atom_html += '<div style="flex:1; min-width:128px;"><p style="font-size:larger; font-weight:bold;"><a href="' + link + '" target="_blank" style="text-decoration:none;">' + product['productName'] + '</a></p><p>'
+            if offer.get('formattedSalePrice'):
+                atom_html += '<span style="font-weight:bold; color:red;">' + offer['formattedSalePrice'] + '</span>'
+                if offer.get('formattedOriginalPrice'):
+                    atom_html += ' <s>' + offer['formattedOriginalPrice'] + '</s>'
+                if offer.get('formattedSavedPrice'):
+                    atom_html += ' <span style="font-weight:bold;">Save ' + offer['formattedSavedPrice'] + '</span>'
+            else:
+                atom_html += '<span style="font-weight:bold;">' + offer['formattedOriginalPrice'] + '</span>'
+            atom_html += '</p></div>'
+            atom_html += '<div style="flex:1; min-width:128px;">' + utils.add_button(link, offer['ctaText']) + '</div>'
+            atom_html += '</div></div></div>'
+    elif atom['type'] == 'core-stock-ticker':
+        if atom['attribs'].get('comparisons'):
+            symbols = []
+            symbols.append(atom['attribs']['symbol'])
+            symbols += atom['attribs']['comparisons'].split(',')
+            atom_html += utils.add_stock_chart_compare(symbols)
+        else:
+            atom_html += utils.add_stock_chart(atom['attribs']['symbol'])
+    elif atom['type'] == 'core-liveblog':
+        for it in atom['items']:
+            for val in it['val']:
+                atom_html += format_atom(val, products)
+    elif atom['type'] == 'liveblogpost':
+        if atom.get('authors'):
+            byline = utils.format_byline([{"name": x['author']['displayName']} for x in atom['authors']])
+        else:
+            byline = ''
+        if atom.get('lastModifiedTime'):
+            dt = datetime.fromisoformat(atom['lastModifiedTime']['iso'])
+        elif atom.get('pubDate'):
+            dt = datetime.fromisoformat(atom['pubDate']['iso'])
+        atom_html += '<div style="display:flex; align-items:end; gap:1em;"><div style="width:24px;"><span style="color:light-dark(#ccc,#333); font-size:48px;">●</span></div><div style="line-height:1.5em;"><b>' + utils.format_display_date(dt) + '</b><br/>' + byline + '</div></div>'
+        atom_html += '<div style="margin-left:13px; border-left:2px solid light-dark(#ccc,#333); padding:1px 0 0 1em;"><h3>' + atom['headline'] + '</h3>'
+        for it in atom['items']:
+            for val in it['val']:
+                atom_html += format_atom(val, products)
+        atom_html += '</div>'
+    else:
+        logger.warning('unhandled atom type ' + atom['type'])
+    return atom_html
+
+
 def get_content(url, args, site_json, save_debug=False):
+    split_url = urlsplit(url)
+    paths = list(filter(None, split_url.path.split('/')))
+
+    if 'yahoo.com' in split_url.netloc:
+        site = split_url.netloc.split('.')[0]
+        if site == 'www':
+            site = paths[0]
+    elif split_url.netloc == 'sports.yahoo.com':
+        site = 'sports'
+    elif split_url.netloc == 'www.engadget.com':
+        site = 'engadget'
+    elif split_url.netloc == 'www.aol.com':
+        site = 'aolhomepage'
+    
+    data_api_url = split_url.scheme + '://' + split_url.netloc + '/caas/content/article/dataApi?dd_resource=CaaS-SeamlessArticle&appid=commerce_web&lang=en-US&partner=none&region=US&site=' + site + '&url=' + quote_plus(split_url.scheme + '://' + split_url.netloc + split_url.path)
+    data_api = utils.get_url_json(data_api_url, site_json=site_json)
+    if data_api:
+        if save_debug:
+            utils.write_file(data_api, './debug/debug.json')
+        try:
+            content_meta = data_api['items'][0]['data']['contentMeta']
+        except:
+            logger.warning('not contentMeta data in ' + data_api_url)
+            return None
+
+        item = {}
+        item['id'] = content_meta['contentI13n']['uuid']
+
+        if content_meta['seoMeta'].get('canonicalUrl'):
+            item['url'] = content_meta['seoMeta']['canonicalUrl']
+        elif content_meta['seoMeta'].get('seamlessUrl'):
+            item['url'] = content_meta['seoMeta']['seamlessUrl']
+        elif content_meta['seoMeta'].get('previewLink'):
+            item['url'] = content_meta['seoMeta']['previewLink']
+
+        item['title'] = content_meta['seoMeta']['title']
+
+        dt = datetime.fromisoformat(content_meta['dates']['publishDate']['iso'])
+        item['date_published'] = dt.isoformat()
+        item['_timestamp'] = dt.timestamp()
+        item['_display_date'] = utils.format_display_date(dt)
+        if content_meta['dates'].get('modifiedDate') and content_meta['dates']['modifiedDate'].get('iso'):
+            dt = datetime.fromisoformat(content_meta['dates']['modifiedDate']['iso'])
+            item['date_modified'] = dt.isoformat()
+
+        item['authors'] = []
+        if content_meta['attribution'].get('authors'):
+            item['authors'] += [{"name": x['name']} for x in content_meta['attribution']['authors']]
+            item['author'] = {
+                "name": utils.format_byline(item['authors'])
+            }
+
+        item['tags'] = []
+        if content_meta.get('categoryLabel'):
+            item['tags'].append(content_meta['categoryLabel'])
+        if content_meta.get('siteSections') and content_meta['siteSections'].get('sectionItems'):
+            item['tags'] += [x['sectionName'] for x in content_meta['siteSections']['sectionItems']]
+        if content_meta['contentTags'].get('normalizedTags') and content_meta['contentTags']['normalizedTags'].get('editorialTags'):
+            item['tags'] += content_meta['contentTags']['normalizedTags']['editorialTags'].copy()
+        if content_meta['contentTags'].get('stockTickers'):
+            item['tags'] += [x['symbol'] for x in content_meta['contentTags']['stockTickers']]
+        if content_meta['seoMeta'].get('keywords'):
+            item['tags'] += [x.strip() for x in content_meta['seoMeta']['keywords'].split(',')]
+        if len(item['tags']) > 0:
+            item['tags'] = utils.dedupe_case_insensitive(item['tags'])
+        else:
+            del item['tags']
+
+        if content_meta['contentSummaries'].get('summary'):
+            item['summary'] = content_meta['contentSummaries']['summary']
+
+        item['content_html'] = ''    
+        if content_meta['seoMeta'].get('subheadline'):
+            item['content_html'] += '<p><em>' + content_meta['seoMeta']['subheadline'] + '</em></p>'
+
+        if content_meta['contentImages'].get('shareImage') and content_meta['contentImages']['shareImage'].get('url'):
+            item['image'] = content_meta['contentImages']['shareImage']['url']
+
+        if content_meta.get('commerce') and content_meta['commerce'].get('products'):
+            products = content_meta['commerce']['products']
+        else:
+            products = {}
+
+        if content_meta['contentCover'].get('cover') and content_meta['contentCover']['cover'].get('type'):
+            if 'image' not in item:
+                if content_meta['contentCover']['cover']['type'] == 'image':
+                    item['image'] = content_meta['contentCover']['cover']['size']['resized']['url']
+                elif content_meta['contentCover']['cover']['type'] == 'yvideo':
+                    if content_meta['contentCover']['cover']['config']['thumbnail']['size']['raw']:
+                        item['image'] = content_meta['contentCover']['cover']['config']['thumbnail']['size']['raw']['url']
+                    else:
+                        item['image'] = content_meta['contentCover']['cover']['thumbnailUrl']
+            if content_meta['contentCover']['enableLead'] == 'ON' or (content_meta['contentCover']['enableLead'] == 'DEFAULT' and (content_meta['storyAtoms'][0]['type'] != 'image' or content_meta['storyAtoms'][0]['type'] != 'yvideo')):
+                item['content_html'] += format_atom(content_meta['contentCover']['cover'], products)
+
+        if content_meta['contentSummaries'].get('aiSummary'):
+            item['content_html'] += '<div style="width:100%; margin:1em 0; padding:0 1em; border:1px solid light-dark(#333,#ccc); border-radius:10px; background-color:#e5e7eb;"><p><b>AI Summary</b></p><ul>'
+            for it in content_meta['contentSummaries']['aiSummary']:
+                if it['type'] == 'text':
+                    item['content_html'] += '<li style="margin:0.5em 0;">' + it['value'] + '</li>'
+            item['content_html'] += '</ul></div>'
+
+        if content_meta['contentTags'].get('stockTickers'):
+            item['content_html'] += '<p><b>In this article:</b></p><ul>'
+            for it in content_meta['contentTags']['stockTickers']:
+                item['content_html'] += '<li style="margin:0.5em 0;">' + utils.get_stock_price(it['symbol'], '', True) + '</li>'
+            item['content_html'] += '</ul>'
+
+        # TODO: first paragraph dropcap?
+        for atom in content_meta['storyAtoms']:
+            item['content_html'] += format_atom(atom, products)
+
+        if content_meta['seoMeta'].get('providerContentUrl'):
+            if urlsplit(content_meta['seoMeta']['providerContentUrl']).netloc != split_url.netloc:
+                item['content_html'] += '<p><em>This article was originally published by <a href="' + content_meta['seoMeta']['providerContentUrl'] + '" target="_blank">' + content_meta['attribution']['providerBrand']['displayName'] + '</a>.</em</p>'
+        return item
+
     clean_url = utils.clean_url(url)
     for i in range(3):
         # Need to load the article page first to set appropriate cookies otherwise some embedded content is restricted
